@@ -3,8 +3,10 @@
 
 @font-face{font-family:uicons-regular-rounded;src:url(../fonts/uicons-regular-rounded.woff2) format("woff2");font-display:block}
 i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,span[class*=fi-rr-]:before{font-family:uicons-regular-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.fi-rr-angle-small-down:before{content:"\f153"}
 .fi-rr-angle-small-left:before{content:"\f154"}
 .fi-rr-angle-small-right:before{content:"\f155"}
+.fi-rr-angle-small-up:before{content:"\f156"}
 .fi-rr-apps:before{content:"\f16c"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-bell:before{content:"\f239"}
@@ -19,11 +21,13 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-heart:before{content:"\f7a0"}
 .fi-rr-home:before{content:"\f7b8"}
 .fi-rr-info:before{content:"\f80b"}
+.fi-rr-lock:before{content:"\f8d5"}
 .fi-rr-marker:before{content:"\f8fd"}
 .fi-rr-menu-burger:before{content:"\f925"}
 .fi-rr-moon:before{content:"\f972"}
 .fi-rr-route:before{content:"\fb6f"}
 .fi-rr-search:before{content:"\fbba"}
+.fi-rr-settings-sliders:before{content:"\fbd1"}
 .fi-rr-shield-check:before{content:"\fbdb"}
 .fi-rr-signal-alt-2:before{content:"\fc11"}
 .fi-rr-star:before{content:"\fce9"}

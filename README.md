@@ -8,18 +8,19 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 | Seite | Inhalt |
 |---|---|
-| **Start** | Hero mit Suche, Play / Gruppe / Discord, Live-Kennzahlen, Abfahrten, Trainings, Strecken, News |
+| **Start** | Begrüßung mit Suche, Play / Gruppe / Discord als Bildkarten, Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, News |
 | **Abfahrten** | Live-Abfahrtstafel mit Abfahrten/Ankünften, Bahnhofssuche, Filtern nach Zuggattung, Lokführer und Verspätungen |
 | **Server** | Serverliste mit Auslastung, Ping, Laufzeit und Beitreten-Button |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, Top-Strecken |
 | **Spieler** | Podium, Bestenliste (Kilometer / Fahrten / Pünktlichkeit), Spieler der Woche, Ränge |
-| **Trainings** | Kommende Trainings mit Countdown, Tagesleiste, Filter, Anmeldung |
+| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten, alle kommenden Termine, Anmeldung |
 
 ## Design
 
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
 - Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
-- Eigenes Design im Stil moderner Bahn-Apps: dunkler Hero, helle „Sheet“-Fläche, Rot als Akzentfarbe
+- App-Design im Stil moderner Mobile-Apps: dunkler Kopfbereich, weiße Fläche mit runden Ecken, Bildkarten, Tab-Leiste unten
+- Farben angelehnt an die DB-Farbwelt (Rot `#EC0016`, Cool-Gray-Töne)
 - Responsiv für Handy, Tablet und Desktop: auf dem Handy mit Tab-Leiste unten und Menü-Sheet
 - Hell- und Dunkelmodus (folgt dem System, umschaltbar oben rechts)
 - Alle Illustrationen sind eigene SVGs in `assets/img`. Sie können jederzeit durch Screenshots aus dem Spiel ersetzt werden (gleicher Dateiname, z. B. als `.png`, dann den Pfad anpassen).
@@ -36,7 +37,9 @@ links: {
 },
 ```
 
-Dort stehen auch Linien und Fahrpläne (daraus werden die Live-Abfahrten berechnet), Server, Spieler, Trainings, Strecken und News. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
+Dort stehen auch Linien und Fahrpläne (daraus werden die Live-Abfahrten berechnet), Server, Spieler, Trainings, Strecken und News.
+
+**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Conductor → Signaller → Dispatcher → Instructor). Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
 ## Icons hinzufügen
 

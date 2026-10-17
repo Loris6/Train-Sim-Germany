@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Train Sim Germany – Das Bahnerlebnis auf Roblox</title>
   <meta name="description" content="Train Sim Germany: Fahre ICE, RE und S-Bahn durch Deutschland auf Roblox. Live-Abfahrten, Server, Statistiken, Spieler und kommende Trainings.">
-  <meta name="theme-color" content="#0B0D12">
+  <meta name="theme-color" content="#131821">
   <meta property="og:title" content="Train Sim Germany">
   <meta property="og:description" content="Das Bahnerlebnis auf Roblox – Live-Abfahrten, Server, Statistiken und Trainings.">
   <meta property="og:type" content="website">
@@ -19,33 +19,33 @@
     try { var t = localStorage.getItem('tsg-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
   </script>
 </head>
-<body>
+<body data-page="home">
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-  <!-- Kopfzeile -->
+  <!-- Kopfzeile: Handy = nur auf der Startseite, Desktop = immer -->
   <header class="topbar" data-topbar>
     <div class="container topbar__inner">
       <a class="brand" href="#/" aria-label="Train Sim Germany – Startseite">
-        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="40" height="40">
+        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="34" height="34">
         <span class="brand__name">Train Sim <b>Germany</b></span>
       </a>
       <nav class="mainnav" aria-label="Hauptnavigation">
         <a href="#/" data-nav="home">Start</a>
         <a href="#/abfahrten" data-nav="abfahrten">Abfahrten</a>
+        <a href="#/trainings" data-nav="trainings">Trainings</a>
         <a href="#/server" data-nav="server">Server</a>
         <a href="#/statistiken" data-nav="statistiken">Statistiken</a>
         <a href="#/spieler" data-nav="spieler">Spieler</a>
-        <a href="#/trainings" data-nav="trainings">Trainings</a>
       </nav>
       <div class="topbar__actions">
-        <button class="icon-btn" type="button" data-theme-toggle aria-label="Farbschema wechseln">
+        <button class="round-btn hide-mobile" type="button" data-theme-toggle aria-label="Farbschema wechseln">
           <i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i>
           <i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i>
         </button>
-        <a class="icon-btn hide-sm" data-link="discord" href="#" target="_blank" rel="noopener" aria-label="Discord beitreten"><i class="fi fi-brands-discord ic" aria-hidden="true"></i></a>
-        <a class="icon-btn hide-sm" data-link="group" href="#" target="_blank" rel="noopener" aria-label="Roblox-Gruppe beitreten"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i></a>
-        <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i><span>Spielen</span></a>
-        <button class="icon-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
+        <a class="round-btn hide-mobile" data-link="discord" href="#" target="_blank" rel="noopener" aria-label="Discord beitreten"><i class="fi fi-brands-discord ic" aria-hidden="true"></i></a>
+        <a class="round-btn hide-mobile" data-link="group" href="#" target="_blank" rel="noopener" aria-label="Roblox-Gruppe beitreten"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i></a>
+        <a class="btn btn--primary btn--sm hide-mobile" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
+        <a class="me-btn" href="#/spieler" aria-label="Mein Profil" data-me-avatar></a>
       </div>
     </div>
   </header>
@@ -59,32 +59,24 @@
         <div class="hero__shade"></div>
         <div class="container hero__inner">
           <div class="hero__content">
-            <span class="pill pill--glass"><span class="live-dot"></span><b data-bind="online">1.284</b>&nbsp;Spieler gerade online</span>
-            <h1 class="hero__title">Moin, Lokführer!<span>Wohin geht die Fahrt heute?</span></h1>
-            <p class="hero__lead">Fahre ICE, RE und S-Bahn durch ganz Deutschland, stell Weichen im Stellwerk und werde Teil der Crew – das Bahnerlebnis auf Roblox.</p>
-
-            <form class="search search--glass" role="search" data-search autocomplete="off">
+            <p class="hero__loc"><span class="live-dot"></span><span><b data-bind="online">1.284</b> Spieler online · <span data-bind="servers">42</span> Server</span></p>
+            <h1 class="hero__greet">Moin, <span data-me-name>Jonas</span>! Wohin geht deine nächste Fahrt?</h1>
+            <form class="search" role="search" data-search autocomplete="off">
               <i class="fi fi-rr-search ic search__icon" aria-hidden="true"></i>
               <label class="search__field">
                 <span class="sr-only">Bahnhof, Linie oder Spieler suchen</span>
-                <input type="search" name="q" placeholder="Bahnhof, Linie oder Spieler" data-search-input>
+                <input type="search" name="q" placeholder="Bahnhof oder Linie suchen" data-search-input>
                 <span class="search__hint">Live-Abfahrten · Server · Spieler</span>
               </label>
-              <button class="search__btn" type="submit" aria-label="Suchen"><i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></button>
+              <button class="sr-only" type="submit">Suchen</button>
               <ul class="search__results" role="listbox" data-search-results hidden></ul>
             </form>
-
-            <div class="hero__actions">
-              <a class="btn btn--primary btn--lg" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Jetzt spielen</a>
-              <a class="btn btn--glass btn--lg" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
-              <a class="btn btn--glass btn--lg" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</a>
-            </div>
           </div>
 
-          <aside class="hero-board glass" aria-label="Nächste Abfahrten">
+          <aside class="hero-board" aria-label="Nächste Abfahrten">
             <div class="hero-board__head">
               <div>
-                <span class="eyebrow eyebrow--light">Nächste Abfahrten</span>
+                <span class="hero-board__label">Nächste Abfahrten</span>
                 <strong data-hero-station>Hamburg Hbf</strong>
               </div>
               <time class="hero-board__clock" data-clock>--:--</time>
@@ -98,122 +90,99 @@
       <div class="sheet">
         <div class="container">
 
-          <!-- Steig ein: Play / Gruppe / Discord -->
-          <section class="section" aria-labelledby="h-join">
-            <div class="section__head">
-              <div>
-                <span class="eyebrow">Steig ein</span>
-                <h2 id="h-join">Dein Platz im Führerstand wartet</h2>
-              </div>
+          <!-- Play / Gruppe / Discord -->
+          <section class="sec" aria-labelledby="h-join">
+            <div class="sec-head">
+              <h2 id="h-join">Jetzt einsteigen</h2>
             </div>
-            <div class="join-grid">
-              <a class="join-card join-card--play" data-link="play" href="#" target="_blank" rel="noopener">
-                <img src="assets/img/play.svg" alt="Blick aus dem Führerstand auf die Strecke mit grünem Signal" loading="lazy">
-                <div class="join-card__body">
-                  <span class="chip chip--glass"><i class="fi fi-rr-gamepad ic" aria-hidden="true"></i>Kostenlos auf Roblox</span>
-                  <h3>Jetzt spielen</h3>
-                  <p>Auf PC, Handy, Tablet und Konsole. Übernimm deinen ersten Zug in wenigen Sekunden.</p>
-                  <span class="btn btn--primary"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spiel starten</span>
+            <div class="rail rail--lg">
+              <a class="lcard" data-link="play" href="#" target="_blank" rel="noopener">
+                <div class="lcard__media">
+                  <img src="assets/img/play.svg" alt="Blick aus dem Führerstand auf die Strecke mit grünem Signal" loading="lazy">
+                  <span class="lcard__badge"><i class="fi fi-rr-gamepad ic" aria-hidden="true"></i></span>
+                  <span class="lcard__chip">Kostenlos auf Roblox</span>
+                </div>
+                <div class="lcard__body">
+                  <div class="lcard__row"><h3>Train Sim Germany</h3><span class="rating"><i class="fi fi-sr-star ic" aria-hidden="true"></i>4,8 <small>(<span data-bind="favorites">284K</span>)</small></span></div>
+                  <p class="lcard__meta">PC · Handy · Tablet · Konsole</p>
+                  <div class="lcard__foot"><span><b data-bind="online">1.284</b> online</span><span class="btn btn--primary btn--xs"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</span></div>
                 </div>
               </a>
-              <a class="join-card join-card--group" data-link="group" href="#" target="_blank" rel="noopener">
-                <img src="assets/img/group.svg" alt="Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug" loading="lazy">
-                <div class="join-card__body">
-                  <span class="chip chip--glass"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i><span data-bind="groupMembers">48,2K</span>&nbsp;Mitglieder</span>
-                  <h3>Gruppe beitreten</h3>
-                  <p>Ränge freischalten, an Trainings teilnehmen und Teil der Crew werden.</p>
-                  <span class="btn btn--light"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Beitreten</span>
+              <a class="lcard" data-link="group" href="#" target="_blank" rel="noopener">
+                <div class="lcard__media">
+                  <img src="assets/img/group.svg" alt="Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug" loading="lazy">
+                  <span class="lcard__badge"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i></span>
+                  <span class="lcard__chip"><span data-bind="groupMembers">48,2K</span>&nbsp;Mitglieder</span>
+                </div>
+                <div class="lcard__body">
+                  <div class="lcard__row"><h3>Roblox-Gruppe</h3><span class="rating"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i>Offiziell</span></div>
+                  <p class="lcard__meta">Ränge, Trainings und Events freischalten</p>
+                  <div class="lcard__foot"><span><b>Kostenlos</b></span><span class="btn btn--dark btn--xs"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Beitreten</span></div>
                 </div>
               </a>
-              <a class="join-card join-card--discord" data-link="discord" href="#" target="_blank" rel="noopener">
-                <img src="assets/img/discord.svg" alt="Chatnachrichten über einer nächtlichen Stadt mit vorbeifahrendem Zug" loading="lazy">
-                <div class="join-card__body">
-                  <span class="chip chip--glass"><span class="live-dot live-dot--sm"></span><span data-bind="discordOnline">3,1K</span>&nbsp;online</span>
-                  <h3>Discord beitreten</h3>
-                  <p>Fahrpläne, Events, Support und Bewerbungen – alles an einem Ort.</p>
-                  <span class="btn btn--discord"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Zum Discord</span>
+              <a class="lcard" data-link="discord" href="#" target="_blank" rel="noopener">
+                <div class="lcard__media">
+                  <img src="assets/img/discord.svg" alt="Chatnachrichten über einer nächtlichen Stadt mit vorbeifahrendem Zug" loading="lazy">
+                  <span class="lcard__badge"><i class="fi fi-brands-discord ic" aria-hidden="true"></i></span>
+                  <span class="lcard__chip"><span class="live-dot live-dot--sm"></span><span data-bind="discordOnline">3,1K</span>&nbsp;online</span>
+                </div>
+                <div class="lcard__body">
+                  <div class="lcard__row"><h3>Discord-Community</h3><span class="rating"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i><span data-bind="discordMembers">21,7K</span></span></div>
+                  <p class="lcard__meta">Fahrpläne, Support und Bewerbungen</p>
+                  <div class="lcard__foot"><span><b>Kostenlos</b></span><span class="btn btn--discord btn--xs"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Beitreten</span></div>
                 </div>
               </a>
             </div>
           </section>
 
-          <!-- Kennzahlen -->
-          <section class="section" aria-labelledby="h-kpi">
-            <div class="section__head">
-              <div>
-                <span class="eyebrow">Live</span>
-                <h2 id="h-kpi">Das Netz in Zahlen</h2>
+          <!-- Abfahrten -->
+          <section class="sec" aria-labelledby="h-dep">
+            <div class="sec-head">
+              <h2 id="h-dep">Live-Abfahrten</h2>
+              <a class="link-more" href="#/abfahrten">Alle <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
+            </div>
+            <div class="chips chips--scroll" data-station-chips="home" role="tablist" aria-label="Bahnhof wählen"></div>
+            <div class="card card--list">
+              <ul class="board board--compact" data-board="home"></ul>
+            </div>
+          </section>
+
+          <!-- Nächstes Training -->
+          <section class="sec" aria-labelledby="h-next">
+            <div class="sec-head">
+              <h2 id="h-next">Dein nächstes Training</h2>
+              <a class="link-more" href="#/trainings">Alle <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
+            </div>
+            <div data-next-step="home"></div>
+          </section>
+
+          <!-- Strecken -->
+          <section class="sec" aria-labelledby="h-routes">
+            <div class="sec-head">
+              <h2 id="h-routes">Strecken entdecken</h2>
+              <div class="rail-ctrl">
+                <button class="round-btn round-btn--soft" type="button" data-rail-prev="routes" aria-label="Zurück"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
+                <button class="round-btn round-btn--soft" type="button" data-rail-next="routes" aria-label="Weiter"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
               </div>
-              <a class="link-more" href="#/statistiken">Alle Statistiken <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
+            </div>
+            <div class="rail rail--sm" data-rail="routes" data-routes></div>
+          </section>
+
+          <!-- Kennzahlen -->
+          <section class="sec" aria-labelledby="h-kpi">
+            <div class="sec-head">
+              <h2 id="h-kpi">Das Netz live</h2>
+              <a class="link-more" href="#/statistiken">Statistiken <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
             </div>
             <div class="kpi-grid" data-kpis="home"></div>
           </section>
 
-          <!-- Abfahrten + Trainings -->
-          <section class="section split" aria-label="Abfahrten und Trainings">
-            <div class="card">
-              <div class="card__head">
-                <div>
-                  <h2 class="card__title">Live-Abfahrten</h2>
-                  <p class="card__sub"><span class="live-dot live-dot--sm"></span>Echtzeit aus allen Servern</p>
-                </div>
-                <a class="link-more" href="#/abfahrten">Alle <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
-              </div>
-              <div class="chips chips--scroll" data-station-chips="home" role="tablist" aria-label="Bahnhof wählen"></div>
-              <ul class="board board--compact" data-board="home"></ul>
-            </div>
-            <div class="card">
-              <div class="card__head">
-                <div>
-                  <h2 class="card__title">Kommende Trainings</h2>
-                  <p class="card__sub">Offizielle Ausbildungen der Crew</p>
-                </div>
-                <a class="link-more" href="#/trainings">Alle <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
-              </div>
-              <ul class="training-mini" data-trainings="home"></ul>
-            </div>
-          </section>
-
-          <!-- Strecken -->
-          <section class="section" aria-labelledby="h-routes">
-            <div class="section__head">
-              <div>
-                <span class="eyebrow">Entdecken</span>
-                <h2 id="h-routes">Beliebte Strecken</h2>
-              </div>
-              <div class="carousel-ctrl">
-                <button class="icon-btn icon-btn--soft" type="button" data-carousel-prev="routes" aria-label="Zurück"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
-                <button class="icon-btn icon-btn--soft" type="button" data-carousel-next="routes" aria-label="Weiter"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
-              </div>
-            </div>
-            <div class="carousel" data-carousel="routes" data-routes></div>
-          </section>
-
-          <!-- Promo -->
-          <section class="section">
-            <div class="promo">
-              <img class="promo__bg" src="assets/img/training.svg" alt="" aria-hidden="true" loading="lazy">
-              <div class="promo__content">
-                <span class="chip chip--red">Bewerbungen offen</span>
-                <h2>Werde Fahrdienstleiter im Stellwerk</h2>
-                <p>Stell Fahrstraßen, regel den Verkehr und halte das Netz am Laufen. Die nächsten Trainings starten diese Woche.</p>
-                <div class="btn-row">
-                  <a class="btn btn--primary" href="#/trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i>Zu den Trainings</a>
-                  <a class="btn btn--glass" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</a>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <!-- News -->
-          <section class="section" aria-labelledby="h-news">
-            <div class="section__head">
-              <div>
-                <span class="eyebrow">Neuigkeiten</span>
-                <h2 id="h-news">Updates &amp; Events</h2>
-              </div>
+          <section class="sec" aria-labelledby="h-news">
+            <div class="sec-head">
+              <h2 id="h-news">Neuigkeiten</h2>
             </div>
-            <div class="news-grid" data-news></div>
+            <div class="news-list" data-news></div>
           </section>
         </div>
       </div>
@@ -221,30 +190,28 @@
 
     <!-- ===================== ABFAHRTEN ===================== -->
     <section class="page" data-page="abfahrten" aria-label="Abfahrten" hidden>
-      <div class="hero hero--page">
-        <img class="hero__bg" src="assets/img/route-city.svg" alt="" aria-hidden="true">
-        <div class="hero__shade"></div>
-        <div class="container hero__inner hero__inner--page">
-          <div class="hero__content">
-            <span class="pill pill--glass"><span class="live-dot"></span>Live · aktualisiert <span data-updated>gerade eben</span></span>
-            <h1 class="page-title">Abfahrtstafel</h1>
-            <p class="hero__lead">Echtzeit-Abfahrten aus allen Servern – wer fährt, wohin und mit wie viel Verspätung.</p>
-            <form class="search search--glass search--station" data-station-search autocomplete="off">
-              <i class="fi fi-rr-marker ic search__icon" aria-hidden="true"></i>
-              <label class="search__field">
-                <span class="sr-only">Bahnhof suchen</span>
-                <input type="search" placeholder="Bahnhof suchen, z. B. Köln Hbf" data-station-input>
-                <span class="search__hint" data-station-current>Hamburg Hbf</span>
-              </label>
-              <button class="search__btn" type="submit" aria-label="Bahnhof anzeigen"><i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></button>
-              <ul class="search__results" role="listbox" data-station-results hidden></ul>
-            </form>
+      <div class="page-head">
+        <div class="container">
+          <div class="appbar">
+            <div class="appbar__title">
+              <span class="appbar__label" data-board-label>Abfahrten ab</span>
+              <h1 class="appbar__value"><button type="button" data-open="station"><span data-board-station>Hamburg Hbf</span><i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button></h1>
+            </div>
+            <div class="appbar__actions">
+              <time class="clock-chip" data-clock-full>--:--:--</time>
+              <button class="round-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
+            </div>
           </div>
-          <div class="hero-clock glass" aria-live="off">
-            <span class="eyebrow eyebrow--light">Spielzeit · MEZ</span>
-            <time data-clock-full>--:--:--</time>
-            <span data-date>&nbsp;</span>
-          </div>
+          <form class="field" data-station-search autocomplete="off">
+            <i class="fi fi-rr-marker ic" aria-hidden="true"></i>
+            <label class="field__input">
+              <span class="sr-only">Bahnhof suchen</span>
+              <input type="search" placeholder="Bahnhof suchen" data-station-input>
+            </label>
+            <span class="field__meta"><span class="live-dot live-dot--sm"></span><span data-updated>gerade eben</span></span>
+            <button class="sr-only" type="submit">Bahnhof anzeigen</button>
+            <ul class="search__results" role="listbox" data-station-results hidden></ul>
+          </form>
         </div>
       </div>
       <div class="sheet">
@@ -261,17 +228,9 @@
               <button class="chip" type="button" data-cat="s">S-Bahn</button>
             </div>
           </div>
-          <div class="chips chips--scroll chips--stations" data-station-chips="full" role="tablist" aria-label="Bahnhof wählen"></div>
 
           <div class="layout-aside">
             <div class="card card--flush">
-              <div class="board-title">
-                <div>
-                  <span class="eyebrow" data-board-label>Abfahrten</span>
-                  <h2 data-board-station>Hamburg Hbf</h2>
-                </div>
-                <span class="pill pill--soft"><span class="live-dot live-dot--sm"></span>Live</span>
-              </div>
               <div class="board-cols" aria-hidden="true">
                 <span>Zeit</span><span>Zug</span><span data-col-dest>Nach</span><span>Gleis</span><span>Status</span><span>Lokführer</span>
               </div>
@@ -281,7 +240,6 @@
               <div class="card station-card">
                 <img src="assets/img/route-city.svg" alt="" aria-hidden="true" loading="lazy" data-station-img>
                 <div class="station-card__body">
-                  <span class="eyebrow">Bahnhof</span>
                   <h3 data-station-name>Hamburg Hbf</h3>
                   <p class="muted" data-station-region>Nordnetz</p>
                   <dl class="mini-stats">
@@ -292,11 +250,11 @@
                 </div>
               </div>
               <div class="card">
-                <div class="card__head"><h3 class="card__title">Hinweise</h3></div>
+                <h3 class="card__title">Hinweise</h3>
                 <ul class="notice-list" data-notices></ul>
               </div>
               <div class="card">
-                <div class="card__head"><h3 class="card__title">Legende</h3></div>
+                <h3 class="card__title">Legende</h3>
                 <ul class="legend-list">
                   <li><span class="line line--ice">ICE</span>Intercity-Express</li>
                   <li><span class="line line--ic">IC</span>Intercity</li>
@@ -311,49 +269,113 @@
       </div>
     </section>
 
-    <!-- ===================== SERVER ===================== -->
-    <section class="page" data-page="server" aria-label="Server" hidden>
-      <div class="hero hero--page">
-        <img class="hero__bg" src="assets/img/route-rhine.svg" alt="" aria-hidden="true">
-        <div class="hero__shade"></div>
-        <div class="container hero__inner hero__inner--page">
-          <div class="hero__content">
-            <span class="pill pill--glass"><span class="live-dot"></span><b data-bind="servers">42</b>&nbsp;Server online</span>
-            <h1 class="page-title">Server</h1>
-            <p class="hero__lead">Finde einen Server mit freien Plätzen und spring direkt in den Führerstand.</p>
+    <!-- ===================== TRAININGS ===================== -->
+    <section class="page" data-page="trainings" aria-label="Trainings" hidden>
+      <div class="page-head">
+        <div class="container">
+          <div class="appbar">
+            <div class="appbar__title">
+              <span class="appbar__label">Dein Rang</span>
+              <h1 class="appbar__value"><button type="button" data-open="rank"><span class="rank-dot" data-rank-dot></span><span data-rank-name>Conductor</span><i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button></h1>
+            </div>
+            <div class="appbar__actions">
+              <button class="round-btn" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-rr-bell ic" aria-hidden="true"></i></button>
+              <button class="round-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
+            </div>
           </div>
-          <div class="hero-stats glass">
-            <div><span>Spieler</span><strong data-bind="online">1.284</strong></div>
-            <div><span>Ø Ping</span><strong>46 ms</strong></div>
-            <div><span>Freie Plätze</span><strong data-bind="freeSlots">186</strong></div>
+          <div class="field field--button">
+            <button class="field__btn" type="button" data-open="date">
+              <i class="fi fi-rr-calendar ic" aria-hidden="true"></i>
+              <span data-date-field>Trainingsdatum wählen</span>
+            </button>
+            <button class="field__icon" type="button" data-open="filter" aria-label="Trainings filtern"><i class="fi fi-rr-settings-sliders ic" aria-hidden="true"></i><span class="field__badge" data-filter-badge hidden></span></button>
           </div>
         </div>
       </div>
       <div class="sheet">
         <div class="container">
-          <div class="toolbar">
-            <label class="input input--search">
-              <i class="fi fi-rr-search ic" aria-hidden="true"></i>
-              <span class="sr-only">Server suchen</span>
-              <input type="search" placeholder="Server oder Strecke suchen" data-server-search>
-            </label>
-            <div class="chips chips--scroll" data-server-filter role="group" aria-label="Server filtern">
-              <button class="chip is-active" type="button" data-type="all">Alle</button>
-              <button class="chip" type="button" data-type="public">Öffentlich</button>
-              <button class="chip" type="button" data-type="free">Freie Plätze</button>
-              <button class="chip" type="button" data-type="event">Event</button>
-              <button class="chip" type="button" data-type="training">Training</button>
-              <button class="chip" type="button" data-type="vip">VIP</button>
+          <div class="layout-aside">
+            <div class="train-main">
+              <div data-next-step="full"></div>
+
+              <div class="day-tabs-wrap">
+                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
+                <div class="day-tabs" data-day-tabs role="tablist" aria-label="Tag wählen"></div>
+                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
+              </div>
+
+              <div class="rail rail--xs" data-day-trainings></div>
+
+              <div class="sec-head sec-head--tight">
+                <h2>Alle kommenden Trainings</h2>
+                <button class="link-more" type="button" data-all-toggle>Alle anzeigen <i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button>
+              </div>
+              <ul class="tlist" data-all-trainings></ul>
             </div>
+
+            <aside class="stack">
+              <div class="card">
+                <h3 class="card__title">So läuft ein Training ab</h3>
+                <ol class="steps">
+                  <li><b>Gruppe beitreten</b><span>Ränge werden über die Roblox-Gruppe vergeben.</span></li>
+                  <li><b>Platz sichern</b><span>Anmelden und 10 Min. vorher auf dem Server sein.</span></li>
+                  <li><b>Theorie &amp; Praxis</b><span>Signale, Fahrplan, Funk – danach eine Prüfung.</span></li>
+                  <li><b>Rang erhalten</b><span>Bestanden? Dein neuer Rang kommt automatisch.</span></li>
+                </ol>
+                <div class="btn-stack">
+                  <a class="btn btn--primary btn--block" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
+                  <a class="btn btn--discord btn--block" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord beitreten</a>
+                </div>
+              </div>
+              <div class="card">
+                <h3 class="card__title">Ränge</h3>
+                <ul class="rank-ladder" data-rank-ladder></ul>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SERVER ===================== -->
+    <section class="page" data-page="server" aria-label="Server" hidden>
+      <div class="page-head">
+        <div class="container">
+          <div class="appbar">
+            <div class="appbar__title">
+              <span class="appbar__label"><span data-bind="servers">42</span> Server online</span>
+              <h1 class="appbar__value">Server</h1>
+            </div>
+            <div class="appbar__actions">
+              <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
+              <button class="round-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
+            </div>
+          </div>
+          <label class="field">
+            <i class="fi fi-rr-search ic" aria-hidden="true"></i>
+            <span class="field__input"><span class="sr-only">Server suchen</span><input type="search" placeholder="Server oder Strecke suchen" data-server-search></span>
+          </label>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container">
+          <div class="stat-row" data-server-stats></div>
+          <div class="chips chips--scroll chips--block" data-server-filter role="group" aria-label="Server filtern">
+            <button class="chip is-active" type="button" data-type="all">Alle</button>
+            <button class="chip" type="button" data-type="public">Öffentlich</button>
+            <button class="chip" type="button" data-type="free">Freie Plätze</button>
+            <button class="chip" type="button" data-type="event">Event</button>
+            <button class="chip" type="button" data-type="training">Training</button>
+            <button class="chip" type="button" data-type="vip">VIP</button>
           </div>
           <div class="server-grid" data-servers></div>
           <div class="info-banner">
-            <i class="fi fi-rr-shield-check ic" aria-hidden="true"></i>
+            <span class="info-banner__ic"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i></span>
             <div>
               <strong>Eigener VIP-Server</strong>
               <p>Fahr mit Freunden auf deinem privaten Server – mit eigenem Fahrplan und Stellwerk.</p>
             </div>
-            <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen</a>
+            <a class="btn btn--dark btn--sm" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen</a>
           </div>
         </div>
       </div>
@@ -361,19 +383,21 @@
 
     <!-- ===================== STATISTIKEN ===================== -->
     <section class="page" data-page="statistiken" aria-label="Statistiken" hidden>
-      <div class="hero hero--page">
-        <img class="hero__bg" src="assets/img/route-alps.svg" alt="" aria-hidden="true">
-        <div class="hero__shade"></div>
-        <div class="container hero__inner hero__inner--page">
-          <div class="hero__content">
-            <span class="pill pill--glass"><i class="fi fi-rr-chart-line-up ic" aria-hidden="true"></i>Statistiken</span>
-            <h1 class="page-title">Das Spiel in Zahlen</h1>
-            <p class="hero__lead">Besuche, Fahrten, Kilometer und Pünktlichkeit – live aus dem gesamten Netz.</p>
+      <div class="page-head">
+        <div class="container">
+          <div class="appbar">
+            <div class="appbar__title">
+              <span class="appbar__label">Live aus dem Netz</span>
+              <h1 class="appbar__value">Statistiken</h1>
+            </div>
+            <div class="appbar__actions">
+              <button class="round-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
+            </div>
           </div>
-          <div class="hero-figure glass">
-            <span class="eyebrow eyebrow--light">Besuche gesamt</span>
+          <div class="head-figure">
+            <span>Besuche gesamt</span>
             <strong data-bind="visits">12,4 Mio.</strong>
-            <span class="delta delta--up">+3,8 % diese Woche</span>
+            <span class="delta delta--up">▲ 3,8 % diese Woche</span>
           </div>
         </div>
       </div>
@@ -385,7 +409,7 @@
             <div class="card__head">
               <div>
                 <h2 class="card__title">Spieler online</h2>
-                <p class="card__sub">Letzte 24 Stunden, stündlich</p>
+                <p class="card__sub" data-chart-sub>Letzte 24 Stunden, stündlich</p>
               </div>
               <div class="segmented segmented--sm" role="tablist" aria-label="Zeitraum">
                 <button type="button" role="tab" aria-selected="true" data-range="24">24 Std.</button>
@@ -410,7 +434,7 @@
               <div class="card__head">
                 <div>
                   <h2 class="card__title">Pünktlichkeit nach Netz</h2>
-                  <p class="card__sub">Anteil der Züge mit weniger als 6 Min. Verspätung</p>
+                  <p class="card__sub">Züge mit weniger als 6 Min. Verspätung</p>
                 </div>
               </div>
               <ul class="meters" data-meters></ul>
@@ -432,20 +456,21 @@
 
     <!-- ===================== SPIELER ===================== -->
     <section class="page" data-page="spieler" aria-label="Spieler" hidden>
-      <div class="hero hero--page hero--bright">
-        <img class="hero__bg" src="assets/img/group.svg" alt="" aria-hidden="true">
-        <div class="hero__shade"></div>
-        <div class="container hero__inner hero__inner--page">
-          <div class="hero__content">
-            <span class="pill pill--glass"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i><b data-bind="groupMembers">48,2K</b>&nbsp;Crew-Mitglieder</span>
-            <h1 class="page-title">Spieler &amp; Bestenliste</h1>
-            <p class="hero__lead">Die fleißigsten Lokführer, Fahrdienstleiter und Zugbegleiter von Train Sim Germany.</p>
-            <label class="search search--glass search--compact">
-              <i class="fi fi-rr-search ic search__icon" aria-hidden="true"></i>
-              <span class="sr-only">Spieler suchen</span>
-              <input type="search" placeholder="Spielername suchen" data-player-search>
-            </label>
+      <div class="page-head">
+        <div class="container">
+          <div class="appbar">
+            <div class="appbar__title">
+              <span class="appbar__label"><span data-bind="groupMembers">48,2K</span> Crew-Mitglieder</span>
+              <h1 class="appbar__value">Spieler</h1>
+            </div>
+            <div class="appbar__actions">
+              <button class="round-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
+            </div>
           </div>
+          <label class="field">
+            <i class="fi fi-rr-search ic" aria-hidden="true"></i>
+            <span class="field__input"><span class="sr-only">Spieler suchen</span><input type="search" placeholder="Spielername suchen" data-player-search></span>
+          </label>
         </div>
       </div>
       <div class="sheet">
@@ -454,10 +479,7 @@
           <div class="layout-aside layout-aside--wide">
             <div class="card card--flush">
               <div class="board-title">
-                <div>
-                  <span class="eyebrow">Bestenliste</span>
-                  <h2>Diese Saison</h2>
-                </div>
+                <h2 class="card__title">Bestenliste · Diese Saison</h2>
                 <div class="segmented segmented--sm" role="tablist" aria-label="Sortierung">
                   <button type="button" role="tab" aria-selected="true" data-sort="km">Kilometer</button>
                   <button type="button" role="tab" aria-selected="false" data-sort="trips">Fahrten</button>
@@ -468,62 +490,6 @@
             </div>
             <aside class="stack">
               <div class="card profile-card" data-profile></div>
-              <div class="card">
-                <div class="card__head"><h3 class="card__title">Ränge</h3></div>
-                <ul class="rank-ladder" data-ranks></ul>
-              </div>
-            </aside>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ===================== TRAININGS ===================== -->
-    <section class="page" data-page="trainings" aria-label="Trainings" hidden>
-      <div class="hero hero--page">
-        <img class="hero__bg" src="assets/img/training.svg" alt="" aria-hidden="true">
-        <div class="hero__shade"></div>
-        <div class="container hero__inner hero__inner--page">
-          <div class="hero__content">
-            <span class="pill pill--glass"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i>Ausbildung</span>
-            <h1 class="page-title">Kommende Trainings</h1>
-            <p class="hero__lead">Werde Lokführer, Fahrdienstleiter oder Zugbegleiter – mit offiziellen Trainings der Crew.</p>
-          </div>
-          <div class="hero-countdown glass">
-            <span class="eyebrow eyebrow--light">Nächstes Training</span>
-            <strong data-next-training-title>–</strong>
-            <div class="countdown" data-countdown>
-              <div><b>00</b><span>Std.</span></div>
-              <div><b>00</b><span>Min.</span></div>
-              <div><b>00</b><span>Sek.</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="sheet">
-        <div class="container">
-          <div class="day-strip" data-day-strip role="tablist" aria-label="Tag wählen"></div>
-          <div class="chips chips--scroll" data-training-filter role="group" aria-label="Trainingsart filtern"></div>
-          <div class="layout-aside">
-            <ul class="training-list" data-trainings="full"></ul>
-            <aside class="stack">
-              <div class="card">
-                <div class="card__head"><h3 class="card__title">So läuft ein Training ab</h3></div>
-                <ol class="steps">
-                  <li><b>Gruppe beitreten</b><span>Du brauchst die Roblox-Gruppe, um Ränge zu erhalten.</span></li>
-                  <li><b>Platz sichern</b><span>Melde dich hier an und erscheine 10 Min. vorher auf dem Server.</span></li>
-                  <li><b>Theorie &amp; Praxis</b><span>Signale, Fahrplan, Funk – danach eine Prüfungsfahrt.</span></li>
-                  <li><b>Rang erhalten</b><span>Bestanden? Dein neuer Rang wird automatisch vergeben.</span></li>
-                </ol>
-                <div class="btn-stack">
-                  <a class="btn btn--primary btn--block" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
-                  <a class="btn btn--discord btn--block" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord beitreten</a>
-                </div>
-              </div>
-              <div class="card">
-                <div class="card__head"><h3 class="card__title">Trainingsarten</h3></div>
-                <ul class="type-list" data-training-types></ul>
-              </div>
             </aside>
           </div>
         </div>
@@ -537,7 +503,7 @@
       <div class="footer__cta">
         <div>
           <h2>Bereit für die erste Fahrt?</h2>
-          <p>Spiel kostenlos auf Roblox und werde Teil der Community.</p>
+          <p>Kostenlos auf Roblox spielen und Teil der Community werden.</p>
         </div>
         <div class="btn-row">
           <a class="btn btn--primary" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
@@ -548,7 +514,7 @@
       <div class="footer__grid">
         <div class="footer__brand">
           <a class="brand" href="#/">
-            <img class="brand__logo" src="assets/img/logo.svg" alt="" width="40" height="40">
+            <img class="brand__logo" src="assets/img/logo.svg" alt="" width="34" height="34">
             <span class="brand__name">Train Sim <b>Germany</b></span>
           </a>
           <p>Das Bahnerlebnis auf Roblox – mit Live-Abfahrten, echten Strecken und einer Crew, die das Netz am Laufen hält.</p>
@@ -567,39 +533,39 @@
         </nav>
         <nav aria-label="Community">
           <h3>Community</h3>
-          <a href="#/spieler">Spieler</a>
           <a href="#/trainings">Trainings</a>
+          <a href="#/spieler">Spieler</a>
         </nav>
       </div>
       <p class="footer__legal">© <span data-year>2026</span> Train Sim Germany. Ein Fan-Projekt auf Roblox – nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation. Icons: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a>.</p>
     </div>
   </footer>
 
-  <!-- Mobile Tab-Leiste -->
+  <!-- Tab-Leiste (Handy & Tablet) -->
   <nav class="tabbar" aria-label="App-Navigation">
-    <a href="#/" data-nav="home"><i class="fi fi-rr-home ic" aria-hidden="true"></i><span>Start</span></a>
-    <a href="#/abfahrten" data-nav="abfahrten"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i><span>Abfahrten</span></a>
-    <a href="#/trainings" data-nav="trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i><span>Trainings</span></a>
-    <a href="#/server" data-nav="server"><i class="fi fi-rr-database ic" aria-hidden="true"></i><span>Server</span></a>
-    <button type="button" data-menu-open data-nav="more" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-apps ic" aria-hidden="true"></i><span>Mehr</span></button>
+    <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-home ic" aria-hidden="true"></i></a>
+    <a href="#/abfahrten" data-nav="abfahrten" aria-label="Abfahrten"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i></a>
+    <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></a>
+    <a href="#/server" data-nav="server" aria-label="Server"><i class="fi fi-rr-database ic" aria-hidden="true"></i></a>
+    <button type="button" data-menu-open data-nav="more" aria-label="Mehr" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-apps ic" aria-hidden="true"></i></button>
   </nav>
 
-  <!-- Menü (mobil) -->
-  <div class="menu" id="menu" data-menu hidden>
-    <div class="menu__backdrop" data-menu-close></div>
-    <div class="menu__panel" role="dialog" aria-modal="true" aria-label="Menü">
-      <div class="menu__grip" aria-hidden="true"></div>
-      <div class="menu__head">
-        <strong>Menü</strong>
-        <button class="icon-btn icon-btn--soft" type="button" data-menu-close aria-label="Menü schließen"><i class="fi fi-rr-cross-small ic" aria-hidden="true"></i></button>
+  <!-- Menü -->
+  <div class="sheet-modal menu" id="menu" data-menu hidden>
+    <div class="sheet-modal__backdrop" data-menu-close></div>
+    <div class="sheet-modal__panel" role="dialog" aria-modal="true" aria-label="Menü">
+      <div class="grip" aria-hidden="true"></div>
+      <div class="sheet-modal__head">
+        <h2>Menü</h2>
+        <button class="round-btn round-btn--soft" type="button" data-menu-close aria-label="Menü schließen"><i class="fi fi-rr-cross-small ic" aria-hidden="true"></i></button>
       </div>
       <nav class="menu__nav" aria-label="Alle Seiten">
         <a href="#/" data-nav="home"><span class="menu__ic"><i class="fi fi-rr-home ic" aria-hidden="true"></i></span>Start</a>
         <a href="#/abfahrten" data-nav="abfahrten"><span class="menu__ic"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i></span>Abfahrten</a>
+        <a href="#/trainings" data-nav="trainings"><span class="menu__ic"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></span>Trainings</a>
         <a href="#/server" data-nav="server"><span class="menu__ic"><i class="fi fi-rr-database ic" aria-hidden="true"></i></span>Server</a>
         <a href="#/statistiken" data-nav="statistiken"><span class="menu__ic"><i class="fi fi-rr-chart-line-up ic" aria-hidden="true"></i></span>Statistiken</a>
         <a href="#/spieler" data-nav="spieler"><span class="menu__ic"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i></span>Spieler</a>
-        <a href="#/trainings" data-nav="trainings"><span class="menu__ic"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></span>Trainings</a>
       </nav>
       <div class="menu__cta">
         <a class="menu-tile menu-tile--play" data-link="play" href="#" target="_blank" rel="noopener">
@@ -612,6 +578,23 @@
           <img src="assets/img/discord.svg" alt="" loading="lazy"><span><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</span>
         </a>
       </div>
+      <button class="menu__theme" type="button" data-theme-toggle>
+        <span class="menu__ic"><i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i><i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i></span>
+        Hell / Dunkel umschalten
+      </button>
+    </div>
+  </div>
+
+  <!-- Auswahl-Sheet (Rang, Datum, Filter, Training, Bahnhof) -->
+  <div class="sheet-modal" data-modal hidden>
+    <div class="sheet-modal__backdrop" data-modal-close></div>
+    <div class="sheet-modal__panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="grip" aria-hidden="true"></div>
+      <div class="sheet-modal__head">
+        <h2 id="modal-title" data-modal-title></h2>
+        <button class="round-btn round-btn--soft" type="button" data-modal-close aria-label="Schließen"><i class="fi fi-rr-cross-small ic" aria-hidden="true"></i></button>
+      </div>
+      <div class="sheet-modal__body" data-modal-body></div>
     </div>
   </div>
 

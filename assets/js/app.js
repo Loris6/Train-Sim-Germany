@@ -33,8 +33,8 @@
   }
 
   const AVATAR_COLORS = [
-    ['#E8112D', '#7A0A18'], ['#2E90FA', '#1849A9'], ['#12B76A', '#05603A'], ['#7A5AF8', '#3E1C96'],
-    ['#F79009', '#B54708'], ['#EE46BC', '#851651'], ['#0BA5EC', '#065986'], ['#475467', '#1D2939'],
+    ['#EC0016', '#9B000E'], ['#1455C0', '#0C3992'], ['#408335', '#2A5A22'], ['#814997', '#5A2F6B'],
+    ['#F39200', '#B35900'], ['#A9455D', '#74283A'], ['#00A099', '#006A65'], ['#646973', '#3C414B'],
   ];
   function initials(name) {
     const parts = name.replace(/[^A-Za-zÄÖÜäöüß_ ]/g, '').split(/[_ ]+/).filter(Boolean);
@@ -63,6 +63,36 @@
   const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   const MONTHS_SHORT = ['Jan.', 'Feb.', 'März', 'Apr.', 'Mai', 'Juni', 'Juli', 'Aug.', 'Sep.', 'Okt.', 'Nov.', 'Dez.'];
   const dateOf = (day) => new Date(day * 864e5); // UTC-Datum des Kalendertags
+  const wdShort = (day) => WEEKDAYS[dateOf(day).getUTCDay()].slice(0, 2);
+  function dayName(day, { long = false } = {}) {
+    const today = berlinNow().day;
+    const dt = dateOf(day);
+    const full = `${WEEKDAYS[dt.getUTCDay()]}, ${dt.getUTCDate()}. ${MONTHS[dt.getUTCMonth()]}`;
+    if (day === today) return long ? `Heute, ${dt.getUTCDate()}. ${MONTHS[dt.getUTCMonth()]}` : 'Heute';
+    if (day === today + 1) return long ? `Morgen, ${dt.getUTCDate()}. ${MONTHS[dt.getUTCMonth()]}` : 'Morgen';
+    return long ? full : `${wdShort(day)}, ${dt.getUTCDate()}. ${MONTHS_SHORT[dt.getUTCMonth()]}`;
+  }
+  function relTime(absMin) {
+    const diff = absMin - berlinNow().abs;
+    if (diff <= 0) return 'läuft gerade';
+    if (diff < 60) return `in ${diff} Min.`;
+    if (diff < 24 * 60) return `in ${Math.round(diff / 60)} Std.`;
+    const d = Math.round(diff / 1440);
+    return d === 1 ? 'in 1 Tag' : `in ${d} Tagen`;
+  }
+
+  // ---------- Ränge & Ausbildung ----------
+  const RANKS = D.ranks;
+  const rankIdx = (name) => RANKS.findIndex((r) => r.name === name);
+  const rankOf = (name) => RANKS[Math.max(0, rankIdx(name))];
+  const typeOf = (name) => D.trainingTypes.find((t) => t.name === name);
+  // Nächster Rang mit eigenem Training (z. B. Conductor → Signaller)
+  function nextRank(rank) {
+    for (let i = rankIdx(rank) + 1; i < RANKS.length; i++) if (typeOf(RANKS[i].name)) return RANKS[i];
+    return null;
+  }
+  const reqFor = (type) => RANKS[Math.max(0, rankIdx(type) - 1)].name;
+  const roleBadge = (role) => `<span class="role" style="--rc:${rankOf(role).color}">${esc(role)}</span>`;
 
   // ---------- Zustand ----------
   const state = {
@@ -76,8 +106,11 @@
     playerSort: 'km',
     playerQuery: '',
     range: '24',
-    trainingDay: 'all',
-    trainingType: 'all',
+    rank: rankIdx(store.get('tsg-rank', '')) >= 0 ? store.get('tsg-rank', '') : D.me.rank,
+    trainingDay: null,
+    typeFilter: new Set(store.get('tsg-tfilter', [])),
+    showAll: false,
+    bell: store.get('tsg-bell', false),
     favs: new Set(store.get('tsg-favs', [])),
     signups: new Set(store.get('tsg-signups', [])),
     online: D.stats.online,
@@ -149,7 +182,7 @@
     const isNew = prevRuns && !prevRuns.has(d.run);
     const viaText = d.via.length ? `über ${d.via.join(' · ')}` : mode === 'dep' ? 'ohne Zwischenhalt' : 'direkt';
     return `<li class="dep${d.cancelled ? ' is-cancelled' : ''}${isNew ? ' is-new' : ''}" data-run="${esc(d.run)}">
-      <div class="dep__time">${hhmm(d.planned)}${d.delay ? `<small class="${d.delay >= 6 ? 'late' : ''}">${hhmm(d.actual)}</small>` : ''}</div>
+      <div class="dep__time">${hhmm(d.planned)}${d.delay ? `<small class="${d.delay >= 6 ? '' : 'minor'}">${hhmm(d.actual)}</small>` : ''}</div>
       <div class="dep__train"><span class="line line--${d.line.cat}">${esc(d.line.name)}</span></div>
       <div class="dep__main"><span class="dep__dest">${mode === 'arr' ? 'von ' : ''}${esc(d.dest)}</span><span class="dep__via">${esc(viaText)}</span></div>
       <div class="dep__track"><span>Gleis</span><b>${d.track}</b></div>
@@ -172,11 +205,10 @@
 
   function renderHeroBoard() {
     const el = $('[data-board="hero"]');
-    if (!el) return;
     $('[data-hero-station]').textContent = state.homeStation;
     el.innerHTML = departures(state.homeStation, { limit: 5 }).map((d) => {
       const st = statusOf(d, 'dep');
-      const small = d.cancelled ? '<small class="late">fällt aus</small>' : d.delay ? `<small class="${d.delay >= 6 ? 'late' : ''}">+${d.delay}</small>` : '';
+      const small = d.cancelled ? '<small>fällt aus</small>' : d.delay ? `<small>+${d.delay}</small>` : '';
       return `<li>
         <span class="t">${hhmm(d.planned)}${small}</span>
         <span class="line line--${d.line.cat}">${esc(d.line.name)}</span>
@@ -186,31 +218,17 @@
     }).join('');
   }
 
-  function renderStationChips(el, current, onPick) {
-    if (!el) return;
-    el.innerHTML = D.stations.map((s) => `<button class="chip" type="button" role="tab" aria-selected="${s.name === current}" data-station="${esc(s.name)}">${esc(s.name.replace(' (Main)', ''))}</button>`).join('');
-    el.onclick = (e) => {
-      const b = e.target.closest('[data-station]');
-      if (b) onPick(b.dataset.station);
-    };
-  }
-
   function renderHomeBoard() {
-    renderStationChips($('[data-station-chips="home"]'), state.homeStation, (name) => {
-      state.homeStation = name;
-      renderHomeBoard();
-      renderHeroBoard();
-    });
-    renderBoard($('[data-board="home"]'), departures(state.homeStation, { limit: 6 }), 'dep', state.homeStation);
+    const chips = $('[data-station-chips="home"]');
+    chips.innerHTML = D.stations.map((s) => `<button class="chip" type="button" role="tab" aria-selected="${s.name === state.homeStation}" data-station="${esc(s.name)}">${esc(s.name.replace(' (Main)', ''))}</button>`).join('');
+    renderBoard($('[data-board="home"]'), departures(state.homeStation, { limit: 4 }), 'dep', state.homeStation);
   }
 
   function renderFullBoard() {
     const info = stationInfo(state.station);
-    renderStationChips($('[data-station-chips="full"]'), state.station, (name) => setStation(name));
     $('[data-board-station]').textContent = state.station;
-    $('[data-board-label]').textContent = state.mode === 'dep' ? 'Abfahrten' : 'Ankünfte';
+    $('[data-board-label]').textContent = state.mode === 'dep' ? 'Abfahrten ab' : 'Ankünfte in';
     $('[data-col-dest]').textContent = state.mode === 'dep' ? 'Nach' : 'Von';
-    $('[data-station-current]').textContent = `Aktuell: ${state.station}`;
     renderBoard($('[data-board="full"]'), departures(state.station, { mode: state.mode, cat: state.cat, limit: 14 }), state.mode, `${state.station}|${state.mode}|${state.cat}`);
 
     $('[data-station-name]').textContent = info.name;
@@ -245,7 +263,7 @@
     return out;
   }
   function sparkline(values) {
-    const w = 72, h = 28, min = Math.min(...values), max = Math.max(...values);
+    const w = 64, h = 26, min = Math.min(...values), max = Math.max(...values);
     const x = (i) => (i / (values.length - 1)) * w;
     const y = (v) => h - 3 - ((v - min) / (max - min || 1)) * (h - 6);
     const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
@@ -317,7 +335,7 @@
     if (!el || !el.clientWidth) return;
     const data = chartData(state.range);
     const W = el.clientWidth, H = el.clientHeight;
-    const m = { l: 44, r: 58, t: 14, b: 30 };
+    const m = { l: 40, r: 54, t: 14, b: 28 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
     const yMax = niceMax(Math.max(...data.map((d) => d.value)) * 1.08);
     const x = (i) => m.l + (i / (data.length - 1)) * iw;
@@ -352,8 +370,7 @@
     hit.addEventListener('pointermove', move);
     hit.addEventListener('pointerdown', move);
     hit.addEventListener('pointerleave', leave);
-    const sub = $('.chart-card .card__sub');
-    sub.textContent = state.range === '24' ? 'Letzte 24 Stunden, stündlich' : `Letzte ${state.range} Tage, Tageshöchstwert`;
+    $('[data-chart-sub]').textContent = state.range === '24' ? 'Letzte 24 Stunden, stündlich' : `Letzte ${state.range} Tage, Tageshöchstwert`;
   }
 
   function renderBars() {
@@ -385,18 +402,14 @@
   function renderRoutes() {
     $('[data-routes]').innerHTML = D.routes.map((r) => {
       const fav = state.favs.has(r.title);
-      return `<article class="route">
-        <div class="route__media">
+      return `<article class="scard">
+        <div class="scard__media">
           <img src="assets/img/${r.img}" alt="Illustration der Strecke ${esc(r.title)}" loading="lazy">
-          <span class="chip chip--glass">${esc(r.tag)}</span>
-          <button class="fav-btn" type="button" aria-pressed="${fav}" aria-label="${esc(r.title)} merken" data-fav="${esc(r.title)}">${icon('fi-rr-heart', 'ic--off')}${icon('fi-sr-heart', 'ic--on')}</button>
+          <button class="glass-btn" type="button" aria-pressed="${fav}" aria-label="${esc(r.title)} merken" data-fav="${esc(r.title)}">${icon('fi-rr-heart', 'fav-off')}${icon('fi-sr-heart', 'fav-on')}</button>
           <span class="line line--${r.cat}">${esc(r.line)}</span>
         </div>
-        <div class="route__body">
-          <div class="route__top"><h3>${esc(r.title)}</h3><span class="rating">${icon('fi-sr-star')}${nf1.format(r.rating)} <small>(${esc(r.reviews)})</small></span></div>
-          <p class="route__sub">${esc(r.from)} → ${esc(r.to)}</p>
-          <p class="route__meta">${r.stops} Halte · ${fmt(r.km)} km · ${esc(r.dur)}</p>
-        </div>
+        <h3>${esc(r.title)}</h3>
+        <p>${esc(r.from)} → ${esc(r.to)}</p>
       </article>`;
     }).join('');
   }
@@ -404,17 +417,22 @@
   function renderNews() {
     $('[data-news]').innerHTML = D.news.map((n, i) => `<article class="news">
       <img src="assets/img/${n.img}" alt="" loading="lazy">
-      <div class="news__body">
+      <div>
         <div class="news__meta"><span class="tag ${['tag--red', 'tag--info', 'tag--ok'][i % 3]}">${esc(n.tag)}</span><span>${esc(n.date)}</span></div>
         <h3>${esc(n.title)}</h3>
-        <p>${esc(n.text)}</p>
-        <a class="link-more" data-link="discord" href="${esc(D.links.discord)}" target="_blank" rel="noopener">Mehr auf Discord ${icon('fi-rr-arrow-small-right')}</a>
       </div>
     </article>`).join('');
   }
 
   // ---------- Server ----------
   function renderServers() {
+    const free = D.servers.reduce((sum, x) => sum + Math.max(0, x.max - x.players), 0);
+    const ping = Math.round(D.servers.reduce((sum, x) => sum + x.ping, 0) / D.servers.length);
+    $('[data-server-stats]').innerHTML = `
+      <div class="stat"><span>Spieler online</span><b data-bind="online">${fmt(state.online)}</b></div>
+      <div class="stat"><span>Freie Plätze</span><b>${fmt(free)}</b></div>
+      <div class="stat"><span>Ø Ping</span><b>${ping} ms</b></div>`;
+
     const q = norm(state.serverQuery.trim());
     const list = D.servers.filter((s) => {
       if (state.serverType === 'free' && s.players >= s.max * 0.8) return false;
@@ -439,7 +457,7 @@
         </div>
         <p class="server__net">${icon('fi-rr-route')}${esc(s.network)}</p>
         <div class="occ">
-          <div class="occ__row"><span>Spieler · <span class="status status--${level}">${label}</span></span><b>${s.players}/${s.max}</b></div>
+          <div class="occ__row"><span class="status status--${level}">${label}</span><b>${s.players}/${s.max}</b></div>
           <div class="bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
         </div>
         <dl class="server__meta">
@@ -458,9 +476,6 @@
   }
 
   // ---------- Spieler ----------
-  const roleColor = (role) => (D.ranks.find((r) => r.name === role) || { color: '#98A2B3' }).color;
-  const roleBadge = (role) => `<span class="role" style="--rc:${roleColor(role)}">${esc(role)}</span>`;
-
   function renderPlayers() {
     const byKm = D.players.slice().sort((a, b) => b.km - a.km);
     const podium = [byKm[1], byKm[0], byKm[2]];
@@ -497,139 +512,278 @@
   function renderProfile() {
     const p = D.players.find((x) => x.name === 'Nordlicht_Mia') || D.players[0];
     $('[data-profile]').innerHTML = `
-      <div class="profile-card__cover"><span class="chip chip--glass">${icon('fi-sr-star')}Spieler der Woche</span></div>
+      <div class="profile-card__cover"><span>${icon('fi-sr-star')}Spieler der Woche</span></div>
       <div class="profile-card__body">
         ${avatar(p.name, 'avatar--xl')}
         <h3>${esc(p.name)}</h3>
-        <p class="handle">@${esc(p.name.toLowerCase())} · ${roleBadge(p.role)}</p>
-        <p class="bio">Fahrdienstleitung im Stellwerk Hamburg Hbf. Hält den S-Bahn-Takt auf Kurs und fährt nachts gern ICE.</p>
-        <div class="meta"><span>${icon('fi-rr-marker')}${esc(p.region)}</span><span>${icon('fi-rr-calendar')}Dabei seit ${esc(p.joined)}</span></div>
+        <p class="handle">@${esc(p.name.toLowerCase())} ${roleBadge(p.role)}</p>
+        <p class="bio">Stellwerk Hamburg Hbf. Hält den S-Bahn-Takt auf Kurs und fährt nachts gern ICE.</p>
         <div class="profile-stats">
           <div><b>${p.level}</b><span>Level</span></div>
           <div><b>${compact(p.km)}</b><span>Kilometer</span></div>
           <div><b>${nf1.format(p.punct)} %</b><span>Pünktlich</span></div>
         </div>
       </div>`;
-    $('[data-ranks]').innerHTML = D.ranks.map((r) => `<li style="--rc:${r.color}"><i></i><b>${esc(r.name)}</b><span>${esc(r.desc)}</span></li>`).join('');
   }
 
   // ---------- Trainings ----------
-  function trainingsList() {
+  // Der Wochenplan aus data.js wird für zwei Wochen ausgerollt.
+  function trainingsList({ all = false } = {}) {
     const now = berlinNow();
-    return D.trainings.map((t, i) => {
-      const [hh, mm] = t.time.split(':').map(Number);
-      const day = now.day + t.day;
-      const start = day * 1440 + hh * 60 + mm;
-      const id = `${i}-${day}`;
-      const signed = state.signups.has(id);
-      return Object.assign({}, t, {
-        id, day, start, end: start + t.dur, signed,
-        taken: Math.min(t.slots, t.taken + (signed ? 1 : 0)),
-        color: (D.trainingTypes.find((x) => x.name === t.type) || { color: '#98A2B3' }).color,
+    const out = [];
+    for (let week = 0; week < 2; week++) {
+      D.trainings.forEach((t, i) => {
+        const [hh, mm] = t.time.split(':').map(Number);
+        const day = now.day + t.day + week * 7;
+        const start = day * 1440 + hh * 60 + mm;
+        const id = `${i}-${day}`;
+        const signed = state.signups.has(id);
+        const taken = week === 0 ? t.taken : Math.max(0, t.taken - 3 - (i % 3));
+        out.push(Object.assign({}, t, {
+          id, day, start, end: start + t.dur, signed,
+          taken: Math.min(t.slots, taken + (signed ? 1 : 0)),
+          req: reqFor(t.type),
+          img: (typeOf(t.type) || {}).img || 'training.svg',
+          color: rankOf(t.type).color,
+        }));
       });
-    }).filter((t) => t.end > now.abs).sort((a, b) => a.start - b.start);
+    }
+    return out
+      .filter((t) => t.end > now.abs && (all || !state.typeFilter.size || state.typeFilter.has(t.type)))
+      .sort((a, b) => a.start - b.start);
   }
-  function dayLabel(day, today) {
-    const dt = dateOf(day);
-    const base = `${WEEKDAYS[dt.getUTCDay()]}, ${dt.getUTCDate()}. ${MONTHS[dt.getUTCMonth()]}`;
-    return day === today ? `Heute · ${base}` : day === today + 1 ? `Morgen · ${base}` : base;
-  }
-  function tdate(day, today) {
-    const dt = dateOf(day);
-    return `<div class="tdate${day === today ? ' is-today' : ''}"><span>${WEEKDAYS[dt.getUTCDay()].slice(0, 2)}</span><b>${dt.getUTCDate()}</b><small>${MONTHS_SHORT[dt.getUTCMonth()]}</small></div>`;
-  }
-  function slotsInfo(t) {
+  const findTraining = (id) => trainingsList({ all: true }).find((t) => t.id === id);
+  const isLocked = (t) => rankIdx(state.rank) < rankIdx(t.req);
+  function trainingState(t) {
     const free = t.slots - t.taken;
-    return free <= 0 ? ['is-full', 'Voll', 'bad'] : free <= 2 ? ['is-low', `${free} frei`, 'warn'] : ['', `${free} frei`, 'ok'];
+    if (t.signed) return { cls: 'mine', text: 'Angemeldet', level: 'ok' };
+    if (isLocked(t)) return { cls: 'lock', text: `ab ${t.req}`, level: 'warn' };
+    if (free <= 0) return { cls: 'bad', text: 'Voll', level: 'bad' };
+    if (free <= 2) return { cls: 'warn', text: `${free} frei`, level: 'warn' };
+    return { cls: 'ok', text: `${free} frei`, level: 'ok' };
   }
 
-  function renderTrainingsMini() {
-    const now = berlinNow();
-    $('[data-trainings="home"]').innerHTML = trainingsList().slice(0, 4).map((t) => {
-      const [cls, txt] = slotsInfo(t);
-      return `<li>
-        ${tdate(t.day, now.day)}
-        <div style="min-width:0"><h3>${esc(t.title)}</h3><p>${t.time} Uhr · ${esc(t.type)} · ${esc(t.host)}</p></div>
-        <span class="slots-chip ${cls}">${txt}</span>
-      </li>`;
-    }).join('') || '<li class="board-empty">Aktuell keine Trainings geplant.</li>';
+  function nextStepHTML(heading) {
+    const me = rankOf(state.rank);
+    const next = nextRank(state.rank);
+    if (!next) {
+      return `<article class="promo-card promo-card--done">
+        <img class="promo-card__img" src="assets/img/group.svg" alt="" loading="lazy">
+        <div class="promo-card__body">
+          <span class="promo-card__eyebrow"><span class="rank-dot" style="--rc:${me.color}"></span>${esc(me.name)}</span>
+          <${heading}>Alle Ausbildungen abgeschlossen</${heading}>
+          <p>Du hast den höchsten Rang erreicht. Hilf jetzt neuen Spielern als Ausbilder.</p>
+        </div>
+      </article>`;
+    }
+    const type = typeOf(next.name);
+    const t = trainingsList({ all: true }).find((x) => x.type === next.name);
+    return `<article class="promo-card">
+      <img class="promo-card__img" src="assets/img/${type.img}" alt="" loading="lazy">
+      <div class="promo-card__body">
+        <span class="promo-card__eyebrow"><span class="rank-dot" style="--rc:${me.color}"></span>${esc(me.name)} → ${esc(next.name)}</span>
+        <${heading}>Dein nächster Schritt: ${esc(next.name)}</${heading}>
+        <p>${esc(type.text)}</p>
+        <p class="promo-card__when">${t ? `<b>${dayName(t.day)} · ${t.time} Uhr</b> · ${relTime(t.start)}` : 'Noch kein Termin geplant'}</p>
+      </div>
+      ${t
+        ? `<button class="btn btn--primary btn--sm promo-card__btn" type="button" data-detail="${t.id}">Details</button>`
+        : '<button class="btn btn--primary btn--sm promo-card__btn" type="button" data-bell>Erinnern</button>'}
+    </article>`;
+  }
+  function renderNextSteps() {
+    const home = $('[data-next-step="home"]');
+    const full = $('[data-next-step="full"]');
+    if (state.page === 'home') home.innerHTML = nextStepHTML('h3');
+    if (state.page === 'trainings') full.innerHTML = nextStepHTML('h2');
+  }
+
+  function tcard(t) {
+    const st = trainingState(t);
+    const badge = t.signed ? 'fi-rr-check' : isLocked(t) ? 'fi-rr-lock' : 'fi-rr-bell';
+    return `<button class="tcard" type="button" data-detail="${t.id}">
+      <div class="tcard__media">
+        <img src="assets/img/${t.img}" alt="" loading="lazy">
+        <span class="glass-btn">${icon(badge)}</span>
+        <span class="tcard__role" style="--rc:${t.color}"><i></i>${esc(t.type)}</span>
+      </div>
+      <div class="tcard__body">
+        <h3>${esc(t.title)}</h3>
+        <div class="tcard__row"><b>${t.time} Uhr</b><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : st.cls === 'mine' ? ' is-mine' : ''}">${icon('fi-rr-users-alt')}${t.taken}/${t.slots}</span></div>
+      </div>
+    </button>`;
   }
 
   function renderTrainings() {
     const now = berlinNow();
-    const all = trainingsList();
+    const list = trainingsList();
+    const me = rankOf(state.rank);
 
-    // Tagesleiste
-    const days = Array.from({ length: 7 }, (_, i) => now.day + i);
-    $('[data-day-strip]').innerHTML =
-      `<button class="day day--all" type="button" role="tab" aria-selected="${state.trainingDay === 'all'}" data-day="all"><span>Woche</span><b>Alle</b><i class="${all.length ? '' : 'none'}"></i></button>` +
-      days.map((d) => {
-        const dt = dateOf(d);
-        const has = all.some((t) => t.day === d);
-        return `<button class="day" type="button" role="tab" aria-selected="${String(state.trainingDay) === String(d)}" data-day="${d}"><span>${d === now.day ? 'Heute' : WEEKDAYS[dt.getUTCDay()].slice(0, 2)}</span><b>${dt.getUTCDate()}</b><i class="${has ? '' : 'none'}"></i></button>`;
-      }).join('');
+    $('[data-rank-name]').textContent = me.name;
+    $('[data-rank-dot]').style.setProperty('--rc', me.color);
+    $('[data-bell]').setAttribute('aria-pressed', String(state.bell));
+    $('[data-filter-badge]').hidden = !state.typeFilter.size;
 
-    // Filter nach Art
-    const counts = {};
-    all.forEach((t) => { counts[t.type] = (counts[t.type] || 0) + 1; });
-    $('[data-training-filter]').innerHTML =
-      `<button class="chip${state.trainingType === 'all' ? ' is-active' : ''}" type="button" data-ttype="all">Alle <span class="count">${all.length}</span></button>` +
-      D.trainingTypes.map((t) => `<button class="chip${state.trainingType === t.name ? ' is-active' : ''}" type="button" data-ttype="${esc(t.name)}"><span class="type-badge" style="--tc:${t.color}"><i></i></span>${esc(t.name)} <span class="count">${counts[t.name] || 0}</span></button>`).join('');
+    // Tagesleiste: 14 Tage, roter Punkt = an diesem Tag gibt es Trainings
+    const days = Array.from({ length: 14 }, (_, i) => now.day + i);
+    if (state.trainingDay === null || !days.includes(state.trainingDay)) state.trainingDay = list.length ? list[0].day : now.day;
+    const tabs = $('[data-day-tabs]');
+    tabs.innerHTML = days.map((d) => {
+      const has = list.some((t) => t.day === d);
+      const dt = dateOf(d);
+      const label = d === now.day ? 'Heute' : d === now.day + 1 ? 'Morgen' : `${wdShort(d)} ${dt.getUTCDate()}.`;
+      return `<button class="day-tab${has ? ' has-trainings' : ''}" type="button" role="tab" aria-selected="${d === state.trainingDay}" data-day="${d}" aria-label="${dayName(d, { long: true })}${has ? ', Trainings geplant' : ''}">${label}<i></i></button>`;
+    }).join('');
+    const sel = $('[aria-selected="true"]', tabs);
+    if (sel) tabs.scrollTo({ left: sel.offsetLeft - tabs.clientWidth / 2 + sel.clientWidth / 2, behavior: 'instant' });
 
-    const list = all.filter((t) => (state.trainingDay === 'all' || String(t.day) === String(state.trainingDay)) && (state.trainingType === 'all' || t.type === state.trainingType));
-    let html = '';
-    let lastDay = null;
-    for (const t of list) {
-      if (t.day !== lastDay) { html += `<li class="day-head">${dayLabel(t.day, now.day)}</li>`; lastDay = t.day; }
-      const [, txt, level] = slotsInfo(t);
-      const running = t.start <= now.abs;
-      const full = t.taken >= t.slots && !t.signed;
-      const btn = t.signed
-        ? `<button class="btn btn--ok btn--sm" type="button" data-signup="${t.id}">${icon('fi-rr-check')}Angemeldet</button>`
-        : full
-          ? `<button class="btn btn--soft btn--sm" type="button" data-signup="${t.id}" data-waitlist>${icon('fi-rr-bell')}Warteliste</button>`
-          : `<button class="btn btn--primary btn--sm" type="button" data-signup="${t.id}">Anmelden</button>`;
-      html += `<li class="training">
-        ${tdate(t.day, now.day)}
-        <div class="training__body">
-          <div class="training__top"><span class="type-badge" style="--tc:${t.color}"><i></i>${esc(t.type)}</span>${running ? '<span class="tag tag--red"><span class="live-dot live-dot--sm"></span>Läuft gerade</span>' : ''}</div>
-          <h3>${esc(t.title)}</h3>
-          <div class="training__meta">
-            <span>${icon('fi-rr-clock-three')}${t.time} – ${hhmm(t.end)} Uhr</span>
-            <span>${icon('fi-rr-database')}${esc(t.server)}</span>
-            <span>${icon('fi-rr-shield-check')}ab ${esc(t.req)}</span>
-          </div>
-          <div class="training__host">${avatar(t.host)}Leitung: <b>${esc(t.host)}</b></div>
-        </div>
-        <div class="training__side">
-          <div class="occ">
-            <div class="occ__row"><span class="status status--${level}">${txt}</span><b>${t.taken}/${t.slots}</b></div>
-            <div class="bar bar--${level}"><span style="width:${(t.taken / t.slots) * 100}%"></span></div>
-          </div>
-          ${btn}
-        </div>
-      </li>`;
-    }
-    $('[data-trainings="full"]').innerHTML = html || '<li class="card board-empty">Für diese Auswahl sind keine Trainings geplant.</li>';
+    const field = $('[data-date-field]');
+    field.textContent = dayName(state.trainingDay, { long: true });
+    field.parentElement.classList.add('is-set');
 
-    $('[data-training-types]').innerHTML = D.trainingTypes.map((t) => `<li style="--tc:${t.color}"><i></i><div><b>${esc(t.name)}</b><span>${esc(t.desc)}</span></div></li>`).join('');
-    updateCountdown();
+    // Trainings am gewählten Tag
+    const ofDay = list.filter((t) => t.day === state.trainingDay);
+    const nextDay = list.find((t) => t.day > state.trainingDay);
+    $('[data-day-trainings]').innerHTML = ofDay.length
+      ? ofDay.map(tcard).join('')
+      : `<div class="rail-empty">${icon('fi-rr-calendar')}<span>Am ${dayName(state.trainingDay, { long: true }).replace(/^(Heute|Morgen), /, '')} ist kein Training geplant.${nextDay ? ` Nächstes: <button class="link-more" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
+
+    // Alle kommenden Trainings (klein)
+    const shown = state.showAll ? list : list.slice(0, 6);
+    $('[data-all-trainings]').innerHTML = shown.length ? shown.map((t) => {
+      const st = trainingState(t);
+      return `<li><button type="button" data-detail="${t.id}">
+        <div class="tdate${t.day === now.day ? ' is-today' : ''}"><span>${wdShort(t.day)}</span><b>${dateOf(t.day).getUTCDate()}</b></div>
+        <div><h3>${esc(t.title)}</h3><p><i style="--rc:${t.color}"></i>${esc(t.type)} · ${t.time} Uhr · ${esc(t.host)}</p></div>
+        <span class="pill-state pill-state--${st.cls}">${st.text}</span>
+      </button></li>`;
+    }).join('') : '<li class="board-empty">Keine Trainings für diesen Filter.</li>';
+    const toggle = $('[data-all-toggle]');
+    toggle.hidden = list.length <= 6;
+    toggle.innerHTML = state.showAll ? `Weniger ${icon('fi-rr-angle-small-up')}` : `Alle (${list.length}) ${icon('fi-rr-angle-small-down')}`;
+
+    // Ränge in der Seitenleiste
+    const cur = rankIdx(state.rank);
+    $('[data-rank-ladder]').innerHTML = RANKS.map((r, i) => `<li class="${i === cur ? 'is-current' : i < cur ? 'is-done' : ''}" style="--rc:${r.color}"><i></i><b>${esc(r.name)}</b><span>${esc(r.label)}</span></li>`).join('');
+
+    renderNextSteps();
   }
 
-  function updateCountdown() {
-    const el = $('[data-countdown]');
-    if (!el) return;
-    const now = berlinNow();
-    const next = trainingsList().find((t) => t.start * 60 > now.absSec);
-    const title = $('[data-next-training-title]');
-    if (!next) { title.textContent = 'Bald neue Termine'; return; }
-    title.textContent = `${next.title} · ${next.time} Uhr`;
-    let diff = next.start * 60 - now.absSec;
-    const h = Math.floor(diff / 3600); diff -= h * 3600;
-    const m = Math.floor(diff / 60);
-    const s = diff - m * 60;
-    const b = $$('b', el);
-    b[0].textContent = pad(h); b[1].textContent = pad(m); b[2].textContent = pad(s);
+  // ---------- Auswahl-Sheets ----------
+  const modal = $('[data-modal]');
+  let modalView = null;
+  const VIEWS = {
+    rank: {
+      title: 'Dein Rang',
+      render: () => `<div class="opt-list" role="radiogroup" aria-label="Rang wählen">${RANKS.filter((r) => r.name !== 'Management').map((r) => `
+        <button class="opt" type="button" role="radio" aria-checked="${r.name === state.rank}" data-rank="${r.name}">
+          <i class="dot" style="--rc:${r.color}"></i><span><b>${esc(r.name)}</b><small>${esc(r.label)} · ${esc(r.desc)}</small></span>
+          ${r.name === state.rank ? icon('fi-rr-check') : ''}
+        </button>`).join('')}</div>
+        <p class="sheet-note">Demo: Später wird dein Rang automatisch aus der Roblox-Gruppe übernommen.</p>`,
+    },
+    date: {
+      title: 'Trainingsdatum wählen',
+      render: () => {
+        const now = berlinNow();
+        const list = trainingsList();
+        const days = Array.from({ length: 14 }, (_, i) => now.day + i);
+        return `<div class="date-grid">
+          ${days.slice(0, 7).map((d) => `<span class="date-grid__wd">${wdShort(d)}</span>`).join('')}
+          ${days.map((d) => `<button class="date-cell${list.some((t) => t.day === d) ? ' has-trainings' : ''}" type="button" aria-pressed="${d === state.trainingDay}" data-pick-day="${d}" aria-label="${dayName(d, { long: true })}">${dateOf(d).getUTCDate()}<i></i></button>`).join('')}
+        </div>
+        <p class="sheet-note">Rote Punkte zeigen Tage mit Trainings.</p>`;
+      },
+    },
+    filter: {
+      title: 'Trainings filtern',
+      render: () => `<div class="opt-list">${D.trainingTypes.map((t) => {
+        const r = rankOf(t.name);
+        const on = state.typeFilter.has(t.name);
+        return `<button class="opt" type="button" role="checkbox" aria-checked="${on}" data-ttoggle="${t.name}">
+          <i class="dot" style="--rc:${r.color}"></i><span><b>${esc(t.name)}</b><small>${esc(r.label)} · ${esc(r.desc)}</small></span>
+          <span class="opt__check">${on ? icon('fi-rr-check') : ''}</span>
+        </button>`;
+      }).join('')}</div>
+      <div class="btn-stack"><button class="btn btn--soft btn--block" type="button" data-treset>Alle Trainings anzeigen</button></div>`,
+    },
+    station: {
+      title: 'Bahnhof wählen',
+      render: () => `<div class="opt-list">${D.stations.map((s) => `
+        <button class="opt" type="button" role="radio" aria-checked="${s.name === state.station}" data-station-pick="${esc(s.name)}">
+          <span class="res-ic">${icon('fi-rr-marker')}</span><span><b>${esc(s.name)}</b><small>${esc(s.region)} · ${s.tracks} Gleise</small></span>
+          ${s.name === state.station ? icon('fi-rr-check') : ''}
+        </button>`).join('')}</div>`,
+    },
+    training: {
+      title: 'Training',
+      render: (id) => {
+        const t = findTraining(id);
+        if (!t) return '<p class="muted">Dieses Training ist bereits vorbei.</p>';
+        const st = trainingState(t);
+        const type = typeOf(t.type);
+        const running = t.start <= berlinNow().abs;
+        const full = t.taken >= t.slots && !t.signed;
+        let action;
+        if (t.signed) action = `<button class="btn btn--ok btn--block" type="button" data-signup="${t.id}">${icon('fi-rr-check')}Angemeldet – abmelden</button>`;
+        else if (isLocked(t)) action = `<button class="btn btn--soft btn--block" type="button" disabled>${icon('fi-rr-lock')}Ab Rang ${esc(t.req)}</button>`;
+        else if (full) action = `<button class="btn btn--soft btn--block" type="button" data-waitlist="${t.id}">${icon('fi-rr-bell')}Auf die Warteliste</button>`;
+        else action = `<button class="btn btn--primary btn--block" type="button" data-signup="${t.id}">Jetzt anmelden</button>`;
+        return `<div class="detail">
+          <img class="detail__img" src="assets/img/${t.img}" alt="">
+          <div class="detail__top">${roleBadge(t.type)}${running ? '<span class="tag tag--red"><span class="live-dot live-dot--sm"></span>Läuft gerade</span>' : `<span class="tag">${relTime(t.start)}</span>`}</div>
+          <h3>${esc(t.title)}</h3>
+          <p>${esc(type ? type.text : '')}</p>
+          <dl>
+            <div><dt>${icon('fi-rr-calendar')}Datum</dt><dd>${dayName(t.day, { long: true })}</dd></div>
+            <div><dt>${icon('fi-rr-clock-three')}Uhrzeit</dt><dd>${t.time} – ${hhmm(t.end)} Uhr</dd></div>
+            <div><dt>${icon('fi-rr-database')}Server</dt><dd>${esc(t.server)}</dd></div>
+            <div><dt>${icon('fi-rr-users-alt')}Leitung</dt><dd>${esc(t.host)}</dd></div>
+          </dl>
+          <div class="occ">
+            <div class="occ__row"><span class="status status--${st.level}">${st.text}</span><b>${t.taken}/${t.slots} Plätze</b></div>
+            <div class="bar bar--${st.level}"><span style="width:${(t.taken / t.slots) * 100}%"></span></div>
+          </div>
+          ${isLocked(t) && !t.signed ? `<div class="lock">${icon('fi-rr-lock')}<span>Für dieses Training brauchst du mindestens den Rang ${esc(t.req)}. Dein Rang: ${esc(state.rank)}.</span></div>` : ''}
+          ${action}
+        </div>`;
+      },
+    },
+  };
+  function openModal(name, arg) {
+    modalView = { name, arg };
+    $('[data-modal-title]').textContent = VIEWS[name].title;
+    $('[data-modal-body]').innerHTML = VIEWS[name].render(arg);
+    modal.hidden = false;
+    document.body.classList.add('menu-open');
+    const focusable = $('[data-modal-body] button:not([disabled])', modal) || $('[data-modal-close]', modal);
+    focusable.focus({ preventScroll: true });
+  }
+  function refreshModal() {
+    if (!modal.hidden && modalView) $('[data-modal-body]').innerHTML = VIEWS[modalView.name].render(modalView.arg);
+  }
+  function closeModal() {
+    if (modal.hidden) return;
+    modal.hidden = true;
+    modalView = null;
+    document.body.classList.remove('menu-open');
+  }
+
+  function toggleSignup(id) {
+    const t = findTraining(id);
+    if (!t) return;
+    if (state.signups.has(id)) { state.signups.delete(id); toast('Anmeldung zurückgezogen'); }
+    else { state.signups.add(id); toast(`Angemeldet: ${t.title}, ${dayName(t.day)} ${t.time} Uhr`); }
+    store.set('tsg-signups', Array.from(state.signups));
+    if (state.page === 'trainings') renderTrainings(); else renderNextSteps();
+    refreshModal();
+  }
+  function toggleBell() {
+    state.bell = !state.bell;
+    store.set('tsg-bell', state.bell);
+    $$('[data-bell]').forEach((b) => b.setAttribute('aria-pressed', String(state.bell)));
+    const next = nextRank(state.rank);
+    toast(state.bell ? `Erinnerungen an${next ? ` – wir melden uns vor ${next.name}-Trainings` : ''}` : 'Erinnerungen aus');
   }
 
   // ---------- Suche ----------
@@ -739,31 +893,31 @@
   // ---------- Bindings ----------
   function bind() {
     const s = D.stats;
-    const freeSlots = D.servers.reduce((sum, x) => sum + Math.max(0, x.max - x.players), 0);
     const values = {
       online: fmt(state.online), servers: fmt(s.servers), groupMembers: compact(s.groupMembers),
-      discordOnline: compact(s.discordOnline), visits: compact(s.visits), freeSlots: fmt(freeSlots),
+      discordOnline: compact(s.discordOnline), discordMembers: compact(s.discordMembers),
+      visits: compact(s.visits), favorites: compact(s.favorites),
     };
     $$('[data-bind]').forEach((el) => { if (values[el.dataset.bind] != null) el.textContent = values[el.dataset.bind]; });
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'abfahrten', 'server', 'statistiken', 'spieler', 'trainings'];
+  const PAGES = ['home', 'abfahrten', 'trainings', 'server', 'statistiken', 'spieler'];
   const TITLES = {
     home: 'Train Sim Germany – Das Bahnerlebnis auf Roblox',
     abfahrten: 'Abfahrten · Train Sim Germany',
+    trainings: 'Trainings · Train Sim Germany',
     server: 'Server · Train Sim Germany',
     statistiken: 'Statistiken · Train Sim Germany',
     spieler: 'Spieler · Train Sim Germany',
-    trainings: 'Trainings · Train Sim Germany',
   };
   const RENDER = {
-    home() { renderHeroBoard(); renderHomeKpis(); renderHomeBoard(); renderTrainingsMini(); renderRoutes(); renderNews(); },
+    home() { renderHeroBoard(); renderHomeBoard(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews(); },
     abfahrten() { renderFullBoard(); renderNotices(); },
+    trainings() { renderTrainings(); },
     server() { $('[data-server-search]').value = state.serverQuery; renderServers(); },
     statistiken() { renderStatsKpis(); renderChart(); renderBars(); },
     spieler() { $('[data-player-search]').value = state.playerQuery; renderPlayers(); renderProfile(); },
-    trainings() { renderTrainings(); },
   };
 
   function route() {
@@ -774,6 +928,7 @@
     if (params.get('station')) state.station = params.get('station');
     const changed = page !== state.page;
     state.page = page;
+    document.body.dataset.page = page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== page; });
     $$('[data-nav]').forEach((a) => {
@@ -782,6 +937,7 @@
     });
     document.title = TITLES[page];
     closeMenu();
+    closeModal();
     RENDER[page]();
     bind();
     if (changed) window.scrollTo({ top: 0, behavior: 'instant' });
@@ -812,19 +968,22 @@
   // ---------- Events ----------
   function events() {
     $$('[data-link]').forEach((a) => { if (D.links[a.dataset.link]) a.href = D.links[a.dataset.link]; });
+    $('[data-me-avatar]').innerHTML = avatar(D.me.username);
+    $$('[data-me-name]').forEach((el) => { el.textContent = D.me.name; });
 
     $('.skip-link').addEventListener('click', (e) => { e.preventDefault(); $('#main').focus(); });
 
     $$('[data-menu-open]').forEach((b) => b.addEventListener('click', openMenu));
     $$('[data-menu-close]').forEach((b) => b.addEventListener('click', closeMenu));
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+    $$('[data-modal-close]').forEach((b) => b.addEventListener('click', closeModal));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu(); closeModal(); } });
 
-    $('[data-theme-toggle]').addEventListener('click', () => {
+    $$('[data-theme-toggle]').forEach((btn) => btn.addEventListener('click', () => {
       const next = isDark() ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
       try { localStorage.setItem('tsg-theme', next); } catch (e) { /* Speicher nicht verfügbar */ }
       if (state.page === 'statistiken') renderChart();
-    });
+    }));
 
     const topbar = $('[data-topbar]');
     const onScroll = () => topbar.classList.toggle('is-scrolled', window.scrollY > 12);
@@ -836,6 +995,58 @@
     attachSearch($('[data-search]'), $('[data-search-input]'), $('[data-search-results]'), () => items);
     const stationItems = items.filter((i) => i.type === 'Bahnhof').map((i) => Object.assign({}, i, { go: () => setStation(i.label) }));
     attachSearch($('[data-station-search]'), $('[data-station-input]'), $('[data-station-results]'), () => stationItems);
+
+    // Klicks, die überall vorkommen (Seiten und Sheets)
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-open], [data-detail], [data-bell], [data-day], [data-pick-day], [data-rank], [data-ttoggle], [data-treset], [data-signup], [data-waitlist], [data-station-pick], [data-station], [data-fav]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.open) openModal(ds.open);
+      else if (ds.detail) openModal('training', ds.detail);
+      else if ('bell' in ds) toggleBell();
+      else if (ds.pickDay) { state.trainingDay = +ds.pickDay; closeModal(); renderTrainings(); }
+      else if (ds.day) { state.trainingDay = +ds.day; renderTrainings(); }
+      else if (ds.rank) {
+        state.rank = ds.rank;
+        store.set('tsg-rank', ds.rank);
+        closeModal();
+        renderTrainings();
+        const next = nextRank(ds.rank);
+        toast(next ? `Rang: ${ds.rank} – als Nächstes ${next.name}` : `Rang: ${ds.rank}`);
+      } else if (ds.ttoggle) {
+        if (state.typeFilter.has(ds.ttoggle)) state.typeFilter.delete(ds.ttoggle); else state.typeFilter.add(ds.ttoggle);
+        store.set('tsg-tfilter', Array.from(state.typeFilter));
+        state.trainingDay = null;
+        renderTrainings();
+        refreshModal();
+      } else if ('treset' in ds) {
+        state.typeFilter.clear();
+        store.set('tsg-tfilter', []);
+        state.trainingDay = null;
+        closeModal();
+        renderTrainings();
+      } else if (ds.signup) toggleSignup(ds.signup);
+      else if (ds.waitlist) { const t = findTraining(ds.waitlist); toast(`Auf der Warteliste für „${t.title}“`); closeModal(); }
+      else if (ds.stationPick) { closeModal(); setStation(ds.stationPick); }
+      else if (ds.station) { state.homeStation = ds.station; renderHomeBoard(); renderHeroBoard(); }
+      else if (ds.fav) {
+        const name = ds.fav;
+        if (state.favs.has(name)) state.favs.delete(name); else state.favs.add(name);
+        store.set('tsg-favs', Array.from(state.favs));
+        el.setAttribute('aria-pressed', String(state.favs.has(name)));
+        toast(state.favs.has(name) ? `${name} gemerkt` : `${name} entfernt`);
+      }
+    });
+
+    // Karussell-Pfeile
+    const rail = $('[data-rail="routes"]');
+    const step = () => (rail.firstElementChild ? rail.firstElementChild.offsetWidth + 14 : 240);
+    $('[data-rail-prev="routes"]').addEventListener('click', () => rail.scrollBy({ left: -step() * 2, behavior: 'smooth' }));
+    $('[data-rail-next="routes"]').addEventListener('click', () => rail.scrollBy({ left: step() * 2, behavior: 'smooth' }));
+    const tabs = $('[data-day-tabs]');
+    $('[data-day-prev]').addEventListener('click', () => tabs.scrollBy({ left: -240, behavior: 'smooth' }));
+    $('[data-day-next]').addEventListener('click', () => tabs.scrollBy({ left: 240, behavior: 'smooth' }));
+    $('[data-all-toggle]').addEventListener('click', () => { state.showAll = !state.showAll; renderTrainings(); });
 
     // Abfahrten
     $$('[data-board-mode]').forEach((b) => b.addEventListener('click', () => {
@@ -850,21 +1061,6 @@
       $$('[data-cat]').forEach((x) => x.classList.toggle('is-active', x === b));
       renderFullBoard();
     });
-
-    // Strecken
-    $('[data-routes]').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-fav]');
-      if (!b) return;
-      const name = b.dataset.fav;
-      if (state.favs.has(name)) state.favs.delete(name); else state.favs.add(name);
-      store.set('tsg-favs', Array.from(state.favs));
-      b.setAttribute('aria-pressed', String(state.favs.has(name)));
-      toast(state.favs.has(name) ? `${name} gemerkt` : `${name} entfernt`);
-    });
-    const carousel = $('[data-carousel="routes"]');
-    const step = () => (carousel.firstElementChild ? carousel.firstElementChild.offsetWidth + 16 : 300);
-    $('[data-carousel-prev="routes"]').addEventListener('click', () => carousel.scrollBy({ left: -step(), behavior: 'smooth' }));
-    $('[data-carousel-next="routes"]').addEventListener('click', () => carousel.scrollBy({ left: step(), behavior: 'smooth' }));
 
     // Server
     $('[data-server-search]').addEventListener('input', (e) => { state.serverQuery = e.target.value; renderServers(); });
@@ -896,31 +1092,6 @@
       renderPlayers();
     }));
 
-    // Trainings
-    $('[data-day-strip]').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-day]');
-      if (!b) return;
-      state.trainingDay = b.dataset.day;
-      renderTrainings();
-    });
-    $('[data-training-filter]').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-ttype]');
-      if (!b) return;
-      state.trainingType = b.dataset.ttype;
-      renderTrainings();
-    });
-    $('[data-trainings="full"]').addEventListener('click', (e) => {
-      const b = e.target.closest('[data-signup]');
-      if (!b) return;
-      const id = b.dataset.signup;
-      const t = trainingsList().find((x) => x.id === id);
-      if (b.hasAttribute('data-waitlist')) { toast(`Auf der Warteliste für „${t.title}“`); return; }
-      if (state.signups.has(id)) { state.signups.delete(id); toast('Anmeldung zurückgezogen'); }
-      else { state.signups.add(id); toast(`Angemeldet: ${t.title} um ${t.time} Uhr`); }
-      store.set('tsg-signups', Array.from(state.signups));
-      renderTrainings();
-    });
-
     window.addEventListener('hashchange', route);
   }
 
@@ -930,23 +1101,22 @@
     const clock = `${pad(now.h)}:${pad(now.m)}`;
     $$('[data-clock]').forEach((el) => { el.textContent = clock; });
     $$('[data-clock-full]').forEach((el) => { el.textContent = `${clock}:${pad(now.s)}`; });
-    const dt = dateOf(now.day);
-    $$('[data-date]').forEach((el) => { el.textContent = `${WEEKDAYS[dt.getUTCDay()]}, ${now.d}. ${MONTHS[now.mo - 1]} ${now.y}`; });
     const ago = Math.round((Date.now() - state.updatedAt) / 1000);
     $$('[data-updated]').forEach((el) => { el.textContent = ago < 5 ? 'gerade eben' : `vor ${ago} s`; });
-    if (state.page === 'trainings') updateCountdown();
   }
 
   let lastMinute = -1;
-  function liveRefresh(force) {
+  function liveRefresh() {
     const now = berlinNow();
-    if (!force && now.abs === lastMinute && (Date.now() - state.updatedAt) < 20000) return;
+    if (now.abs === lastMinute && (Date.now() - state.updatedAt) < 20000) return;
+    const minuteChanged = now.abs !== lastMinute;
     lastMinute = now.abs;
     state.updatedAt = Date.now();
     state.online = Math.max(900, state.online + Math.round((Math.random() - 0.48) * 14));
     bind();
-    if (state.page === 'home') { renderHeroBoard(); renderHomeBoard(); }
+    if (state.page === 'home') { renderHeroBoard(); renderHomeBoard(); if (minuteChanged) renderNextSteps(); }
     if (state.page === 'abfahrten') renderFullBoard();
+    if (state.page === 'trainings' && minuteChanged && modal.hidden) renderNextSteps();
   }
 
   // ---------- Start ----------
@@ -954,6 +1124,7 @@
   events();
   route();
   tick();
+  lastMinute = berlinNow().abs;
   setInterval(tick, 1000);
-  setInterval(() => liveRefresh(false), 1000);
+  setInterval(liveRefresh, 1000);
 })();
