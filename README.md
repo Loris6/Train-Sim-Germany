@@ -18,6 +18,7 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 ## Design
 
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
+- Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
 - Eigenes Design im Stil moderner Bahn-Apps: dunkler Hero, helle „Sheet“-Fläche, Rot als Akzentfarbe
 - Responsiv für Handy, Tablet und Desktop: auf dem Handy mit Tab-Leiste unten und Menü-Sheet
 - Hell- und Dunkelmodus (folgt dem System, umschaltbar oben rechts)
@@ -37,6 +38,19 @@ links: {
 
 Dort stehen auch Linien und Fahrpläne (daraus werden die Live-Abfahrten berechnet), Server, Spieler, Trainings, Strecken und News. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
+## Icons hinzufügen
+
+1. Icon auf [flaticon.com/uicons](https://www.flaticon.com/uicons) suchen und die Klasse verwenden, z. B. `<i class="fi fi-rr-ticket ic"></i>` im HTML oder `icon('fi-rr-ticket')` im JavaScript.
+2. Icon-Dateien neu bauen:
+
+```bash
+npm install --no-save @flaticon/flaticon-uicons
+pip install fonttools brotli
+python3 tools/build_icons.py
+```
+
+Das Skript findet alle `fi-rr-…`, `fi-sr-…` und `fi-brands-…` Klassen und erzeugt `assets/css/uicons.css` sowie die passenden Schriftdateien in `assets/fonts`.
+
 ## Lokal starten
 
 ```bash
@@ -54,8 +68,10 @@ index.html            Alle Seiten (Hash-Routing: #/abfahrten, #/server, …)
 assets/css/style.css  Design-System und Layouts
 assets/js/data.js     Inhalte & Beispieldaten
 assets/js/app.js      Routing, Live-Abfahrten, Diagramme, Filter, Anmeldung
+assets/css/uicons.css Flaticon UIcons (erzeugt)
 assets/img/           Logo und Illustrationen (SVG)
-assets/fonts/         Rubik (woff2)
+assets/fonts/         Rubik und UIcons (woff2)
+tools/build_icons.py  Baut die UIcons-Teilmenge
 ```
 
 ---

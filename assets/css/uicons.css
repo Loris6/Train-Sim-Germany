@@ -1,0 +1,46 @@
+/* Flaticon UIcons (https://www.flaticon.com/uicons) – nur die genutzten Icons.
+   Automatisch erzeugt mit tools/build_icons.py, nicht von Hand bearbeiten. */
+
+@font-face{font-family:uicons-regular-rounded;src:url(../fonts/uicons-regular-rounded.woff2) format("woff2");font-display:block}
+i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,span[class*=fi-rr-]:before{font-family:uicons-regular-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.fi-rr-angle-small-left:before{content:"\f154"}
+.fi-rr-angle-small-right:before{content:"\f155"}
+.fi-rr-apps:before{content:"\f16c"}
+.fi-rr-arrow-small-right:before{content:"\f19e"}
+.fi-rr-bell:before{content:"\f239"}
+.fi-rr-bolt:before{content:"\f26c"}
+.fi-rr-calendar:before{content:"\f339"}
+.fi-rr-chart-line-up:before{content:"\f3a5"}
+.fi-rr-check:before{content:"\f3c8"}
+.fi-rr-clock-three:before{content:"\f453"}
+.fi-rr-cross-small:before{content:"\f4f6"}
+.fi-rr-database:before{content:"\f525"}
+.fi-rr-gamepad:before{content:"\f6df"}
+.fi-rr-heart:before{content:"\f7a0"}
+.fi-rr-home:before{content:"\f7b8"}
+.fi-rr-info:before{content:"\f80b"}
+.fi-rr-marker:before{content:"\f8fd"}
+.fi-rr-menu-burger:before{content:"\f925"}
+.fi-rr-moon:before{content:"\f972"}
+.fi-rr-route:before{content:"\fb6f"}
+.fi-rr-search:before{content:"\fbba"}
+.fi-rr-shield-check:before{content:"\fbdb"}
+.fi-rr-signal-alt-2:before{content:"\fc11"}
+.fi-rr-star:before{content:"\fce9"}
+.fi-rr-sun:before{content:"\fd17"}
+.fi-rr-train-side:before{content:"\fddf"}
+.fi-rr-train-station:before{content:"\fde1"}
+.fi-rr-triangle-warning:before{content:"\fe33"}
+.fi-rr-user-add:before{content:"\fe7a"}
+.fi-rr-users-alt:before{content:"\fea1"}
+
+@font-face{font-family:uicons-solid-rounded;src:url(../fonts/uicons-solid-rounded.woff2) format("woff2");font-display:block}
+i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,span[class*=fi-sr-]:before{font-family:uicons-solid-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.fi-sr-crown:before{content:"\f4ef"}
+.fi-sr-heart:before{content:"\f794"}
+.fi-sr-play:before{content:"\fa7f"}
+.fi-sr-star:before{content:"\fcc1"}
+
+@font-face{font-family:uicons-brands;src:url(../fonts/uicons-brands.woff2) format("woff2");font-display:block}
+i[class^=fi-brands-]:before,i[class*=" fi-brands-"]:before,span[class^=fi-brands-]:before,span[class*=fi-brands-]:before{font-family:uicons-brands!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.fi-brands-discord:before{content:"\f144"}

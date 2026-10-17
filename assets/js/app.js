@@ -13,7 +13,8 @@
   const compact = (n) => (n >= 1e6 ? nf1.format(n / 1e6) + ' Mio.' : n >= 1e3 ? nf1.format(n / 1e3) + 'K' : fmt(n));
   const pad = (n) => String(n).padStart(2, '0');
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const icon = (id, cls = '') => `<svg class="ic ${cls}"><use href="#i-${id}"/></svg>`;
+  // Flaticon UIcons, z. B. icon('fi-rr-home')
+  const icon = (name, cls = '') => `<i class="fi ${name} ic ${cls}" aria-hidden="true"></i>`;
   const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss');
 
   const store = {
@@ -229,7 +230,7 @@
   }
 
   function renderNotices() {
-    const icons = { warn: 'alert', info: 'info', ok: 'check' };
+    const icons = { warn: 'fi-rr-triangle-warning', info: 'fi-rr-info', ok: 'fi-rr-check' };
     $('[data-notices]').innerHTML = D.notices.map((n) => `<li>
       <span class="n-ic n-ic--${n.level}">${icon(icons[n.level])}</span>
       <div><b>${esc(n.title)}</b><span>${esc(n.text)}</span></div>
@@ -262,21 +263,21 @@
   function renderHomeKpis() {
     const s = D.stats;
     $('[data-kpis="home"]').innerHTML = [
-      kpi({ label: 'Spieler online', value: `<span data-bind="online">${fmt(state.online)}</span>`, delta: '12 % <small>vs. gestern</small>', ic: 'users', seed: 'on' }),
-      kpi({ label: 'Aktive Server', value: fmt(s.servers), delta: '3 <small>seit 1 Std.</small>', ic: 'server', seed: 'sv' }),
-      kpi({ label: 'Züge unterwegs', value: fmt(s.trains), delta: '8 % <small>vs. gestern</small>', ic: 'train', seed: 'tr' }),
-      kpi({ label: 'Pünktlichkeit', value: `${nf1.format(s.punctuality)} %`, delta: '0,6 Pkt. <small>vs. gestern</small>', up: false, ic: 'clock', seed: 'pu' }),
+      kpi({ label: 'Spieler online', value: `<span data-bind="online">${fmt(state.online)}</span>`, delta: '12 % <small>vs. gestern</small>', ic: 'fi-rr-users-alt', seed: 'on' }),
+      kpi({ label: 'Aktive Server', value: fmt(s.servers), delta: '3 <small>seit 1 Std.</small>', ic: 'fi-rr-database', seed: 'sv' }),
+      kpi({ label: 'Züge unterwegs', value: fmt(s.trains), delta: '8 % <small>vs. gestern</small>', ic: 'fi-rr-train-side', seed: 'tr' }),
+      kpi({ label: 'Pünktlichkeit', value: `${nf1.format(s.punctuality)} %`, delta: '0,6 Pkt. <small>vs. gestern</small>', up: false, ic: 'fi-rr-clock-three', seed: 'pu' }),
     ].join('');
   }
   function renderStatsKpis() {
     const s = D.stats;
     $('[data-kpis="stats"]').innerHTML = [
-      kpi({ label: 'Besuche gesamt', value: compact(s.visits), delta: '3,8 %', ic: 'play', seed: 'vi' }),
-      kpi({ label: 'Favoriten', value: compact(s.favorites), delta: '1,2 %', ic: 'star', seed: 'fa' }),
-      kpi({ label: 'Gruppenmitglieder', value: compact(s.groupMembers), delta: '640', ic: 'users', seed: 'gr' }),
-      kpi({ label: 'Discord', value: compact(s.discordMembers), delta: '2,1 %', ic: 'discord', seed: 'dc' }),
-      kpi({ label: 'Gefahrene km', value: compact(s.km), delta: '4,4 %', ic: 'route', seed: 'km' }),
-      kpi({ label: 'Fahrten heute', value: fmt(s.tripsToday), delta: '6 %', ic: 'train', seed: 'ft' }),
+      kpi({ label: 'Besuche gesamt', value: compact(s.visits), delta: '3,8 %', ic: 'fi-rr-gamepad', seed: 'vi' }),
+      kpi({ label: 'Favoriten', value: compact(s.favorites), delta: '1,2 %', ic: 'fi-rr-star', seed: 'fa' }),
+      kpi({ label: 'Gruppenmitglieder', value: compact(s.groupMembers), delta: '640', ic: 'fi-rr-users-alt', seed: 'gr' }),
+      kpi({ label: 'Discord', value: compact(s.discordMembers), delta: '2,1 %', ic: 'fi-brands-discord', seed: 'dc' }),
+      kpi({ label: 'Gefahrene km', value: compact(s.km), delta: '4,4 %', ic: 'fi-rr-route', seed: 'km' }),
+      kpi({ label: 'Fahrten heute', value: fmt(s.tripsToday), delta: '6 %', ic: 'fi-rr-train-side', seed: 'ft' }),
     ].join('');
   }
 
@@ -363,7 +364,7 @@
     </div>`).join('');
 
     $('[data-meters]').innerHTML = D.punctualityByNet.map((d) => {
-      const s = d.value >= 93 ? ['ok', 'Gut', 'check'] : d.value >= 88 ? ['warn', 'Angespannt', 'alert'] : ['bad', 'Kritisch', 'alert'];
+      const s = d.value >= 93 ? ['ok', 'Gut', 'fi-rr-check'] : d.value >= 88 ? ['warn', 'Angespannt', 'fi-rr-triangle-warning'] : ['bad', 'Kritisch', 'fi-rr-triangle-warning'];
       return `<li>
         <span class="m-label">${esc(d.label)}</span>
         <span class="m-value"><span class="state state--${s[0]}">${icon(s[2])}${s[1]}</span>${nf1.format(d.value)} %</span>
@@ -388,11 +389,11 @@
         <div class="route__media">
           <img src="assets/img/${r.img}" alt="Illustration der Strecke ${esc(r.title)}" loading="lazy">
           <span class="chip chip--glass">${esc(r.tag)}</span>
-          <button class="fav-btn" type="button" aria-pressed="${fav}" aria-label="${esc(r.title)} merken" data-fav="${esc(r.title)}">${icon('heart')}</button>
+          <button class="fav-btn" type="button" aria-pressed="${fav}" aria-label="${esc(r.title)} merken" data-fav="${esc(r.title)}">${icon('fi-rr-heart', 'ic--off')}${icon('fi-sr-heart', 'ic--on')}</button>
           <span class="line line--${r.cat}">${esc(r.line)}</span>
         </div>
         <div class="route__body">
-          <div class="route__top"><h3>${esc(r.title)}</h3><span class="rating">${icon('star')}${nf1.format(r.rating)} <small>(${esc(r.reviews)})</small></span></div>
+          <div class="route__top"><h3>${esc(r.title)}</h3><span class="rating">${icon('fi-sr-star')}${nf1.format(r.rating)} <small>(${esc(r.reviews)})</small></span></div>
           <p class="route__sub">${esc(r.from)} → ${esc(r.to)}</p>
           <p class="route__meta">${r.stops} Halte · ${fmt(r.km)} km · ${esc(r.dur)}</p>
         </div>
@@ -407,7 +408,7 @@
         <div class="news__meta"><span class="tag ${['tag--red', 'tag--info', 'tag--ok'][i % 3]}">${esc(n.tag)}</span><span>${esc(n.date)}</span></div>
         <h3>${esc(n.title)}</h3>
         <p>${esc(n.text)}</p>
-        <a class="link-more" data-link="discord" href="${esc(D.links.discord)}" target="_blank" rel="noopener">Mehr auf Discord ${icon('arrow')}</a>
+        <a class="link-more" data-link="discord" href="${esc(D.links.discord)}" target="_blank" rel="noopener">Mehr auf Discord ${icon('fi-rr-arrow-small-right')}</a>
       </div>
     </article>`).join('');
   }
@@ -431,26 +432,26 @@
       return `<article class="server">
         <div class="server__head">
           <div class="server__name">
-            <span class="server__ic">${icon(s.type === 'training' ? 'calendar' : s.type === 'event' ? 'zap' : 'server')}</span>
+            <span class="server__ic">${icon(s.type === 'training' ? 'fi-rr-calendar' : s.type === 'event' ? 'fi-rr-bolt' : 'fi-rr-database')}</span>
             <div><h3>${esc(s.name)}</h3><small><span class="live-dot live-dot--sm"></span>${esc(s.region)} · v${esc(s.version)}</small></div>
           </div>
           <span class="tag ${tagCls}">${tagText}</span>
         </div>
-        <p class="server__net">${icon('route')}${esc(s.network)}</p>
+        <p class="server__net">${icon('fi-rr-route')}${esc(s.network)}</p>
         <div class="occ">
           <div class="occ__row"><span>Spieler · <span class="status status--${level}">${label}</span></span><b>${s.players}/${s.max}</b></div>
           <div class="bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
         </div>
         <dl class="server__meta">
-          <div><dt>${icon('wifi')}Ping</dt><dd>${s.ping} ms</dd></div>
-          <div><dt>${icon('train')}Züge</dt><dd>${s.trains}</dd></div>
-          <div><dt>${icon('clock')}Laufzeit</dt><dd>${esc(s.uptime)}</dd></div>
+          <div><dt>${icon('fi-rr-signal-alt-2')}Ping</dt><dd>${s.ping} ms</dd></div>
+          <div><dt>${icon('fi-rr-train-side')}Züge</dt><dd>${s.trains}</dd></div>
+          <div><dt>${icon('fi-rr-clock-three')}Laufzeit</dt><dd>${esc(s.uptime)}</dd></div>
         </dl>
         <div class="server__foot">
           <span class="avatars">${names.map((n) => avatar(n)).join('')}<small>+${Math.max(0, s.players - names.length)}</small></span>
           ${full
             ? '<button class="btn btn--soft btn--sm" type="button" disabled>Voll</button>'
-            : `<a class="btn btn--primary btn--sm" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('play')}Beitreten</a>`}
+            : `<a class="btn btn--primary btn--sm" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}Beitreten</a>`}
         </div>
       </article>`;
     }).join('') : '<p class="empty">Kein Server gefunden. Versuch einen anderen Filter.</p>';
@@ -467,7 +468,7 @@
       const place = byKm.indexOf(p) + 1;
       return `<div class="podium__item podium__item--${place}">
         <span class="podium__place">${place}</span>
-        ${place === 1 ? `<span class="podium__crown">${icon('crown')}</span>` : ''}
+        ${place === 1 ? `<span class="podium__crown">${icon('fi-sr-crown')}</span>` : ''}
         ${avatar(p.name)}
         <h3>${esc(p.name)}</h3>
         <p>${esc(p.role)}</p>
@@ -496,13 +497,13 @@
   function renderProfile() {
     const p = D.players.find((x) => x.name === 'Nordlicht_Mia') || D.players[0];
     $('[data-profile]').innerHTML = `
-      <div class="profile-card__cover"><span class="chip chip--glass">${icon('star')}Spieler der Woche</span></div>
+      <div class="profile-card__cover"><span class="chip chip--glass">${icon('fi-sr-star')}Spieler der Woche</span></div>
       <div class="profile-card__body">
         ${avatar(p.name, 'avatar--xl')}
         <h3>${esc(p.name)}</h3>
         <p class="handle">@${esc(p.name.toLowerCase())} · ${roleBadge(p.role)}</p>
         <p class="bio">Fahrdienstleitung im Stellwerk Hamburg Hbf. Hält den S-Bahn-Takt auf Kurs und fährt nachts gern ICE.</p>
-        <div class="meta"><span>${icon('pin')}${esc(p.region)}</span><span>${icon('calendar')}Dabei seit ${esc(p.joined)}</span></div>
+        <div class="meta"><span>${icon('fi-rr-marker')}${esc(p.region)}</span><span>${icon('fi-rr-calendar')}Dabei seit ${esc(p.joined)}</span></div>
         <div class="profile-stats">
           <div><b>${p.level}</b><span>Level</span></div>
           <div><b>${compact(p.km)}</b><span>Kilometer</span></div>
@@ -584,9 +585,9 @@
       const running = t.start <= now.abs;
       const full = t.taken >= t.slots && !t.signed;
       const btn = t.signed
-        ? `<button class="btn btn--ok btn--sm" type="button" data-signup="${t.id}">${icon('check')}Angemeldet</button>`
+        ? `<button class="btn btn--ok btn--sm" type="button" data-signup="${t.id}">${icon('fi-rr-check')}Angemeldet</button>`
         : full
-          ? `<button class="btn btn--soft btn--sm" type="button" data-signup="${t.id}" data-waitlist>${icon('bell')}Warteliste</button>`
+          ? `<button class="btn btn--soft btn--sm" type="button" data-signup="${t.id}" data-waitlist>${icon('fi-rr-bell')}Warteliste</button>`
           : `<button class="btn btn--primary btn--sm" type="button" data-signup="${t.id}">Anmelden</button>`;
       html += `<li class="training">
         ${tdate(t.day, now.day)}
@@ -594,9 +595,9 @@
           <div class="training__top"><span class="type-badge" style="--tc:${t.color}"><i></i>${esc(t.type)}</span>${running ? '<span class="tag tag--red"><span class="live-dot live-dot--sm"></span>Läuft gerade</span>' : ''}</div>
           <h3>${esc(t.title)}</h3>
           <div class="training__meta">
-            <span>${icon('clock')}${t.time} – ${hhmm(t.end)} Uhr</span>
-            <span>${icon('server')}${esc(t.server)}</span>
-            <span>${icon('shield')}ab ${esc(t.req)}</span>
+            <span>${icon('fi-rr-clock-three')}${t.time} – ${hhmm(t.end)} Uhr</span>
+            <span>${icon('fi-rr-database')}${esc(t.server)}</span>
+            <span>${icon('fi-rr-shield-check')}ab ${esc(t.req)}</span>
           </div>
           <div class="training__host">${avatar(t.host)}Leitung: <b>${esc(t.host)}</b></div>
         </div>
@@ -634,17 +635,17 @@
   // ---------- Suche ----------
   function searchIndex() {
     const items = [];
-    ALL_STOPS.forEach((s) => items.push({ type: 'Bahnhof', label: s, sub: stationInfo(s).region, ic: 'pin', go: () => goStation(s) }));
+    ALL_STOPS.forEach((s) => items.push({ type: 'Bahnhof', label: s, sub: stationInfo(s).region, ic: 'fi-rr-marker', go: () => goStation(s) }));
     const seenLines = new Set();
     D.lines.forEach((l) => {
       const key = `${l.name} ${l.stops[0][0]}`;
       if (seenLines.has(key)) return;
       seenLines.add(key);
       const hub = l.stops.find((s) => D.stations.some((st) => st.name === s[0])) || l.stops[0];
-      items.push({ type: 'Linie', label: l.name, sub: `${l.stops[0][0]} – ${l.stops[l.stops.length - 1][0]}`, ic: 'train', go: () => goStation(hub[0]) });
+      items.push({ type: 'Linie', label: l.name, sub: `${l.stops[0][0]} – ${l.stops[l.stops.length - 1][0]}`, ic: 'fi-rr-train-side', go: () => goStation(hub[0]) });
     });
-    D.players.forEach((p) => items.push({ type: 'Spieler', label: p.name, sub: p.role, ic: 'users', go: () => { state.playerQuery = p.name; location.hash = '#/spieler'; } }));
-    D.servers.forEach((s) => items.push({ type: 'Server', label: s.name, sub: s.network, ic: 'server', go: () => { state.serverQuery = s.name; location.hash = '#/server'; } }));
+    D.players.forEach((p) => items.push({ type: 'Spieler', label: p.name, sub: p.role, ic: 'fi-rr-users-alt', go: () => { state.playerQuery = p.name; location.hash = '#/spieler'; } }));
+    D.servers.forEach((s) => items.push({ type: 'Server', label: s.name, sub: s.network, ic: 'fi-rr-database', go: () => { state.serverQuery = s.name; location.hash = '#/server'; } }));
     return items;
   }
   function goStation(name) {
@@ -726,7 +727,7 @@
   let toastTimer;
   function toast(msg) {
     const el = $('[data-toast]');
-    el.innerHTML = `${icon('check')}<span>${esc(msg)}</span>`;
+    el.innerHTML = `${icon('fi-rr-check')}<span>${esc(msg)}</span>`;
     el.hidden = false;
     el.style.animation = 'none';
     void el.offsetWidth;
