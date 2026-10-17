@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Train Sim Germany – Das Bahnerlebnis auf Roblox</title>
+  <meta name="description" content="Train Sim Germany: Fahre ICE, RE und S-Bahn durch Deutschland auf Roblox. Live-Abfahrten, Server, Statistiken, Spieler und kommende Trainings.">
+  <meta name="theme-color" content="#0B0D12">
+  <meta property="og:title" content="Train Sim Germany">
+  <meta property="og:description" content="Das Bahnerlebnis auf Roblox – Live-Abfahrten, Server, Statistiken und Trainings.">
+  <meta property="og:type" content="website">
+  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
+  <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script>
+    // Theme vor dem ersten Rendern setzen, damit nichts aufblitzt
+    try { var t = localStorage.getItem('tsg-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+  </script>
+</head>
+<body>
+  <!-- Icon-Sprite -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M7 8.5h4M7 12.5h7M15 8.5h2M8 21h8M12 17v4"/></symbol>
+    <symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .6 3.2 2.3 3.5 5.2"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-9-9a4.8 4.8 0 0 1 9-3 4.8 4.8 0 0 1 9 3c-2 4.6-9 9-9 9z"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
+    <symbol id="i-train" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 10.5h14M9 21l1.5-4M15 21l-1.5-4"/><path d="M9 13.8h.01M15 13.8h.01"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0M12 19h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 1 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path d="m3 8 4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 4.5 3.4 8.3 8 9 4.6-.7 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 17h.01"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
+    <symbol id="i-discord" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M19.3 5.3A16.6 16.6 0 0 0 15.2 4l-.5 1.1a15.4 15.4 0 0 0-5.4 0L8.8 4a16.5 16.5 0 0 0-4.1 1.3C2.1 9.2 1.4 13 1.8 16.7a16.7 16.7 0 0 0 5 2.5l1.1-1.7a10.8 10.8 0 0 1-1.7-.8l.4-.3a11.9 11.9 0 0 0 10.8 0l.4.3c-.5.3-1.1.6-1.7.8l1.1 1.7a16.6 16.6 0 0 0 5-2.5c.5-4.3-.8-8.1-2.9-11.4zM8.7 14.5c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z"/></symbol>
+    <symbol id="i-roblox" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" fill-rule="evenodd" d="M6.3 2 2 17.7 17.7 22 22 6.3zm7.6 12.9-4.8-1.3 1.3-4.8 4.8 1.3z"/></symbol>
+  </svg>
+
+  <a class="skip-link" href="#main">Zum Inhalt springen</a>
+
+  <!-- Kopfzeile -->
+  <header class="topbar" data-topbar>
+    <div class="container topbar__inner">
+      <a class="brand" href="#/" aria-label="Train Sim Germany – Startseite">
+        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="40" height="40">
+        <span class="brand__name">Train Sim <b>Germany</b></span>
+      </a>
+      <nav class="mainnav" aria-label="Hauptnavigation">
+        <a href="#/" data-nav="home">Start</a>
+        <a href="#/abfahrten" data-nav="abfahrten">Abfahrten</a>
+        <a href="#/server" data-nav="server">Server</a>
+        <a href="#/statistiken" data-nav="statistiken">Statistiken</a>
+        <a href="#/spieler" data-nav="spieler">Spieler</a>
+        <a href="#/trainings" data-nav="trainings">Trainings</a>
+      </nav>
+      <div class="topbar__actions">
+        <button class="icon-btn" type="button" data-theme-toggle aria-label="Farbschema wechseln">
+          <svg class="ic ic--sun"><use href="#i-sun"/></svg>
+          <svg class="ic ic--moon"><use href="#i-moon"/></svg>
+        </button>
+        <a class="icon-btn hide-sm" data-link="discord" href="#" target="_blank" rel="noopener" aria-label="Discord beitreten"><svg class="ic"><use href="#i-discord"/></svg></a>
+        <a class="icon-btn hide-sm" data-link="group" href="#" target="_blank" rel="noopener" aria-label="Roblox-Gruppe beitreten"><svg class="ic"><use href="#i-roblox"/></svg></a>
+        <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-play"/></svg><span>Spielen</span></a>
+        <button class="icon-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen" aria-controls="menu" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+
+    <!-- ===================== START ===================== -->
+    <section class="page" data-page="home" aria-label="Start">
+      <div class="hero hero--home">
+        <img class="hero__bg" src="assets/img/hero.svg" alt="" aria-hidden="true">
+        <div class="hero__shade"></div>
+        <div class="container hero__inner">
+          <div class="hero__content">
+            <span class="pill pill--glass"><span class="live-dot"></span><b data-bind="online">1.284</b>&nbsp;Spieler gerade online</span>
+            <h1 class="hero__title">Moin, Lokführer!<span>Wohin geht die Fahrt heute?</span></h1>
+            <p class="hero__lead">Fahre ICE, RE und S-Bahn durch ganz Deutschland, stell Weichen im Stellwerk und werde Teil der Crew – das Bahnerlebnis auf Roblox.</p>
+
+            <form class="search search--glass" role="search" data-search autocomplete="off">
+              <svg class="ic search__icon"><use href="#i-search"/></svg>
+              <label class="search__field">
+                <span class="sr-only">Bahnhof, Linie oder Spieler suchen</span>
+                <input type="search" name="q" placeholder="Bahnhof, Linie oder Spieler" data-search-input>
+                <span class="search__hint">Live-Abfahrten · Server · Spieler</span>
+              </label>
+              <button class="search__btn" type="submit" aria-label="Suchen"><svg class="ic"><use href="#i-arrow"/></svg></button>
+              <ul class="search__results" role="listbox" data-search-results hidden></ul>
+            </form>
+
+            <div class="hero__actions">
+              <a class="btn btn--primary btn--lg" data-link="play" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-play"/></svg>Jetzt spielen</a>
+              <a class="btn btn--glass btn--lg" data-link="group" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-roblox"/></svg>Gruppe beitreten</a>
+              <a class="btn btn--glass btn--lg" data-link="discord" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
+            </div>
+          </div>
+
+          <aside class="hero-board glass" aria-label="Nächste Abfahrten">
+            <div class="hero-board__head">
+              <div>
+                <span class="eyebrow eyebrow--light">Nächste Abfahrten</span>
+                <strong data-hero-station>Hamburg Hbf</strong>
+              </div>
+              <time class="hero-board__clock" data-clock>--:--</time>
+            </div>
+            <ul class="hero-board__list" data-board="hero"></ul>
+            <a class="hero-board__more" href="#/abfahrten">Zur Abfahrtstafel <svg class="ic"><use href="#i-arrow"/></svg></a>
+          </aside>
+        </div>
+      </div>
+
+      <div class="sheet">
+        <div class="container">
+
+          <!-- Steig ein: Play / Gruppe / Discord -->
+          <section class="section" aria-labelledby="h-join">
+            <div class="section__head">
+              <div>
+                <span class="eyebrow">Steig ein</span>
+                <h2 id="h-join">Dein Platz im Führerstand wartet</h2>
+              </div>
+            </div>
+            <div class="join-grid">
+              <a class="join-card join-card--play" data-link="play" href="#" target="_blank" rel="noopener">
+                <img src="assets/img/play.svg" alt="Blick aus dem Führerstand auf die Strecke mit grünem Signal" loading="lazy">
+                <div class="join-card__body">
+                  <span class="chip chip--glass"><svg class="ic"><use href="#i-roblox"/></svg>Kostenlos auf Roblox</span>
+                  <h3>Jetzt spielen</h3>
+                  <p>Auf PC, Handy, Tablet und Konsole. Übernimm deinen ersten Zug in wenigen Sekunden.</p>
+                  <span class="btn btn--primary"><svg class="ic"><use href="#i-play"/></svg>Spiel starten</span>
+                </div>
+              </a>
+              <a class="join-card join-card--group" data-link="group" href="#" target="_blank" rel="noopener">
+                <img src="assets/img/group.svg" alt="Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug" loading="lazy">
+                <div class="join-card__body">
+                  <span class="chip chip--glass"><svg class="ic"><use href="#i-users"/></svg><span data-bind="groupMembers">48,2K</span>&nbsp;Mitglieder</span>
+                  <h3>Gruppe beitreten</h3>
+                  <p>Ränge freischalten, an Trainings teilnehmen und Teil der Crew werden.</p>
+                  <span class="btn btn--light"><svg class="ic"><use href="#i-roblox"/></svg>Beitreten</span>
+                </div>
+              </a>
+              <a class="join-card join-card--discord" data-link="discord" href="#" target="_blank" rel="noopener">
+                <img src="assets/img/discord.svg" alt="Chatnachrichten über einer nächtlichen Stadt mit vorbeifahrendem Zug" loading="lazy">
+                <div class="join-card__body">
+                  <span class="chip chip--glass"><span class="live-dot live-dot--sm"></span><span data-bind="discordOnline">3,1K</span>&nbsp;online</span>
+                  <h3>Discord beitreten</h3>
+                  <p>Fahrpläne, Events, Support und Bewerbungen – alles an einem Ort.</p>
+                  <span class="btn btn--discord"><svg class="ic"><use href="#i-discord"/></svg>Zum Discord</span>
+                </div>
+              </a>
+            </div>
+          </section>
+
+          <!-- Kennzahlen -->
+          <section class="section" aria-labelledby="h-kpi">
+            <div class="section__head">
+              <div>
+                <span class="eyebrow">Live</span>
+                <h2 id="h-kpi">Das Netz in Zahlen</h2>
+              </div>
+              <a class="link-more" href="#/statistiken">Alle Statistiken <svg class="ic"><use href="#i-arrow"/></svg></a>
+            </div>
+            <div class="kpi-grid" data-kpis="home"></div>
+          </section>
+
+          <!-- Abfahrten + Trainings -->
+          <section class="section split" aria-label="Abfahrten und Trainings">
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Live-Abfahrten</h2>
+                  <p class="card__sub"><span class="live-dot live-dot--sm"></span>Echtzeit aus allen Servern</p>
+                </div>
+                <a class="link-more" href="#/abfahrten">Alle <svg class="ic"><use href="#i-arrow"/></svg></a>
+              </div>
+              <div class="chips chips--scroll" data-station-chips="home" role="tablist" aria-label="Bahnhof wählen"></div>
+              <ul class="board board--compact" data-board="home"></ul>
+            </div>
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Kommende Trainings</h2>
+                  <p class="card__sub">Offizielle Ausbildungen der Crew</p>
+                </div>
+                <a class="link-more" href="#/trainings">Alle <svg class="ic"><use href="#i-arrow"/></svg></a>
+              </div>
+              <ul class="training-mini" data-trainings="home"></ul>
+            </div>
+          </section>
+
+          <!-- Strecken -->
+          <section class="section" aria-labelledby="h-routes">
+            <div class="section__head">
+              <div>
+                <span class="eyebrow">Entdecken</span>
+                <h2 id="h-routes">Beliebte Strecken</h2>
+              </div>
+              <div class="carousel-ctrl">
+                <button class="icon-btn icon-btn--soft" type="button" data-carousel-prev="routes" aria-label="Zurück"><svg class="ic"><use href="#i-chev-l"/></svg></button>
+                <button class="icon-btn icon-btn--soft" type="button" data-carousel-next="routes" aria-label="Weiter"><svg class="ic"><use href="#i-chev-r"/></svg></button>
+              </div>
+            </div>
+            <div class="carousel" data-carousel="routes" data-routes></div>
+          </section>
+
+          <!-- Promo -->
+          <section class="section">
+            <div class="promo">
+              <img class="promo__bg" src="assets/img/training.svg" alt="" aria-hidden="true" loading="lazy">
+              <div class="promo__content">
+                <span class="chip chip--red">Bewerbungen offen</span>
+                <h2>Werde Fahrdienstleiter im Stellwerk</h2>
+                <p>Stell Fahrstraßen, regel den Verkehr und halte das Netz am Laufen. Die nächsten Trainings starten diese Woche.</p>
+                <div class="btn-row">
+                  <a class="btn btn--primary" href="#/trainings"><svg class="ic"><use href="#i-calendar"/></svg>Zu den Trainings</a>
+                  <a class="btn btn--glass" data-link="discord" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- News -->
+          <section class="section" aria-labelledby="h-news">
+            <div class="section__head">
+              <div>
+                <span class="eyebrow">Neuigkeiten</span>
+                <h2 id="h-news">Updates &amp; Events</h2>
+              </div>
+            </div>
+            <div class="news-grid" data-news></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ABFAHRTEN ===================== -->
+    <section class="page" data-page="abfahrten" aria-label="Abfahrten" hidden>
+      <div class="hero hero--page">
+        <img class="hero__bg" src="assets/img/route-city.svg" alt="" aria-hidden="true">
+        <div class="hero__shade"></div>
+        <div class="container hero__inner hero__inner--page">
+          <div class="hero__content">
+            <span class="pill pill--glass"><span class="live-dot"></span>Live · aktualisiert <span data-updated>gerade eben</span></span>
+            <h1 class="page-title">Abfahrtstafel</h1>
+            <p class="hero__lead">Echtzeit-Abfahrten aus allen Servern – wer fährt, wohin und mit wie viel Verspätung.</p>
+            <form class="search search--glass search--station" data-station-search autocomplete="off">
+              <svg class="ic search__icon"><use href="#i-pin"/></svg>
+              <label class="search__field">
+                <span class="sr-only">Bahnhof suchen</span>
+                <input type="search" placeholder="Bahnhof suchen, z. B. Köln Hbf" data-station-input>
+                <span class="search__hint" data-station-current>Hamburg Hbf</span>
+              </label>
+              <button class="search__btn" type="submit" aria-label="Bahnhof anzeigen"><svg class="ic"><use href="#i-arrow"/></svg></button>
+              <ul class="search__results" role="listbox" data-station-results hidden></ul>
+            </form>
+          </div>
+          <div class="hero-clock glass" aria-live="off">
+            <span class="eyebrow eyebrow--light">Spielzeit · MEZ</span>
+            <time data-clock-full>--:--:--</time>
+            <span data-date>&nbsp;</span>
+          </div>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container">
+          <div class="toolbar">
+            <div class="segmented" role="tablist" aria-label="Tafel">
+              <button type="button" role="tab" aria-selected="true" data-board-mode="dep">Abfahrten</button>
+              <button type="button" role="tab" aria-selected="false" data-board-mode="arr">Ankünfte</button>
+            </div>
+            <div class="chips chips--scroll" data-cat-filter role="group" aria-label="Zuggattung filtern">
+              <button class="chip is-active" type="button" data-cat="all">Alle</button>
+              <button class="chip" type="button" data-cat="fern">Fernverkehr</button>
+              <button class="chip" type="button" data-cat="regio">Regional</button>
+              <button class="chip" type="button" data-cat="s">S-Bahn</button>
+            </div>
+          </div>
+          <div class="chips chips--scroll chips--stations" data-station-chips="full" role="tablist" aria-label="Bahnhof wählen"></div>
+
+          <div class="layout-aside">
+            <div class="card card--flush">
+              <div class="board-title">
+                <div>
+                  <span class="eyebrow" data-board-label>Abfahrten</span>
+                  <h2 data-board-station>Hamburg Hbf</h2>
+                </div>
+                <span class="pill pill--soft"><span class="live-dot live-dot--sm"></span>Live</span>
+              </div>
+              <div class="board-cols" aria-hidden="true">
+                <span>Zeit</span><span>Zug</span><span data-col-dest>Nach</span><span>Gleis</span><span>Status</span><span>Lokführer</span>
+              </div>
+              <ul class="board board--full" data-board="full"></ul>
+            </div>
+            <aside class="stack">
+              <div class="card station-card">
+                <img src="assets/img/route-city.svg" alt="" aria-hidden="true" loading="lazy" data-station-img>
+                <div class="station-card__body">
+                  <span class="eyebrow">Bahnhof</span>
+                  <h3 data-station-name>Hamburg Hbf</h3>
+                  <p class="muted" data-station-region>Nordnetz</p>
+                  <dl class="mini-stats">
+                    <div><dt>Gleise</dt><dd data-station-tracks>14</dd></div>
+                    <div><dt>Züge/Std.</dt><dd data-station-tph>32</dd></div>
+                    <div><dt>Spieler hier</dt><dd data-station-players>23</dd></div>
+                  </dl>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card__head"><h3 class="card__title">Hinweise</h3></div>
+                <ul class="notice-list" data-notices></ul>
+              </div>
+              <div class="card">
+                <div class="card__head"><h3 class="card__title">Legende</h3></div>
+                <ul class="legend-list">
+                  <li><span class="line line--ice">ICE</span>Intercity-Express</li>
+                  <li><span class="line line--ic">IC</span>Intercity</li>
+                  <li><span class="line line--re">RE</span>Regional-Express</li>
+                  <li><span class="line line--rb">RB</span>Regionalbahn</li>
+                  <li><span class="line line--s">S</span>S-Bahn</li>
+                </ul>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SERVER ===================== -->
+    <section class="page" data-page="server" aria-label="Server" hidden>
+      <div class="hero hero--page">
+        <img class="hero__bg" src="assets/img/route-rhine.svg" alt="" aria-hidden="true">
+        <div class="hero__shade"></div>
+        <div class="container hero__inner hero__inner--page">
+          <div class="hero__content">
+            <span class="pill pill--glass"><span class="live-dot"></span><b data-bind="servers">42</b>&nbsp;Server online</span>
+            <h1 class="page-title">Server</h1>
+            <p class="hero__lead">Finde einen Server mit freien Plätzen und spring direkt in den Führerstand.</p>
+          </div>
+          <div class="hero-stats glass">
+            <div><span>Spieler</span><strong data-bind="online">1.284</strong></div>
+            <div><span>Ø Ping</span><strong>46 ms</strong></div>
+            <div><span>Freie Plätze</span><strong data-bind="freeSlots">186</strong></div>
+          </div>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container">
+          <div class="toolbar">
+            <label class="input input--search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="sr-only">Server suchen</span>
+              <input type="search" placeholder="Server oder Strecke suchen" data-server-search>
+            </label>
+            <div class="chips chips--scroll" data-server-filter role="group" aria-label="Server filtern">
+              <button class="chip is-active" type="button" data-type="all">Alle</button>
+              <button class="chip" type="button" data-type="public">Öffentlich</button>
+              <button class="chip" type="button" data-type="free">Freie Plätze</button>
+              <button class="chip" type="button" data-type="event">Event</button>
+              <button class="chip" type="button" data-type="training">Training</button>
+              <button class="chip" type="button" data-type="vip">VIP</button>
+            </div>
+          </div>
+          <div class="server-grid" data-servers></div>
+          <div class="info-banner">
+            <svg class="ic"><use href="#i-shield"/></svg>
+            <div>
+              <strong>Eigener VIP-Server</strong>
+              <p>Fahr mit Freunden auf deinem privaten Server – mit eigenem Fahrplan und Stellwerk.</p>
+            </div>
+            <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== STATISTIKEN ===================== -->
+    <section class="page" data-page="statistiken" aria-label="Statistiken" hidden>
+      <div class="hero hero--page">
+        <img class="hero__bg" src="assets/img/route-alps.svg" alt="" aria-hidden="true">
+        <div class="hero__shade"></div>
+        <div class="container hero__inner hero__inner--page">
+          <div class="hero__content">
+            <span class="pill pill--glass"><svg class="ic"><use href="#i-chart"/></svg>Statistiken</span>
+            <h1 class="page-title">Das Spiel in Zahlen</h1>
+            <p class="hero__lead">Besuche, Fahrten, Kilometer und Pünktlichkeit – live aus dem gesamten Netz.</p>
+          </div>
+          <div class="hero-figure glass">
+            <span class="eyebrow eyebrow--light">Besuche gesamt</span>
+            <strong data-bind="visits">12,4 Mio.</strong>
+            <span class="delta delta--up">+3,8 % diese Woche</span>
+          </div>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container">
+          <div class="kpi-grid kpi-grid--6" data-kpis="stats"></div>
+
+          <div class="card chart-card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Spieler online</h2>
+                <p class="card__sub">Letzte 24 Stunden, stündlich</p>
+              </div>
+              <div class="segmented segmented--sm" role="tablist" aria-label="Zeitraum">
+                <button type="button" role="tab" aria-selected="true" data-range="24">24 Std.</button>
+                <button type="button" role="tab" aria-selected="false" data-range="7">7 Tage</button>
+                <button type="button" role="tab" aria-selected="false" data-range="30">30 Tage</button>
+              </div>
+            </div>
+            <div class="chart" data-chart="online" role="img" aria-label="Flächendiagramm der Spieler online"></div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Fahrten nach Zuggattung</h2>
+                  <p class="card__sub">Anteil an allen Fahrten heute</p>
+                </div>
+              </div>
+              <div class="hbars" data-hbars></div>
+            </div>
+            <div class="card">
+              <div class="card__head">
+                <div>
+                  <h2 class="card__title">Pünktlichkeit nach Netz</h2>
+                  <p class="card__sub">Anteil der Züge mit weniger als 6 Min. Verspätung</p>
+                </div>
+              </div>
+              <ul class="meters" data-meters></ul>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Meistbefahrene Strecken</h2>
+                <p class="card__sub">Fahrten in den letzten 7 Tagen</p>
+              </div>
+            </div>
+            <ol class="rank-list" data-top-routes></ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== SPIELER ===================== -->
+    <section class="page" data-page="spieler" aria-label="Spieler" hidden>
+      <div class="hero hero--page hero--bright">
+        <img class="hero__bg" src="assets/img/group.svg" alt="" aria-hidden="true">
+        <div class="hero__shade"></div>
+        <div class="container hero__inner hero__inner--page">
+          <div class="hero__content">
+            <span class="pill pill--glass"><svg class="ic"><use href="#i-users"/></svg><b data-bind="groupMembers">48,2K</b>&nbsp;Crew-Mitglieder</span>
+            <h1 class="page-title">Spieler &amp; Bestenliste</h1>
+            <p class="hero__lead">Die fleißigsten Lokführer, Fahrdienstleiter und Zugbegleiter von Train Sim Germany.</p>
+            <label class="search search--glass search--compact">
+              <svg class="ic search__icon"><use href="#i-search"/></svg>
+              <span class="sr-only">Spieler suchen</span>
+              <input type="search" placeholder="Spielername suchen" data-player-search>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container">
+          <div class="podium" data-podium></div>
+          <div class="layout-aside layout-aside--wide">
+            <div class="card card--flush">
+              <div class="board-title">
+                <div>
+                  <span class="eyebrow">Bestenliste</span>
+                  <h2>Diese Saison</h2>
+                </div>
+                <div class="segmented segmented--sm" role="tablist" aria-label="Sortierung">
+                  <button type="button" role="tab" aria-selected="true" data-sort="km">Kilometer</button>
+                  <button type="button" role="tab" aria-selected="false" data-sort="trips">Fahrten</button>
+                  <button type="button" role="tab" aria-selected="false" data-sort="punct">Pünktlich</button>
+                </div>
+              </div>
+              <ol class="leaderboard" data-leaderboard></ol>
+            </div>
+            <aside class="stack">
+              <div class="card profile-card" data-profile></div>
+              <div class="card">
+                <div class="card__head"><h3 class="card__title">Ränge</h3></div>
+                <ul class="rank-ladder" data-ranks></ul>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== TRAININGS ===================== -->
+    <section class="page" data-page="trainings" aria-label="Trainings" hidden>
+      <div class="hero hero--page">
+        <img class="hero__bg" src="assets/img/training.svg" alt="" aria-hidden="true">
+        <div class="hero__shade"></div>
+        <div class="container hero__inner hero__inner--page">
+          <div class="hero__content">
+            <span class="pill pill--glass"><svg class="ic"><use href="#i-calendar"/></svg>Ausbildung</span>
+            <h1 class="page-title">Kommende Trainings</h1>
+            <p class="hero__lead">Werde Lokführer, Fahrdienstleiter oder Zugbegleiter – mit offiziellen Trainings der Crew.</p>
+          </div>
+          <div class="hero-countdown glass">
+            <span class="eyebrow eyebrow--light">Nächstes Training</span>
+            <strong data-next-training-title>–</strong>
+            <div class="countdown" data-countdown>
+              <div><b>00</b><span>Std.</span></div>
+              <div><b>00</b><span>Min.</span></div>
+              <div><b>00</b><span>Sek.</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container">
+          <div class="day-strip" data-day-strip role="tablist" aria-label="Tag wählen"></div>
+          <div class="chips chips--scroll" data-training-filter role="group" aria-label="Trainingsart filtern"></div>
+          <div class="layout-aside">
+            <ul class="training-list" data-trainings="full"></ul>
+            <aside class="stack">
+              <div class="card">
+                <div class="card__head"><h3 class="card__title">So läuft ein Training ab</h3></div>
+                <ol class="steps">
+                  <li><b>Gruppe beitreten</b><span>Du brauchst die Roblox-Gruppe, um Ränge zu erhalten.</span></li>
+                  <li><b>Platz sichern</b><span>Melde dich hier an und erscheine 10 Min. vorher auf dem Server.</span></li>
+                  <li><b>Theorie &amp; Praxis</b><span>Signale, Fahrplan, Funk – danach eine Prüfungsfahrt.</span></li>
+                  <li><b>Rang erhalten</b><span>Bestanden? Dein neuer Rang wird automatisch vergeben.</span></li>
+                </ol>
+                <div class="btn-stack">
+                  <a class="btn btn--primary btn--block" data-link="group" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-roblox"/></svg>Gruppe beitreten</a>
+                  <a class="btn btn--discord btn--block" data-link="discord" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-discord"/></svg>Discord beitreten</a>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card__head"><h3 class="card__title">Trainingsarten</h3></div>
+                <ul class="type-list" data-training-types></ul>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Fußzeile -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__cta">
+        <div>
+          <h2>Bereit für die erste Fahrt?</h2>
+          <p>Spiel kostenlos auf Roblox und werde Teil der Community.</p>
+        </div>
+        <div class="btn-row">
+          <a class="btn btn--primary" data-link="play" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-play"/></svg>Spielen</a>
+          <a class="btn btn--glass" data-link="group" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-roblox"/></svg>Gruppe</a>
+          <a class="btn btn--glass" data-link="discord" href="#" target="_blank" rel="noopener"><svg class="ic"><use href="#i-discord"/></svg>Discord</a>
+        </div>
+      </div>
+      <div class="footer__grid">
+        <div class="footer__brand">
+          <a class="brand" href="#/">
+            <img class="brand__logo" src="assets/img/logo.svg" alt="" width="40" height="40">
+            <span class="brand__name">Train Sim <b>Germany</b></span>
+          </a>
+          <p>Das Bahnerlebnis auf Roblox – mit Live-Abfahrten, echten Strecken und einer Crew, die das Netz am Laufen hält.</p>
+        </div>
+        <nav aria-label="Spiel">
+          <h3>Spiel</h3>
+          <a data-link="play" href="#" target="_blank" rel="noopener">Spielen</a>
+          <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe</a>
+          <a data-link="discord" href="#" target="_blank" rel="noopener">Discord</a>
+        </nav>
+        <nav aria-label="Netz">
+          <h3>Netz</h3>
+          <a href="#/abfahrten">Abfahrten</a>
+          <a href="#/server">Server</a>
+          <a href="#/statistiken">Statistiken</a>
+        </nav>
+        <nav aria-label="Community">
+          <h3>Community</h3>
+          <a href="#/spieler">Spieler</a>
+          <a href="#/trainings">Trainings</a>
+        </nav>
+      </div>
+      <p class="footer__legal">© <span data-year>2026</span> Train Sim Germany. Ein Fan-Projekt auf Roblox – nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation.</p>
+    </div>
+  </footer>
+
+  <!-- Mobile Tab-Leiste -->
+  <nav class="tabbar" aria-label="App-Navigation">
+    <a href="#/" data-nav="home"><svg class="ic"><use href="#i-home"/></svg><span>Start</span></a>
+    <a href="#/abfahrten" data-nav="abfahrten"><svg class="ic"><use href="#i-board"/></svg><span>Abfahrten</span></a>
+    <a href="#/trainings" data-nav="trainings"><svg class="ic"><use href="#i-calendar"/></svg><span>Trainings</span></a>
+    <a href="#/server" data-nav="server"><svg class="ic"><use href="#i-server"/></svg><span>Server</span></a>
+    <button type="button" data-menu-open data-nav="more" aria-controls="menu" aria-expanded="false"><svg class="ic"><use href="#i-grid"/></svg><span>Mehr</span></button>
+  </nav>
+
+  <!-- Menü (mobil) -->
+  <div class="menu" id="menu" data-menu hidden>
+    <div class="menu__backdrop" data-menu-close></div>
+    <div class="menu__panel" role="dialog" aria-modal="true" aria-label="Menü">
+      <div class="menu__grip" aria-hidden="true"></div>
+      <div class="menu__head">
+        <strong>Menü</strong>
+        <button class="icon-btn icon-btn--soft" type="button" data-menu-close aria-label="Menü schließen"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+      <nav class="menu__nav" aria-label="Alle Seiten">
+        <a href="#/" data-nav="home"><span class="menu__ic"><svg class="ic"><use href="#i-home"/></svg></span>Start</a>
+        <a href="#/abfahrten" data-nav="abfahrten"><span class="menu__ic"><svg class="ic"><use href="#i-board"/></svg></span>Abfahrten</a>
+        <a href="#/server" data-nav="server"><span class="menu__ic"><svg class="ic"><use href="#i-server"/></svg></span>Server</a>
+        <a href="#/statistiken" data-nav="statistiken"><span class="menu__ic"><svg class="ic"><use href="#i-chart"/></svg></span>Statistiken</a>
+        <a href="#/spieler" data-nav="spieler"><span class="menu__ic"><svg class="ic"><use href="#i-users"/></svg></span>Spieler</a>
+        <a href="#/trainings" data-nav="trainings"><span class="menu__ic"><svg class="ic"><use href="#i-calendar"/></svg></span>Trainings</a>
+      </nav>
+      <div class="menu__cta">
+        <a class="menu-tile menu-tile--play" data-link="play" href="#" target="_blank" rel="noopener">
+          <img src="assets/img/play.svg" alt="" loading="lazy"><span><svg class="ic"><use href="#i-play"/></svg>Spielen</span>
+        </a>
+        <a class="menu-tile" data-link="group" href="#" target="_blank" rel="noopener">
+          <img src="assets/img/group.svg" alt="" loading="lazy"><span><svg class="ic"><use href="#i-roblox"/></svg>Gruppe</span>
+        </a>
+        <a class="menu-tile" data-link="discord" href="#" target="_blank" rel="noopener">
+          <img src="assets/img/discord.svg" alt="" loading="lazy"><span><svg class="ic"><use href="#i-discord"/></svg>Discord</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
+  <div class="tooltip" data-tooltip hidden></div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
