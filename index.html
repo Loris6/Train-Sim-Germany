@@ -29,6 +29,7 @@
         <img class="brand__logo" src="assets/img/logo.svg" alt="" width="34" height="34">
         <span class="brand__name">Train Sim <b>Germany</b></span>
       </a>
+      <p class="topbar__loc"><i class="fi fi-rr-location-arrow ic" aria-hidden="true"></i>Deutschland</p>
       <nav class="mainnav" aria-label="Hauptnavigation">
         <a href="#/" data-nav="home">Start</a>
         <a href="#/abfahrten" data-nav="abfahrten">Abfahrten</a>
@@ -45,7 +46,7 @@
         <a class="round-btn hide-mobile" data-link="discord" href="#" target="_blank" rel="noopener" aria-label="Discord beitreten"><i class="fi fi-brands-discord ic" aria-hidden="true"></i></a>
         <a class="round-btn hide-mobile" data-link="group" href="#" target="_blank" rel="noopener" aria-label="Roblox-Gruppe beitreten"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i></a>
         <a class="btn btn--primary btn--sm hide-mobile" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
-        <a class="me-btn" href="#/spieler" aria-label="Mein Profil" data-me-avatar></a>
+        <a class="me-btn" href="#/spieler" aria-label="Mein Profil"><i class="fi fi-rr-circle-user ic" aria-hidden="true"></i></a>
       </div>
     </div>
   </header>
@@ -59,14 +60,13 @@
         <div class="hero__shade"></div>
         <div class="container hero__inner">
           <div class="hero__content">
-            <p class="hero__loc"><span class="live-dot"></span><span><b data-bind="online">1.284</b> Spieler online · <span data-bind="servers">42</span> Server</span></p>
             <h1 class="hero__greet">Moin, <span data-me-name>Jonas</span>! Wohin geht deine nächste Fahrt?</h1>
             <form class="search" role="search" data-search autocomplete="off">
               <i class="fi fi-rr-search ic search__icon" aria-hidden="true"></i>
               <label class="search__field">
                 <span class="sr-only">Bahnhof, Linie oder Spieler suchen</span>
-                <input type="search" name="q" placeholder="Bahnhof oder Linie suchen" data-search-input>
-                <span class="search__hint">Live-Abfahrten · Server · Spieler</span>
+                <input type="search" name="q" placeholder="Bahnhof suchen" data-search-input>
+                <span class="search__hint">Live-Abfahrten • Linien • Spieler</span>
               </label>
               <button class="sr-only" type="submit">Suchen</button>
               <ul class="search__results" role="listbox" data-search-results hidden></ul>
@@ -100,39 +100,48 @@
                 <div class="lcard__media">
                   <img src="assets/img/play.svg" alt="Blick aus dem Führerstand auf die Strecke mit grünem Signal" loading="lazy">
                   <span class="lcard__badge"><i class="fi fi-rr-gamepad ic" aria-hidden="true"></i></span>
-                  <span class="lcard__chip">Kostenlos auf Roblox</span>
                 </div>
                 <div class="lcard__body">
-                  <div class="lcard__row"><h3>Train Sim Germany</h3><span class="rating"><i class="fi fi-sr-star ic" aria-hidden="true"></i>4,8 <small>(<span data-bind="favorites">284K</span>)</small></span></div>
-                  <p class="lcard__meta">PC · Handy · Tablet · Konsole</p>
-                  <div class="lcard__foot"><span><b data-bind="online">1.284</b> online</span><span class="btn btn--primary btn--xs"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</span></div>
+                  <div class="lcard__row"><h3>Jetzt spielen</h3><span class="rating"><i class="fi fi-sr-star ic" aria-hidden="true"></i>4,8 <small>(<span data-bind="favorites">284K</span>)</small></span></div>
+                  <p class="lcard__meta">PC • Handy • Tablet • Konsole</p>
+                  <p class="lcard__price"><b>Kostenlos</b> auf Roblox • <span data-bind="online">1.284</span> online</p>
                 </div>
               </a>
               <a class="lcard" data-link="group" href="#" target="_blank" rel="noopener">
                 <div class="lcard__media">
                   <img src="assets/img/group.svg" alt="Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug" loading="lazy">
                   <span class="lcard__badge"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i></span>
-                  <span class="lcard__chip"><span data-bind="groupMembers">48,2K</span>&nbsp;Mitglieder</span>
                 </div>
                 <div class="lcard__body">
-                  <div class="lcard__row"><h3>Roblox-Gruppe</h3><span class="rating"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i>Offiziell</span></div>
-                  <p class="lcard__meta">Ränge, Trainings und Events freischalten</p>
-                  <div class="lcard__foot"><span><b>Kostenlos</b></span><span class="btn btn--dark btn--xs"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Beitreten</span></div>
+                  <div class="lcard__row"><h3>Gruppe beitreten</h3><span class="rating"><i class="fi fi-sr-shield-check ic" aria-hidden="true"></i>Offiziell</span></div>
+                  <p class="lcard__meta">Ränge • Trainings • Events</p>
+                  <p class="lcard__price"><b><span data-bind="groupMembers">48,2K</span></b> Mitglieder • kostenlos</p>
                 </div>
               </a>
               <a class="lcard" data-link="discord" href="#" target="_blank" rel="noopener">
                 <div class="lcard__media">
                   <img src="assets/img/discord.svg" alt="Chatnachrichten über einer nächtlichen Stadt mit vorbeifahrendem Zug" loading="lazy">
                   <span class="lcard__badge"><i class="fi fi-brands-discord ic" aria-hidden="true"></i></span>
-                  <span class="lcard__chip"><span class="live-dot live-dot--sm"></span><span data-bind="discordOnline">3,1K</span>&nbsp;online</span>
                 </div>
                 <div class="lcard__body">
-                  <div class="lcard__row"><h3>Discord-Community</h3><span class="rating"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i><span data-bind="discordMembers">21,7K</span></span></div>
-                  <p class="lcard__meta">Fahrpläne, Support und Bewerbungen</p>
-                  <div class="lcard__foot"><span><b>Kostenlos</b></span><span class="btn btn--discord btn--xs"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Beitreten</span></div>
+                  <div class="lcard__row"><h3>Discord beitreten</h3><span class="rating"><span class="live-dot live-dot--sm"></span><span data-bind="discordOnline">3,1K</span> online</span></div>
+                  <p class="lcard__meta">Fahrpläne • Support • Bewerbungen</p>
+                  <p class="lcard__price"><b><span data-bind="discordMembers">21,7K</span></b> Mitglieder • kostenlos</p>
                 </div>
               </a>
             </div>
+          </section>
+
+          <!-- Strecken -->
+          <section class="sec" aria-labelledby="h-routes">
+            <div class="sec-head">
+              <h2 id="h-routes">Strecken entdecken</h2>
+              <div class="rail-ctrl">
+                <button class="round-btn round-btn--soft" type="button" data-rail-prev="routes" aria-label="Zurück"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
+                <button class="round-btn round-btn--soft" type="button" data-rail-next="routes" aria-label="Weiter"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
+              </div>
+            </div>
+            <div class="rail rail--sm" data-rail="routes" data-routes></div>
           </section>
 
           <!-- Abfahrten -->
@@ -154,18 +163,6 @@
               <a class="link-more" href="#/trainings">Alle <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
             </div>
             <div data-next-step="home"></div>
-          </section>
-
-          <!-- Strecken -->
-          <section class="sec" aria-labelledby="h-routes">
-            <div class="sec-head">
-              <h2 id="h-routes">Strecken entdecken</h2>
-              <div class="rail-ctrl">
-                <button class="round-btn round-btn--soft" type="button" data-rail-prev="routes" aria-label="Zurück"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
-                <button class="round-btn round-btn--soft" type="button" data-rail-next="routes" aria-label="Weiter"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
-              </div>
-            </div>
-            <div class="rail rail--sm" data-rail="routes" data-routes></div>
           </section>
 
           <!-- Kennzahlen -->
@@ -276,10 +273,10 @@
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label">Dein Rang</span>
-              <h1 class="appbar__value"><button type="button" data-open="rank"><span class="rank-dot" data-rank-dot></span><span data-rank-name>Conductor</span><i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button></h1>
+              <h1 class="appbar__value"><button type="button" data-open="rank"><i class="fi fi-sr-id-badge ic appbar__pin" aria-hidden="true"></i><span data-rank-name>Conductor</span><i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button></h1>
             </div>
             <div class="appbar__actions">
-              <button class="round-btn" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-rr-bell ic" aria-hidden="true"></i></button>
+              <button class="round-btn" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-sr-bell ic" aria-hidden="true"></i></button>
               <button class="round-btn show-mobile" type="button" data-menu-open aria-label="Menü öffnen"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
             </div>
           </div>
@@ -308,7 +305,7 @@
 
               <div class="sec-head sec-head--tight">
                 <h2>Alle kommenden Trainings</h2>
-                <button class="link-more" type="button" data-all-toggle>Alle anzeigen <i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button>
+                <button class="link-more" type="button" data-all-toggle>Alle anzeigen</button>
               </div>
               <ul class="tlist" data-all-trainings></ul>
             </div>
@@ -543,11 +540,11 @@
 
   <!-- Tab-Leiste (Handy & Tablet) -->
   <nav class="tabbar" aria-label="App-Navigation">
-    <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-home ic" aria-hidden="true"></i></a>
-    <a href="#/abfahrten" data-nav="abfahrten" aria-label="Abfahrten"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i></a>
-    <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></a>
-    <a href="#/server" data-nav="server" aria-label="Server"><i class="fi fi-rr-database ic" aria-hidden="true"></i></a>
-    <button type="button" data-menu-open data-nav="more" aria-label="Mehr" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-apps ic" aria-hidden="true"></i></button>
+    <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-home ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-home ic tab-on" aria-hidden="true"></i></a>
+    <a href="#/abfahrten" data-nav="abfahrten" aria-label="Abfahrten"><i class="fi fi-rr-train-station ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-train-station ic tab-on" aria-hidden="true"></i></a>
+    <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i></a>
+    <a href="#/server" data-nav="server" aria-label="Server"><i class="fi fi-rr-database ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-database ic tab-on" aria-hidden="true"></i></a>
+    <button type="button" data-menu-open data-nav="more" aria-label="Mehr" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-apps ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-apps ic tab-on" aria-hidden="true"></i></button>
   </nav>
 
   <!-- Menü -->

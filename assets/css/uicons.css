@@ -6,7 +6,6 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-angle-small-down:before{content:"\f153"}
 .fi-rr-angle-small-left:before{content:"\f154"}
 .fi-rr-angle-small-right:before{content:"\f155"}
-.fi-rr-angle-small-up:before{content:"\f156"}
 .fi-rr-apps:before{content:"\f16c"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-bell:before{content:"\f239"}
@@ -14,6 +13,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-calendar:before{content:"\f339"}
 .fi-rr-chart-line-up:before{content:"\f3a5"}
 .fi-rr-check:before{content:"\f3c8"}
+.fi-rr-circle-user:before{content:"\f423"}
 .fi-rr-clock-three:before{content:"\f453"}
 .fi-rr-cross-small:before{content:"\f4f6"}
 .fi-rr-database:before{content:"\f525"}
@@ -21,6 +21,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-heart:before{content:"\f7a0"}
 .fi-rr-home:before{content:"\f7b8"}
 .fi-rr-info:before{content:"\f80b"}
+.fi-rr-location-arrow:before{content:"\f8cc"}
 .fi-rr-lock:before{content:"\f8d5"}
 .fi-rr-marker:before{content:"\f8fd"}
 .fi-rr-menu-burger:before{content:"\f925"}
@@ -40,10 +41,19 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 
 @font-face{font-family:uicons-solid-rounded;src:url(../fonts/uicons-solid-rounded.woff2) format("woff2");font-display:block}
 i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,span[class*=fi-sr-]:before{font-family:uicons-solid-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.fi-sr-apps:before{content:"\f16d"}
+.fi-sr-bell:before{content:"\f237"}
+.fi-sr-calendar:before{content:"\f336"}
 .fi-sr-crown:before{content:"\f4ef"}
+.fi-sr-database:before{content:"\f51b"}
 .fi-sr-heart:before{content:"\f794"}
+.fi-sr-home:before{content:"\f7ad"}
+.fi-sr-id-badge:before{content:"\f7eb"}
 .fi-sr-play:before{content:"\fa7f"}
+.fi-sr-shield-check:before{content:"\fbb5"}
 .fi-sr-star:before{content:"\fcc1"}
+.fi-sr-train-station:before{content:"\fdb9"}
+.fi-sr-user:before{content:"\fe78"}
 
 @font-face{font-family:uicons-brands;src:url(../fonts/uicons-brands.woff2) format("woff2");font-display:block}
 i[class^=fi-brands-]:before,i[class*=" fi-brands-"]:before,span[class^=fi-brands-]:before,span[class*=fi-brands-]:before{font-family:uicons-brands!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}

@@ -564,31 +564,32 @@
   }
 
   function nextStepHTML(heading) {
-    const me = rankOf(state.rank);
     const next = nextRank(state.rank);
     if (!next) {
-      return `<article class="promo-card promo-card--done">
+      return `<article class="promo-card">
         <img class="promo-card__img" src="assets/img/group.svg" alt="" loading="lazy">
         <div class="promo-card__body">
-          <span class="promo-card__eyebrow"><span class="rank-dot" style="--rc:${me.color}"></span>${esc(me.name)}</span>
-          <${heading}>Alle Ausbildungen abgeschlossen</${heading}>
+          <${heading}>Alle Ausbildungen geschafft</${heading}>
           <p>Du hast den höchsten Rang erreicht. Hilf jetzt neuen Spielern als Ausbilder.</p>
         </div>
       </article>`;
     }
     const type = typeOf(next.name);
     const t = trainingsList({ all: true }).find((x) => x.type === next.name);
+    let when = `Noch kein ${next.name}-Training geplant.`;
+    if (t) {
+      const d = dayName(t.day);
+      when = `${next.name}-Training ${d === 'Heute' || d === 'Morgen' ? d.toLowerCase() : `am ${d}`} um ${t.time} Uhr.`;
+    }
     return `<article class="promo-card">
       <img class="promo-card__img" src="assets/img/${type.img}" alt="" loading="lazy">
       <div class="promo-card__body">
-        <span class="promo-card__eyebrow"><span class="rank-dot" style="--rc:${me.color}"></span>${esc(me.name)} → ${esc(next.name)}</span>
         <${heading}>Dein nächster Schritt: ${esc(next.name)}</${heading}>
-        <p>${esc(type.text)}</p>
-        <p class="promo-card__when">${t ? `<b>${dayName(t.day)} · ${t.time} Uhr</b> · ${relTime(t.start)}` : 'Noch kein Termin geplant'}</p>
+        <p>${esc(when)} ${t ? 'Sichere dir jetzt deinen Platz.' : 'Aktiviere die Glocke, dann sagen wir Bescheid.'}</p>
       </div>
       ${t
-        ? `<button class="btn btn--primary btn--sm promo-card__btn" type="button" data-detail="${t.id}">Details</button>`
-        : '<button class="btn btn--primary btn--sm promo-card__btn" type="button" data-bell>Erinnern</button>'}
+        ? `<button class="btn btn--primary promo-card__btn" type="button" data-detail="${t.id}">Details</button>`
+        : '<button class="btn btn--primary promo-card__btn" type="button" data-bell>Erinnern</button>'}
     </article>`;
   }
   function renderNextSteps() {
@@ -604,12 +605,12 @@
     return `<button class="tcard" type="button" data-detail="${t.id}">
       <div class="tcard__media">
         <img src="assets/img/${t.img}" alt="" loading="lazy">
-        <span class="glass-btn">${icon(badge)}</span>
+        <span class="tcard__fav">${icon(badge)}</span>
         <span class="tcard__role" style="--rc:${t.color}"><i></i>${esc(t.type)}</span>
       </div>
       <div class="tcard__body">
         <h3>${esc(t.title)}</h3>
-        <div class="tcard__row"><b>${t.time} Uhr</b><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : st.cls === 'mine' ? ' is-mine' : ''}">${icon('fi-rr-users-alt')}${t.taken}/${t.slots}</span></div>
+        <div class="tcard__row"><span>${t.time} Uhr</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : st.cls === 'mine' ? ' is-mine' : ''}">${icon('fi-sr-user')}${t.taken}/${t.slots}</span></div>
       </div>
     </button>`;
   }
@@ -620,7 +621,6 @@
     const me = rankOf(state.rank);
 
     $('[data-rank-name]').textContent = me.name;
-    $('[data-rank-dot]').style.setProperty('--rc', me.color);
     $('[data-bell]').setAttribute('aria-pressed', String(state.bell));
     $('[data-filter-badge]').hidden = !state.typeFilter.size;
 
@@ -660,7 +660,7 @@
     }).join('') : '<li class="board-empty">Keine Trainings für diesen Filter.</li>';
     const toggle = $('[data-all-toggle]');
     toggle.hidden = list.length <= 6;
-    toggle.innerHTML = state.showAll ? `Weniger ${icon('fi-rr-angle-small-up')}` : `Alle (${list.length}) ${icon('fi-rr-angle-small-down')}`;
+    toggle.textContent = state.showAll ? 'Weniger anzeigen' : 'Alle anzeigen';
 
     // Ränge in der Seitenleiste
     const cur = rankIdx(state.rank);
@@ -968,7 +968,6 @@
   // ---------- Events ----------
   function events() {
     $$('[data-link]').forEach((a) => { if (D.links[a.dataset.link]) a.href = D.links[a.dataset.link]; });
-    $('[data-me-avatar]').innerHTML = avatar(D.me.username);
     $$('[data-me-name]').forEach((el) => { el.textContent = D.me.name; });
 
     $('.skip-link').addEventListener('click', (e) => { e.preventDefault(); $('#main').focus(); });
