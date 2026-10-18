@@ -131,6 +131,8 @@
     // Neuigkeiten & Karriere
     newsCat: 'all',
     jobId: null,
+    jobApply: false,
+    quizAnswers: {},
     applications: store.get('tsg-applications', {}),
   };
 
@@ -1076,94 +1078,258 @@
 
   // ---------- Karriere ----------
   const jobStatus = (job) => (job.open
-    ? `<span class="job-status">${icon('fi-rr-check')}Offen</span>`
-    : '<span class="job-status job-status--closed">Geschlossen</span>');
+    ? `<span class="pill pill--ok">${icon('fi-rr-check')}Offen</span>`
+    : '<span class="pill pill--bad">Geschlossen</span>');
+  const SINCE = ['Weniger als 1 Monat', '1–3 Monate', '3–6 Monate', '6–12 Monate', 'Mehr als 1 Jahr'];
+  const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+  const SECTORS = [
+    { title: 'Über dich', text: 'Damit wir dich im Spiel und auf Discord finden.' },
+    { title: 'Grundwissen', text: 'Ein paar Fragen zu deinem Bereich. Du musst nicht alles wissen.' },
+    { title: 'Erfahrung & Zeit', text: 'Erzähl uns, was du mitbringst und wann du Zeit hast.' },
+  ];
+  // Instructor: gemeinsame Fragen + gewählter Bereich + alle Bereiche darunter
+  function quizGroups(job, area) {
+    if (!job.areas) return [{ key: 'job', title: 'Fragen zur Stelle', items: job.quiz || [] }];
+    const groups = [{ key: 'common', title: 'Für alle Instructor', items: job.quiz || [] }];
+    job.areas.slice(0, job.areas.indexOf(area) + 1).forEach((a) => {
+      groups.push({ key: a, title: `${a} · ${rankOf(a).label}`, color: rankOf(a).color, items: D.knowledge[a] || [] });
+    });
+    return groups;
+  }
+  // Die erste Antwort ist richtig; angezeigt wird eine feste, gemischte Reihenfolge
+  const optionOrder = (q) => q.options.map((_, i) => i).sort((a, b) => hash(q.q + a) - hash(q.q + b));
+  const dataField = (name) => `data-field="${name}"`;
+
   function jobCard(job) {
     return `<a class="job" href="#/karriere/${job.id}">
       <div class="job__top"><h3>${esc(job.title)}</h3>${jobStatus(job)}</div>
-      <span class="job__team">${icon('fi-rr-users-alt')}${esc(job.team)}</span>
+      <span class="job__team">${icon('fi-rr-users-alt')}Team ${esc(job.team)}</span>
       <p>${esc(job.text)}</p>
       <span class="job__more">Details ${icon('fi-rr-arrow-small-right')}</span>
     </a>`;
   }
-  function applyForm(job) {
-    return `<form class="apply" data-apply="${job.id}" novalidate>
-      <h3>Jetzt bewerben</h3>
-      <div class="form-field"><label for="ap-roblox">Roblox-Benutzername</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(D.me.username)}" placeholder="Dein Roblox-Benutzername"></div>
-      <div class="form-field"><label for="ap-discord">Discord-Benutzername</label><input id="ap-discord" name="discord" autocomplete="off" placeholder="z. B. lokfuehrer_max"></div>
-      <div class="form-field"><label for="ap-exp">Welche Erfahrung hast du in dieser Rolle?</label><textarea id="ap-exp" name="experience" placeholder="Beschreibe kurz deine Erfahrung"></textarea><span class="form-hint">Mindestens 30 Zeichen</span></div>
-      <div class="form-field"><label for="ap-act">Wie aktiv wärst du, wenn du angenommen wirst?</label><div class="range-row"><input type="range" id="ap-act" name="activity" min="1" max="10" value="6"><output for="ap-act" data-act-out>6</output></div><span class="form-hint">1 = selten, 10 = sehr aktiv</span></div>
-      <button class="btn btn--dark btn--block btn--lg" type="submit">Bewerbung senden ${icon('fi-rr-paper-plane')}</button>
-      <p class="form-note">Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.</p>
-    </form>`;
+  function renderCrumbs(job) {
+    const jobs = `${icon('fi-rr-briefcase')}`;
+    const sep = '<span class="crumbs-box__sep" aria-hidden="true">/</span>';
+    let html = jobs;
+    if (!job) html += '<b aria-current="page">Jobs</b>';
+    else if (!state.jobApply) html += `<a href="#/karriere">Jobs</a>${sep}<b aria-current="page">${esc(job.title)}</b>`;
+    else html += `<a href="#/karriere">Jobs</a>${sep}<a href="#/karriere/${job.id}">${esc(job.title)}</a>${sep}<b aria-current="page">Bewerbung</b>`;
+    $('[data-crumbs]').innerHTML = html;
   }
-  function renderCareer() {
-    const job = D.jobs.find((x) => x.id === state.jobId);
-    $('[data-career-back]').hidden = !job;
-    $('[data-crumb-sep]').hidden = !job;
-    const crumb = $('[data-crumb-job]');
-    crumb.hidden = !job;
-    crumb.textContent = job ? job.title : '';
-    const el = $('[data-career]');
-    if (!job) {
-      const open = D.jobs.filter((x) => x.open).length;
-      el.innerHTML = `<div class="career-intro">
-          <h2>Werde Teil unseres Teams</h2>
-          <p>Die <strong>Train Sim Germany</strong> Roblox-Community sucht motivierte Mitglieder, die dabei helfen möchten, unser virtuelles Bahnnetz zu erweitern und zu verbessern. Entdecke offene Positionen und finde die perfekte Rolle für dich.</p>
-          <p>Als Teil des Teams entwickelst du eine der größten deutschen Roblox-Bahncommunities mit und sammelst dabei wertvolle Erfahrungen.</p>
-        </div>
-        <div class="career-head"><h2>Offene Positionen</h2><span>${open} von ${D.jobs.length} offen</span></div>
-        <div class="job-list">${D.jobs.map(jobCard).join('')}</div>`;
-      return;
-    }
+  function careerList() {
+    const open = D.jobs.filter((x) => x.open).length;
+    return `<div class="cbox">
+        <h2>Werde Teil <em>unseres Teams</em></h2>
+        <p class="lead">Die <strong>Train Sim Germany</strong> Community sucht motivierte Mitglieder, die unser virtuelles Bahnnetz erweitern und verbessern. Entdecke die offenen Stellen und finde die Rolle, die zu dir passt.</p>
+      </div>
+      <div class="career-list-head"><h2>Offene Stellen</h2><span>${open} von ${D.jobs.length} offen</span></div>
+      <div class="job-list">${D.jobs.map(jobCard).join('')}</div>`;
+  }
+  function careerDetail(job) {
     const app = state.applications[job.id];
     let action;
     if (app) {
-      action = `<div class="apply-done"><span class="apply-done__ic">${icon('fi-rr-check')}</span><h3>Bewerbung gesendet</h3><p>Danke, ${esc(app.roblox)}! Wir melden uns über Discord bei <b>${esc(app.discord)}</b>.</p><button class="btn btn--outline" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button></div>`;
+      action = `<div class="note note--ok">${icon('fi-rr-check-circle')}<span>Du hast dich am ${new Date(app.at).toLocaleDateString('de-DE')} beworben${app.area ? ` (${esc(app.area)} Instructor)` : ''}. Wir melden uns über Discord bei <b>${esc(app.discord)}</b>.</span></div>
+        <button class="btn-text" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button>`;
     } else if (!job.open) {
-      action = `<div class="closed-note">${icon('fi-rr-info')}<span>Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.</span></div>
-        <div class="btn-stack"><a class="btn btn--discord btn--block btn--lg" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Zum Discord</a></div>`;
+      action = `<div class="note note--bad">${icon('fi-rr-info')}<span>Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.</span></div>
+        <a class="btn-line" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Zum Discord</a>`;
     } else {
-      action = applyForm(job);
+      action = `<a class="btn-line" href="#/karriere/${job.id}/bewerben">${icon('fi-rr-briefcase')}Jetzt bewerben</a>`;
     }
-    const list = (items) => `<ul>${items.map((x) => `<li>${icon('fi-rr-check')}<span>${esc(x)}</span></li>`).join('')}</ul>`;
-    el.innerHTML = `<article class="job-detail">
-      <div class="job-detail__top">${jobStatus(job)}<span class="job__team">${icon('fi-rr-users-alt')}Team ${esc(job.team)}</span></div>
-      <h2>Werde Teil des Teams als <span>${esc(job.title)}</span></h2>
+    const list = (items) => `<ul>${items.map((x) => `<li>${icon('fi-rr-check-circle')}<span>${esc(x)}</span></li>`).join('')}</ul>`;
+    const areas = job.areas
+      ? `<section class="checks"><h3>${icon('fi-sr-check')}Bereiche</h3><div class="area-tags">${job.areas.map((a) => `<span style="--rc:${rankOf(a).color}"><i></i>${esc(a)} Instructor</span>`).join('')}</div></section>`
+      : '';
+    return `<article class="cbox">
+      <div class="cbox__meta">${jobStatus(job)}<span class="job__team">${icon('fi-rr-users-alt')}Team ${esc(job.team)}</span></div>
+      <h2>Werde Teil des Teams als <em>${esc(job.title)}</em></h2>
       <p class="lead">${esc(job.text)}</p>
       <hr>
-      <section class="check-list"><h3>${icon('fi-rr-check')}Verantwortlichkeiten</h3>${list(job.tasks)}</section>
-      <section class="check-list"><h3>${icon('fi-rr-check')}Anforderungen</h3>${list(job.needs)}</section>
+      <section class="checks"><h3>${icon('fi-sr-check')}Verantwortlichkeiten</h3>${list(job.tasks)}</section>
+      <section class="checks"><h3>${icon('fi-sr-check')}Anforderungen</h3>${list(job.needs)}</section>
+      ${areas}
       <hr>
-      ${action}
+      <div class="cbox__action">${action}</div>
     </article>`;
+  }
+  function quizHtml(job, area, answers = {}) {
+    if (job.areas && !area) {
+      return `<div class="quiz-empty">${icon('fi-rr-arrow-small-up')}<span>Wähle zuerst deinen Bereich. Danach erscheinen die passenden Fragen.</span></div>`;
+    }
+    let n = 0;
+    return quizGroups(job, area).map((g) => `<div class="quiz-group">
+        <h4 class="quiz-group__title"${g.color ? ` style="--rc:${g.color}"` : ''}>${g.color ? '<i></i>' : ''}${esc(g.title)}</h4>
+        ${g.items.map((q, i) => {
+          const key = `${g.key}-${i}`;
+          n += 1;
+          return `<fieldset class="q f" ${dataField(`q:${key}`)}>
+            <legend><span class="q__no">${n}</span>${esc(q.q)}</legend>
+            <div class="q__opts">${optionOrder(q).map((o) => `<label class="choice"><input type="radio" name="q:${key}" value="${o}"${answers[key] === String(o) ? ' checked' : ''}><span>${esc(q.options[o])}</span></label>`).join('')}</div>
+          </fieldset>`;
+        }).join('')}
+      </div>`).join('');
+  }
+  function sectorHead(i) {
+    const s = SECTORS[i];
+    return `<header class="sector__head"><span class="sector__no">${i + 1}</span><div><small>Sektor ${i + 1}</small><h3>${s.title}</h3></div></header>
+      <p class="sector__text">${s.text}</p>`;
+  }
+  function careerApply(job) {
+    const rankOpts = RANKS.filter((r) => r.name !== 'Management')
+      .map((r) => `<option value="${esc(r.name)}"${r.name === state.rank ? ' selected' : ''}>${esc(r.name)} · ${esc(r.label)}</option>`).join('');
+    const areaPicker = job.areas ? `<fieldset class="f" ${dataField('area')}>
+        <legend class="f__label">In welchem Bereich möchtest du ausbilden?</legend>
+        <div class="areas">${job.areas.map((a, i) => {
+          const covered = job.areas.slice(0, i + 1);
+          return `<label class="area" style="--rc:${rankOf(a).color}"><input type="radio" name="area" value="${esc(a)}">
+            <span class="area__body"><b>${esc(a)} Instructor</b><small>Wissen: ${covered.length === job.areas.length ? 'alle vier Bereiche' : esc(covered.join(', '))}</small></span></label>`;
+        }).join('')}</div>
+        <span class="f__hint">Jeder Bereich baut auf den vorherigen auf: Signaller Instructor prüft auch Conductor, Platform Staff und Driver.</span>
+      </fieldset>` : '';
+    return `<div class="cbox">
+        <h2>Bewerbung als <em>${esc(job.title)}</em></h2>
+        <p class="lead">Fülle die drei Sektoren aus. Das dauert etwa 5 Minuten.</p>
+        <ol class="sector-steps">${SECTORS.map((s, i) => `<li><button type="button" data-sector-jump="${i + 1}"><span class="sector-steps__no">${i + 1}</span><span class="sector-steps__label">${s.title}</span></button></li>`).join('')}</ol>
+      </div>
+      <form class="apply" data-apply="${job.id}" novalidate>
+        <section class="cbox sector" data-sector="1" aria-labelledby="sector-1">
+          ${sectorHead(0).replace('<h3>', '<h3 id="sector-1">')}
+          <div class="f" ${dataField('roblox')}><label class="f__label" for="ap-roblox">Roblox-Benutzername</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(D.me.username)}" placeholder="Dein Roblox-Benutzername"></div>
+          <div class="f" ${dataField('discord')}><label class="f__label" for="ap-discord">Discord-Benutzername</label><input id="ap-discord" name="discord" autocomplete="off" placeholder="z. B. lokfuehrer_max"></div>
+          <div class="f-row">
+            <div class="f" ${dataField('age')}><label class="f__label" for="ap-age">Alter</label><input id="ap-age" name="age" type="number" inputmode="numeric" min="10" max="99" placeholder="z. B. 16"></div>
+            <div class="f" ${dataField('since')}><label class="f__label" for="ap-since">Du spielst seit</label><div class="select"><select id="ap-since" name="since"><option value="">Bitte wählen</option>${SINCE.map((x) => `<option>${x}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
+          </div>
+          <div class="f" ${dataField('rank')}><label class="f__label" for="ap-rank">Dein aktueller Rang</label><div class="select"><select id="ap-rank" name="rank">${rankOpts}</select>${icon('fi-rr-angle-small-down')}</div></div>
+        </section>
+
+        <section class="cbox sector" data-sector="2" aria-labelledby="sector-2">
+          ${sectorHead(1).replace('<h3>', '<h3 id="sector-2">')}
+          ${areaPicker}
+          <div class="quiz" data-quiz>${quizHtml(job, null)}</div>
+        </section>
+
+        <section class="cbox sector" data-sector="3" aria-labelledby="sector-3">
+          ${sectorHead(2).replace('<h3>', '<h3 id="sector-3">')}
+          <div class="f" ${dataField('experience')}><label class="f__label" for="ap-exp">Welche Erfahrung hast du in dieser Rolle?</label><textarea id="ap-exp" name="experience" placeholder="Beschreibe kurz deine Erfahrung"></textarea><span class="f__hint">Mindestens 30 Zeichen</span></div>
+          <fieldset class="f" ${dataField('activity')}>
+            <legend class="f__label">Wie aktiv wärst du, wenn du angenommen wirst?</legend>
+            <div class="scale">${Array.from({ length: 10 }, (_, i) => `<label><input type="radio" name="activity" value="${i + 1}"><span>${i + 1}</span></label>`).join('')}</div>
+            <div class="scale__legend"><span>1 = selten</span><span>10 = sehr aktiv</span></div>
+          </fieldset>
+          <fieldset class="f" ${dataField('days')}>
+            <legend class="f__label">An welchen Tagen hast du meistens Zeit?</legend>
+            <div class="scale scale--days">${DAYS.map((d) => `<label><input type="checkbox" name="days" value="${d}"><span>${d}</span></label>`).join('')}</div>
+          </fieldset>
+          <div class="f" ${dataField('confirm')}><label class="confirm"><input type="checkbox" name="confirm"><span>Ich habe alle Angaben ehrlich gemacht und kenne die Regeln von Train Sim Germany.</span></label></div>
+          <button class="btn-line" type="submit">Bewerbung senden ${icon('fi-rr-paper-plane')}</button>
+          <p class="f__note">Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.</p>
+        </section>
+      </form>`;
+  }
+  function careerDone(job, app) {
+    const rows = [['Stelle', job.title], ...(app.area ? [['Bereich', `${app.area} Instructor`]] : []), ['Rang', app.rank], ['Discord', app.discord], ['Gesendet', new Date(app.at).toLocaleDateString('de-DE')]];
+    return `<div class="cbox done">
+      <span class="done__ic">${icon('fi-rr-check')}</span>
+      <h2>Bewerbung <em>gesendet</em></h2>
+      <p class="lead">Danke, ${esc(app.roblox)}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen über Discord.</p>
+      <dl class="done__list">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+      <a class="btn-line" href="#/karriere">${icon('fi-rr-briefcase')}Zurück zu den Jobs</a>
+      <button class="btn-text" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button>
+    </div>`;
+  }
+  function renderCareer() {
+    const job = D.jobs.find((x) => x.id === state.jobId);
+    if (job && state.jobApply && !job.open && !state.applications[job.id]) state.jobApply = false;
+    renderCrumbs(job);
+    const el = $('[data-career]');
+    if (!job) el.innerHTML = careerList();
+    else if (!state.jobApply) el.innerHTML = careerDetail(job);
+    else if (state.applications[job.id]) el.innerHTML = careerDone(job, state.applications[job.id]);
+    else {
+      state.quizAnswers = {};
+      el.innerHTML = careerApply(job);
+    }
+  }
+
+  // Prüft alle Felder; liefert { feld: Meldung }
+  function applyErrors(form) {
+    const job = D.jobs.find((x) => x.id === form.dataset.apply);
+    const f = form.elements;
+    const val = (name) => (f[name] ? f[name].value.trim() : '');
+    const errors = {};
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(val('roblox'))) errors.roblox = 'Bitte gib einen gültigen Roblox-Namen ein (3–20 Zeichen: Buchstaben, Zahlen, _).';
+    if (!/^([a-z0-9_.]{2,32}|.{2,32}#\d{4})$/i.test(val('discord'))) errors.discord = 'Bitte gib deinen Discord-Namen ein, z. B. lokfuehrer_max.';
+    const age = Number(val('age'));
+    if (!Number.isInteger(age) || age < 10 || age > 99) errors.age = 'Bitte gib dein Alter an.';
+    if (!val('since')) errors.since = 'Bitte wähle aus, seit wann du spielst.';
+    const area = form.querySelector('input[name="area"]:checked');
+    if (job.areas) {
+      if (!area) errors.area = 'Bitte wähle einen Bereich.';
+      else if (rankIdx(val('rank')) < rankIdx(area.value)) errors.area = `Für ${area.value} Instructor brauchst du mindestens den Rang ${area.value}.`;
+    }
+    $$('fieldset.q', form).forEach((q) => {
+      if (!$('input:checked', q)) errors[q.dataset.field] = 'Bitte beantworte diese Frage.';
+    });
+    if (val('experience').length < 30) errors.experience = 'Erzähl uns etwas mehr, mindestens 30 Zeichen.';
+    if (!form.querySelector('input[name="activity"]:checked')) errors.activity = 'Bitte wähle einen Wert von 1 bis 10.';
+    if (!form.querySelector('input[name="days"]:checked')) errors.days = 'Bitte wähle mindestens einen Tag.';
+    if (!f.confirm.checked) errors.confirm = 'Bitte bestätige deine Angaben.';
+    return errors;
+  }
+  // Fortschritt der drei Sektoren (ohne Fehlermeldungen anzuzeigen)
+  function updateSectors(form) {
+    const errors = applyErrors(form);
+    [1, 2, 3].forEach((n) => {
+      const sec = $(`[data-sector="${n}"]`, form);
+      const done = !Object.keys(errors).some((k) => $(`[data-field="${CSS.escape(k)}"]`, sec));
+      const step = $(`[data-sector-jump="${n}"]`);
+      if (step) step.classList.toggle('is-done', done);
+    });
+  }
+  function clearFieldError(field) {
+    field.classList.remove('has-error');
+    const er = $('.f__error', field);
+    if (er) er.remove();
+    $$('[aria-invalid]', field).forEach((x) => { x.removeAttribute('aria-invalid'); x.removeAttribute('aria-describedby'); });
   }
   function submitApplication(form) {
     const id = form.dataset.apply;
-    const data = Object.fromEntries(new FormData(form));
-    const errors = {};
-    if (!/^[A-Za-z0-9_]{3,20}$/.test(data.roblox.trim())) errors.roblox = 'Bitte gib einen gültigen Roblox-Namen ein (3–20 Zeichen: Buchstaben, Zahlen, _).';
-    if (!/^([a-z0-9_.]{2,32}|.{2,32}#\d{4})$/i.test(data.discord.trim())) errors.discord = 'Bitte gib deinen Discord-Namen ein, z. B. lokfuehrer_max.';
-    if (data.experience.trim().length < 30) errors.experience = 'Erzähl uns etwas mehr – mindestens 30 Zeichen.';
-    $$('.form-field', form).forEach((f) => {
-      f.classList.remove('has-error');
-      const er = $('.form-error', f);
-      if (er) er.remove();
-    });
-    Object.entries(errors).forEach(([name, msg]) => {
-      const input = form.elements[name];
-      const f = input.closest('.form-field');
-      f.classList.add('has-error');
-      f.insertAdjacentHTML('beforeend', `<span class="form-error" id="err-${name}">${msg}</span>`);
+    const errors = applyErrors(form);
+    $$('.f.has-error', form).forEach(clearFieldError);
+    Object.entries(errors).forEach(([name, msg], i) => {
+      const field = $(`[data-field="${CSS.escape(name)}"]`, form);
+      const errId = `err-${i}`;
+      field.classList.add('has-error');
+      field.insertAdjacentHTML('beforeend', `<span class="f__error" id="${errId}">${icon('fi-rr-info')}${esc(msg)}</span>`);
+      const input = $('input, select, textarea', field);
       input.setAttribute('aria-invalid', 'true');
-      input.setAttribute('aria-describedby', `err-${name}`);
+      input.setAttribute('aria-describedby', errId);
     });
-    const firstError = Object.keys(errors)[0];
-    if (firstError) { form.elements[firstError].focus(); return; }
-    state.applications[id] = { roblox: data.roblox.trim(), discord: data.discord.trim(), experience: data.experience.trim(), activity: +data.activity, at: Date.now() };
+    const first = Object.keys(errors)[0];
+    if (first) {
+      const field = $(`[data-field="${CSS.escape(first)}"]`, form);
+      field.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $('input, select, textarea', field).focus({ preventScroll: true });
+      return;
+    }
+    const data = new FormData(form);
+    const answers = {};
+    for (const [k, v] of data) if (k.startsWith('q:')) answers[k.slice(2)] = +v;
+    const values = Object.values(answers);
+    state.applications[id] = {
+      roblox: data.get('roblox').trim(), discord: data.get('discord').trim(), age: +data.get('age'),
+      since: data.get('since'), rank: data.get('rank'), area: data.get('area') || null,
+      answers, score: values.filter((v) => v === 0).length, total: values.length,
+      experience: data.get('experience').trim(), activity: +data.get('activity'), days: data.getAll('days'),
+      at: Date.now(),
+    };
     store.set('tsg-applications', state.applications);
     toast('Bewerbung gesendet');
     renderCareer();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   // ---------- Auswahl-Sheets ----------
@@ -1478,14 +1644,16 @@
   function route() {
     const raw = location.hash.replace(/^#\/?/, '');
     const [path, qs] = raw.split('?');
-    const [first, sub] = path.split('/');
+    const [first, sub, sub2] = path.split('/');
     const page = PAGES.includes(first) ? first : 'home';
     const params = new URLSearchParams(qs || '');
     if (params.get('station')) state.station = params.get('station');
     const jobId = page === 'karriere' ? (sub || null) : null;
-    const changed = page !== state.page || jobId !== state.jobId;
+    const jobApply = !!jobId && sub2 === 'bewerben';
+    const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply;
     state.page = page;
     state.jobId = jobId;
+    state.jobApply = jobApply;
     document.body.dataset.page = page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== page; });
@@ -1658,7 +1826,7 @@
     // Reiseauskunft, Schnelle Suche, Sheets, News, Karriere
     let suppressClick = false;
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-picker], [data-pk], [data-pk-star], [data-pk-clear], [data-trip-swap], [data-trip-search], [data-conn], [data-plan-toggle], [data-pin-trip], [data-unpin], [data-pinned-open], [data-quick-del], [data-quick-tile], [data-quick-add], [data-quick-edit], [data-quick-info], [data-when-day], [data-when-now], [data-when-apply], [data-opt-product], [data-opt-direct], [data-opt-via-clear], [data-opt-reset], [data-opt-apply], [data-news-cat], [data-news-open], [data-apply-reset]');
+      const el = e.target.closest('[data-picker], [data-pk], [data-pk-star], [data-pk-clear], [data-trip-swap], [data-trip-search], [data-conn], [data-plan-toggle], [data-pin-trip], [data-unpin], [data-pinned-open], [data-quick-del], [data-quick-tile], [data-quick-add], [data-quick-edit], [data-quick-info], [data-when-day], [data-when-now], [data-when-apply], [data-opt-product], [data-opt-direct], [data-opt-via-clear], [data-opt-reset], [data-opt-apply], [data-news-cat], [data-news-open], [data-apply-reset], [data-sector-jump]');
       if (!el) return;
       const ds = el.dataset;
       const t = state.trip;
@@ -1751,11 +1919,13 @@
         state.newsCat = ds.newsCat;
         renderNewsPage();
       } else if (ds.newsOpen) openModal('news', ds.newsOpen);
+      else if (ds.sectorJump) $(`[data-sector="${ds.sectorJump}"]`).scrollIntoView({ behavior: 'smooth', block: 'start' });
       else if (ds.applyReset) {
         delete state.applications[ds.applyReset];
         store.set('tsg-applications', state.applications);
         toast('Bewerbung zurückgezogen');
-        renderCareer();
+        if (state.jobApply) location.hash = `#/karriere/${ds.applyReset}`;
+        else renderCareer();
       }
     });
 
@@ -1802,15 +1972,23 @@
     document.addEventListener('input', (e) => {
       const target = e.target;
       if (target.matches('[data-picker-input]')) $('[data-pk-list]').innerHTML = pickerList(target.value);
-      if (target.matches('#ap-act')) $('[data-act-out]').textContent = target.value;
-      const field = target.closest('.form-field.has-error');
-      if (field) {
-        field.classList.remove('has-error');
-        const er = $('.form-error', field);
-        if (er) er.remove();
-        target.removeAttribute('aria-invalid');
-        target.removeAttribute('aria-describedby');
+      const form = target.closest('form[data-apply]');
+      if (form) {
+        const field = target.closest('.f.has-error');
+        if (field) clearFieldError(field);
+        // Der Rang entscheidet mit, ob der gewählte Bereich passt
+        const area = target.name === 'rank' && $('[data-field="area"].has-error', form);
+        if (area) clearFieldError(area);
+        updateSectors(form);
       }
+    });
+    // Bereich gewechselt: passende Fragen zeigen, bisherige Antworten behalten
+    document.addEventListener('change', (e) => {
+      if (!e.target.matches('form[data-apply] input[name="area"]')) return;
+      const form = e.target.form;
+      $$('[data-quiz] input:checked', form).forEach((x) => { state.quizAnswers[x.name.slice(2)] = x.value; });
+      $('[data-quiz]', form).innerHTML = quizHtml(D.jobs.find((x) => x.id === form.dataset.apply), e.target.value, state.quizAnswers);
+      updateSectors(form);
     });
     document.addEventListener('submit', (e) => {
       const form = e.target.closest('form[data-apply]');

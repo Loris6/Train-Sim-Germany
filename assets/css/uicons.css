@@ -10,6 +10,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-apps:before{content:"\f16c"}
 .fi-rr-arrow-left:before{content:"\f197"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
+.fi-rr-arrow-small-up:before{content:"\f19f"}
 .fi-rr-bell:before{content:"\f239"}
 .fi-rr-bolt:before{content:"\f26c"}
 .fi-rr-bookmark:before{content:"\f28b"}
@@ -17,6 +18,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-calendar:before{content:"\f339"}
 .fi-rr-chart-line-up:before{content:"\f3a5"}
 .fi-rr-check:before{content:"\f3c8"}
+.fi-rr-check-circle:before{content:"\f3c4"}
 .fi-rr-circle-h:before{content:"\f405"}
 .fi-rr-circle-user:before{content:"\f423"}
 .fi-rr-clock-three:before{content:"\f453"}
@@ -58,6 +60,7 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 .fi-sr-bell:before{content:"\f237"}
 .fi-sr-bookmark:before{content:"\f289"}
 .fi-sr-calendar:before{content:"\f336"}
+.fi-sr-check:before{content:"\f3c0"}
 .fi-sr-crown:before{content:"\f4ef"}
 .fi-sr-heart:before{content:"\f794"}
 .fi-sr-home:before{content:"\f7ad"}

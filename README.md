@@ -13,7 +13,7 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 | **Abfahrten** | Live-Abfahrtstafel mit Abfahrten/Ankünften, Bahnhofssuche, Filtern nach Zuggattung, Lokführer und Verspätungen |
 | **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community) und Detailansicht |
-| **Karriere** | Offene Stellen mit Status, Detailseite mit Aufgaben und Anforderungen, Bewerbungsformular mit Prüfung der Eingaben |
+| **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit drei Sektoren: 1. Über dich (Roblox, Discord, Alter, Rang), 2. Grundwissen (Fragen zum Bereich; bei Instructor wählbar: Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, Top-Strecken |
 | **Spieler** | Podium, Bestenliste (Kilometer / Fahrten / Pünktlichkeit), Spieler der Woche, Ränge |
 | **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten, alle kommenden Termine, Anmeldung |
@@ -23,6 +23,7 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
 - Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
 - App-Design im Stil moderner Mobile-Apps: dunkler Kopfbereich, weiße Fläche mit runden Ecken, Bildkarten, Tab-Leiste unten
+- Karriere-Seiten: helles Layout in einer zentrierten Spalte, alle Ecken mit kleinem Radius (6 px), Kontur-Buttons in DB-Rot
 - Farben angelehnt an die DB-Farbwelt (Rot `#EC0016`, Cool-Gray-Töne)
 - Responsiv für Handy, Tablet und Desktop: auf dem Handy mit Tab-Leiste unten und Menü-Sheet
 - Hell- und Dunkelmodus (folgt dem System, umschaltbar oben rechts)
@@ -42,9 +43,11 @@ links: {
 
 Dort stehen auch Linien und Fahrpläne (daraus werden Live-Abfahrten und Verbindungen berechnet), Server, Spieler, Trainings, Strecken, News und Jobs (`jobs`).
 
+**Fragen im Bewerbungsformular:** Jede Stelle hat unter `quiz` eigene Fragen. Für Instructor kommen die Fragen aus `knowledge`: abgefragt wird der gewählte Bereich und alle Bereiche darunter (Signaller Instructor also auch Conductor, Platform Staff und Driver). Bei jeder Frage ist die erste Antwort die richtige, die App mischt die Reihenfolge.
+
 **Bewerbungen:** Das Formular prüft die Eingaben, speichert Bewerbungen aber nur im Browser (Demo). Für echte Bewerbungen braucht es einen Server, der sie z. B. an einen Discord-Kanal weiterleitet. Eine Discord-Webhook-URL sollte nicht direkt in die Seite eingetragen werden, weil sie sonst öffentlich ist.
 
-**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Conductor → Signaller → Dispatcher → Instructor). Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
+**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher → Instructor). Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
 ## Icons hinzufügen
 
