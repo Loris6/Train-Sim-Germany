@@ -257,13 +257,27 @@
     }).join('');
 
     const top = Math.max(...D.topRoutes.map((d) => d.value));
-    $('[data-top-routes]').innerHTML = D.topRoutes.map((d, i) => `<li>
-      <span class="rank-num">${i + 1}</span>
-      <span class="r-main"><span class="line line--${d.cat}">${esc(d.line)}</span><span>${esc(d.label)}</span></span>
-      <span class="r-val">${fmt(d.value)} <small>Fahrten</small></span>
-      <span class="r-bar"><span style="width:${(d.value / top) * 100}%"></span></span>
-    </li>`).join('');
+    $('[data-top-routes]').innerHTML = routeList(D.topRoutes.map((d) => ({ route: routeOf(d.no), value: d.value })), top);
   }
+
+  // Strecken über ihre Nummer (R001, R002, …)
+  const routeOf = (no) => D.routes.find((r) => r.no === no) || { no, title: no, cat: 're', line: '' };
+  const routeNo = (r) => `<span class="route-no">${esc(r.no)}</span>`;
+  // Streifendiagramm als Rangliste (Statistikseite und Meine Statistik)
+  const routeList = (rows, max) => rows.map((d, i) => `<li>
+      <span class="rank-num">${i + 1}</span>
+      <span class="r-main">${routeNo(d.route)}<span>${esc(d.route.title)}</span></span>
+      <span class="r-val">${fmt(d.value)} <small>Fahrten</small></span>
+      <span class="r-bar"><span style="width:${max ? (d.value / max) * 100 : 0}%"></span></span>
+    </li>`).join('');
+  // Streifendiagramm mit Balken (Zuggattungen, Meine Statistik)
+  const hbarList = (rows, unit) => {
+    const max = Math.max(...rows.map((d) => d.value), 1);
+    return rows.map((d) => `<div class="hbar" data-tip="<b>${fmt(d.value)} ${unit}</b><span>${esc(d.label)}</span>">
+      <span class="hbar__label">${esc(d.label)}</span>
+      <span class="hbar__track"><span class="hbar__fill" style="width:${(d.value / max) * 86}%"></span><span class="hbar__value">${fmt(d.value)}</span></span>
+    </div>`).join('');
+  };
 
   // ---------- Strecken & News ----------
   // Einstieg und Rollen (Startseite)
@@ -306,7 +320,7 @@
           <span class="line line--${r.cat}">${esc(r.line)}</span>
         </div>
         <div class="scard__body">
-          <h3>${esc(r.title)}</h3>
+          <h3>${routeNo(r)}<span>${esc(r.title)}</span></h3>
           <p>${esc(r.from)} → ${esc(r.to)}</p>
           <small>${fmt(r.km)} km · ${esc(r.dur)} · ${r.stops} Halte</small>
         </div>
@@ -834,19 +848,39 @@
       const day = monday + i;
       return { label: wdShort(day), today: day === now.day, min: day > now.day ? 0 : rnd(`w${i}`, 0, 170) };
     });
-    const fav = D.routes[rnd('route', 0, D.routes.length - 1)];
+    // Fahrten auf Züge und Strecken verteilen (Summe bleibt gleich), meistgefahren zuerst
+    const split = (total, labels, key) => {
+      const w = labels.map((_, i) => (4 + (hash(name + key + i) % 97)) ** 2);
+      const sum = w.reduce((a, b) => a + b, 0);
+      const rows = labels.map((label, i) => ({ label, i, value: Math.floor((total * w[i]) / sum) }));
+      rows[0].value += total - rows.reduce((a, d) => a + d.value, 0);
+      return rows.sort((a, b) => b.value - a.value);
+    };
+    const trips = rnd('trips', 120, 1600);
+    const share = split(trips, ['fern', 'regio', 'sbahn'], 'cat');
+    const part = (k) => share.find((d) => d.label === k).value;
+    const groups = [
+      { key: 'fern', title: 'Fernverkehr', cat: 'ice' },
+      { key: 'regio', title: 'Regio', cat: 're' },
+      { key: 'sbahn', title: 'S-Bahn', cat: 's' },
+    ].map((g) => ({ ...g, total: part(g.key), rows: split(part(g.key), D.fleet[g.key], g.key) }));
+    const routes = split(trips, D.routes.map((r) => r.no), 'route').map((d) => ({ route: D.routes[d.i], value: d.value }));
+    const fav = routes[0].route;
     return {
       week,
+      groups,
+      routes,
+      trips,
       tiles: [
         { ic: 'fi-rr-star', label: 'Level', value: fmt(state.profile ? rnd('lvl', 4, 60) : D.me.level) },
         { ic: 'fi-rr-train-side', label: 'Kilometer', value: fmt(rnd('km', 900, 32000)) },
-        { ic: 'fi-rr-route', label: 'Fahrten', value: fmt(rnd('trips', 40, 1600)) },
+        { ic: 'fi-rr-route', label: 'Fahrten', value: fmt(trips) },
         { ic: 'fi-rr-clock-three', label: 'Pünktlichkeit', value: `${nf1.format(rnd('punct', 860, 992) / 10)} %` },
         { ic: 'fi-rr-calendar', label: 'Trainings', value: `${fmt(Math.max(0, rankIdx(state.rank)))} bestanden` },
         { ic: 'fi-rr-time-fast', label: 'Spielzeit', value: `${fmt(rnd('hours', 12, 640))} Std.` },
         { ic: 'fi-rr-trophy', label: 'Bestenliste', value: `Platz ${fmt(rnd('place', 18, 2400))}` },
         { ic: 'fi-rr-user-add', label: 'Dabei seit', value: `${MONTHS_SHORT[rnd('mon', 0, 11)]} ${rnd('year', 2023, 2025)}` },
-        { ic: 'fi-rr-heart', label: 'Lieblingsstrecke', value: esc(fav.title), wide: true },
+        { ic: 'fi-rr-heart', label: 'Lieblingsstrecke', value: `${routeNo(fav)}${esc(fav.title)}`, wide: true },
       ],
     };
   }
@@ -990,6 +1024,16 @@
           <dl class="mystats__grid">
             ${st.tiles.map((x) => `<div${x.wide ? ' class="is-wide"' : ''}><dt>${icon(x.ic)}${x.label}</dt><dd>${x.value}</dd></div>`).join('')}
           </dl>
+          ${st.groups.map((g) => `<section class="mystats__block">
+            <h4 class="mystats__title"><span class="mystats__dot" style="--c:var(--c-${g.cat})"></span>${g.title}<small>${fmt(g.total)} Fahrten</small></h4>
+            <p class="mystats__sub">Deine meistgefahrenen Züge</p>
+            <div class="hbars" style="--viz:var(--c-${g.cat})">${hbarList(g.rows, 'Fahrten')}</div>
+          </section>`).join('')}
+          <section class="mystats__block">
+            <h4 class="mystats__title"><span class="mystats__dot"></span>Alle Strecken<small>${fmt(st.trips)} Fahrten</small></h4>
+            <p class="mystats__sub">Wie oft du jede Strecke gefahren bist</p>
+            <ol class="rank-list rank-list--compact">${routeList(st.routes, st.routes[0].value)}</ol>
+          </section>
           <h4 class="mystats__title">Diese Woche gespielt</h4>
           <div class="week-bars">${st.week.map((d) => `<div class="week-bars__col${d.today ? ' is-today' : ''}"><span class="week-bars__val">${d.min ? `${Math.round(d.min / 6) / 10} h` : '–'}</span><span class="week-bars__bar"><i style="height:${Math.max(4, (d.min / max) * 100)}%"></i></span><span class="week-bars__day">${d.label}</span></div>`).join('')}</div>
           <p class="sheet-note">Demo-Werte – später kommen sie direkt aus dem Spiel.</p>

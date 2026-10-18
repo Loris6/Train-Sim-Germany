@@ -8,11 +8,11 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 | Seite | Inhalt |
 |---|---|
-| **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, nächstes Training, Strecken, Kennzahlen, Karriere, News |
+| **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, nächstes Training, Strecken mit Nummer (R001, R002, …), Kennzahlen, Karriere, News |
 | **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community) und Detailansicht |
 | **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit drei Sektoren: 1. Über dich (Roblox, Discord, Spielzeit, Rang), 2. Grundwissen (Fragen zum Bereich; bei Instructor wählbar: Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (Aktivität und freie Tage per Schieberegler) |
-| **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, Top-Strecken |
+| **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, meistbefahrene Strecken (mit Streckennummer) |
 | **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. |
 | **Einstellungen** | Darstellung: Hell, Dunkel oder Mit Gerät synchronisieren (folgt automatisch der Einstellung von Handy oder PC), Roblox-Konto, App installieren |
 
@@ -50,10 +50,10 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 
 ## Navigation & Profil
 
-- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten, Spielen/Gruppe/Discord, Uhr, Einstellungen, App installieren).
+- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten inkl. Einstellungen direkt unter Statistiken, Spielen/Gruppe/Discord, Uhr, App installieren).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
 - Unten schwebt eine komplett runde Leiste mit gleichem Abstand links, rechts und unten: Start, News, Trainings und das Profilbild. Das Profil unten ist dasselbe wie oben.
-- **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Statistik** mit den eigenen Werten (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Lieblingsstrecke, Platz und Fahrten der letzten 7 Tage, Demo-Werte). Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
+- **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
 
 ## Inhalte anpassen
 
@@ -61,13 +61,17 @@ Alle Texte, Zahlen und Links stehen in **`assets/js/data.js`**:
 
 ```js
 links: {
-  play: 'https://www.roblox.com/games/…',   // Spiel-Link
+  play: 'https://www.roblox.com/games/140440792597921/…', // Spiel-Link
   group: 'https://www.roblox.com/communities/…', // Roblox-Gruppe
   discord: 'https://discord.gg/…',          // Discord-Einladung
 },
 ```
 
-Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Server, Trainings, Strecken, News und Jobs (`jobs`).
+Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Server, Trainings, News und Jobs (`jobs`).
+
+**Strecken:** Jede Strecke in `routes` hat eine Nummer (`no`: `R001`, `R002`, …). Die Nummer steht auf den Streckenkarten, in den meistbefahrenen Strecken (`topRoutes` verweist nur auf die Nummer) und in „Meine Statistik“. Neue Strecken einfach mit der nächsten Nummer anhängen.
+
+**Züge:** `fleet` enthält die Züge für „Meine Statistik“, getrennt nach Fernverkehr (`fern`), Regio (`regio`) und S-Bahn (`sbahn`).
 
 **Fragen im Bewerbungsformular:** Jede Stelle hat unter `quiz` eigene Fragen. Für Instructor kommen die Fragen aus `knowledge`: abgefragt wird der gewählte Bereich und alle Bereiche darunter (Signaller Instructor also auch Conductor, Platform Staff und Driver). Bei jeder Frage ist die erste Antwort die richtige, die App mischt die Reihenfolge.
 

@@ -7,7 +7,7 @@
 window.TSG = {
   // Hier die echten Links eintragen
   links: {
-    play: 'https://www.roblox.com/discover?Keyword=Train%20Sim%20Germany',
+    play: 'https://www.roblox.com/games/140440792597921/Unbenannte-Experience',
     group: 'https://www.roblox.com/search/communities?keyword=Train%20Sim%20Germany',
     discord: 'https://discord.gg/DEIN-EINLADUNGSCODE',
   },
@@ -112,14 +112,26 @@ window.TSG = {
     { rank: 'Signaller', img: 'training.svg', title: 'Stell als {rank} die Fahrstraßen.', text: 'Übernimm ein Stellwerk wie Hannover Hbf oder Köln Hbf und leite die Züge sicher durch deinen Bereich – Signal für Signal.' },
   ],
 
+  // Strecken mit Nummer (R001, R002, …) wie im Spiel
   routes: [
-    { title: 'Marschbahn', from: 'Hamburg-Altona', to: 'Westerland (Sylt)', line: 'RE 6', cat: 're', km: 237, dur: '3:05 Std.', stops: 14, rating: 4.9, reviews: '2,4K', img: 'route-coast.svg', tag: 'Küste' },
-    { title: 'Werdenfelsbahn', from: 'München Hbf', to: 'Garmisch-Partenkirchen', line: 'RB 6', cat: 'rb', km: 101, dur: '1:28 Std.', stops: 12, rating: 4.8, reviews: '1,9K', img: 'route-alps.svg', tag: 'Alpen' },
-    { title: 'Berliner Stadtbahn', from: 'Westkreuz', to: 'Ostbahnhof', line: 'S7', cat: 's', km: 12, dur: '0:24 Std.', stops: 10, rating: 4.7, reviews: '3,1K', img: 'route-city.svg', tag: 'Großstadt' },
-    { title: 'Linke Rheinstrecke', from: 'Köln Hbf', to: 'Mainz Hbf', line: 'RE 5', cat: 're', km: 185, dur: '2:10 Std.', stops: 18, rating: 4.9, reviews: '980', img: 'route-rhine.svg', tag: 'Neu in 2.5' },
-    { title: 'Schwarzwaldbahn', from: 'Offenburg', to: 'Konstanz', line: 'RE 2', cat: 're', km: 149, dur: '2:05 Std.', stops: 21, rating: 4.8, reviews: '1,2K', img: 'route-forest.svg', tag: 'Gebirge' },
-    { title: 'SFS Hannover – Würzburg', from: 'Hannover Hbf', to: 'Würzburg Hbf', line: 'ICE 23', cat: 'ice', km: 327, dur: '1:58 Std.', stops: 4, rating: 4.6, reviews: '2,0K', img: 'play.svg', tag: '280 km/h' },
+    { no: 'R001', title: 'Marschbahn', from: 'Hamburg-Altona', to: 'Westerland (Sylt)', line: 'RE 6', cat: 're', km: 237, dur: '3:05 Std.', stops: 14, rating: 4.9, reviews: '2,4K', img: 'route-coast.svg', tag: 'Küste' },
+    { no: 'R002', title: 'Werdenfelsbahn', from: 'München Hbf', to: 'Garmisch-Partenkirchen', line: 'RB 6', cat: 'rb', km: 101, dur: '1:28 Std.', stops: 12, rating: 4.8, reviews: '1,9K', img: 'route-alps.svg', tag: 'Alpen' },
+    { no: 'R003', title: 'Berliner Stadtbahn', from: 'Westkreuz', to: 'Ostbahnhof', line: 'S7', cat: 's', km: 12, dur: '0:24 Std.', stops: 10, rating: 4.7, reviews: '3,1K', img: 'route-city.svg', tag: 'Großstadt' },
+    { no: 'R004', title: 'Linke Rheinstrecke', from: 'Köln Hbf', to: 'Mainz Hbf', line: 'RE 5', cat: 're', km: 185, dur: '2:10 Std.', stops: 18, rating: 4.9, reviews: '980', img: 'route-rhine.svg', tag: 'Neu in 2.5' },
+    { no: 'R005', title: 'Schwarzwaldbahn', from: 'Offenburg', to: 'Konstanz', line: 'RE 2', cat: 're', km: 149, dur: '2:05 Std.', stops: 21, rating: 4.8, reviews: '1,2K', img: 'route-forest.svg', tag: 'Gebirge' },
+    { no: 'R006', title: 'SFS Hannover – Würzburg', from: 'Hannover Hbf', to: 'Würzburg Hbf', line: 'ICE 23', cat: 'ice', km: 327, dur: '1:58 Std.', stops: 4, rating: 4.6, reviews: '2,0K', img: 'play.svg', tag: '280 km/h' },
+    { no: 'R007', title: 'Hamburg – Berlin', from: 'Hamburg Hbf', to: 'Berlin Hbf', line: 'ICE 28', cat: 'ice', km: 289, dur: '1:45 Std.', stops: 3, rating: 4.7, reviews: '2,8K', img: 'play.svg', tag: '230 km/h' },
+    { no: 'R008', title: 'S-Bahn Hamburg', from: 'Wedel', to: 'Poppenbüttel', line: 'S1', cat: 's', km: 46, dur: '1:00 Std.', stops: 25, rating: 4.6, reviews: '2,2K', img: 'route-city.svg', tag: 'Großstadt' },
+    { no: 'R009', title: 'SFS Köln – Frankfurt', from: 'Köln Hbf', to: 'Frankfurt (Main) Hbf', line: 'ICE 41', cat: 'ice', km: 180, dur: '1:10 Std.', stops: 3, rating: 4.7, reviews: '1,6K', img: 'route-rhine.svg', tag: '300 km/h' },
+    { no: 'R010', title: 'Hamburg – Kiel', from: 'Hamburg Hbf', to: 'Kiel Hbf', line: 'RE 7', cat: 're', km: 105, dur: '1:15 Std.', stops: 6, rating: 4.5, reviews: '1,1K', img: 'route-coast.svg', tag: 'Küste' },
   ],
+
+  // Züge für „Meine Statistik“: daraus werden die meistgefahrenen Züge je Bereich angezeigt
+  fleet: {
+    fern: ['ICE 4', 'ICE 3', 'ICE T', 'ICE 1', 'IC 2', 'IC 1'],
+    regio: ['Talent 2', 'KISS', 'FLIRT 3', 'Desiro HC', 'LINT 41', 'Doppelstock'],
+    sbahn: ['BR 423', 'BR 430', 'BR 474', 'BR 481', 'BR 490'],
+  },
 
   // cat: update | event | community
   news: [
@@ -245,11 +257,12 @@ window.TSG = {
     { label: 'Ostnetz', value: 87.2 },
   ],
 
+  // Meistbefahrene Strecken (Nummer aus routes, Fahrten in 7 Tagen)
   topRoutes: [
-    { label: 'Hamburg – Berlin', line: 'ICE 28', cat: 'ice', value: 18420 },
-    { label: 'S-Bahn Hamburg (S1)', line: 'S1', cat: 's', value: 16210 },
-    { label: 'Köln – Frankfurt (SFS)', line: 'ICE 41', cat: 'ice', value: 14980 },
-    { label: 'München – Garmisch', line: 'RB 6', cat: 'rb', value: 11340 },
-    { label: 'Hamburg – Kiel', line: 'RE 7', cat: 're', value: 9870 },
+    { no: 'R007', value: 18420 },
+    { no: 'R008', value: 16210 },
+    { no: 'R009', value: 14980 },
+    { no: 'R002', value: 11340 },
+    { no: 'R010', value: 9870 },
   ],
 };
