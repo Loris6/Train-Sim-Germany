@@ -2008,6 +2008,27 @@
       submitApplication(form);
     });
 
+    // App installieren (Chrome, Edge, Android); auf dem iPhone über „Zum Home-Bildschirm“
+    let installEvent = null;
+    const showInstall = (on) => $$('[data-install]').forEach((b) => { b.hidden = !on; });
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      installEvent = e;
+      showInstall(true);
+    });
+    window.addEventListener('appinstalled', () => {
+      installEvent = null;
+      showInstall(false);
+      toast('App installiert');
+    });
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-install]') || !installEvent) return;
+      installEvent.prompt();
+      installEvent.userChoice.finally(() => { installEvent = null; showInstall(false); });
+    });
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $$('[data-install-ios]').forEach((el) => { el.hidden = false; });
+
     window.addEventListener('hashchange', route);
   }
 
@@ -2036,6 +2057,10 @@
   }
 
   // ---------- Start ----------
+  // Offline-Fähigkeit als App (nur über http/https möglich)
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
   $$('[data-year]').forEach((el) => { el.textContent = berlinNow().y; });
   const tzName = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', timeZoneName: 'short' }).formatToParts(new Date()).find((x) => x.type === 'timeZoneName');
   $$('[data-tz]').forEach((el) => { el.textContent = tzName ? tzName.value : 'MEZ'; });

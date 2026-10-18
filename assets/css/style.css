@@ -296,13 +296,13 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; a
 
 /* ---------- Kopfzeile ---------- */
 .topbar {
-  position: sticky; top: 0; z-index: 50; height: var(--topbar-h);
+  position: sticky; top: 0; z-index: 50; height: calc(var(--topbar-h) + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top);
   background: var(--surface); border-bottom: 1px solid var(--line); transition: box-shadow .2s;
 }
 .topbar.is-scrolled { box-shadow: var(--elev-md); }
 .topbar__inner { height: 100%; display: flex; align-items: center; gap: 8px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; min-width: 0; color: var(--ink); text-decoration: none; }
-.brand__logo { width: 32px; height: 32px; flex: none; }
+.brand__logo { width: 32px; height: 32px; flex: none; border-radius: 22%; }
 .brand__name { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mainnav { display: none; }
 .topbar__actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
@@ -353,7 +353,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; a
 .stage__inner { display: flex; flex-direction: column; align-items: center; text-align: center; padding-block: 44px 48px; }
 @media (min-width: 1080px) { .stage__inner { padding-block: 88px 96px; } }
 .stage__brand { display: flex; align-items: center; justify-content: center; gap: 14px; }
-.stage__logo { width: 48px; height: 48px; flex: none; }
+.stage__logo { width: 48px; height: 48px; flex: none; border-radius: 22%; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); }
 .stage .stage__title { color: #fff; font-size: clamp(30px, 7.4vw, 64px); font-weight: 700; line-height: 1.05; letter-spacing: -.02em; }
 @media (min-width: 640px) { .stage__brand { gap: 20px; } .stage__logo { width: 72px; height: 72px; } }
 .stage__lead { max-width: 36em; margin-top: 16px; font-size: clamp(17px, 2.2vw, 22px); line-height: 1.45; color: rgba(255, 255, 255, .88); }
@@ -1175,6 +1175,8 @@ a.promo-card:hover { box-shadow: var(--elev-md); border-color: transparent; }
   border: 0; border-radius: var(--r-xs); background: none; color: var(--text); font-size: 16px; cursor: pointer; text-align: left;
 }
 .menu__theme:hover { background: var(--hover); }
+.menu__hint { display: flex; align-items: flex-start; gap: 12px; margin-top: 8px; padding: 12px; border-radius: var(--r-xs); background: var(--bg-2); font-size: 14px; color: var(--text-2); }
+.menu__hint .ic { font-size: 18px; margin-top: 1px; }
 
 /* Inhalte der Auswahl-Dialoge */
 .opt-list { display: grid; gap: 2px; }

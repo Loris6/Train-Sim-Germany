@@ -10,7 +10,16 @@
   <meta property="og:title" content="Train Sim Germany">
   <meta property="og:description" content="Das Bahnerlebnis auf Roblox – Live-Abfahrten, Server, Statistiken und Trainings.">
   <meta property="og:type" content="website">
+  <meta property="og:image" content="assets/icons/roblox-thumbnail.png">
+  <meta name="application-name" content="Train Sim Germany">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TSG">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/uicons-regular-rounded.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/uicons.css">
@@ -620,6 +629,7 @@
           <a class="btn btn--primary" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
           <a class="btn btn--outline" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe</a>
           <a class="btn btn--outline" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</a>
+          <button class="btn btn--outline" type="button" data-install hidden><i class="fi fi-rr-download ic" aria-hidden="true"></i>App installieren</button>
         </div>
       </div>
       <div class="footer__grid">
@@ -698,6 +708,11 @@
         <span class="menu__ic"><i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i><i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i></span>
         Hell / Dunkel umschalten
       </button>
+      <button class="menu__theme" type="button" data-install hidden>
+        <span class="menu__ic"><i class="fi fi-rr-download ic" aria-hidden="true"></i></span>
+        App installieren
+      </button>
+      <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
     </div>
   </div>
 

@@ -26,6 +26,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-cross-small:before{content:"\f4f6"}
 .fi-rr-database:before{content:"\f525"}
 .fi-rr-dot-circle:before{content:"\f588"}
+.fi-rr-download:before{content:"\f591"}
 .fi-rr-gamepad:before{content:"\f6df"}
 .fi-rr-heart:before{content:"\f7a0"}
 .fi-rr-home:before{content:"\f7b8"}
@@ -43,6 +44,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-settings-sliders:before{content:"\fbd1"}
 .fi-rr-shield-check:before{content:"\fbdb"}
 .fi-rr-signal-alt-2:before{content:"\fc11"}
+.fi-rr-smartphone:before{content:"\fc44"}
 .fi-rr-sort-alt:before{content:"\fc69"}
 .fi-rr-star:before{content:"\fce9"}
 .fi-rr-sun:before{content:"\fd17"}

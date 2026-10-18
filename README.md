@@ -30,6 +30,23 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 - Hell- und Dunkelmodus (folgt dem System, umschaltbar oben rechts)
 - Alle Illustrationen sind eigene SVGs in `assets/img`. Sie können jederzeit durch Screenshots aus dem Spiel ersetzt werden (gleicher Dateiname, z. B. als `.png`, dann den Pfad anpassen).
 
+## App & Spielbild
+
+Die Seite ist eine installierbare Web-App (PWA): Auf dem Handy über „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ im Menü, am PC über das Installieren-Symbol in der Adressleiste. Danach startet sie wie eine eigene App mit Icon und funktioniert auch offline.
+
+Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/logo.svg`, daraus sind alle Größen erzeugt:
+
+| Datei | Wofür |
+|---|---|
+| `assets/icons/roblox-game-icon.png` | Roblox-Spiel-Icon (512 × 512, randlos – Roblox rundet die Ecken selbst) |
+| `assets/icons/roblox-thumbnail.png` | Roblox-Vorschaubild und Link-Vorschau (1920 × 1080) |
+| `assets/icons/icon-192.png`, `icon-512.png` | App-Icon (mit runden Ecken) |
+| `assets/icons/icon-maskable-512.png` | App-Icon für Android (randlos, das System schneidet die Form zu) |
+| `assets/icons/apple-touch-icon.png` | iPhone/iPad-Startbildschirm (180 × 180) |
+| `assets/icons/favicon-32.png` | Browser-Tab |
+
+`manifest.webmanifest` beschreibt die App (Name, Icons, Schnellzugriffe auf Abfahrten, Reise und Trainings), `sw.js` sorgt für den Offline-Modus. Wenn sich Dateien ändern, holt die App sie automatisch neu, solange eine Verbindung besteht.
+
 ## Inhalte anpassen
 
 Alle Texte, Zahlen und Links stehen in **`assets/js/data.js`**:
@@ -77,11 +94,14 @@ Danach `http://localhost:8080` (bzw. `:8000`) öffnen.
 
 ```
 index.html            Alle Seiten (Hash-Routing: #/abfahrten, #/server, …)
+manifest.webmanifest  App-Beschreibung (Name, Icons, Schnellzugriffe)
+sw.js                 Service Worker für den Offline-Modus
 assets/css/style.css  Design-System und Layouts
 assets/js/data.js     Inhalte & Beispieldaten
 assets/js/app.js      Routing, Live-Abfahrten, Diagramme, Filter, Anmeldung
 assets/css/uicons.css Flaticon UIcons (erzeugt)
-assets/img/           Logo und Illustrationen (SVG)
+assets/img/           Logo bzw. App-Icon und Illustrationen (SVG)
+assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PNG)
 assets/fonts/         Rubik und UIcons (woff2)
 tools/build_icons.py  Baut die UIcons-Teilmenge
 ```
