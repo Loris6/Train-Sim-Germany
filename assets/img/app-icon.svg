@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- App-Icon und Roblox-Spielbild: Logo auf weißer Fläche (randlos, die Ecken rundet das System) -->
+  <defs>
+    <linearGradient id="tsg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#B80011"/>
+      <stop offset="1" stop-color="#FF3A4D"/>
+    </linearGradient>
+    <mask id="cut">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M298 202H326C350 202 370 220 382 248L386 258H298C292 258 288 254 288 248V212C288 206 292 202 298 202Z" fill="#000"/>
+      <rect x="204" y="290" width="206" height="14" rx="7" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  <g transform="translate(256 256) scale(.68) translate(-237 -256)">
+  <path d="M64 146V186C64 116 116 64 186 64H326C396 64 448 116 448 186V326C448 396 396 448 326 448H186C116 448 64 396 64 326V380" fill="none" stroke="url(#tsg)" stroke-width="36" stroke-linecap="round"/>
+  <g fill="url(#tsg)">
+    <path mask="url(#cut)" d="M222 176H262C340 176 392 226 414 300C419 318 420 336 420 352H222C211 352 202 343 202 332V196C202 185 211 176 222 176Z"/>
+    <rect x="40" y="184" width="140" height="36" rx="18"/>
+    <rect x="16" y="246" width="164" height="36" rx="18"/>
+    <rect x="64" y="308" width="116" height="36" rx="18"/>
+    <rect x="150" y="384" width="256" height="16" rx="8"/>
+  </g>
+</g>
+</svg>

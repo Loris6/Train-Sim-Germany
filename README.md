@@ -8,12 +8,12 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 | Seite | Inhalt |
 |---|---|
-| **Start** | Titelbereich mit Logo, Begrüßung und Suche, Einstiegskarte mit Server / Gruppe / Discord, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller), Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, Karriere, News |
+| **Start** | Titelbereich mit Logo, Begrüßung und Suche, Einstiegskarte mit Server / Gruppe / Discord, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, Karriere, News |
 | **Reise** | Reiseauskunft wie im DB Navigator: Von/Nach mit Tauschen, Datum, Routeneinstellungen (Verkehrsmittel, nur direkt, Zwischenhalt), Haltestellen-Auswahl mit Favoriten und Verlauf, Schnelle Suche (Start antippen oder auf das Ziel ziehen), Verbindungen mit einem Umstieg, Reiseplan mit allen Halten, merken & anheften |
 | **Abfahrten** | Live-Abfahrtstafel mit Abfahrten/Ankünften, Bahnhofssuche, Filtern nach Zuggattung, Lokführer und Verspätungen |
 | **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community) und Detailansicht |
-| **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit drei Sektoren: 1. Über dich (Roblox, Discord, Alter, Rang), 2. Grundwissen (Fragen zum Bereich; bei Instructor wählbar: Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit |
+| **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit drei Sektoren: 1. Über dich (Roblox, Discord, Spielzeit, Rang), 2. Grundwissen (Fragen zum Bereich; bei Instructor wählbar: Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (Aktivität und freie Tage per Schieberegler) |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, Top-Strecken |
 | **Spieler** | Podium, Bestenliste (Kilometer / Fahrten / Pünktlichkeit), Spieler der Woche, Ränge |
 | **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten, alle kommenden Termine, Anmeldung |
@@ -22,19 +22,21 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
 - Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
-- Aufbau nach dem [DB UX Design System](https://github.com/db-ux-design-system/core-web) (Generation 3, Apache-2.0): weiße Kopfzeile mit roter Markierung für die aktive Seite, Brotkrümel und große Überschriften, Buttons mit 40 px Höhe (Rot für die Hauptaktion, sonst mit Rand), graue Eingabefelder, Karten mit 1 px Rand, Tabs mit roter Linie, blauer Fokusrahmen. Abstände und Schatten sind die Werte aus dem DB UX Design System, die Ecken sind etwas runder (Buttons und Felder 8 px, Karten 12 px).
-- Uhr mit deutscher Zeit (MEZ/MESZ) in der Kopfzeile DB-Logo und DB-Schriften werden nicht verwendet.
+- Aufbau nach dem [DB UX Design System](https://github.com/db-ux-design-system/core-web) (Generation 3, Apache-2.0): weiße Kopfzeile, große Überschriften, Buttons mit 40 px Höhe (Rot für die Hauptaktion, sonst grau oder mit Rand), graue Eingabefelder, Karten mit 1 px Rand, blauer Fokusrahmen. Abstände und Schatten sind die Werte aus dem DB UX Design System, die Ecken sind etwas runder (Buttons und Felder 8 px, Karten 12 px). DB-Logo und DB-Schriften werden nicht verwendet.
+- Aktive Elemente (Tabs, Menü, Leiste unten) sind grau eingerahmt mit Hintergrund, Tage mit Trainings haben einen roten Punkt – keine Unterstriche
 - Farben: DB-Rot `#EC0016` und die Cool-Gray-Töne der DB, Gleisnummern im DB-Blau wie an den Bahnhofsschildern
-- Auf dem Handy: Kopfzeile mit Spielen-Button und Tab-Leiste unten mit Beschriftung
+- Uhr mit deutscher Zeit (MEZ/MESZ) im Menü
 - Responsiv für Handy, Tablet und Desktop
-- Hell- und Dunkelmodus (folgt dem System, umschaltbar oben rechts)
+- Hell- und Dunkelmodus (folgt dem System, umschaltbar im Menü)
 - Alle Illustrationen sind eigene SVGs in `assets/img`. Sie können jederzeit durch Screenshots aus dem Spiel ersetzt werden (gleicher Dateiname, z. B. als `.png`, dann den Pfad anpassen).
 
 ## App & Spielbild
 
 Die Seite ist eine installierbare Web-App (PWA): Auf dem Handy über „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ im Menü, am PC über das Installieren-Symbol in der Adressleiste. Danach startet sie wie eine eigene App mit Icon und funktioniert auch offline.
 
-Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/logo.svg`, daraus sind alle Größen erzeugt:
+**Logo:** `assets/img/logo.svg` ist das Zeichen ohne Hintergrund (Schnellzug mit Fahrtlinien, der aus einem offenen Rahmen fährt), `assets/img/logo-white.svg` die weiße Variante für dunkle Hintergründe. Als PNG in 1024 × 1024 mit transparentem Hintergrund: `assets/icons/logo-1024.png` und `logo-white-1024.png`.
+
+Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/app-icon.svg` (Logo auf weißer Fläche, der Hintergrund lässt sich frei austauschen), daraus sind alle Größen erzeugt:
 
 | Datei | Wofür |
 |---|---|
@@ -46,6 +48,13 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 | `assets/icons/favicon-32.png` | Browser-Tab |
 
 `manifest.webmanifest` beschreibt die App (Name, Icons, Schnellzugriffe auf Abfahrten, Reise und Trainings), `sw.js` sorgt für den Offline-Modus. Wenn sich Dateien ändern, holt die App sie automatisch neu, solange eine Verbindung besteht.
+
+## Navigation & Profil
+
+- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten, Spielen/Gruppe/Discord, Uhr, Hell/Dunkel, App installieren).
+- Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
+- Unten schwebt die Leiste mit Start, News, Trainings und Profil. Das Profil unten ist dasselbe wie oben.
+- **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
 
 ## Inhalte anpassen
 
@@ -65,7 +74,7 @@ Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Linien und Fahr
 
 **Bewerbungen:** Das Formular prüft die Eingaben, speichert Bewerbungen aber nur im Browser (Demo). Für echte Bewerbungen braucht es einen Server, der sie z. B. an einen Discord-Kanal weiterleitet. Eine Discord-Webhook-URL sollte nicht direkt in die Seite eingetragen werden, weil sie sonst öffentlich ist.
 
-**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher → Instructor). Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
+**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher → Instructor). Supervisor ist ein Teamrang ohne eigenes Training. Jeder Rang hat ein Kürzel (`prefix`, z. B. UD, D, PS, CD, SG, SV) und die Zahl der Spieler (`members`), die auf der Startseite bei den Rollen steht. Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
 ## Icons hinzufügen
 

@@ -1,65 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- App-Icon und Roblox-Spielbild von Train Sim Germany (randlos, die Ecken rundet das System) -->
+  <!-- Logo von Train Sim Germany: ein Hochgeschwindigkeitszug fährt aus einem offenen Rahmen. Ohne Hintergrund. -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#F5112A"/>
-      <stop offset="1" stop-color="#C40013"/>
+    <linearGradient id="tsg" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#B80011"/>
+      <stop offset="1" stop-color="#FF3A4D"/>
     </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.38" r="0.55">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".2"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#E4E8EC"/>
-    </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2A3242"/>
-      <stop offset="1" stop-color="#0E121A"/>
-    </linearGradient>
-    <clipPath id="front">
-      <path d="M196 104H316C350 104 370 122 376 154L402 350C406 380 388 404 358 404H154C124 404 106 380 110 350L136 154C142 122 162 104 196 104Z"/>
-    </clipPath>
+    <mask id="cut">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M298 202H326C350 202 370 220 382 248L386 258H298C292 258 288 254 288 248V212C288 206 292 202 298 202Z" fill="#000"/>
+      <rect x="204" y="290" width="206" height="14" rx="7" fill="#000"/>
+    </mask>
   </defs>
-
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <rect width="512" height="512" fill="url(#glow)"/>
-
-  <!-- Gleis -->
-  <g fill="#FFFFFF">
-    <path d="M168 420h176l8 16H160z" opacity=".22"/>
-    <path d="M150 456h212l10 20H140z" opacity=".22"/>
-    <path d="M128 496h256l10 16H118z" opacity=".22"/>
-    <path d="M196 398h12L140 512h-22z" opacity=".9"/>
-    <path d="M304 398h12l78 114h-22z" opacity=".9"/>
+  <path d="M64 146V186C64 116 116 64 186 64H326C396 64 448 116 448 186V326C448 396 396 448 326 448H186C116 448 64 396 64 326V380" fill="none" stroke="url(#tsg)" stroke-width="36" stroke-linecap="round"/>
+  <g fill="url(#tsg)">
+    <path mask="url(#cut)" d="M222 176H262C340 176 392 226 414 300C419 318 420 336 420 352H222C211 352 202 343 202 332V196C202 185 211 176 222 176Z"/>
+    <rect x="40" y="184" width="140" height="36" rx="18"/>
+    <rect x="16" y="246" width="164" height="36" rx="18"/>
+    <rect x="64" y="308" width="116" height="36" rx="18"/>
+    <rect x="150" y="384" width="256" height="16" rx="8"/>
   </g>
-  <ellipse cx="256" cy="406" rx="150" ry="12" fill="#000000" opacity=".22"/>
-
-  <!-- Stromabnehmer -->
-  <g fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M228 104L256 72L284 104"/>
-    <path d="M256 72V62"/>
-    <path d="M214 62H298"/>
-  </g>
-
-  <!-- Zugfront -->
-  <path d="M196 104H316C350 104 370 122 376 154L402 350C406 380 388 404 358 404H154C124 404 106 380 110 350L136 154C142 122 162 104 196 104Z" fill="url(#body)"/>
-  <g clip-path="url(#front)">
-    <rect x="100" y="292" width="312" height="9" fill="#131821"/>
-    <rect x="100" y="301" width="312" height="9" fill="#EC0016"/>
-    <rect x="100" y="310" width="312" height="9" fill="#FFCE00"/>
-    <rect x="100" y="372" width="312" height="40" fill="#282D37"/>
-    <rect x="226" y="380" width="60" height="16" rx="6" fill="#4F555F"/>
-  </g>
-  <path d="M190 134H322C338 134 348 144 350 160L364 254C366 270 356 280 340 280H172C156 280 146 270 148 254L162 160C164 144 174 134 190 134Z" fill="url(#glass)"/>
-  <path d="M192 146H262L214 268H176C166 268 160 262 161 252L174 162C175 152 182 146 192 146Z" fill="#FFFFFF" opacity=".1"/>
-  <rect x="208" y="146" width="96" height="14" rx="5" fill="#FFB000"/>
-
-  <!-- Scheinwerfer -->
-  <rect x="136" y="330" width="62" height="28" rx="11" fill="#131821"/>
-  <rect x="314" y="330" width="62" height="28" rx="11" fill="#131821"/>
-  <circle cx="156" cy="344" r="8" fill="#FFF6D6"/>
-  <circle cx="178" cy="344" r="8" fill="#FFF6D6"/>
-  <circle cx="334" cy="344" r="8" fill="#FFF6D6"/>
-  <circle cx="356" cy="344" r="8" fill="#FFF6D6"/>
 </svg>

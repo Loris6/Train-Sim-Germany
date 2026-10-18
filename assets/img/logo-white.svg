@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Logo von Train Sim Germany: ein Hochgeschwindigkeitszug fährt aus einem offenen Rahmen. Weiße Variante für dunkle Hintergründe. -->
+  <defs>
+    <mask id="cut">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M298 202H326C350 202 370 220 382 248L386 258H298C292 258 288 254 288 248V212C288 206 292 202 298 202Z" fill="#000"/>
+      <rect x="204" y="290" width="206" height="14" rx="7" fill="#000"/>
+    </mask>
+  </defs>
+  <path d="M64 146V186C64 116 116 64 186 64H326C396 64 448 116 448 186V326C448 396 396 448 326 448H186C116 448 64 396 64 326V380" fill="none" stroke="#FFFFFF" stroke-width="36" stroke-linecap="round"/>
+  <g fill="#FFFFFF">
+    <path mask="url(#cut)" d="M222 176H262C340 176 392 226 414 300C419 318 420 336 420 352H222C211 352 202 343 202 332V196C202 185 211 176 222 176Z"/>
+    <rect x="40" y="184" width="140" height="36" rx="18"/>
+    <rect x="16" y="246" width="164" height="36" rx="18"/>
+    <rect x="64" y="308" width="116" height="36" rx="18"/>
+    <rect x="150" y="384" width="256" height="16" rx="8"/>
+  </g>
+</svg>

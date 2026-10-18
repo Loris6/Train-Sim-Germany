@@ -32,33 +32,18 @@
 <body data-page="home">
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-  <!-- Kopfzeile -->
+  <!-- Kopfzeile: Menü links, Profil rechts -->
   <header class="topbar" data-topbar>
     <div class="container topbar__inner">
+      <button class="round-btn topbar__menu" type="button" data-menu-open aria-label="Menü öffnen" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
       <a class="brand" href="#/" aria-label="Train Sim Germany – Startseite">
         <img class="brand__logo" src="assets/img/logo.svg" alt="" width="36" height="36">
         <span class="brand__name">Train Sim Germany</span>
       </a>
-      <nav class="mainnav" aria-label="Hauptnavigation">
-        <a href="#/" data-nav="home">Start</a>
-        <a href="#/reise" data-nav="reise">Reise</a>
-        <a href="#/trainings" data-nav="trainings">Trainings</a>
-        <a href="#/server" data-nav="server">Server</a>
-        <a href="#/news" data-nav="news">News</a>
-        <a href="#/karriere" data-nav="karriere">Karriere</a>
-        <a class="nav-extra" href="#/statistiken" data-nav="statistiken">Statistiken</a>
-        <a class="nav-extra" href="#/spieler" data-nav="spieler">Spieler</a>
-        <button class="nav-more" type="button" data-menu-open data-nav="more-desk">Mehr<i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button>
-      </nav>
-      <div class="topbar__actions">
-        <button class="round-btn hide-mobile" type="button" data-theme-toggle aria-label="Farbschema wechseln">
-          <i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i>
-          <i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i>
-        </button>
-        <span class="clock-pill" role="timer" aria-label="Uhrzeit in Deutschland"><span data-clock-full>--:--:--</span><small data-tz>MEZ</small></span>
-        <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
-        <a class="round-btn hide-mobile" href="#/spieler" aria-label="Mein Profil"><i class="fi fi-rr-circle-user ic" aria-hidden="true"></i></a>
-      </div>
+      <button class="me" type="button" data-open="profile" aria-label="Profil öffnen">
+        <span class="rank-pill" data-me-rank>[CD]</span>
+        <span class="avatar-ring" data-me-ring><span class="avatar-img" data-me-avatar></span></span>
+      </button>
     </div>
   </header>
 
@@ -85,11 +70,6 @@
             </div>
             <ul class="search__results" role="listbox" data-search-results hidden></ul>
           </form>
-          <nav class="stage__links" aria-label="Schnellzugriff">
-            <a href="#/reise"><i class="fi fi-rr-route ic" aria-hidden="true"></i>Verbindung suchen</a>
-            <a href="#/abfahrten"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i>Abfahrtstafel</a>
-            <a href="#/trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i>Trainings</a>
-          </nav>
         </div>
       </div>
 
@@ -197,7 +177,6 @@
     <section class="page" data-page="abfahrten" aria-label="Abfahrten" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><a href="#/reise">Reise</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Abfahrten</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label" data-board-label>Abfahrten ab</span>
@@ -282,7 +261,6 @@
     <section class="page" data-page="trainings" aria-label="Trainings" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Trainings</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label">Dein Rang</span>
@@ -350,7 +328,6 @@
     <section class="page" data-page="server" aria-label="Server" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Server</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label"><span data-bind="servers">42</span> Server online</span>
@@ -394,7 +371,6 @@
     <section class="page" data-page="statistiken" aria-label="Statistiken" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Statistiken</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label">Live aus dem Netz</span>
@@ -465,7 +441,6 @@
     <section class="page" data-page="spieler" aria-label="Spieler" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Spieler</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label"><span data-bind="groupMembers">48,2K</span> Crew-Mitglieder</span>
@@ -505,7 +480,6 @@
     <section class="page" data-page="reise" aria-label="Reiseauskunft" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Reiseauskunft</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label">Reiseauskunft</span>
@@ -548,7 +522,6 @@
     <section class="page" data-page="reiseplan" aria-label="Reiseplan" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><a href="#/reise">Reiseauskunft</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Reiseplan</span></nav>
           <div class="appbar">
             <div class="appbar__title appbar__title--back">
               <a class="round-btn" href="#/reise" aria-label="Zurück zur Reiseauskunft"><i class="fi fi-rr-arrow-left ic" aria-hidden="true"></i></a>
@@ -576,7 +549,6 @@
     <section class="page" data-page="news" aria-label="Neuigkeiten" hidden>
       <div class="page-head">
         <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel"><a href="#/">Start</a><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i><span aria-current="page">Neuigkeiten</span></nav>
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label">Infotainment</span>
@@ -599,19 +571,9 @@
     </section>
 
     <!-- ===================== KARRIERE ===================== -->
-    <section class="page" data-page="karriere" aria-label="Karriere" hidden>
-      <div class="page-head">
-        <div class="container">
-          <nav class="crumbs" aria-label="Brotkrümel" data-crumbs></nav>
-          <div class="appbar">
-            <div class="appbar__title">
-              <span class="appbar__label">Jobs &amp; Bewerbung</span>
-              <h1 class="appbar__value">Karriere bei Train Sim Germany</h1>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="sheet">
+    <section class="page" data-page="karriere" aria-labelledby="h-career" hidden>
+      <h1 class="sr-only" id="h-career">Karriere bei Train Sim Germany</h1>
+      <div class="sheet sheet--career">
         <div class="container career" data-career></div>
       </div>
     </section>
@@ -620,100 +582,83 @@
   <!-- Fußzeile -->
   <footer class="footer">
     <div class="container">
-      <div class="footer__cta">
-        <div>
-          <h2>Bereit für die erste Fahrt?</h2>
-          <p>Kostenlos auf Roblox spielen und Teil der Community werden.</p>
-        </div>
+      <div class="footer__top">
+        <a class="brand footer__brand" href="#/">
+          <img class="brand__logo" src="assets/img/logo.svg" alt="" width="40" height="40">
+          <span><span class="brand__name">Train Sim Germany</span><small>Das Bahnerlebnis auf Roblox</small></span>
+        </a>
         <div class="btn-row">
           <a class="btn btn--primary" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
-          <a class="btn btn--outline" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe</a>
-          <a class="btn btn--outline" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</a>
-          <button class="btn btn--outline" type="button" data-install hidden><i class="fi fi-rr-download ic" aria-hidden="true"></i>App installieren</button>
+          <a class="btn btn--soft" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe</a>
+          <a class="btn btn--soft" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</a>
+          <button class="btn btn--soft" type="button" data-install hidden><i class="fi fi-rr-download ic" aria-hidden="true"></i>App installieren</button>
         </div>
       </div>
-      <div class="footer__grid">
-        <div class="footer__brand">
-          <a class="brand" href="#/">
-            <img class="brand__logo" src="assets/img/logo.svg" alt="" width="36" height="36">
-            <span class="brand__name">Train Sim Germany</span>
-          </a>
-          <p>Das Bahnerlebnis auf Roblox – mit Live-Abfahrten, echten Strecken und einer Crew, die das Netz am Laufen hält.</p>
-        </div>
-        <nav aria-label="Spiel">
-          <h3>Spiel</h3>
-          <a data-link="play" href="#" target="_blank" rel="noopener">Spielen</a>
-          <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe</a>
-          <a data-link="discord" href="#" target="_blank" rel="noopener">Discord</a>
-        </nav>
-        <nav aria-label="Netz">
-          <h3>Netz</h3>
-          <a href="#/reise">Reiseauskunft</a>
-          <a href="#/abfahrten">Abfahrten</a>
-          <a href="#/server">Server</a>
-          <a href="#/statistiken">Statistiken</a>
-        </nav>
-        <nav aria-label="Community">
-          <h3>Community</h3>
-          <a href="#/trainings">Trainings</a>
-          <a href="#/news">Neuigkeiten</a>
-          <a href="#/karriere">Karriere</a>
-          <a href="#/spieler">Spieler</a>
-        </nav>
-      </div>
-      <p class="footer__legal">© <span data-year>2026</span> Train Sim Germany. Ein Fan-Projekt auf Roblox – nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation. Icons: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a>.</p>
+      <nav class="footer__links" aria-label="Seiten">
+        <a href="#/reise">Reiseauskunft</a>
+        <a href="#/abfahrten">Abfahrten</a>
+        <a href="#/trainings">Trainings</a>
+        <a href="#/server">Server</a>
+        <a href="#/news">Neuigkeiten</a>
+        <a href="#/karriere">Karriere</a>
+        <a href="#/statistiken">Statistiken</a>
+        <a href="#/spieler">Spieler</a>
+      </nav>
+      <p class="footer__legal">© <span data-year>2026</span> Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation · Icons: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a></p>
     </div>
   </footer>
 
   <!-- Tab-Leiste (Handy & Tablet) -->
   <nav class="tabbar" aria-label="App-Navigation">
     <a href="#/" data-nav="home"><i class="fi fi-rr-home ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-home ic tab-on" aria-hidden="true"></i><span>Start</span></a>
-    <a href="#/reise" data-nav="reise"><i class="fi fi-rr-route ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-route ic tab-on" aria-hidden="true"></i><span>Reise</span></a>
-    <a href="#/trainings" data-nav="trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i><span>Trainings</span></a>
     <a href="#/news" data-nav="news"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i><span>News</span></a>
-    <button type="button" data-menu-open data-nav="more" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-apps ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-apps ic tab-on" aria-hidden="true"></i><span>Mehr</span></button>
+    <a href="#/trainings" data-nav="trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i><span>Trainings</span></a>
+    <button type="button" data-open="profile"><span class="avatar-ring avatar-ring--sm" data-me-ring><span class="avatar-img" data-me-avatar></span></span><span>Profil</span></button>
   </nav>
 
-  <!-- Menü -->
-  <div class="sheet-modal menu" id="menu" data-menu hidden>
-    <div class="sheet-modal__backdrop" data-menu-close></div>
-    <div class="sheet-modal__panel" role="dialog" aria-modal="true" aria-label="Menü">
-      <div class="grip" aria-hidden="true"></div>
-      <div class="sheet-modal__head">
-        <h2>Menü</h2>
+  <!-- Menü (schiebt sich von links herein) -->
+  <div class="drawer" id="menu" data-menu hidden>
+    <div class="drawer__backdrop" data-menu-close></div>
+    <aside class="drawer__panel" role="dialog" aria-modal="true" aria-label="Menü">
+      <div class="drawer__head">
+        <a class="brand" href="#/">
+          <img class="brand__logo" src="assets/img/logo.svg" alt="" width="36" height="36">
+          <span class="brand__name">Train Sim Germany</span>
+        </a>
         <button class="round-btn" type="button" data-menu-close aria-label="Menü schließen"><i class="fi fi-rr-cross-small ic" aria-hidden="true"></i></button>
       </div>
+      <button class="drawer__me" type="button" data-open="profile" data-drawer-me></button>
       <nav class="menu__nav" aria-label="Alle Seiten">
         <a href="#/" data-nav="home"><span class="menu__ic"><i class="fi fi-rr-home ic" aria-hidden="true"></i></span>Start</a>
-        <a href="#/reise" data-nav="reise"><span class="menu__ic"><i class="fi fi-rr-route ic" aria-hidden="true"></i></span>Reise</a>
+        <a href="#/reise" data-nav="reise"><span class="menu__ic"><i class="fi fi-rr-route ic" aria-hidden="true"></i></span>Reiseauskunft</a>
+        <a href="#/abfahrten" data-nav="abfahrten"><span class="menu__ic"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i></span>Abfahrten</a>
         <a href="#/trainings" data-nav="trainings"><span class="menu__ic"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></span>Trainings</a>
-        <a href="#/news" data-nav="news"><span class="menu__ic"><i class="fi fi-rr-newspaper ic" aria-hidden="true"></i></span>News</a>
+        <a href="#/news" data-nav="news"><span class="menu__ic"><i class="fi fi-rr-newspaper ic" aria-hidden="true"></i></span>Neuigkeiten</a>
         <a href="#/server" data-nav="server"><span class="menu__ic"><i class="fi fi-rr-database ic" aria-hidden="true"></i></span>Server</a>
         <a href="#/karriere" data-nav="karriere"><span class="menu__ic"><i class="fi fi-rr-briefcase ic" aria-hidden="true"></i></span>Karriere</a>
         <a href="#/statistiken" data-nav="statistiken"><span class="menu__ic"><i class="fi fi-rr-chart-line-up ic" aria-hidden="true"></i></span>Statistiken</a>
         <a href="#/spieler" data-nav="spieler"><span class="menu__ic"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i></span>Spieler</a>
       </nav>
-      <div class="menu__cta">
-        <a class="menu-tile menu-tile--play" data-link="play" href="#" target="_blank" rel="noopener">
-          <img src="assets/img/play.svg" alt="" loading="lazy"><span><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</span>
-        </a>
-        <a class="menu-tile" data-link="group" href="#" target="_blank" rel="noopener">
-          <img src="assets/img/group.svg" alt="" loading="lazy"><span><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe</span>
-        </a>
-        <a class="menu-tile" data-link="discord" href="#" target="_blank" rel="noopener">
-          <img src="assets/img/discord.svg" alt="" loading="lazy"><span><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</span>
-        </a>
+      <div class="drawer__actions">
+        <a class="btn btn--primary btn--block" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
+        <div class="drawer__pair">
+          <a class="btn btn--soft" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe</a>
+          <a class="btn btn--soft" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord</a>
+        </div>
       </div>
-      <button class="menu__theme" type="button" data-theme-toggle>
-        <span class="menu__ic"><i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i><i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i></span>
-        Hell / Dunkel umschalten
-      </button>
-      <button class="menu__theme" type="button" data-install hidden>
-        <span class="menu__ic"><i class="fi fi-rr-download ic" aria-hidden="true"></i></span>
-        App installieren
-      </button>
-      <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
-    </div>
+      <div class="drawer__foot">
+        <span class="drawer__clock"><i class="fi fi-rr-clock-three ic" aria-hidden="true"></i><span data-clock-full>--:--:--</span><small data-tz>MEZ</small></span>
+        <button class="menu__theme" type="button" data-theme-toggle>
+          <span class="menu__ic"><i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i><i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i></span>
+          Hell / Dunkel
+        </button>
+        <button class="menu__theme" type="button" data-install hidden>
+          <span class="menu__ic"><i class="fi fi-rr-download ic" aria-hidden="true"></i></span>
+          App installieren
+        </button>
+        <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
+      </div>
+    </aside>
   </div>
 
   <!-- Auswahl-Sheet (Rang, Datum, Filter, Training, Bahnhof) -->

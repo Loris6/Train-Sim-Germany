@@ -91,7 +91,11 @@
     for (let i = rankIdx(rank) + 1; i < RANKS.length; i++) if (typeOf(RANKS[i].name)) return RANKS[i];
     return null;
   }
-  const reqFor = (type) => RANKS[Math.max(0, rankIdx(type) - 1)].name;
+  // Voraussetzung = der Rang davor (Teamränge ohne Training zählen nicht)
+  function reqFor(type) {
+    for (let i = rankIdx(type) - 1; i > 0; i--) if (!RANKS[i].staff) return RANKS[i].name;
+    return RANKS[0].name;
+  }
   const roleBadge = (role) => `<span class="role" style="--rc:${rankOf(role).color}">${esc(role)}</span>`;
 
   // ---------- Zustand ----------
@@ -134,6 +138,8 @@
     jobApply: false,
     quizAnswers: {},
     applications: store.get('tsg-applications', {}),
+    // Mit Roblox verbundenes Profil: { userId, username, displayName, avatar }
+    profile: store.get('tsg-profile', null),
   };
 
   // ---------- Abfahrten (aus Linien & Takt berechnet) ----------
@@ -521,7 +527,7 @@
       <div class="role-card__body">
         <h3>${fill(c.title, c.rank)}</h3>
         <p>${fill(c.text, c.rank)}</p>
-        <a class="link-more" href="${c.href}">${esc(c.cta)} ${icon('fi-rr-arrow-small-right')}</a>
+        <span class="count-pill">${icon('fi-rr-users-alt')}<b>${fmt(rankOf(c.rank).members)}</b> Spieler als ${esc(c.rank)}</span>
       </div>
     </article>`).join('');
   }
@@ -1120,14 +1126,6 @@
       <span class="job__more">Details ${icon('fi-rr-arrow-small-right')}</span>
     </a>`;
   }
-  function renderCrumbs(job) {
-    const sep = icon('fi-rr-angle-small-right');
-    let html = `<a href="#/">Start</a>${sep}`;
-    if (!job) html += '<span aria-current="page">Karriere</span>';
-    else if (!state.jobApply) html += `<a href="#/karriere">Karriere</a>${sep}<span aria-current="page">${esc(job.title)}</span>`;
-    else html += `<a href="#/karriere">Karriere</a>${sep}<a href="#/karriere/${job.id}">${esc(job.title)}</a>${sep}<span aria-current="page">Bewerbung</span>`;
-    $('[data-crumbs]').innerHTML = html;
-  }
   function careerList() {
     const open = D.jobs.filter((x) => x.open).length;
     return `<div class="cbox">
@@ -1184,7 +1182,7 @@
   }
   function sectorHead(i) {
     const s = SECTORS[i];
-    return `<header class="sector__head"><span class="sector__no">${i + 1}</span><div><small>Sektor ${i + 1}</small><h3>${s.title}</h3></div></header>
+    return `<header class="sector__head"><span class="sector__no" aria-hidden="true">${i + 1}</span><small>Sektor ${i + 1}</small><h3>${s.title}</h3></header>
       <p class="sector__text">${s.text}</p>`;
   }
   function careerApply(job) {
@@ -1207,12 +1205,9 @@
       <form class="apply" data-apply="${job.id}" novalidate>
         <section class="cbox sector" data-sector="1" aria-labelledby="sector-1">
           ${sectorHead(0).replace('<h3>', '<h3 id="sector-1">')}
-          <div class="f" ${dataField('roblox')}><label class="f__label" for="ap-roblox">Roblox-Benutzername</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(D.me.username)}" placeholder="Dein Roblox-Benutzername"></div>
+          <div class="f" ${dataField('roblox')}><label class="f__label" for="ap-roblox">Roblox-Benutzername</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(state.profile ? state.profile.username : D.me.username)}" placeholder="Dein Roblox-Benutzername"></div>
           <div class="f" ${dataField('discord')}><label class="f__label" for="ap-discord">Discord-Benutzername</label><input id="ap-discord" name="discord" autocomplete="off" placeholder="z. B. lokfuehrer_max"></div>
-          <div class="f-row">
-            <div class="f" ${dataField('age')}><label class="f__label" for="ap-age">Alter</label><input id="ap-age" name="age" type="number" inputmode="numeric" min="10" max="99" placeholder="z. B. 16"></div>
-            <div class="f" ${dataField('since')}><label class="f__label" for="ap-since">Du spielst seit</label><div class="select"><select id="ap-since" name="since"><option value="">Bitte wählen</option>${SINCE.map((x) => `<option>${x}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
-          </div>
+          <div class="f" ${dataField('since')}><label class="f__label" for="ap-since">Du spielst seit</label><div class="select"><select id="ap-since" name="since"><option value="">Bitte wählen</option>${SINCE.map((x) => `<option>${x}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
           <div class="f" ${dataField('rank')}><label class="f__label" for="ap-rank">Dein aktueller Rang</label><div class="select"><select id="ap-rank" name="rank">${rankOpts}</select>${icon('fi-rr-angle-small-down')}</div></div>
         </section>
 
@@ -1225,15 +1220,28 @@
         <section class="cbox sector" data-sector="3" aria-labelledby="sector-3">
           ${sectorHead(2).replace('<h3>', '<h3 id="sector-3">')}
           <div class="f" ${dataField('experience')}><label class="f__label" for="ap-exp">Welche Erfahrung hast du in dieser Rolle?</label><textarea id="ap-exp" name="experience" placeholder="Beschreibe kurz deine Erfahrung"></textarea><span class="f__hint">Mindestens 30 Zeichen</span></div>
-          <fieldset class="f" ${dataField('activity')}>
-            <legend class="f__label">Wie aktiv wärst du, wenn du angenommen wirst?</legend>
-            <div class="scale">${Array.from({ length: 10 }, (_, i) => `<label><input type="radio" name="activity" value="${i + 1}"><span>${i + 1}</span></label>`).join('')}</div>
-            <div class="scale__legend"><span>1 = selten</span><span>10 = sehr aktiv</span></div>
-          </fieldset>
-          <fieldset class="f" ${dataField('days')}>
-            <legend class="f__label">An welchen Tagen hast du meistens Zeit?</legend>
-            <div class="scale scale--days">${DAYS.map((d) => `<label><input type="checkbox" name="days" value="${d}"><span>${d}</span></label>`).join('')}</div>
-          </fieldset>
+          <div class="f" ${dataField('activity')}>
+            <label class="f__label" for="ap-act">Wie aktiv wärst du, wenn du angenommen wirst?</label>
+            <div class="slider" data-slider style="--a:0%;--b:${(5 - 1) / 9 * 100}%">
+              <output class="slider__out" for="ap-act" data-slider-out>5 von 10</output>
+              <div class="slider__track">
+                <input type="range" id="ap-act" name="activity" min="1" max="10" step="1" value="5" data-slider-input="single">
+              </div>
+              <div class="slider__ticks" aria-hidden="true">${Array.from({ length: 10 }, (_, i) => `<span>${i + 1}</span>`).join('')}</div>
+            </div>
+            <div class="scale__legend"><span>selten</span><span>sehr aktiv</span></div>
+          </div>
+          <div class="f" ${dataField('days')}>
+            <span class="f__label" id="ap-days">An welchen Tagen hast du meistens Zeit?</span>
+            <div class="slider slider--range" data-slider style="--a:0%;--b:100%" role="group" aria-labelledby="ap-days">
+              <output class="slider__out" data-slider-out>Mo – So</output>
+              <div class="slider__track">
+                <input type="range" name="dayFrom" min="0" max="6" step="1" value="0" aria-label="Von" data-slider-input="from">
+                <input type="range" name="dayTo" min="0" max="6" step="1" value="6" aria-label="Bis" data-slider-input="to">
+              </div>
+              <div class="slider__ticks" aria-hidden="true">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div>
+            </div>
+          </div>
           <div class="f" ${dataField('confirm')}><label class="confirm"><input type="checkbox" name="confirm"><span>Ich habe alle Angaben ehrlich gemacht und kenne die Regeln von Train Sim Germany.</span></label></div>
           <button class="btn-line" type="submit">Bewerbung senden ${icon('fi-rr-paper-plane')}</button>
           <p class="f__note">Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.</p>
@@ -1254,7 +1262,6 @@
   function renderCareer() {
     const job = D.jobs.find((x) => x.id === state.jobId);
     if (job && state.jobApply && !job.open && !state.applications[job.id]) state.jobApply = false;
-    renderCrumbs(job);
     const el = $('[data-career]');
     if (!job) el.innerHTML = careerList();
     else if (!state.jobApply) el.innerHTML = careerDetail(job);
@@ -1273,8 +1280,6 @@
     const errors = {};
     if (!/^[A-Za-z0-9_]{3,20}$/.test(val('roblox'))) errors.roblox = 'Bitte gib einen gültigen Roblox-Namen ein (3–20 Zeichen: Buchstaben, Zahlen, _).';
     if (!/^([a-z0-9_.]{2,32}|.{2,32}#\d{4})$/i.test(val('discord'))) errors.discord = 'Bitte gib deinen Discord-Namen ein, z. B. lokfuehrer_max.';
-    const age = Number(val('age'));
-    if (!Number.isInteger(age) || age < 10 || age > 99) errors.age = 'Bitte gib dein Alter an.';
     if (!val('since')) errors.since = 'Bitte wähle aus, seit wann du spielst.';
     const area = form.querySelector('input[name="area"]:checked');
     if (job.areas) {
@@ -1285,8 +1290,6 @@
       if (!$('input:checked', q)) errors[q.dataset.field] = 'Bitte beantworte diese Frage.';
     });
     if (val('experience').length < 30) errors.experience = 'Erzähl uns etwas mehr, mindestens 30 Zeichen.';
-    if (!form.querySelector('input[name="activity"]:checked')) errors.activity = 'Bitte wähle einen Wert von 1 bis 10.';
-    if (!form.querySelector('input[name="days"]:checked')) errors.days = 'Bitte wähle mindestens einen Tag.';
     if (!f.confirm.checked) errors.confirm = 'Bitte bestätige deine Angaben.';
     return errors;
   }
@@ -1300,6 +1303,13 @@
       if (step) step.classList.toggle('is-done', done);
     });
   }
+  function showFieldError(field, msg, id) {
+    field.classList.add('has-error');
+    field.insertAdjacentHTML('beforeend', `<span class="f__error" id="${id}">${icon('fi-rr-info')}${esc(msg)}</span>`);
+    const input = $('input, select, textarea', field);
+    input.setAttribute('aria-invalid', 'true');
+    input.setAttribute('aria-describedby', id);
+  }
   function clearFieldError(field) {
     field.classList.remove('has-error');
     const er = $('.f__error', field);
@@ -1310,15 +1320,7 @@
     const id = form.dataset.apply;
     const errors = applyErrors(form);
     $$('.f.has-error', form).forEach(clearFieldError);
-    Object.entries(errors).forEach(([name, msg], i) => {
-      const field = $(`[data-field="${CSS.escape(name)}"]`, form);
-      const errId = `err-${i}`;
-      field.classList.add('has-error');
-      field.insertAdjacentHTML('beforeend', `<span class="f__error" id="${errId}">${icon('fi-rr-info')}${esc(msg)}</span>`);
-      const input = $('input, select, textarea', field);
-      input.setAttribute('aria-invalid', 'true');
-      input.setAttribute('aria-describedby', errId);
-    });
+    Object.entries(errors).forEach(([name, msg], i) => showFieldError($(`[data-field="${CSS.escape(name)}"]`, form), msg, `err-${i}`));
     const first = Object.keys(errors)[0];
     if (first) {
       const field = $(`[data-field="${CSS.escape(first)}"]`, form);
@@ -1331,10 +1333,10 @@
     for (const [k, v] of data) if (k.startsWith('q:')) answers[k.slice(2)] = +v;
     const values = Object.values(answers);
     state.applications[id] = {
-      roblox: data.get('roblox').trim(), discord: data.get('discord').trim(), age: +data.get('age'),
+      roblox: data.get('roblox').trim(), discord: data.get('discord').trim(),
       since: data.get('since'), rank: data.get('rank'), area: data.get('area') || null,
       answers, score: values.filter((v) => v === 0).length, total: values.length,
-      experience: data.get('experience').trim(), activity: +data.get('activity'), days: data.getAll('days'),
+      experience: data.get('experience').trim(), activity: +data.get('activity'), days: DAYS.slice(+data.get('dayFrom'), +data.get('dayTo') + 1),
       at: Date.now(),
     };
     store.set('tsg-applications', state.applications);
@@ -1343,15 +1345,143 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // Schieberegler (Aktivität 1–10, Tage von–bis)
+  function updateSlider(box) {
+    const inputs = $$('[data-slider-input]', box);
+    const out = $('[data-slider-out]', box);
+    if (inputs.length === 1) {
+      const el = inputs[0];
+      box.style.setProperty('--b', `${((el.value - el.min) / (el.max - el.min)) * 100}%`);
+      out.textContent = `${el.value} von ${el.max}`;
+      return;
+    }
+    const [from, to] = inputs;
+    if (+from.value > +to.value) {
+      if (document.activeElement === from) from.value = to.value; else to.value = from.value;
+    }
+    const max = +from.max;
+    box.style.setProperty('--a', `${(from.value / max) * 100}%`);
+    box.style.setProperty('--b', `${(to.value / max) * 100}%`);
+    // Liegen beide Griffe ganz rechts, muss „von“ oben liegen, sonst lässt er sich nicht mehr greifen
+    from.style.zIndex = +from.value >= max ? 3 : '';
+    out.textContent = from.value === to.value ? DAYS[from.value] : `${DAYS[from.value]} – ${DAYS[to.value]}`;
+  }
+
+  // ---------- Profil (Kopfzeile, Tab-Leiste, Menü) ----------
+  function avatarInner(p) {
+    if (p && p.avatar) return `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">`;
+    if (p) return `<b>${esc(initials(p.username))}</b>`;
+    return icon('fi-sr-user');
+  }
+  const ringHTML = (p, rank, cls) => `<span class="avatar-ring ${cls}" style="--rc:${rank.color}"><span class="avatar-img">${avatarInner(p)}</span></span>`;
+  const rankPill = (rank, extra = '') => `<span class="rank-pill" style="--rc:${rank.color}">[${esc(rank.prefix)}]${extra}</span>`;
+  function renderMe() {
+    const r = rankOf(state.rank);
+    const p = state.profile;
+    $$('[data-me-rank]').forEach((el) => {
+      el.textContent = `[${r.prefix}]`;
+      el.style.setProperty('--rc', r.color);
+      el.title = r.name;
+    });
+    $$('[data-me-ring]').forEach((el) => el.style.setProperty('--rc', r.color));
+    $$('[data-me-avatar]').forEach((el) => { el.innerHTML = avatarInner(p); });
+    $$('.me').forEach((b) => b.setAttribute('aria-label', p ? `Profil von ${p.displayName || p.username}` : 'Profil öffnen und mit Roblox verbinden'));
+    $('[data-drawer-me]').innerHTML = `${ringHTML(p, r, 'avatar-ring--lg')}
+      <span class="drawer__who"><b>${p ? esc(p.displayName || p.username) : 'Gast'}</b><small>${p ? `@${esc(p.username)}` : 'Mit Roblox verbinden'}</small></span>
+      ${rankPill(r)}`;
+  }
+  // Öffentliches Roblox-Profil laden (Name, Anzeigename, Profilbild)
+  async function fetchRoblox(name) {
+    const api = D.roblox;
+    const res = await fetch(`${api.usersApi}/v1/usernames/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usernames: [name], excludeBannedUsers: true }),
+    });
+    if (!res.ok) throw new Error('Roblox nicht erreichbar');
+    const user = ((await res.json()).data || [])[0];
+    if (!user) return null;
+    let avatarUrl = null;
+    try {
+      const t = await fetch(`${api.thumbnailsApi}/v1/users/avatar-headshot?userIds=${user.id}&size=150x150&format=Png&isCircular=false`);
+      const img = ((await t.json()).data || [])[0];
+      if (img && img.state === 'Completed') avatarUrl = img.imageUrl;
+    } catch (e) { /* ohne Profilbild weiter */ }
+    return { userId: user.id, username: user.name, displayName: user.displayName, avatar: avatarUrl };
+  }
+  async function connectRoblox(form) {
+    const input = form.elements.username;
+    const field = input.closest('.f');
+    const btn = $('button[type="submit"]', form);
+    const name = input.value.trim();
+    clearFieldError(field);
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) {
+      showFieldError(field, 'Bitte gib einen gültigen Roblox-Namen ein (3–20 Zeichen: Buchstaben, Zahlen, _).', 'err-rbx');
+      input.focus();
+      return;
+    }
+    const label = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Wird verbunden …';
+    let profile = null;
+    let offline = false;
+    try { profile = await fetchRoblox(name); } catch (e) { offline = true; }
+    if (!offline && !profile) {
+      btn.disabled = false;
+      btn.innerHTML = label;
+      showFieldError(field, 'Diesen Roblox-Namen gibt es nicht.', 'err-rbx');
+      input.focus();
+      return;
+    }
+    state.profile = profile || { userId: null, username: name, displayName: name, avatar: null };
+    store.set('tsg-profile', state.profile);
+    renderMe();
+    closeModal();
+    toast(offline ? `Verbunden als ${name} – Profilbild gerade nicht erreichbar` : `Verbunden als ${state.profile.displayName}`);
+  }
+
   // ---------- Auswahl-Sheets ----------
   const modal = $('[data-modal]');
   let modalView = null;
   const VIEWS = {
+    profile: {
+      title: 'Profil',
+      render: () => {
+        const p = state.profile;
+        const r = rankOf(state.rank);
+        if (!p) {
+          return `<div class="profile-box">
+              ${ringHTML(null, r, 'avatar-ring--xl')}
+              <h3>Mit Roblox verbinden</h3>
+              <p>Dein Roblox-Name und dein Profilbild erscheinen dann oben in der Kopfzeile, unten in der Leiste und im Menü.</p>
+            </div>
+            <form class="connect" data-connect novalidate>
+              <div class="f"><label class="f__label" for="rbx-name">Roblox-Benutzername</label><input id="rbx-name" name="username" autocomplete="username" placeholder="z. B. ${esc(D.me.username)}"></div>
+              <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-link-alt')}Verbinden</button>
+              <p class="sheet-note">Es wird nur dein öffentliches Roblox-Profil geladen – kein Passwort, kein Login.</p>
+            </form>`;
+        }
+        return `<div class="profile-box">
+            ${ringHTML(p, r, 'avatar-ring--xl')}
+            <h3>${esc(p.displayName || p.username)}</h3>
+            <p>@${esc(p.username)}</p>
+            <button class="rank-pill rank-pill--btn" type="button" data-open="rank" style="--rc:${r.color}">[${esc(r.prefix)}] ${esc(r.name)}${icon('fi-rr-angle-small-down')}</button>
+          </div>
+          <div class="detail"><dl>
+            <div><dt>${icon('fi-rr-id-badge')}Rang</dt><dd>${esc(r.label)}</dd></div>
+            <div><dt>${icon('fi-rr-calendar')}Angemeldet</dt><dd>${state.signups.size} ${state.signups.size === 1 ? 'Training' : 'Trainings'}</dd></div>
+          </dl></div>
+          <div class="sheet-actions">
+            ${p.userId ? `<a class="btn btn--outline btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(p.userId)}/profile" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}Roblox-Profil ansehen</a>` : ''}
+            <button class="btn btn--soft btn--lg btn--block" type="button" data-disconnect>Verbindung trennen</button>
+          </div>`;
+      },
+    },
     rank: {
       title: 'Dein Rang',
       render: () => `<div class="opt-list" role="radiogroup" aria-label="Rang wählen">${RANKS.filter((r) => r.name !== 'Management').map((r) => `
         <button class="opt" type="button" role="radio" aria-checked="${r.name === state.rank}" data-rank="${r.name}">
-          <i class="dot" style="--rc:${r.color}"></i><span><b>${esc(r.name)}</b><small>${esc(r.label)} · ${esc(r.desc)}</small></span>
+          ${rankPill(r)}<span><b>${esc(r.name)}</b><small>${esc(r.label)} · ${esc(r.desc)}</small></span>
           ${r.name === state.rank ? icon('fi-rr-check') : ''}
         </button>`).join('')}</div>
         <p class="sheet-note">Demo: Später wird dein Rang automatisch aus der Roblox-Gruppe übernommen.</p>`,
@@ -1465,6 +1595,7 @@
     },
   };
   function openModal(name, arg) {
+    closeMenu();
     const t = state.trip;
     if (name === 'options' && arg !== 'keep') state.optDraft = { products: new Set(t.products), directOnly: t.directOnly, via: t.via };
     if (name === 'when') state.whenDraft = { dayOffset: t.dayOffset, time: t.time };
@@ -1623,7 +1754,6 @@
   // ---------- Routing ----------
   const PAGES = ['home', 'reise', 'reiseplan', 'abfahrten', 'trainings', 'news', 'server', 'karriere', 'statistiken', 'spieler'];
   const NAV_OF = { abfahrten: 'reise', reiseplan: 'reise' };
-  const MORE_PAGES = ['server', 'karriere', 'statistiken', 'spieler'];
   const TITLES = {
     home: 'Train Sim Germany – Das Bahnerlebnis auf Roblox',
     reise: 'Reiseauskunft · Train Sim Germany',
@@ -1671,7 +1801,7 @@
     const group = NAV_OF[page] || page;
     $$('[data-nav]').forEach((a) => {
       const n = a.dataset.nav;
-      const current = n === group || (n === 'more' && MORE_PAGES.includes(page)) || (n === 'more-desk' && (page === 'statistiken' || page === 'spieler'));
+      const current = n === page || (n === 'reise' && page === 'reiseplan');
       if (current) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
     $$('[data-head-tab]').forEach((a) => {
@@ -1753,6 +1883,7 @@
         store.set('tsg-rank', ds.rank);
         closeModal();
         renderTrainings();
+        renderMe();
         const next = nextRank(ds.rank);
         toast(next ? `Rang: ${ds.rank} – als Nächstes ${next.name}` : `Rang: ${ds.rank}`);
       } else if (ds.ttoggle) {
@@ -1983,6 +2114,8 @@
     document.addEventListener('input', (e) => {
       const target = e.target;
       if (target.matches('[data-picker-input]')) $('[data-pk-list]').innerHTML = pickerList(target.value);
+      const slider = target.closest('[data-slider]');
+      if (slider) updateSlider(slider);
       const form = target.closest('form[data-apply]');
       if (form) {
         const field = target.closest('.f.has-error');
@@ -2002,10 +2135,21 @@
       updateSectors(form);
     });
     document.addEventListener('submit', (e) => {
+      const connect = e.target.closest('form[data-connect]');
+      if (connect) { e.preventDefault(); connectRoblox(connect); return; }
       const form = e.target.closest('form[data-apply]');
       if (!form) return;
       e.preventDefault();
       submitApplication(form);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-disconnect]')) return;
+      state.profile = null;
+      store.set('tsg-profile', null);
+      renderMe();
+      refreshModal();
+      toast('Verbindung zu Roblox getrennt');
     });
 
     // App installieren (Chrome, Edge, Android); auf dem iPhone über „Zum Home-Bildschirm“
@@ -2065,6 +2209,7 @@
   const tzName = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', timeZoneName: 'short' }).formatToParts(new Date()).find((x) => x.type === 'timeZoneName');
   $$('[data-tz]').forEach((el) => { el.textContent = tzName ? tzName.value : 'MEZ'; });
   events();
+  renderMe();
   route();
   tick();
   lastMinute = berlinNow().abs;

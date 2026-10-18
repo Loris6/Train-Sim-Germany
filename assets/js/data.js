@@ -97,16 +97,27 @@ window.TSG = {
   ],
 
   // Reihenfolge = Ausbildungsweg. Nach jedem Training steigt man einen Rang auf.
+  // prefix = Kürzel vor dem Profilbild, members = Spieler mit diesem Rang in der Gruppe.
+  // staff = Teamrang ohne eigenes Training (zählt nicht als Voraussetzung für Trainings).
   ranks: [
-    { name: 'Passenger', label: 'Fahrgast', desc: 'Neu im Spiel', color: '#878C96' },
-    { name: 'Driver', label: 'Lokführer', desc: 'Züge sicher und pünktlich fahren', color: '#EC0016' },
-    { name: 'Platform Staff', label: 'Bahnsteigpersonal', desc: 'Bahnsteig sichern, Abfahrtsauftrag geben', color: '#00A099' },
-    { name: 'Conductor', label: 'Zugbegleiter', desc: 'Türen, Abfahrt und Fahrgäste', color: '#408335' },
-    { name: 'Signaller', label: 'Fahrdienstleiter', desc: 'Stellwerke bedienen, Fahrstraßen stellen', color: '#0C3992' },
-    { name: 'Dispatcher', label: 'Disponent', desc: 'Netz und Fahrplan steuern', color: '#814997' },
-    { name: 'Instructor', label: 'Ausbilder', desc: 'Trainings selbst leiten', color: '#F39200' },
-    { name: 'Management', label: 'Leitung', desc: 'Leitung von Train Sim Germany', color: '#3C414B' },
+    { name: 'Passenger', prefix: 'UD', label: 'Fahrgast', desc: 'Neu im Spiel, noch ohne Ausbildung', color: '#878C96', members: 18420 },
+    { name: 'Driver', prefix: 'D', label: 'Lokführer', desc: 'Züge sicher und pünktlich fahren', color: '#EC0016', members: 9650 },
+    { name: 'Platform Staff', prefix: 'PS', label: 'Bahnsteigpersonal', desc: 'Bahnsteig sichern, Abfahrtsauftrag geben', color: '#00A099', members: 3120 },
+    { name: 'Conductor', prefix: 'CD', label: 'Zugbegleiter', desc: 'Türen, Abfahrt und Fahrgäste', color: '#408335', members: 4380 },
+    { name: 'Signaller', prefix: 'SG', label: 'Fahrdienstleiter', desc: 'Stellwerke bedienen, Fahrstraßen stellen', color: '#0C3992', members: 1890 },
+    { name: 'Supervisor', prefix: 'SV', label: 'Aufsicht', desc: 'Betrieb auf den Servern überwachen', color: '#0087B9', members: 140, staff: true },
+    { name: 'Dispatcher', prefix: 'DS', label: 'Disponent', desc: 'Netz und Fahrplan steuern', color: '#814997', members: 610 },
+    { name: 'Instructor', prefix: 'IN', label: 'Ausbilder', desc: 'Trainings selbst leiten', color: '#F39200', members: 95 },
+    { name: 'Management', prefix: 'MG', label: 'Leitung', desc: 'Leitung von Train Sim Germany', color: '#3C414B', members: 12 },
   ],
+
+  // Profil mit Roblox verbinden: öffentliche Roblox-Daten (Name, Profilbild) über einen
+  // Proxy mit CORS laden. Roblox selbst erlaubt keine Abfragen direkt aus dem Browser.
+  // Für einen echten Login (OAuth) braucht es einen eigenen Server.
+  roblox: {
+    usersApi: 'https://users.roproxy.com',
+    thumbnailsApi: 'https://thumbnails.roproxy.com',
+  },
 
   players: [
     { name: 'Lokfuehrer_Max', role: 'Instructor', level: 87, km: 48210, trips: 1912, punct: 97.8, joined: 'März 2024', region: 'Nordnetz' },
