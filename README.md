@@ -8,7 +8,7 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 | Seite | Inhalt |
 |---|---|
-| **Start** | Begrüßung mit Suche, Play / Gruppe / Discord als Bildkarten, Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, News |
+| **Start** | Titelbereich mit Logo, Begrüßung und Suche, Einstiegskarte mit Server / Gruppe / Discord, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller), Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, Karriere, News |
 | **Reise** | Reiseauskunft wie im DB Navigator: Von/Nach mit Tauschen, Datum, Routeneinstellungen (Verkehrsmittel, nur direkt, Zwischenhalt), Haltestellen-Auswahl mit Favoriten und Verlauf, Schnelle Suche (Start antippen oder auf das Ziel ziehen), Verbindungen mit einem Umstieg, Reiseplan mit allen Halten, merken & anheften |
 | **Abfahrten** | Live-Abfahrtstafel mit Abfahrten/Ankünften, Bahnhofssuche, Filtern nach Zuggattung, Lokführer und Verspätungen |
 | **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
@@ -22,7 +22,8 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
 - Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
-- Aufbau nach dem [DB UX Design System](https://github.com/db-ux-design-system/core-web) (Generation 3, Apache-2.0): weiße Kopfzeile mit roter Markierung für die aktive Seite, Brotkrümel und große Überschriften, Buttons mit 40 px Höhe und 4 px Ecken (Rot für die Hauptaktion, sonst mit Rand), graue Eingabefelder, Karten mit 1 px Rand und 8 px Ecken, Tabs mit roter Linie, blauer Fokusrahmen. Abstände, Ecken und Schatten sind die Werte aus dem DB UX Design System. DB-Logo und DB-Schriften werden nicht verwendet.
+- Aufbau nach dem [DB UX Design System](https://github.com/db-ux-design-system/core-web) (Generation 3, Apache-2.0): weiße Kopfzeile mit roter Markierung für die aktive Seite, Brotkrümel und große Überschriften, Buttons mit 40 px Höhe (Rot für die Hauptaktion, sonst mit Rand), graue Eingabefelder, Karten mit 1 px Rand, Tabs mit roter Linie, blauer Fokusrahmen. Abstände und Schatten sind die Werte aus dem DB UX Design System, die Ecken sind etwas runder (Buttons und Felder 8 px, Karten 12 px).
+- Uhr mit deutscher Zeit (MEZ/MESZ) in der Kopfzeile DB-Logo und DB-Schriften werden nicht verwendet.
 - Farben: DB-Rot `#EC0016` und die Cool-Gray-Töne der DB, Gleisnummern im DB-Blau wie an den Bahnhofsschildern
 - Auf dem Handy: Kopfzeile mit Spielen-Button und Tab-Leiste unten mit Beschriftung
 - Responsiv für Handy, Tablet und Desktop
@@ -41,7 +42,7 @@ links: {
 },
 ```
 
-Dort stehen auch Linien und Fahrpläne (daraus werden Live-Abfahrten und Verbindungen berechnet), Server, Spieler, Trainings, Strecken, News und Jobs (`jobs`).
+Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Linien und Fahrpläne (daraus werden Live-Abfahrten und Verbindungen berechnet), Server, Spieler, Trainings, Strecken, News und Jobs (`jobs`).
 
 **Fragen im Bewerbungsformular:** Jede Stelle hat unter `quiz` eigene Fragen. Für Instructor kommen die Fragen aus `knowledge`: abgefragt wird der gewählte Bereich und alle Bereiche darunter (Signaller Instructor also auch Conductor, Platform Staff und Driver). Bei jeder Frage ist die erste Antwort die richtige, die App mischt die Reihenfolge.
 

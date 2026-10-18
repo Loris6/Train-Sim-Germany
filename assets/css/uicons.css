@@ -11,6 +11,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-arrow-left:before{content:"\f197"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-arrow-small-up:before{content:"\f19f"}
+.fi-rr-arrow-up-right-from-square:before{content:"\f1b3"}
 .fi-rr-bell:before{content:"\f239"}
 .fi-rr-bolt:before{content:"\f26c"}
 .fi-rr-bookmark:before{content:"\f28b"}
@@ -67,7 +68,6 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 .fi-sr-newspaper:before{content:"\f994"}
 .fi-sr-play:before{content:"\fa7f"}
 .fi-sr-route:before{content:"\fb4c"}
-.fi-sr-shield-check:before{content:"\fbb5"}
 .fi-sr-star:before{content:"\fcc1"}
 .fi-sr-user:before{content:"\fe78"}
 

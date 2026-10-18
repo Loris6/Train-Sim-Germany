@@ -154,6 +154,15 @@ window.TSG = {
     { name: 'Instructor', img: 'role-instructor.svg', text: 'Lerne, wie du selbst Trainings leitest und neue Spieler ausbildest.' },
   ],
 
+  // Startseite: Rollen-Karten. {rank} = Rangname in seiner Farbe, {group} = Link zur Roblox-Gruppe
+  roleCards: [
+    { rank: 'Passenger', img: 'route-coast.svg', title: 'Fahr als {rank} mit.', text: 'Lehn dich zurück und genieß die Fahrt durch Deutschland – von der Nordseeküste bis in die Alpen. Als {rank} entdeckst du Dutzende Bahnhöfe, vom kleinen Haltepunkt bis zum großen Hauptbahnhof.', cta: 'Verbindung suchen', href: '#/reise' },
+    { rank: 'Driver', img: 'play.svg', title: 'Fahr Züge als {rank} durchs ganze Netz.', text: 'Tritt der {group} bei und besuche ein {rank}-Training. Danach fährst du ICE, Regionalzüge und S-Bahnen nach echtem Fahrplan.', cta: 'Zu den Trainings', href: '#/trainings' },
+    { rank: 'Platform Staff', img: 'role-platform.svg', title: 'Sorg als {rank} für pünktliche Abfahrten.', text: 'Sichere den Bahnsteig, lenke die Fahrgäste und gib mit der Kelle den Abfahrtsauftrag. Nach dem Training bist du als {rank} an jedem großen Bahnhof gefragt.', cta: 'Zu den Trainings', href: '#/trainings' },
+    { rank: 'Conductor', img: 'role-conductor.svg', title: 'Begleite Züge als {rank}.', text: 'Schließ die Türen, prüf die Fahrkarten und mach die Ansagen. Als {rank} bist du das Gesicht des Zuges und sorgst für eine pünktliche Abfahrt.', cta: 'Zu den Trainings', href: '#/trainings' },
+    { rank: 'Signaller', img: 'training.svg', title: 'Stell als {rank} die Fahrstraßen.', text: 'Übernimm ein Stellwerk wie Hannover Hbf oder Köln Hbf und leite die Züge sicher durch deinen Bereich – Signal für Signal.', cta: 'Zu den Trainings', href: '#/trainings' },
+  ],
+
   routes: [
     { title: 'Marschbahn', from: 'Hamburg-Altona', to: 'Westerland (Sylt)', line: 'RE 6', cat: 're', km: 237, dur: '3:05 Std.', stops: 14, rating: 4.9, reviews: '2,4K', img: 'route-coast.svg', tag: 'Küste' },
     { title: 'Werdenfelsbahn', from: 'München Hbf', to: 'Garmisch-Partenkirchen', line: 'RB 6', cat: 'rb', km: 101, dur: '1:28 Std.', stops: 12, rating: 4.8, reviews: '1,9K', img: 'route-alps.svg', tag: 'Alpen' },

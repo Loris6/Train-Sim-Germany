@@ -315,21 +315,6 @@
       : '<li class="board-empty">Keine Fahrten in den nächsten Stunden.</li>';
   }
 
-  function renderHeroBoard() {
-    const el = $('[data-board="hero"]');
-    $('[data-hero-station]').textContent = state.homeStation;
-    el.innerHTML = departures(state.homeStation, { limit: 5 }).map((d) => {
-      const st = statusOf(d, 'dep');
-      const small = d.cancelled ? '<small>fällt aus</small>' : d.delay ? `<small>+${d.delay}</small>` : '';
-      return `<li>
-        <span class="t">${hhmm(d.planned)}${small}</span>
-        <span class="line line--${d.line.cat}">${esc(d.line.name)}</span>
-        <span class="d"><b>${esc(d.dest)}</b><span>${esc(st.text)}</span></span>
-        <span class="g">Gl.<b>${d.track}</b></span>
-      </li>`;
-    }).join('');
-  }
-
   function renderHomeBoard() {
     const chips = $('[data-station-chips="home"]');
     chips.innerHTML = D.stations.map((s) => `<button class="chip" type="button" role="tab" aria-selected="${s.name === state.homeStation}" data-station="${esc(s.name)}">${esc(s.name.replace(' (Main)', ''))}</button>`).join('');
@@ -511,6 +496,36 @@
   }
 
   // ---------- Strecken & News ----------
+  // Einstieg und Rollen (Startseite)
+  function renderRoles() {
+    const rk = (name) => `<b class="rk" style="--rc:${rankOf(name).color}">${esc(name)}</b>`;
+    const fill = (text, rank) => esc(text)
+      .replace(/\{rank\}/g, rk(rank))
+      .replace('{group}', `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">Train Sim Germany Gruppe auf Roblox${icon('fi-rr-arrow-up-right-from-square')}</a>`);
+    const start = `<article class="role-card role-card--start">
+      <div class="role-card__media"><img src="assets/img/group.svg" alt="Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug" loading="lazy"></div>
+      <div class="role-card__body">
+        <h3>Starte jetzt bei Train Sim Germany!</h3>
+        <div class="start-actions">
+          <a class="btn btn--primary btn--lg btn--block" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}Server beitreten</a>
+          <p>Deine Reise beginnt auf Roblox.</p>
+          <a class="btn btn--outline btn--lg btn--block" href="${esc(D.links.group)}" target="_blank" rel="noopener">${icon('fi-rr-user-add')}Roblox-Gruppe beitreten</a>
+          <p>Für Ränge und Trainings.</p>
+          <a class="btn btn--outline btn--lg btn--block btn--discord" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Discord-Community beitreten</a>
+          <p>Chatte mit <span data-bind="discordMembers">${compact(D.stats.discordMembers)}</span> anderen Spielern.</p>
+        </div>
+      </div>
+    </article>`;
+    $('[data-roles]').innerHTML = start + D.roleCards.map((c) => `<article class="role-card">
+      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy"></div>
+      <div class="role-card__body">
+        <h3>${fill(c.title, c.rank)}</h3>
+        <p>${fill(c.text, c.rank)}</p>
+        <a class="link-more" href="${c.href}">${esc(c.cta)} ${icon('fi-rr-arrow-small-right')}</a>
+      </div>
+    </article>`).join('');
+  }
+
   function renderRoutes() {
     $('[data-routes]').innerHTML = D.routes.map((r) => {
       const fav = state.favs.has(r.title);
@@ -1623,7 +1638,7 @@
   };
   const RENDER = {
     home() {
-      renderHeroBoard(); renderHomeBoard(); renderPinned(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews();
+      renderRoles(); renderHomeBoard(); renderPinned(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews();
       $('[data-open-jobs]').textContent = D.jobs.filter((x) => x.open).length;
     },
     reise() { renderTrip(); },
@@ -1755,7 +1770,7 @@
       } else if (ds.signup) toggleSignup(ds.signup);
       else if (ds.waitlist) { const t = findTraining(ds.waitlist); toast(`Auf der Warteliste für „${t.title}“`); closeModal(); }
       else if (ds.stationPick) { closeModal(); setStation(ds.stationPick); }
-      else if (ds.station) { state.homeStation = ds.station; renderHomeBoard(); renderHeroBoard(); }
+      else if (ds.station) { state.homeStation = ds.station; renderHomeBoard(); }
       else if (ds.fav) {
         const name = ds.fav;
         if (state.favs.has(name)) state.favs.delete(name); else state.favs.add(name);
@@ -2015,13 +2030,15 @@
     state.updatedAt = Date.now();
     state.online = Math.max(900, state.online + Math.round((Math.random() - 0.48) * 14));
     bind();
-    if (state.page === 'home') { renderHeroBoard(); renderHomeBoard(); if (minuteChanged) renderNextSteps(); }
+    if (state.page === 'home') { renderHomeBoard(); if (minuteChanged) renderNextSteps(); }
     if (state.page === 'abfahrten') renderFullBoard();
     if (state.page === 'trainings' && minuteChanged && modal.hidden) renderNextSteps();
   }
 
   // ---------- Start ----------
   $$('[data-year]').forEach((el) => { el.textContent = berlinNow().y; });
+  const tzName = new Intl.DateTimeFormat('de-DE', { timeZone: 'Europe/Berlin', timeZoneName: 'short' }).formatToParts(new Date()).find((x) => x.type === 'timeZoneName');
+  $$('[data-tz]').forEach((el) => { el.textContent = tzName ? tzName.value : 'MEZ'; });
   events();
   route();
   tick();

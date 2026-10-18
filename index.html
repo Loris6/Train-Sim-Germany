@@ -46,8 +46,7 @@
           <i class="fi fi-rr-sun ic ic--sun" aria-hidden="true"></i>
           <i class="fi fi-rr-moon ic ic--moon" aria-hidden="true"></i>
         </button>
-        <a class="round-btn hide-mobile" data-link="discord" href="#" target="_blank" rel="noopener" aria-label="Discord beitreten"><i class="fi fi-brands-discord ic" aria-hidden="true"></i></a>
-        <a class="round-btn hide-mobile" data-link="group" href="#" target="_blank" rel="noopener" aria-label="Roblox-Gruppe beitreten"><i class="fi fi-rr-users-alt ic" aria-hidden="true"></i></a>
+        <span class="clock-pill" role="timer" aria-label="Uhrzeit in Deutschland"><span data-clock-full>--:--:--</span><small data-tz>MEZ</small></span>
         <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
         <a class="round-btn hide-mobile" href="#/spieler" aria-label="Mein Profil"><i class="fi fi-rr-circle-user ic" aria-hidden="true"></i></a>
       </div>
@@ -58,80 +57,38 @@
 
     <!-- ===================== START ===================== -->
     <section class="page" data-page="home" aria-label="Start">
-      <div class="hero">
-        <img class="hero__bg" src="assets/img/hero.svg" alt="" aria-hidden="true">
-        <div class="container hero__inner">
-          <div class="hero__panel">
-            <p class="hero__hello">Moin, <span data-me-name>Jonas</span>!</p>
-            <h1 class="hero__title">Wohin geht deine nächste Fahrt?</h1>
-            <form class="search" role="search" data-search autocomplete="off">
-              <label class="search__label" for="home-search">Bahnhof, Linie oder Spieler</label>
-              <div class="search__row">
-                <div class="search__field">
-                  <i class="fi fi-rr-search ic" aria-hidden="true"></i>
-                  <input id="home-search" type="search" name="q" placeholder="z. B. Hamburg Hbf" data-search-input>
-                </div>
-                <button class="btn btn--primary btn--lg" type="submit">Suchen</button>
-              </div>
-              <ul class="search__results" role="listbox" data-search-results hidden></ul>
-            </form>
-            <nav class="hero__links" aria-label="Schnellzugriff">
-              <a href="#/reise"><i class="fi fi-rr-route ic" aria-hidden="true"></i>Verbindung suchen</a>
-              <a href="#/abfahrten"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i>Abfahrtstafel</a>
-              <a href="#/trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i>Trainings</a>
-            </nav>
+      <div class="stage">
+        <img class="stage__bg" src="assets/img/hero.svg" alt="" aria-hidden="true">
+        <div class="container stage__inner">
+          <div class="stage__brand">
+            <img class="stage__logo" src="assets/img/logo.svg" alt="" width="72" height="72">
+            <h1 class="stage__title">Train Sim Germany</h1>
           </div>
-
-          <aside class="hero-board" aria-label="Nächste Abfahrten">
-            <div class="hero-board__head">
-              <div>
-                <span class="hero-board__label">Nächste Abfahrten</span>
-                <strong data-hero-station>Hamburg Hbf</strong>
+          <p class="stage__lead">Willkommen bei Train Sim Germany, der Bahnsimulation für ganz Deutschland auf Roblox!</p>
+          <form class="search stage__search" role="search" data-search autocomplete="off">
+            <label class="sr-only" for="home-search">Bahnhof, Linie oder Spieler suchen</label>
+            <div class="search__row">
+              <div class="search__field">
+                <i class="fi fi-rr-search ic" aria-hidden="true"></i>
+                <input id="home-search" type="search" name="q" placeholder="Bahnhof, Linie, Spieler" data-search-input>
               </div>
-              <time class="hero-board__clock" data-clock>--:--</time>
+              <button class="btn btn--primary btn--lg" type="submit">Suchen</button>
             </div>
-            <ul class="hero-board__list" data-board="hero"></ul>
-            <a class="hero-board__more" href="#/abfahrten">Zur Abfahrtstafel <i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
-          </aside>
+            <ul class="search__results" role="listbox" data-search-results hidden></ul>
+          </form>
+          <nav class="stage__links" aria-label="Schnellzugriff">
+            <a href="#/reise"><i class="fi fi-rr-route ic" aria-hidden="true"></i>Verbindung suchen</a>
+            <a href="#/abfahrten"><i class="fi fi-rr-train-station ic" aria-hidden="true"></i>Abfahrtstafel</a>
+            <a href="#/trainings"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i>Trainings</a>
+          </nav>
         </div>
       </div>
 
       <div class="sheet sheet--home">
-        <!-- Play / Gruppe / Discord -->
-        <section class="band" aria-labelledby="h-join">
+        <!-- Einstieg & Rollen -->
+        <section class="band" aria-label="Einstieg und Rollen im Spiel">
           <div class="container">
-            <div class="sec-head">
-              <h2 id="h-join">Jetzt einsteigen</h2>
-            </div>
-            <div class="teasers">
-              <a class="lcard" data-link="play" href="#" target="_blank" rel="noopener">
-                <div class="lcard__media"><img src="assets/img/play.svg" alt="Blick aus dem Führerstand auf die Strecke mit grünem Signal" loading="lazy"></div>
-                <div class="lcard__body">
-                  <div class="lcard__row"><h3>Jetzt spielen</h3><span class="rating"><i class="fi fi-sr-star ic" aria-hidden="true"></i>4,8 <small>(<span data-bind="favorites">284K</span>)</small></span></div>
-                  <p class="lcard__meta">PC · Handy · Tablet · Konsole</p>
-                  <p class="lcard__price"><b>Kostenlos</b> auf Roblox · <span data-bind="online">1.284</span> online</p>
-                  <span class="btn btn--primary lcard__cta"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Auf Roblox spielen</span>
-                </div>
-              </a>
-              <a class="lcard" data-link="group" href="#" target="_blank" rel="noopener">
-                <div class="lcard__media"><img src="assets/img/group.svg" alt="Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug" loading="lazy"></div>
-                <div class="lcard__body">
-                  <div class="lcard__row"><h3>Gruppe beitreten</h3><span class="rating"><i class="fi fi-sr-shield-check ic" aria-hidden="true"></i>Offiziell</span></div>
-                  <p class="lcard__meta">Ränge · Trainings · Events</p>
-                  <p class="lcard__price"><b><span data-bind="groupMembers">48,2K</span></b> Mitglieder · kostenlos</p>
-                  <span class="btn btn--outline lcard__cta"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe beitreten</span>
-                </div>
-              </a>
-              <a class="lcard" data-link="discord" href="#" target="_blank" rel="noopener">
-                <div class="lcard__media"><img src="assets/img/discord.svg" alt="Chatnachrichten über einer nächtlichen Stadt mit vorbeifahrendem Zug" loading="lazy"></div>
-                <div class="lcard__body">
-                  <div class="lcard__row"><h3>Discord beitreten</h3><span class="rating"><span class="live-dot live-dot--sm"></span><span data-bind="discordOnline">3,1K</span> online</span></div>
-                  <p class="lcard__meta">Fahrpläne · Support · Bewerbungen</p>
-                  <p class="lcard__price"><b><span data-bind="discordMembers">21,7K</span></b> Mitglieder · kostenlos</p>
-                  <span class="btn btn--outline lcard__cta"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord öffnen</span>
-                </div>
-              </a>
-            </div>
+            <div class="role-grid" data-roles></div>
           </div>
         </section>
 
