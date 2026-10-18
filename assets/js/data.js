@@ -13,7 +13,10 @@ window.TSG = {
   },
 
   // Angemeldeter Spieler (Demo – später aus dem Roblox-Login)
-  me: { name: 'Jonas', username: 'Jonas_BR218', rank: 'Conductor', level: 24 },
+  me: { name: 'Jonas', username: 'Jonas_BR218', rank: 'Conductor', level: 24, position: 'Hamburg Hbf' },
+
+  // Kacheln der „Schnellen Suche“ (Reiseauskunft), bis Spieler eigene speichern
+  quickSearch: ['Hamburg Hbf', 'Berlin Hbf', 'Köln Hbf'],
 
   stats: {
     online: 1284,
@@ -156,10 +159,54 @@ window.TSG = {
     { title: 'SFS Hannover – Würzburg', from: 'Hannover Hbf', to: 'Würzburg Hbf', line: 'ICE 23', cat: 'ice', km: 327, dur: '1:58 Std.', stops: 4, rating: 4.6, reviews: '2,0K', img: 'play.svg', tag: '280 km/h' },
   ],
 
+  // cat: update | event | community
   news: [
-    { date: '15. Okt. 2026', tag: 'Update 2.5', title: 'Linke Rheinstrecke jetzt in der Beta', text: 'Burgen, Weinberge und 185 km Strecke zwischen Köln und Mainz – teste sie auf dem Beta-Server.', img: 'route-rhine.svg' },
-    { date: '12. Okt. 2026', tag: 'Event', title: 'Nachtfahrt-Wochenende mit Sonderzügen', text: 'Freitag bis Sonntag ab 21 Uhr: Nachtfahrplan, Sonderzüge und doppelte XP auf allen Event-Servern.', img: 'route-city.svg' },
-    { date: '08. Okt. 2026', tag: 'Crew', title: 'Neue Stellwerke für Fahrdienstleiter', text: 'Köln Hbf und Berlin Ostkreuz können jetzt von Spielern besetzt werden. Trainings starten diese Woche.', img: 'training.svg' },
+    { date: '15. Okt. 2026', cat: 'update', tag: 'Update 2.5', title: 'Linke Rheinstrecke jetzt in der Beta', text: 'Burgen, Weinberge und 185 km Strecke zwischen Köln und Mainz – teste sie auf dem Beta-Server. Neu sind außerdem 18 Bahnhöfe, das Stellwerk Koblenz und der Fahrzeugtyp BR 429.', img: 'route-rhine.svg' },
+    { date: '12. Okt. 2026', cat: 'event', tag: 'Event', title: 'Nachtfahrt-Wochenende mit Sonderzügen', text: 'Freitag bis Sonntag ab 21 Uhr: Nachtfahrplan, Sonderzüge und doppelte XP auf allen Event-Servern. Wer drei Nachtfahrten pünktlich schafft, bekommt das Abzeichen „Nachteule“.', img: 'route-city.svg' },
+    { date: '08. Okt. 2026', cat: 'community', tag: 'Crew', title: 'Neue Stellwerke für Signaller', text: 'Köln Hbf und Berlin Ostkreuz können jetzt von Spielern besetzt werden. Die passenden Signaller-Trainings starten diese Woche.', img: 'training.svg' },
+    { date: '02. Okt. 2026', cat: 'update', tag: 'Update 2.4.1', title: 'Neue Abfahrtstafeln und weniger Ruckler', text: 'Bahnhöfe zeigen jetzt Live-Abfahrten mit Verspätungen an. Außerdem laufen große Bahnhöfe auf Handys spürbar flüssiger.', img: 'play.svg' },
+    { date: '27. Sep. 2026', cat: 'community', tag: 'Community', title: 'Spieler der Woche: Nordlicht_Mia', text: 'Über 1.800 Fahrten und 98,6 % Pünktlichkeit – Nordlicht_Mia hält den S-Bahn-Takt in Hamburg zuverlässig am Laufen.', img: 'group.svg' },
+    { date: '20. Sep. 2026', cat: 'event', tag: 'Event', title: 'Alpen-Rallye auf der Werdenfelsbahn', text: 'Wer schafft München – Garmisch am schnellsten und trotzdem pünktlich? Die Bestenliste läuft noch bis Sonntag.', img: 'route-alps.svg' },
+  ],
+
+  // Karriere: offene Stellen im Team
+  jobs: [
+    {
+      id: 'game-developer', title: 'Game Developer', open: true, team: 'Entwicklung',
+      text: 'Entwickle neue Strecken, Züge und Spielfunktionen für Train Sim Germany. Erfahrung mit Lua und Roblox Studio ist Voraussetzung.',
+      tasks: ['Neue Spielfunktionen in Lua programmieren', 'Fehler finden und beheben', 'Mit Buildern und Testern zusammenarbeiten'],
+      needs: ['Sicherer Umgang mit Lua und Roblox Studio', 'Mindestens 5 Stunden pro Woche Zeit', 'Discord-Account und Teamgeist'],
+    },
+    {
+      id: 'map-builder', title: 'Map Builder', open: true, team: 'Entwicklung',
+      text: 'Baue Bahnhöfe, Brücken und Landschaften nach echten Vorbildern – von der Nordsee bis in die Alpen.',
+      tasks: ['Bahnhöfe und Strecken nach Vorbild bauen', 'Modelle für gute Leistung auf Handys optimieren', 'Feedback aus der Community umsetzen'],
+      needs: ['Erfahrung mit Roblox Studio (Bauen, Terrain)', 'Auge für Details', 'Mindestens 4 Stunden pro Woche Zeit'],
+    },
+    {
+      id: 'moderator', title: 'Moderator', open: false, team: 'Community',
+      text: 'Sorge für eine freundliche Community, setze die Regeln durch und hilf Spielern im Spiel und auf Discord.',
+      tasks: ['Regeln im Spiel und auf Discord durchsetzen', 'Spielern bei Fragen helfen', 'Meldungen bearbeiten und dokumentieren'],
+      needs: ['Mindestens Rang Conductor', 'Ruhig und fair auch in hitzigen Situationen', 'Mindestens 14 Jahre alt'],
+    },
+    {
+      id: 'supervisor', title: 'Supervisor', open: true, team: 'Betrieb',
+      text: 'Behalte den Betrieb auf den Servern im Blick, leite neue Mitarbeiter an und sorge dafür, dass alles nach Fahrplan läuft.',
+      tasks: ['Server-Betrieb und Stellwerke überwachen', 'Neue Crew-Mitglieder einarbeiten', 'Bei Störungen schnell reagieren'],
+      needs: ['Mindestens Rang Signaller', 'Erfahrung als Lokführer und im Stellwerk', 'Zuverlässig und gut organisiert'],
+    },
+    {
+      id: 'instructor', title: 'Ausbilder (Instructor)', open: true, team: 'Ausbildung',
+      text: 'Leite Trainings für Driver, Conductor und Signaller und bring neuen Spielern den Bahnbetrieb bei.',
+      tasks: ['Trainings planen und leiten', 'Prüfungsfahrten abnehmen', 'Trainingsunterlagen verbessern'],
+      needs: ['Mindestens Rang Dispatcher', 'Geduld und klare Erklärungen', 'Mindestens 2 Trainings pro Woche'],
+    },
+    {
+      id: 'social-media', title: 'Social Media', open: false, team: 'Community',
+      text: 'Zeig Train Sim Germany auf TikTok, YouTube und Discord – mit Clips, Screenshots und Ankündigungen.',
+      tasks: ['Clips und Screenshots aus dem Spiel erstellen', 'Updates und Events ankündigen', 'Kommentare und Fragen beantworten'],
+      needs: ['Erfahrung mit Videoschnitt', 'Kreative Ideen', 'Mindestens 3 Stunden pro Woche Zeit'],
+    },
   ],
 
   trainShare: [

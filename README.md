@@ -9,8 +9,11 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 | Seite | Inhalt |
 |---|---|
 | **Start** | Begrüßung mit Suche, Play / Gruppe / Discord als Bildkarten, Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, News |
+| **Reise** | Reiseauskunft wie im DB Navigator: Von/Nach mit Tauschen, Datum, Routeneinstellungen (Verkehrsmittel, nur direkt, Zwischenhalt), Haltestellen-Auswahl mit Favoriten und Verlauf, Schnelle Suche (Start antippen oder auf das Ziel ziehen), Verbindungen mit einem Umstieg, Reiseplan mit allen Halten, merken & anheften |
 | **Abfahrten** | Live-Abfahrtstafel mit Abfahrten/Ankünften, Bahnhofssuche, Filtern nach Zuggattung, Lokführer und Verspätungen |
-| **Server** | Serverliste mit Auslastung, Ping, Laufzeit und Beitreten-Button |
+| **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
+| **News** | Neuigkeiten mit Kategorien (Updates, Events, Community) und Detailansicht |
+| **Karriere** | Offene Stellen mit Status, Detailseite mit Aufgaben und Anforderungen, Bewerbungsformular mit Prüfung der Eingaben |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, Top-Strecken |
 | **Spieler** | Podium, Bestenliste (Kilometer / Fahrten / Pünktlichkeit), Spieler der Woche, Ränge |
 | **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten, alle kommenden Termine, Anmeldung |
@@ -37,7 +40,9 @@ links: {
 },
 ```
 
-Dort stehen auch Linien und Fahrpläne (daraus werden die Live-Abfahrten berechnet), Server, Spieler, Trainings, Strecken und News.
+Dort stehen auch Linien und Fahrpläne (daraus werden Live-Abfahrten und Verbindungen berechnet), Server, Spieler, Trainings, Strecken, News und Jobs (`jobs`).
+
+**Bewerbungen:** Das Formular prüft die Eingaben, speichert Bewerbungen aber nur im Browser (Demo). Für echte Bewerbungen braucht es einen Server, der sie z. B. an einen Discord-Kanal weiterleitet. Eine Discord-Webhook-URL sollte nicht direkt in die Seite eingetragen werden, weil sie sonst öffentlich ist.
 
 **Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Conductor → Signaller → Dispatcher → Instructor). Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 

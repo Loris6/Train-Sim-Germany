@@ -115,6 +115,23 @@
     signups: new Set(store.get('tsg-signups', [])),
     online: D.stats.online,
     updatedAt: Date.now(),
+    // Reiseauskunft
+    trip: { from: '', to: '', via: '', dayOffset: 0, time: null, products: new Set(['fern', 'regio', 's']), directOnly: false },
+    optDraft: null,
+    tripResults: null,
+    planConn: null,
+    planOpen: {},
+    quick: store.get('tsg-quick', D.quickSearch.slice()),
+    quickSel: null,
+    quickEdit: false,
+    favStations: new Set(store.get('tsg-fav-stations', ['Hamburg Hbf', 'Berlin Hbf'])),
+    history: store.get('tsg-history', ['Leipzig Hbf', 'Frankfurt (Main) Hbf', 'Dresden Hbf']),
+    pinned: store.get('tsg-pinned', null),
+    pickerTarget: null,
+    // Neuigkeiten & Karriere
+    newsCat: 'all',
+    jobId: null,
+    applications: store.get('tsg-applications', {}),
   };
 
   // ---------- Abfahrten (aus Linien & Takt berechnet) ----------
@@ -124,49 +141,142 @@
   const ALL_STOPS = Array.from(new Set(D.lines.flatMap((l) => l.stops.map((s) => s[0])))).sort((a, b) => a.localeCompare(b, 'de'));
   const stationInfo = (name) => D.stations.find((s) => s.name === name) || { name, region: 'Regionalnetz', tracks: 6, img: 'route-forest.svg' };
 
+  // Fahrplan-Helfer: Richtung, Takt-Versatz, Verspätung je Fahrt, Gleis
+  function orient(line, dir) {
+    const total = line.stops[line.stops.length - 1][1];
+    return dir === 0 ? line.stops : line.stops.slice().reverse().map(([n, t]) => [n, total - t]);
+  }
+  const lineOffset = (line, dir) => (dir === 0 ? line.offset : (line.offset + Math.floor(line.every / 2)) % line.every);
+  function runInfo(run) {
+    const r = hash(run);
+    const roll = r % 100;
+    const cancelled = roll < 2;
+    let delay = 0;
+    if (!cancelled && roll < 10) delay = 6 + ((r >>> 8) % 12);
+    else if (!cancelled && roll < 32) delay = 1 + ((r >>> 8) % 5);
+    return { r, delay, cancelled, reason: cancelled || delay >= 6 ? D.delayReasons[(r >>> 12) % D.delayReasons.length] : '' };
+  }
+  function trackFor(line, dir, station) {
+    const info = stationInfo(station);
+    return line.cat === 's'
+      ? 1 + ((hash(line.id + station) + dir) % 2)
+      : 3 + (hash(`${line.id}:${dir}:${station}`) % Math.max(1, info.tracks - 2));
+  }
+
   function departures(station, { mode = 'dep', limit = 10, cat = 'all' } = {}) {
     const now = berlinNow();
-    const info = stationInfo(station);
     const out = [];
     for (const line of D.lines) {
       if (cat !== 'all' && CAT_GROUP[line.cat] !== cat) continue;
-      const total = line.stops[line.stops.length - 1][1];
       for (const dir of [0, 1]) {
-        const stops = dir === 0 ? line.stops : line.stops.slice().reverse().map(([n, t]) => [n, total - t]);
+        const stops = orient(line, dir);
         const idx = stops.findIndex((s) => s[0] === station);
         if (idx < 0) continue;
         if (mode === 'dep' && idx === stops.length - 1) continue;
         if (mode === 'arr' && idx === 0) continue;
-        const offset = dir === 0 ? line.offset : (line.offset + Math.floor(line.every / 2)) % line.every;
-        const base = offset + stops[idx][1];
+        const base = lineOffset(line, dir) + stops[idx][1];
         for (let k = Math.ceil((now.abs - 20 - base) / line.every); ; k++) {
           const planned = base + k * line.every;
           if (planned > now.abs + 300) break;
           const run = `${line.id}:${dir}:${planned - stops[idx][1]}`;
-          const r = hash(run);
-          const roll = r % 100;
-          let delay = 0;
-          const cancelled = roll < 2;
-          if (!cancelled && roll < 10) delay = 6 + ((r >>> 8) % 12);
-          else if (!cancelled && roll < 32) delay = 1 + ((r >>> 8) % 5);
-          const actual = planned + delay;
-          if (actual < now.abs || (cancelled && planned < now.abs)) continue;
+          const ri = runInfo(run);
+          const actual = planned + ri.delay;
+          if (actual < now.abs || (ri.cancelled && planned < now.abs)) continue;
           const dest = mode === 'dep' ? stops[stops.length - 1][0] : stops[0][0];
           const via = mode === 'dep' ? stops.slice(idx + 1, -1).slice(0, 3).map((s) => s[0]) : stops.slice(1, idx).slice(-3).map((s) => s[0]);
-          const track = line.cat === 's'
-            ? 1 + ((hash(line.id + station) + dir) % 2)
-            : 3 + (hash(`${line.id}:${dir}:${station}`) % Math.max(1, info.tracks - 2));
           out.push({
-            line, run, planned, actual, delay, cancelled, dest, via, track,
+            line, run, planned, actual, delay: ri.delay, cancelled: ri.cancelled, dest, via,
+            track: trackFor(line, dir, station),
             mins: actual - now.abs,
-            driver: DRIVERS[(r >>> 4) % DRIVERS.length],
-            reason: cancelled || delay >= 6 ? D.delayReasons[(r >>> 12) % D.delayReasons.length] : '',
+            driver: DRIVERS[(ri.r >>> 4) % DRIVERS.length],
+            reason: ri.reason,
           });
         }
       }
     }
     out.sort((a, b) => a.planned - b.planned || a.actual - b.actual);
     return out.slice(0, limit);
+  }
+
+  // ---------- Verbindungssuche (direkt oder mit einem Umstieg) ----------
+  const PRODUCTS = [
+    { id: 'fern', label: 'Fernverkehr', short: 'ICE/IC', hint: 'ICE, IC' },
+    { id: 'regio', label: 'Regionalverkehr', short: 'RE/RB', hint: 'RE, RB' },
+    { id: 's', label: 'S-Bahn', short: 'S-Bahn', hint: 'S' },
+  ];
+  const MIN_TRANSFER = 4;
+
+  function legsBetween(from, to, t0, products, count) {
+    const out = [];
+    for (const line of D.lines) {
+      if (!products.has(CAT_GROUP[line.cat])) continue;
+      for (const dir of [0, 1]) {
+        const stops = orient(line, dir);
+        const i = stops.findIndex((s) => s[0] === from);
+        if (i < 0) continue;
+        const k = stops.findIndex((s) => s[0] === to);
+        if (k <= i) continue;
+        const base = lineOffset(line, dir) + stops[i][1];
+        let n = Math.ceil((t0 - base) / line.every);
+        for (let c = 0; c < count; c++, n++) {
+          const start = base + n * line.every - stops[i][1];
+          const run = `${line.id}:${dir}:${start}`;
+          const ri = runInfo(run);
+          const seq = stops.slice(i, k + 1).map(([name, t]) => ({ name, planned: start + t, actual: start + t + ri.delay, track: trackFor(line, dir, name) }));
+          out.push({
+            line, dir, run, seq, dest: stops[stops.length - 1][0],
+            dep: seq[0].planned, arr: seq[seq.length - 1].planned,
+            depAct: seq[0].actual, arrAct: seq[seq.length - 1].actual,
+            delay: ri.delay, cancelled: ri.cancelled, reason: ri.reason,
+            driver: DRIVERS[(ri.r >>> 4) % DRIVERS.length],
+          });
+        }
+      }
+    }
+    return out;
+  }
+
+  function searchConnections(from, to, t0, opts) {
+    if (!from || !to || from === to) return [];
+    let found = legsBetween(from, to, t0, opts.products, 3).map((l) => [l]);
+    if (!opts.directOnly) {
+      const hubs = new Set();
+      for (const line of D.lines) {
+        if (!opts.products.has(CAT_GROUP[line.cat])) continue;
+        for (const dir of [0, 1]) {
+          const st = orient(line, dir);
+          const i = st.findIndex((x) => x[0] === from);
+          if (i >= 0) st.slice(i + 1).forEach((x) => { if (x[0] !== to) hubs.add(x[0]); });
+        }
+      }
+      hubs.forEach((hub) => {
+        legsBetween(from, hub, t0, opts.products, 2).forEach((l1) => {
+          legsBetween(hub, to, l1.arr + MIN_TRANSFER, opts.products, 1).forEach((l2) => {
+            if (l2.line.id !== l1.line.id) found.push([l1, l2]);
+          });
+        });
+      });
+    }
+    if (opts.via) found = found.filter((legs) => legs.some((l) => l.seq.some((x) => x.name === opts.via)));
+    const conns = found
+      .map((legs, i) => {
+        const a = legs[0], b = legs[legs.length - 1];
+        return {
+          id: `${a.run}>${b.run}`, legs, transfers: legs.length - 1,
+          dep: a.dep, arr: b.arr, depAct: a.depAct, arrAct: b.arrAct,
+          cancelled: legs.some((l) => l.cancelled),
+          risky: legs.length > 1 && legs[1].depAct - legs[0].arrAct < 2,
+        };
+      })
+      .filter((c) => c.dep >= t0 && c.arr - c.dep < 12 * 60);
+    // Unsinnige Verbindungen entfernen: später los und trotzdem früher da = besser
+    const best = conns.filter((c) => !conns.some((o) => o !== c && o.dep >= c.dep && o.arr <= c.arr
+      && (o.dep > c.dep || o.arr < c.arr || o.transfers < c.transfers)));
+    const seen = new Set();
+    return best
+      .sort((a, b) => a.dep - b.dep || a.transfers - b.transfers)
+      .filter((c) => { const k = `${c.dep}|${c.arr}`; if (seen.has(k)) return false; seen.add(k); return true; })
+      .slice(0, 6);
   }
 
   function statusOf(d, mode) {
@@ -415,16 +525,25 @@
   }
 
   function renderNews() {
-    $('[data-news]').innerHTML = D.news.map((n, i) => `<article class="news">
+    $('[data-news]').innerHTML = D.news.slice(0, 3).map((n, i) => `<button class="news" type="button" data-news-open="${i}">
       <img src="assets/img/${n.img}" alt="" loading="lazy">
       <div>
-        <div class="news__meta"><span class="tag ${['tag--red', 'tag--info', 'tag--ok'][i % 3]}">${esc(n.tag)}</span><span>${esc(n.date)}</span></div>
+        <div class="news__meta"><span class="cat-tag cat-tag--${n.cat}">${esc(n.tag)}</span><span>${esc(n.date)}</span></div>
         <h3>${esc(n.title)}</h3>
       </div>
-    </article>`).join('');
+    </button>`).join('');
   }
 
   // ---------- Server ----------
+  function serverRoles(s) {
+    const roles = [
+      ['Driver', 'Lokführer', Math.round(s.players * 0.32)],
+      ['Conductor', 'Zugbegleiter', Math.round(s.players * 0.2)],
+      ['Signaller', 'Fahrdienstleiter', Math.max(1, Math.round(s.players * 0.08))],
+    ];
+    roles.push(['Passenger', 'Fahrgäste', Math.max(0, s.players - roles.reduce((sum, r) => sum + r[2], 0))]);
+    return roles;
+  }
   function renderServers() {
     const free = D.servers.reduce((sum, x) => sum + Math.max(0, x.max - x.players), 0);
     const ping = Math.round(D.servers.reduce((sum, x) => sum + x.ping, 0) / D.servers.length);
@@ -460,6 +579,7 @@
           <div class="occ__row"><span class="status status--${level}">${label}</span><b>${s.players}/${s.max}</b></div>
           <div class="bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
         </div>
+        <div class="server__roles"><span class="server__roles-title">Rollen</span>${serverRoles(s).map(([r, label, n]) => `<span class="role-count" style="--rc:${rankOf(r).color}"><i></i><span>${label}</span><b>${n}</b></span>`).join('')}</div>
         <dl class="server__meta">
           <div><dt>${icon('fi-rr-signal-alt-2')}Ping</dt><dd>${s.ping} ms</dd></div>
           <div><dt>${icon('fi-rr-train-side')}Züge</dt><dd>${s.trains}</dd></div>
@@ -669,6 +789,383 @@
     renderNextSteps();
   }
 
+  // ---------- Reiseauskunft ----------
+  const fmtDur = (min) => `${Math.floor(min / 60)}:${pad(min % 60)}`;
+  const PICKER_TITLES = { from: 'Von', to: 'Nach', via: 'Zwischenhalt', board: 'Bahnhof', quick: 'Bahnhof hinzufügen' };
+
+  function tripStart() {
+    const now = berlinNow();
+    if (state.trip.time === null) return now.abs;
+    const [hh, mm] = state.trip.time.split(':').map(Number);
+    return (now.day + state.trip.dayOffset) * 1440 + hh * 60 + mm;
+  }
+  function whenLabel() {
+    const day = berlinNow().day + state.trip.dayOffset;
+    return `${dayName(day)}, ${state.trip.time === null ? 'jetzt' : state.trip.time}`;
+  }
+  function optsLabel() {
+    const t = state.trip;
+    const parts = [];
+    if (t.products.size < PRODUCTS.length) parts.push(PRODUCTS.filter((p) => t.products.has(p.id)).map((p) => p.short).join(', '));
+    if (t.directOnly) parts.push('nur direkt');
+    if (t.via) parts.push(`über ${t.via}`);
+    return parts.length ? parts.join(' · ') : 'Alle Züge';
+  }
+  function addHistory(name) {
+    state.history = [name].concat(state.history.filter((x) => x !== name)).slice(0, 8);
+    store.set('tsg-history', state.history);
+  }
+  const lineBadge = (line) => `<span class="line line--${line.cat}">${esc(line.name)}</span>`;
+  function rtTime(planned, actual, cancelled, tag = 'span') {
+    if (cancelled) return `<${tag} class="rt rt--late">fällt aus</${tag}>`;
+    return `<${tag} class="rt ${actual - planned >= 6 ? 'rt--late' : 'rt--ok'}">${hhmm(actual)}</${tag}>`;
+  }
+
+  function renderTrip() {
+    const t = state.trip;
+    const setField = (sel, val, ph) => {
+      const el = $(sel);
+      el.textContent = val || ph;
+      el.classList.toggle('is-empty', !val);
+    };
+    setField('[data-trip-from]', t.from, 'Von');
+    setField('[data-trip-to]', t.to, 'Nach');
+    $('[data-trip-when]').textContent = whenLabel();
+    $('[data-trip-opts]').textContent = optsLabel();
+    $('[data-trip-search]').disabled = !(t.from && t.to && t.from !== t.to);
+    renderQuick();
+    renderTripResults();
+  }
+
+  function renderQuick() {
+    const tiles = [{ name: D.me.position, label: 'Aktuelle Position', pos: true }].concat(state.quick.map((n) => ({ name: n, label: n })));
+    $('[data-quick]').innerHTML = tiles.map((q) => {
+      const sel = state.quickSel === q.name;
+      return `<button class="quick-tile${sel ? ' is-from' : ''}" type="button" data-quick-tile="${esc(q.name)}" draggable="false" aria-pressed="${sel}">
+        ${q.pos ? icon('fi-rr-location-crosshairs') : ''}<span>${esc(q.label)}</span>
+        ${sel ? '<span class="quick-tile__tag">Start</span>' : ''}
+        ${state.quickEdit && !q.pos ? `<span class="quick-tile__del" data-quick-del="${esc(q.name)}" role="button" aria-label="${esc(q.name)} entfernen">${icon('fi-rr-cross-small')}</span>` : ''}
+      </button>`;
+    }).join('') + (state.quick.length < 7 ? `<button class="quick-tile quick-tile--add" type="button" data-quick-add aria-label="Bahnhof hinzufügen">${icon('fi-rr-plus')}</button>` : '');
+    $('[data-quick-edit]').innerHTML = `${icon(state.quickEdit ? 'fi-rr-check' : 'fi-rr-settings')}${state.quickEdit ? 'Fertig' : 'Bearbeiten'}`;
+  }
+
+  function connCard(c, i) {
+    const first = c.legs[0], last = c.legs[c.legs.length - 1];
+    let state_ = first.delay ? `<span class="conn__warn">+${first.delay} Min.</span>` : '<span class="rt--ok">pünktlich</span>';
+    if (c.risky) state_ = '<span class="conn__warn">Anschluss gefährdet</span>';
+    if (c.cancelled) state_ = '<span class="conn__warn">Fahrt fällt aus</span>';
+    return `<button class="conn" type="button" data-conn="${i}">
+      <div class="conn__top">
+        <div class="conn__times">
+          <b>${hhmm(c.dep)}</b><i>–</i><b>${hhmm(c.arr)}</b>
+          ${rtTime(c.dep, c.depAct, first.cancelled)}<span></span>${rtTime(c.arr, c.arrAct, last.cancelled)}
+        </div>
+        <div class="conn__dur"><b>${fmtDur(c.arr - c.dep)}</b>${c.transfers ? '1 Umstieg' : 'Direkt'}</div>
+      </div>
+      <div class="conn__legs">${c.legs.map((l) => lineBadge(l.line)).join(icon('fi-rr-angle-small-right'))}</div>
+      <div class="conn__meta"><span>ab Gl. ${first.seq[0].track} · nach ${esc(first.dest)}</span>${state_}</div>
+    </button>`;
+  }
+
+  function renderTripResults() {
+    const el = $('[data-trip-results]');
+    const t = state.trip;
+    if (!state.tripResults) {
+      el.innerHTML = (state.pinned ? `<div class="results-head"><h2>Angeheftet</h2></div>${pinnedHTML()}` : '')
+        + `<div class="empty-state empty-state--desk">${icon('fi-rr-route')}<b>Wohin möchtest du fahren?</b><span>Wähle Start und Ziel oder nutze die schnelle Suche.</span></div>`;
+      return;
+    }
+    const list = state.tripResults;
+    el.innerHTML = `<div class="results-head"><h2>${esc(t.from)} → ${esc(t.to)}</h2><span>${whenLabel()}</span></div>`
+      + (list.length
+        ? `<div class="conn-list">${list.map(connCard).join('')}</div>`
+        : `<div class="empty-state">${icon('fi-rr-train-side')}<b>Keine Verbindung gefunden</b><span>Probier andere Optionen oder eine spätere Uhrzeit.</span></div>`);
+  }
+
+  function runSearch({ scroll = true } = {}) {
+    const t = state.trip;
+    if (!t.from || !t.to || t.from === t.to) return;
+    state.tripResults = searchConnections(t.from, t.to, tripStart(), t);
+    renderTripResults();
+    if (scroll && window.innerWidth < 1080) $('[data-trip-results]').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function quickTap(name) {
+    if (state.quickEdit) return;
+    if (!state.quickSel) {
+      state.quickSel = name;
+      renderQuick();
+      toast(`Start: ${name} – jetzt das Ziel antippen`);
+    } else if (state.quickSel === name) {
+      state.quickSel = null;
+      renderQuick();
+    } else {
+      quickSearch(state.quickSel, name);
+    }
+  }
+  function quickSearch(from, to) {
+    state.quickSel = null;
+    state.trip.from = from;
+    state.trip.to = to;
+    addHistory(from);
+    addHistory(to);
+    renderTrip();
+    runSearch();
+  }
+
+  // Angeheftete Verbindung
+  const isPinned = (c) => !!(state.pinned && c && state.pinned.id === c.id);
+  function pinnedHTML() {
+    const p = state.pinned;
+    if (!p) return '';
+    const over = p.arr < berlinNow().abs;
+    return `<div class="pinned">
+      <span class="pinned__ic">${icon('fi-sr-bookmark')}</span>
+      <button class="pinned__body" type="button" data-pinned-open><b>${esc(p.from)} → ${esc(p.to)}</b><small>${over ? 'Fahrt vorbei · ' : ''}${dayName(Math.floor(p.dep / 1440))} ${hhmm(p.dep)} – ${hhmm(p.arr)} · ${esc(p.lines.join(' › '))}</small></button>
+      <button class="round-btn" type="button" data-unpin aria-label="Anheften lösen">${icon('fi-rr-cross-small')}</button>
+    </div>`;
+  }
+  function renderPinned() {
+    $('[data-pinned="home"]').innerHTML = pinnedHTML();
+    $('[data-pinned-sec]').hidden = !state.pinned;
+  }
+  function togglePin() {
+    const c = state.planConn;
+    if (!c) return;
+    if (isPinned(c)) {
+      state.pinned = null;
+      toast('Anheften gelöst');
+    } else {
+      state.pinned = {
+        id: c.id, from: c.legs[0].seq[0].name, to: c.legs[c.legs.length - 1].seq.slice(-1)[0].name,
+        dep: c.dep, arr: c.arr, lines: c.legs.map((l) => l.line.name),
+      };
+      toast('Gemerkt – du findest die Fahrt auf der Startseite');
+    }
+    store.set('tsg-pinned', state.pinned);
+    renderPlan();
+  }
+  function openPinned() {
+    const p = state.pinned;
+    if (!p) return;
+    const now = berlinNow();
+    state.trip.from = p.from;
+    state.trip.to = p.to;
+    if (p.dep >= now.abs) {
+      state.trip.dayOffset = Math.floor(p.dep / 1440) - now.day;
+      state.trip.time = hhmm(p.dep);
+    } else {
+      state.trip.dayOffset = 0;
+      state.trip.time = null;
+    }
+    state.tripResults = searchConnections(p.from, p.to, tripStart(), state.trip);
+    const match = state.tripResults.find((c) => c.id === p.id);
+    if (match) {
+      state.planConn = match;
+      state.planOpen = {};
+      location.hash = '#/reiseplan';
+    } else if (state.page === 'reise') {
+      renderTrip();
+    } else {
+      location.hash = '#/reise';
+    }
+  }
+
+  // Reiseplan
+  function stopRow(st, o = {}) {
+    const rail = o.mark === 'start' ? icon('fi-rr-dot-circle', 'plan__start')
+      : o.mark === 'pin' ? icon('fi-sr-marker', 'plan__pin') : '<i class="plan__dot"></i>';
+    return `<li class="plan__stop${o.main ? ' plan__stop--main' : ''}${o.first ? ' plan__stop--first' : ''}${o.last ? ' plan__stop--last' : ''}">
+      <div class="plan__time">${hhmm(st.planned)}${rtTime(st.planned, st.actual, false, 'small')}</div>
+      <span class="plan__rail">${rail}</span>
+      <div class="plan__name">${esc(st.name)}</div>
+      <span class="gl${o.main ? ' gl--strong' : ''}">Gl. ${st.track}</span>
+    </li>`;
+  }
+  function renderPlan() {
+    const c = state.planConn;
+    if (!c) { location.replace('#/reise'); return; }
+    const day = Math.floor(c.dep / 1440);
+    $('[data-plan-summary]').textContent = `${dayName(day)} • Dauer: ${fmtDur(c.arr - c.dep)} • ${c.transfers} ${c.transfers === 1 ? 'Umstieg' : 'Umstiege'}`;
+    $('[data-plan-route]').textContent = `${c.legs[0].seq[0].name} → ${c.legs[c.legs.length - 1].seq.slice(-1)[0].name}`;
+    let html = '';
+    c.legs.forEach((l, li) => {
+      const open = state.planOpen[li] !== false;
+      const first = l.seq[0], last = l.seq[l.seq.length - 1];
+      const mid = l.seq.slice(1, -1);
+      const isStart = li === 0, isEnd = li === c.legs.length - 1;
+      html += stopRow(first, { main: true, first: isStart, mark: isStart ? 'start' : '' });
+      html += `<li class="plan__leg"><span></span><span class="plan__rail"></span><div class="plan__info">
+        <span class="plan__badge line--${l.line.cat}">${icon('fi-rr-train-side')}<i class="sep"></i>${esc(l.line.name)}</span>
+        <p class="plan__dir">nach ${esc(l.dest)}</p>
+        <p class="plan__extra">Lokführer: ${esc(l.driver)}${l.cancelled ? ' · Fahrt fällt aus' : l.reason ? ` · ${esc(l.reason)}` : ''}</p>
+        ${mid.length ? `<button class="plan__toggle" type="button" data-plan-toggle="${li}" aria-expanded="${open}">${icon(open ? 'fi-rr-angle-small-up' : 'fi-rr-angle-small-down')}${open ? 'Zwischenhaltestellen ausblenden' : `${mid.length} Zwischenhaltestellen einblenden`}</button>` : ''}
+      </div></li>`;
+      if (open) mid.forEach((st) => { html += stopRow(st); });
+      html += stopRow(last, { main: true, last: isEnd, mark: isEnd ? 'pin' : '' });
+      if (!isEnd) {
+        const next = c.legs[li + 1];
+        html += `<li class="plan__transfer${c.risky ? ' is-risky' : ''}"><span></span><span class="plan__rail"></span><div class="plan__info">${icon(c.risky ? 'fi-rr-triangle-warning' : 'fi-rr-clock-three')}<span>Umstieg in ${esc(last.name)} · ${next.dep - l.arr} Min. · Gl. ${last.track} → Gl. ${next.seq[0].track}${c.risky ? ' · Anschluss gefährdet' : ''}</span></div></li>`;
+      }
+    });
+    $('[data-plan]').innerHTML = html;
+    const pinned = isPinned(c);
+    $('[data-pin-trip]').innerHTML = `${icon(pinned ? 'fi-sr-bookmark' : 'fi-rr-bookmark')}<span>${pinned ? 'Angeheftet – lösen' : 'merken &amp; anheften'}</span>`;
+  }
+
+  // Haltestellen-Auswahl
+  function pkRow(name) {
+    const fav = state.favStations.has(name);
+    return `<div class="pk-row"><button class="pk-item" type="button" data-pk="${esc(name)}">${icon('fi-rr-circle-h')}<span>${esc(name)}</span></button><button class="pk-star" type="button" data-pk-star="${esc(name)}" aria-pressed="${fav}" aria-label="${esc(name)} ${fav ? 'aus den Favoriten entfernen' : 'als Favorit speichern'}">${icon(fav ? 'fi-sr-star' : 'fi-rr-star')}</button></div>`;
+  }
+  function pickerList(q) {
+    const nq = norm(q.trim());
+    if (nq) {
+      const hits = ALL_STOPS.map((n) => ({ n, p: norm(n).indexOf(nq) })).filter((x) => x.p >= 0)
+        .sort((a, b) => a.p - b.p || a.n.length - b.n.length).slice(0, 30);
+      return hits.length ? hits.map((x) => pkRow(x.n)).join('') : '<p class="pk-empty">Keine Haltestelle gefunden.</p>';
+    }
+    const favs = Array.from(state.favStations);
+    const hist = state.history.filter((n) => !state.favStations.has(n));
+    return `<div class="pk-row"><button class="pk-item pk-item--pos" type="button" data-pk="${esc(D.me.position)}">${icon('fi-rr-location-crosshairs')}<span>Aktuelle Position</span><small>${esc(D.me.position)}</small></button></div>
+      <div class="pk-head">Favoriten</div>${favs.length ? favs.map(pkRow).join('') : '<p class="pk-empty">Tippe auf den Stern, um Bahnhöfe zu speichern.</p>'}
+      ${hist.length ? `<div class="pk-head">Verlauf<button type="button" data-pk-clear aria-label="Verlauf löschen">${icon('fi-rr-trash')}</button></div>${hist.map(pkRow).join('')}` : ''}
+      <div class="pk-head">Beliebte Bahnhöfe</div>${D.stations.filter((x) => !state.favStations.has(x.name) && !hist.includes(x.name)).map((x) => pkRow(x.name)).join('')}`;
+  }
+  function pickStation(name) {
+    const target = state.pickerTarget;
+    addHistory(name);
+    if (target === 'from' || target === 'to') {
+      state.trip[target] = name;
+      state.tripResults = null;
+      closeModal();
+      renderTrip();
+    } else if (target === 'via') {
+      state.optDraft.via = name;
+      openModal('options', 'keep');
+    } else if (target === 'board') {
+      closeModal();
+      setStation(name);
+    } else if (target === 'quick') {
+      if (name !== D.me.position && !state.quick.includes(name)) {
+        state.quick.push(name);
+        store.set('tsg-quick', state.quick);
+      }
+      closeModal();
+      renderQuick();
+    }
+  }
+
+  // ---------- Neuigkeiten ----------
+  function newsCard(n, i) {
+    return `<button class="ncard" type="button" data-news-open="${i}">
+      <div class="ncard__img"><img src="assets/img/${n.img}" alt="" loading="lazy"></div>
+      <div class="ncard__body">
+        <h3>${esc(n.title)}</h3>
+        <div class="ncard__foot"><span class="cat-tag cat-tag--${n.cat}">${esc(n.tag)}</span><span>${esc(n.date)}</span></div>
+      </div>
+    </button>`;
+  }
+  function renderNewsPage() {
+    $$('[data-news-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.newsCat === state.newsCat)));
+    $('[data-news-feed]').innerHTML = D.news.map((n, i) => ({ n, i }))
+      .filter(({ n }) => state.newsCat === 'all' || n.cat === state.newsCat)
+      .map(({ n, i }) => newsCard(n, i)).join('');
+  }
+
+  // ---------- Karriere ----------
+  const jobStatus = (job) => (job.open
+    ? `<span class="job-status">${icon('fi-rr-check')}Offen</span>`
+    : '<span class="job-status job-status--closed">Geschlossen</span>');
+  function jobCard(job) {
+    return `<a class="job" href="#/karriere/${job.id}">
+      <div class="job__top"><h3>${esc(job.title)}</h3>${jobStatus(job)}</div>
+      <span class="job__team">${icon('fi-rr-users-alt')}${esc(job.team)}</span>
+      <p>${esc(job.text)}</p>
+      <span class="job__more">Details ${icon('fi-rr-arrow-small-right')}</span>
+    </a>`;
+  }
+  function applyForm(job) {
+    return `<form class="apply" data-apply="${job.id}" novalidate>
+      <h3>Jetzt bewerben</h3>
+      <div class="form-field"><label for="ap-roblox">Roblox-Benutzername</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(D.me.username)}" placeholder="Dein Roblox-Benutzername"></div>
+      <div class="form-field"><label for="ap-discord">Discord-Benutzername</label><input id="ap-discord" name="discord" autocomplete="off" placeholder="z. B. lokfuehrer_max"></div>
+      <div class="form-field"><label for="ap-exp">Welche Erfahrung hast du in dieser Rolle?</label><textarea id="ap-exp" name="experience" placeholder="Beschreibe kurz deine Erfahrung"></textarea><span class="form-hint">Mindestens 30 Zeichen</span></div>
+      <div class="form-field"><label for="ap-act">Wie aktiv wärst du, wenn du angenommen wirst?</label><div class="range-row"><input type="range" id="ap-act" name="activity" min="1" max="10" value="6"><output for="ap-act" data-act-out>6</output></div><span class="form-hint">1 = selten, 10 = sehr aktiv</span></div>
+      <button class="btn btn--dark btn--block btn--lg" type="submit">Bewerbung senden ${icon('fi-rr-paper-plane')}</button>
+      <p class="form-note">Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.</p>
+    </form>`;
+  }
+  function renderCareer() {
+    const job = D.jobs.find((x) => x.id === state.jobId);
+    $('[data-career-back]').hidden = !job;
+    $('[data-crumb-sep]').hidden = !job;
+    const crumb = $('[data-crumb-job]');
+    crumb.hidden = !job;
+    crumb.textContent = job ? job.title : '';
+    const el = $('[data-career]');
+    if (!job) {
+      const open = D.jobs.filter((x) => x.open).length;
+      el.innerHTML = `<div class="career-intro">
+          <h2>Werde Teil unseres Teams</h2>
+          <p>Die <strong>Train Sim Germany</strong> Roblox-Community sucht motivierte Mitglieder, die dabei helfen möchten, unser virtuelles Bahnnetz zu erweitern und zu verbessern. Entdecke offene Positionen und finde die perfekte Rolle für dich.</p>
+          <p>Als Teil des Teams entwickelst du eine der größten deutschen Roblox-Bahncommunities mit und sammelst dabei wertvolle Erfahrungen.</p>
+        </div>
+        <div class="career-head"><h2>Offene Positionen</h2><span>${open} von ${D.jobs.length} offen</span></div>
+        <div class="job-list">${D.jobs.map(jobCard).join('')}</div>`;
+      return;
+    }
+    const app = state.applications[job.id];
+    let action;
+    if (app) {
+      action = `<div class="apply-done"><span class="apply-done__ic">${icon('fi-rr-check')}</span><h3>Bewerbung gesendet</h3><p>Danke, ${esc(app.roblox)}! Wir melden uns über Discord bei <b>${esc(app.discord)}</b>.</p><button class="btn btn--outline" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button></div>`;
+    } else if (!job.open) {
+      action = `<div class="closed-note">${icon('fi-rr-info')}<span>Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.</span></div>
+        <div class="btn-stack"><a class="btn btn--discord btn--block btn--lg" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Zum Discord</a></div>`;
+    } else {
+      action = applyForm(job);
+    }
+    const list = (items) => `<ul>${items.map((x) => `<li>${icon('fi-rr-check')}<span>${esc(x)}</span></li>`).join('')}</ul>`;
+    el.innerHTML = `<article class="job-detail">
+      <div class="job-detail__top">${jobStatus(job)}<span class="job__team">${icon('fi-rr-users-alt')}Team ${esc(job.team)}</span></div>
+      <h2>Werde Teil des Teams als <span>${esc(job.title)}</span></h2>
+      <p class="lead">${esc(job.text)}</p>
+      <hr>
+      <section class="check-list"><h3>${icon('fi-rr-check')}Verantwortlichkeiten</h3>${list(job.tasks)}</section>
+      <section class="check-list"><h3>${icon('fi-rr-check')}Anforderungen</h3>${list(job.needs)}</section>
+      <hr>
+      ${action}
+    </article>`;
+  }
+  function submitApplication(form) {
+    const id = form.dataset.apply;
+    const data = Object.fromEntries(new FormData(form));
+    const errors = {};
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(data.roblox.trim())) errors.roblox = 'Bitte gib einen gültigen Roblox-Namen ein (3–20 Zeichen: Buchstaben, Zahlen, _).';
+    if (!/^([a-z0-9_.]{2,32}|.{2,32}#\d{4})$/i.test(data.discord.trim())) errors.discord = 'Bitte gib deinen Discord-Namen ein, z. B. lokfuehrer_max.';
+    if (data.experience.trim().length < 30) errors.experience = 'Erzähl uns etwas mehr – mindestens 30 Zeichen.';
+    $$('.form-field', form).forEach((f) => {
+      f.classList.remove('has-error');
+      const er = $('.form-error', f);
+      if (er) er.remove();
+    });
+    Object.entries(errors).forEach(([name, msg]) => {
+      const input = form.elements[name];
+      const f = input.closest('.form-field');
+      f.classList.add('has-error');
+      f.insertAdjacentHTML('beforeend', `<span class="form-error" id="err-${name}">${msg}</span>`);
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', `err-${name}`);
+    });
+    const firstError = Object.keys(errors)[0];
+    if (firstError) { form.elements[firstError].focus(); return; }
+    state.applications[id] = { roblox: data.roblox.trim(), discord: data.discord.trim(), experience: data.experience.trim(), activity: +data.activity, at: Date.now() };
+    store.set('tsg-applications', state.applications);
+    toast('Bewerbung gesendet');
+    renderCareer();
+  }
+
   // ---------- Auswahl-Sheets ----------
   const modal = $('[data-modal]');
   let modalView = null;
@@ -707,13 +1204,53 @@
       }).join('')}</div>
       <div class="btn-stack"><button class="btn btn--soft btn--block" type="button" data-treset>Alle Trainings anzeigen</button></div>`,
     },
-    station: {
-      title: 'Bahnhof wählen',
-      render: () => `<div class="opt-list">${D.stations.map((s) => `
-        <button class="opt" type="button" role="radio" aria-checked="${s.name === state.station}" data-station-pick="${esc(s.name)}">
-          <span class="res-ic">${icon('fi-rr-marker')}</span><span><b>${esc(s.name)}</b><small>${esc(s.region)} · ${s.tracks} Gleise</small></span>
-          ${s.name === state.station ? icon('fi-rr-check') : ''}
-        </button>`).join('')}</div>`,
+    picker: {
+      title: (target) => PICKER_TITLES[target] || 'Haltestelle',
+      render: () => `<label class="picker__search">${icon('fi-rr-search')}<span class="sr-only">Haltestelle eingeben</span><input type="search" placeholder="Haltestelle eingeben" autocomplete="off" data-picker-input></label>
+        <div class="pk-list" data-pk-list>${pickerList('')}</div>`,
+    },
+    when: {
+      title: 'Datum & Uhrzeit',
+      render: () => {
+        const d = state.whenDraft;
+        const now = berlinNow();
+        const time = d.time || `${pad(now.h)}:${pad(now.m)}`;
+        return `<div class="when-days" role="radiogroup" aria-label="Tag">${Array.from({ length: 7 }, (_, i) => `<button class="chip${d.dayOffset === i ? ' is-active' : ''}" type="button" role="radio" aria-checked="${d.dayOffset === i}" data-when-day="${i}">${dayName(now.day + i)}</button>`).join('')}</div>
+          <label class="time-field">${icon('fi-rr-clock-three')}<span class="sr-only">Uhrzeit</span><input type="time" value="${time}" data-when-time></label>
+          <div class="sheet-actions">
+            <button class="btn btn--outline btn--lg btn--block" type="button" data-when-now>Jetzt</button>
+            <button class="btn btn--dark btn--lg btn--block" type="button" data-when-apply>Übernehmen</button>
+          </div>`;
+      },
+    },
+    options: {
+      title: 'Routeneinstellungen',
+      render: () => {
+        const d = state.optDraft;
+        return `<section class="opt-section"><h3>Verkehrsmittel</h3><div class="opt-list">${PRODUCTS.map((p) => {
+          const on = d.products.has(p.id);
+          return `<button class="opt" type="button" role="checkbox" aria-checked="${on}" data-opt-product="${p.id}"><span><b>${p.label}</b><small>${p.hint}</small></span><span class="opt__check">${on ? icon('fi-rr-check') : ''}</span></button>`;
+        }).join('')}</div></section>
+          <section class="opt-section"><h3>Verbindungstyp</h3><div class="switch-row"><span id="lbl-direct">Nur Direktverbindungen</span><button class="switch" type="button" role="switch" aria-checked="${d.directOnly}" aria-labelledby="lbl-direct" data-opt-direct></button></div></section>
+          <section class="opt-section"><h3>Zwischenhalt</h3><div class="via-btn"><button type="button" data-picker="via">${icon('fi-rr-circle-h')}<span class="${d.via ? '' : 'is-empty'}">${d.via ? esc(d.via) : 'Zwischenhalt wählen'}</span></button>${d.via ? `<button class="round-btn round-btn--soft" type="button" data-opt-via-clear aria-label="Zwischenhalt entfernen">${icon('fi-rr-cross-small')}</button>` : ''}</div></section>
+          <div class="sheet-actions">
+            <button class="btn btn--outline btn--lg btn--block" type="button" data-opt-reset>Zurücksetzen</button>
+            <button class="btn btn--dark btn--lg btn--block" type="button" data-opt-apply>Übernehmen</button>
+          </div>`;
+      },
+    },
+    news: {
+      title: 'Neuigkeit',
+      render: (i) => {
+        const n = D.news[+i];
+        return `<div class="detail">
+          <img class="detail__img" src="assets/img/${n.img}" alt="">
+          <div class="detail__top"><span class="cat-tag cat-tag--${n.cat}">${esc(n.tag)}</span><span class="tag">${esc(n.date)}</span></div>
+          <h3>${esc(n.title)}</h3>
+          <p>${esc(n.text)}</p>
+          <div class="btn-stack"><a class="btn btn--discord btn--block btn--lg" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Auf Discord diskutieren</a></div>
+        </div>`;
+      },
     },
     training: {
       title: 'Training',
@@ -751,12 +1288,17 @@
     },
   };
   function openModal(name, arg) {
+    const t = state.trip;
+    if (name === 'options' && arg !== 'keep') state.optDraft = { products: new Set(t.products), directOnly: t.directOnly, via: t.via };
+    if (name === 'when') state.whenDraft = { dayOffset: t.dayOffset, time: t.time };
+    if (name === 'picker') state.pickerTarget = arg;
     modalView = { name, arg };
-    $('[data-modal-title]').textContent = VIEWS[name].title;
+    const title = VIEWS[name].title;
+    $('[data-modal-title]').textContent = typeof title === 'function' ? title(arg) : title;
     $('[data-modal-body]').innerHTML = VIEWS[name].render(arg);
     modal.hidden = false;
     document.body.classList.add('menu-open');
-    const focusable = $('[data-modal-body] button:not([disabled])', modal) || $('[data-modal-close]', modal);
+    const focusable = $('[data-modal-body] input[type="search"]', modal) || $('[data-modal-body] button:not([disabled])', modal) || $('[data-modal-close]', modal);
     focusable.focus({ preventScroll: true });
   }
   function refreshModal() {
@@ -902,17 +1444,30 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'abfahrten', 'trainings', 'server', 'statistiken', 'spieler'];
+  const PAGES = ['home', 'reise', 'reiseplan', 'abfahrten', 'trainings', 'news', 'server', 'karriere', 'statistiken', 'spieler'];
+  const NAV_OF = { abfahrten: 'reise', reiseplan: 'reise' };
+  const MORE_PAGES = ['server', 'karriere', 'statistiken', 'spieler'];
   const TITLES = {
     home: 'Train Sim Germany – Das Bahnerlebnis auf Roblox',
+    reise: 'Reiseauskunft · Train Sim Germany',
+    reiseplan: 'Reiseplan · Train Sim Germany',
     abfahrten: 'Abfahrten · Train Sim Germany',
+    news: 'Neuigkeiten · Train Sim Germany',
+    karriere: 'Karriere · Train Sim Germany',
     trainings: 'Trainings · Train Sim Germany',
     server: 'Server · Train Sim Germany',
     statistiken: 'Statistiken · Train Sim Germany',
     spieler: 'Spieler · Train Sim Germany',
   };
   const RENDER = {
-    home() { renderHeroBoard(); renderHomeBoard(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews(); },
+    home() {
+      renderHeroBoard(); renderHomeBoard(); renderPinned(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews();
+      $('[data-open-jobs]').textContent = D.jobs.filter((x) => x.open).length;
+    },
+    reise() { renderTrip(); },
+    reiseplan() { renderPlan(); },
+    news() { renderNewsPage(); },
+    karriere() { renderCareer(); },
     abfahrten() { renderFullBoard(); renderNotices(); },
     trainings() { renderTrainings(); },
     server() { $('[data-server-search]').value = state.serverQuery; renderServers(); },
@@ -923,18 +1478,27 @@
   function route() {
     const raw = location.hash.replace(/^#\/?/, '');
     const [path, qs] = raw.split('?');
-    const page = PAGES.includes(path) ? path : 'home';
+    const [first, sub] = path.split('/');
+    const page = PAGES.includes(first) ? first : 'home';
     const params = new URLSearchParams(qs || '');
     if (params.get('station')) state.station = params.get('station');
-    const changed = page !== state.page;
+    const jobId = page === 'karriere' ? (sub || null) : null;
+    const changed = page !== state.page || jobId !== state.jobId;
     state.page = page;
+    state.jobId = jobId;
     document.body.dataset.page = page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== page; });
+    const group = NAV_OF[page] || page;
     $$('[data-nav]').forEach((a) => {
-      const current = a.dataset.nav === page || (a.dataset.nav === 'more' && (page === 'statistiken' || page === 'spieler'));
+      const n = a.dataset.nav;
+      const current = n === group || (n === 'more' && MORE_PAGES.includes(page)) || (n === 'more-desk' && (page === 'statistiken' || page === 'spieler'));
       if (current) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
+    $$('[data-head-tab]').forEach((a) => {
+      if (a.dataset.headTab === group || a.dataset.headTab === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+    $$('[data-head-tab="reise"]').forEach((a) => { if (page === 'abfahrten') a.removeAttribute('aria-current'); });
     document.title = TITLES[page];
     closeMenu();
     closeModal();
@@ -1090,6 +1654,170 @@
       $$('[data-sort]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
       renderPlayers();
     }));
+
+    // Reiseauskunft, Schnelle Suche, Sheets, News, Karriere
+    let suppressClick = false;
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-picker], [data-pk], [data-pk-star], [data-pk-clear], [data-trip-swap], [data-trip-search], [data-conn], [data-plan-toggle], [data-pin-trip], [data-unpin], [data-pinned-open], [data-quick-del], [data-quick-tile], [data-quick-add], [data-quick-edit], [data-quick-info], [data-when-day], [data-when-now], [data-when-apply], [data-opt-product], [data-opt-direct], [data-opt-via-clear], [data-opt-reset], [data-opt-apply], [data-news-cat], [data-news-open], [data-apply-reset]');
+      if (!el) return;
+      const ds = el.dataset;
+      const t = state.trip;
+      if (ds.picker) openModal('picker', ds.picker);
+      else if (ds.pk) pickStation(ds.pk);
+      else if (ds.pkStar) {
+        if (state.favStations.has(ds.pkStar)) state.favStations.delete(ds.pkStar); else state.favStations.add(ds.pkStar);
+        store.set('tsg-fav-stations', Array.from(state.favStations));
+        const input = $('[data-picker-input]');
+        $('[data-pk-list]').innerHTML = pickerList(input ? input.value : '');
+      } else if ('pkClear' in ds) {
+        state.history = [];
+        store.set('tsg-history', []);
+        $('[data-pk-list]').innerHTML = pickerList('');
+      } else if ('tripSwap' in ds) {
+        [t.from, t.to] = [t.to, t.from];
+        if (state.tripResults) runSearch({ scroll: false }); else renderTrip();
+        renderTrip();
+      } else if ('tripSearch' in ds) runSearch();
+      else if (ds.conn) {
+        state.planConn = state.tripResults[+ds.conn];
+        state.planOpen = {};
+        location.hash = '#/reiseplan';
+      } else if (ds.planToggle) {
+        const li = +ds.planToggle;
+        state.planOpen[li] = state.planOpen[li] === false;
+        renderPlan();
+      } else if ('pinTrip' in ds) togglePin();
+      else if ('unpin' in ds) {
+        state.pinned = null;
+        store.set('tsg-pinned', null);
+        toast('Anheften gelöst');
+        if (state.page === 'home') renderPinned();
+        if (state.page === 'reise') renderTripResults();
+      } else if ('pinnedOpen' in ds) openPinned();
+      else if (ds.quickDel) {
+        state.quick = state.quick.filter((n) => n !== ds.quickDel);
+        store.set('tsg-quick', state.quick);
+        renderQuick();
+      } else if (ds.quickTile) {
+        if (!suppressClick) quickTap(ds.quickTile);
+      } else if ('quickAdd' in ds) openModal('picker', 'quick');
+      else if ('quickEdit' in ds) {
+        state.quickEdit = !state.quickEdit;
+        state.quickSel = null;
+        renderQuick();
+      } else if ('quickInfo' in ds) toast('Start antippen, dann Ziel antippen – oder den Start aufs Ziel ziehen');
+      else if (ds.whenDay) {
+        const input = $('[data-when-time]');
+        if (input) state.whenDraft.time = input.value;
+        state.whenDraft.dayOffset = +ds.whenDay;
+        refreshModal();
+      } else if ('whenNow' in ds) {
+        t.dayOffset = 0;
+        t.time = null;
+        closeModal();
+        renderTrip();
+        if (state.tripResults) runSearch({ scroll: false });
+      } else if ('whenApply' in ds) {
+        const now = berlinNow();
+        const value = $('[data-when-time]').value || `${pad(now.h)}:${pad(now.m)}`;
+        const unchangedNow = state.whenDraft.dayOffset === 0 && state.whenDraft.time === null && value === `${pad(now.h)}:${pad(now.m)}`;
+        t.dayOffset = state.whenDraft.dayOffset;
+        t.time = unchangedNow ? null : value;
+        closeModal();
+        renderTrip();
+        if (state.tripResults) runSearch({ scroll: false });
+      } else if (ds.optProduct) {
+        const p = state.optDraft.products;
+        if (p.has(ds.optProduct) && p.size === 1) { toast('Mindestens ein Verkehrsmittel muss ausgewählt sein'); return; }
+        if (p.has(ds.optProduct)) p.delete(ds.optProduct); else p.add(ds.optProduct);
+        refreshModal();
+      } else if ('optDirect' in ds) {
+        state.optDraft.directOnly = !state.optDraft.directOnly;
+        refreshModal();
+      } else if ('optViaClear' in ds) {
+        state.optDraft.via = '';
+        refreshModal();
+      } else if ('optReset' in ds) {
+        state.optDraft = { products: new Set(PRODUCTS.map((p) => p.id)), directOnly: false, via: '' };
+        refreshModal();
+      } else if ('optApply' in ds) {
+        t.products = state.optDraft.products;
+        t.directOnly = state.optDraft.directOnly;
+        t.via = state.optDraft.via;
+        closeModal();
+        renderTrip();
+        if (state.tripResults) runSearch({ scroll: false });
+      } else if (ds.newsCat) {
+        state.newsCat = ds.newsCat;
+        renderNewsPage();
+      } else if (ds.newsOpen) openModal('news', ds.newsOpen);
+      else if (ds.applyReset) {
+        delete state.applications[ds.applyReset];
+        store.set('tsg-applications', state.applications);
+        toast('Bewerbung zurückgezogen');
+        renderCareer();
+      }
+    });
+
+    // Schnelle Suche: Start-Kachel auf die Ziel-Kachel ziehen (Maus & Touch)
+    let drag = null;
+    $('[data-quick]').addEventListener('pointerdown', (e) => {
+      const tile = e.target.closest('[data-quick-tile]');
+      if (!tile || state.quickEdit || e.target.closest('[data-quick-del]')) return;
+      drag = { name: tile.dataset.quickTile, x: e.clientX, y: e.clientY, moved: false, ghost: null, over: null };
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 8) return;
+      if (!drag.moved) {
+        drag.moved = true;
+        drag.ghost = document.createElement('div');
+        drag.ghost.className = 'quick-ghost';
+        drag.ghost.textContent = drag.name === D.me.position ? 'Aktuelle Position' : drag.name;
+        document.body.appendChild(drag.ghost);
+      }
+      drag.ghost.style.left = `${e.clientX}px`;
+      drag.ghost.style.top = `${e.clientY}px`;
+      const hit = document.elementFromPoint(e.clientX, e.clientY);
+      const over = hit && hit.closest('[data-quick-tile]');
+      $$('.quick-tile.is-drop').forEach((x) => x.classList.remove('is-drop'));
+      drag.over = over && over.dataset.quickTile !== drag.name ? over.dataset.quickTile : null;
+      if (drag.over) over.classList.add('is-drop');
+    });
+    const endDrag = () => {
+      if (!drag) return;
+      const d = drag;
+      drag = null;
+      if (d.ghost) d.ghost.remove();
+      $$('.quick-tile.is-drop').forEach((x) => x.classList.remove('is-drop'));
+      if (d.moved) {
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, 0);
+        if (d.over) quickSearch(d.name, d.over);
+      }
+    };
+    window.addEventListener('pointerup', endDrag);
+    window.addEventListener('pointercancel', endDrag);
+
+    document.addEventListener('input', (e) => {
+      const target = e.target;
+      if (target.matches('[data-picker-input]')) $('[data-pk-list]').innerHTML = pickerList(target.value);
+      if (target.matches('#ap-act')) $('[data-act-out]').textContent = target.value;
+      const field = target.closest('.form-field.has-error');
+      if (field) {
+        field.classList.remove('has-error');
+        const er = $('.form-error', field);
+        if (er) er.remove();
+        target.removeAttribute('aria-invalid');
+        target.removeAttribute('aria-describedby');
+      }
+    });
+    document.addEventListener('submit', (e) => {
+      const form = e.target.closest('form[data-apply]');
+      if (!form) return;
+      e.preventDefault();
+      submitApplication(form);
+    });
 
     window.addEventListener('hashchange', route);
   }
