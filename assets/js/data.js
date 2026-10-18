@@ -13,10 +13,7 @@ window.TSG = {
   },
 
   // Angemeldeter Spieler (Demo – später aus dem Roblox-Login)
-  me: { name: 'Jonas', username: 'Jonas_BR218', rank: 'Conductor', level: 24, position: 'Hamburg Hbf' },
-
-  // Kacheln der „Schnellen Suche“ (Reiseauskunft), bis Spieler eigene speichern
-  quickSearch: ['Hamburg Hbf', 'Berlin Hbf', 'Köln Hbf'],
+  me: { name: 'Jonas', username: 'Jonas_BR218', rank: 'Conductor', level: 24 },
 
   stats: {
     online: 1284,
@@ -31,55 +28,6 @@ window.TSG = {
     km: 9800000,
     tripsToday: 18430,
   },
-
-  // Linien: Haltestellen mit Fahrzeit (Minuten) ab Startbahnhof, Takt und Versatz
-  lines: [
-    { id: 'ice23', name: 'ICE 23', cat: 'ice', every: 60, offset: 5, stops: [['Hamburg-Altona', 0], ['Hamburg Hbf', 12], ['Hannover Hbf', 90], ['Göttingen', 125], ['Kassel-Wilhelmshöhe', 145], ['Fulda', 175], ['Frankfurt (Main) Hbf', 230]] },
-    { id: 'ice28', name: 'ICE 28', cat: 'ice', every: 120, offset: 24, stops: [['Hamburg Hbf', 0], ['Berlin Hbf', 105], ['Leipzig Hbf', 180], ['Erfurt Hbf', 225], ['Nürnberg Hbf', 300], ['München Hbf', 370]] },
-    { id: 'ice10', name: 'ICE 10', cat: 'ice', every: 60, offset: 33, stops: [['Berlin Hbf', 0], ['Berlin-Spandau', 14], ['Hannover Hbf', 100], ['Bielefeld Hbf', 150], ['Dortmund Hbf', 200], ['Köln Hbf', 265]] },
-    { id: 'ice41', name: 'ICE 41', cat: 'ice', every: 60, offset: 18, stops: [['Köln Hbf', 0], ['Frankfurt Flughafen', 55], ['Frankfurt (Main) Hbf', 70], ['Würzburg Hbf', 140], ['Nürnberg Hbf', 195], ['München Hbf', 260]] },
-    { id: 'ic31', name: 'IC 31', cat: 'ic', every: 120, offset: 47, stops: [['Kiel Hbf', 0], ['Hamburg Hbf', 75], ['Bremen Hbf', 135], ['Osnabrück Hbf', 185], ['Münster (Westf) Hbf', 210], ['Dortmund Hbf', 240], ['Köln Hbf', 315]] },
-    { id: 'ic55', name: 'IC 55', cat: 'ic', every: 120, offset: 11, stops: [['Dresden Hbf', 0], ['Leipzig Hbf', 70], ['Halle (Saale) Hbf', 95], ['Magdeburg Hbf', 145], ['Hannover Hbf', 230], ['Bremen Hbf', 300]] },
-    { id: 're7', name: 'RE 7', cat: 're', every: 60, offset: 15, stops: [['Hamburg Hbf', 0], ['Elmshorn', 25], ['Neumünster', 52], ['Kiel Hbf', 75]] },
-    { id: 're1', name: 'RE 1', cat: 're', every: 30, offset: 8, stops: [['Brandenburg Hbf', 0], ['Potsdam Hbf', 20], ['Berlin Hbf', 42], ['Berlin Ostbahnhof', 50], ['Erkner', 70], ['Frankfurt (Oder)', 105]] },
-    { id: 're5', name: 'RE 5', cat: 're', every: 60, offset: 21, stops: [['Koblenz Hbf', 0], ['Bonn Hbf', 40], ['Köln Hbf', 65], ['Düsseldorf Hbf', 95], ['Duisburg Hbf', 110], ['Wesel', 140]] },
-    { id: 're2', name: 'RE 2', cat: 're', every: 60, offset: 40, stops: [['Hannover Hbf', 0], ['Hildesheim Hbf', 28], ['Kreiensen', 62], ['Göttingen', 90]] },
-    { id: 're50', name: 'RE 50', cat: 're', every: 60, offset: 28, stops: [['Leipzig Hbf', 0], ['Wurzen', 20], ['Oschatz', 40], ['Riesa', 52], ['Dresden Hbf', 100]] },
-    { id: 're30', name: 'RE 30', cat: 're', every: 60, offset: 2, stops: [['Kassel Hbf', 0], ['Treysa', 60], ['Marburg (Lahn)', 90], ['Gießen', 110], ['Frankfurt (Main) Hbf', 160]] },
-    { id: 're9', name: 'RE 9', cat: 're', every: 60, offset: 50, stops: [['München Hbf', 0], ['München-Pasing', 7], ['Augsburg Hbf', 35], ['Günzburg', 62], ['Ulm Hbf', 80]] },
-    { id: 're10', name: 'RE 10', cat: 're', every: 60, offset: 36, stops: [['Nürnberg Hbf', 0], ['Fürth Hbf', 7], ['Erlangen', 18], ['Bamberg', 42], ['Lichtenfels', 62], ['Coburg', 80]] },
-    { id: 'rb6', name: 'RB 6', cat: 'rb', every: 60, offset: 32, stops: [['München Hbf', 0], ['München-Pasing', 7], ['Tutzing', 35], ['Weilheim (Oberbay)', 50], ['Murnau', 68], ['Garmisch-Partenkirchen', 88]] },
-    { id: 'rb61', name: 'RB 61', cat: 'rb', every: 60, offset: 12, stops: [['Hamburg Hbf', 0], ['Pinneberg', 20], ['Elmshorn', 32], ['Glückstadt', 48], ['Itzehoe', 62]] },
-    { id: 's1hh', name: 'S1', cat: 's', every: 20, offset: 2, stops: [['Wedel', 0], ['Hamburg-Altona', 25], ['Hamburg Hbf', 35], ['Hamburg-Barmbek', 45], ['Poppenbüttel', 60]] },
-    { id: 's3hh', name: 'S3', cat: 's', every: 20, offset: 6, stops: [['Pinneberg', 0], ['Hamburg-Altona', 18], ['Hamburg Hbf', 28], ['Hamburg-Harburg', 40], ['Stade', 75]] },
-    { id: 's7b', name: 'S7', cat: 's', every: 20, offset: 4, stops: [['Potsdam Hbf', 0], ['Berlin-Wannsee', 12], ['Berlin Zoologischer Garten', 28], ['Berlin Hbf', 33], ['Berlin Ostkreuz', 45], ['Ahrensfelde', 65]] },
-    { id: 's1m', name: 'S1', cat: 's', every: 20, offset: 3, stops: [['Freising', 0], ['München-Moosach', 25], ['München Hbf', 35], ['München Marienplatz', 38], ['München Ost', 43]] },
-    { id: 's8f', name: 'S8', cat: 's', every: 30, offset: 9, stops: [['Wiesbaden Hbf', 0], ['Mainz Hbf', 12], ['Frankfurt Flughafen', 30], ['Frankfurt (Main) Hbf', 42], ['Offenbach Ost', 60], ['Hanau Hbf', 75]] },
-    { id: 's11k', name: 'S11', cat: 's', every: 20, offset: 14, stops: [['Düsseldorf Flughafen', 0], ['Düsseldorf Hbf', 12], ['Dormagen', 32], ['Köln Hbf', 50], ['Bergisch Gladbach', 72]] },
-    { id: 's5h', name: 'S5', cat: 's', every: 30, offset: 19, stops: [['Hannover Flughafen', 0], ['Hannover Hbf', 18], ['Weetzen', 34], ['Springe', 46], ['Hameln', 62]] },
-    { id: 's3l', name: 'S3', cat: 's', every: 30, offset: 7, stops: [['Halle (Saale) Hbf', 0], ['Schkeuditz', 22], ['Leipzig Hbf', 38], ['Leipzig MDR', 46], ['Leipzig-Connewitz', 52]] },
-    { id: 's1n', name: 'S1', cat: 's', every: 20, offset: 16, stops: [['Bamberg', 0], ['Erlangen', 30], ['Fürth Hbf', 42], ['Nürnberg Hbf', 50], ['Hersbruck', 74]] },
-  ],
-
-  // Bahnhöfe mit eigener Abfahrtstafel
-  stations: [
-    { name: 'Hamburg Hbf', region: 'Nordnetz', tracks: 14, img: 'route-coast.svg' },
-    { name: 'Berlin Hbf', region: 'Ostnetz', tracks: 16, img: 'route-city.svg' },
-    { name: 'München Hbf', region: 'Südnetz', tracks: 32, img: 'route-alps.svg' },
-    { name: 'Köln Hbf', region: 'Westnetz', tracks: 11, img: 'route-rhine.svg' },
-    { name: 'Frankfurt (Main) Hbf', region: 'Westnetz', tracks: 25, img: 'route-rhine.svg' },
-    { name: 'Hannover Hbf', region: 'Nordnetz', tracks: 12, img: 'route-forest.svg' },
-    { name: 'Leipzig Hbf', region: 'Ostnetz', tracks: 23, img: 'route-city.svg' },
-    { name: 'Nürnberg Hbf', region: 'Südnetz', tracks: 22, img: 'route-forest.svg' },
-  ],
-
-  notices: [
-    { level: 'warn', title: 'Bauarbeiten Hannover – Göttingen', text: 'Eingleisiger Betrieb zwischen Kreiensen und Göttingen. Rechne mit +5 Min.' },
-    { level: 'info', title: 'Nachtfahrt-Event heute ab 21 Uhr', text: 'Auf allen Event-Servern gilt der Nachtfahrplan mit Sonderzügen.' },
-    { level: 'ok', title: 'Stellwerk Köln wieder besetzt', text: 'Fahrdienstleiter „Weichenwolf“ hat übernommen – Betrieb läuft normal.' },
-  ],
-
-  delayReasons: ['Verzögerung im Betriebsablauf', 'Signalstörung', 'Warten auf Anschlussreisende', 'Reparatur am Zug', 'Stellwerk unbesetzt', 'Hohe Auslastung'],
 
   servers: [
     { name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: '6 Std. 12 Min.', version: '2.4.1', trains: 16, type: 'public' },
@@ -119,22 +67,12 @@ window.TSG = {
     thumbnailsApi: 'https://thumbnails.roproxy.com',
   },
 
-  players: [
-    { name: 'Lokfuehrer_Max', role: 'Instructor', level: 87, km: 48210, trips: 1912, punct: 97.8, joined: 'März 2024', region: 'Nordnetz' },
-    { name: 'ICEspeed2009', role: 'Driver', level: 81, km: 45980, trips: 1544, punct: 93.1, joined: 'Jan. 2024', region: 'Westnetz' },
-    { name: 'Nordlicht_Mia', role: 'Signaller', level: 79, km: 41320, trips: 1803, punct: 98.6, joined: 'Mai 2024', region: 'Nordnetz' },
-    { name: 'Weichenwolf', role: 'Signaller', level: 74, km: 36940, trips: 1702, punct: 96.4, joined: 'Feb. 2024', region: 'Westnetz' },
-    { name: 'Paula_Pendolino', role: 'Driver', level: 72, km: 35110, trips: 1290, punct: 95.0, joined: 'Juni 2024', region: 'Südnetz' },
-    { name: 'BR218Fan', role: 'Dispatcher', level: 70, km: 33870, trips: 1401, punct: 94.7, joined: 'Dez. 2023', region: 'Südnetz' },
-    { name: 'Stellwerk_Tim', role: 'Signaller', level: 66, km: 30210, trips: 1655, punct: 97.1, joined: 'Apr. 2024', region: 'Ostnetz' },
-    { name: 'TrainSpotterJan', role: 'Driver', level: 63, km: 28750, trips: 1104, punct: 91.9, joined: 'Juli 2024', region: 'Ostnetz' },
-    { name: 'Taktfahrplan', role: 'Dispatcher', level: 61, km: 27400, trips: 1222, punct: 96.0, joined: 'Okt. 2023', region: 'Nordnetz' },
-    { name: 'S_Bahn_Sven', role: 'Conductor', level: 58, km: 25120, trips: 2011, punct: 92.8, joined: 'Aug. 2024', region: 'Nordnetz' },
-    { name: 'Gleis9dreiviertel', role: 'Platform Staff', level: 52, km: 21990, trips: 987, punct: 90.4, joined: 'Sep. 2024', region: 'Westnetz' },
-    { name: 'Rangierlok_Rudi', role: 'Driver', level: 49, km: 20430, trips: 876, punct: 93.6, joined: 'Mai 2024', region: 'Südnetz' },
-    { name: 'Fahrdienst_Finn', role: 'Signaller', level: 47, km: 18210, trips: 1340, punct: 95.9, joined: 'Juni 2024', region: 'Ostnetz' },
-    { name: 'xXRegioXx', role: 'Driver', level: 41, km: 15880, trips: 702, punct: 88.7, joined: 'Juli 2025', region: 'Westnetz' },
-    { name: 'BahnFan_Lea', role: 'Conductor', level: 38, km: 14320, trips: 655, punct: 94.2, joined: 'Jan. 2025', region: 'Südnetz' },
+  // Spielernamen für die Besatzung auf den Servern (Demo)
+  crew: [
+    'Lokfuehrer_Max', 'ICEspeed2009', 'Nordlicht_Mia', 'Weichenwolf',
+    'Paula_Pendolino', 'BR218Fan', 'Stellwerk_Tim', 'TrainSpotterJan',
+    'Taktfahrplan', 'S_Bahn_Sven', 'Gleis9dreiviertel', 'Rangierlok_Rudi',
+    'Fahrdienst_Finn', 'xXRegioXx', 'BahnFan_Lea',
   ],
 
   // Wochenplan: Tag 0 = heute, Uhrzeit in MEZ. Die App plant daraus zwei Wochen.
@@ -167,11 +105,11 @@ window.TSG = {
 
   // Startseite: Rollen-Karten. {rank} = Rangname in seiner Farbe, {group} = Link zur Roblox-Gruppe
   roleCards: [
-    { rank: 'Passenger', img: 'route-coast.svg', title: 'Fahr als {rank} mit.', text: 'Lehn dich zurück und genieß die Fahrt durch Deutschland – von der Nordseeküste bis in die Alpen. Als {rank} entdeckst du Dutzende Bahnhöfe, vom kleinen Haltepunkt bis zum großen Hauptbahnhof.', cta: 'Verbindung suchen', href: '#/reise' },
-    { rank: 'Driver', img: 'play.svg', title: 'Fahr Züge als {rank} durchs ganze Netz.', text: 'Tritt der {group} bei und besuche ein {rank}-Training. Danach fährst du ICE, Regionalzüge und S-Bahnen nach echtem Fahrplan.', cta: 'Zu den Trainings', href: '#/trainings' },
-    { rank: 'Platform Staff', img: 'role-platform.svg', title: 'Sorg als {rank} für pünktliche Abfahrten.', text: 'Sichere den Bahnsteig, lenke die Fahrgäste und gib mit der Kelle den Abfahrtsauftrag. Nach dem Training bist du als {rank} an jedem großen Bahnhof gefragt.', cta: 'Zu den Trainings', href: '#/trainings' },
-    { rank: 'Conductor', img: 'role-conductor.svg', title: 'Begleite Züge als {rank}.', text: 'Schließ die Türen, prüf die Fahrkarten und mach die Ansagen. Als {rank} bist du das Gesicht des Zuges und sorgst für eine pünktliche Abfahrt.', cta: 'Zu den Trainings', href: '#/trainings' },
-    { rank: 'Signaller', img: 'training.svg', title: 'Stell als {rank} die Fahrstraßen.', text: 'Übernimm ein Stellwerk wie Hannover Hbf oder Köln Hbf und leite die Züge sicher durch deinen Bereich – Signal für Signal.', cta: 'Zu den Trainings', href: '#/trainings' },
+    { rank: 'Passenger', img: 'route-coast.svg', title: 'Fahr als {rank} mit.', text: 'Lehn dich zurück und genieß die Fahrt durch Deutschland – von der Nordseeküste bis in die Alpen. Als {rank} entdeckst du Dutzende Bahnhöfe, vom kleinen Haltepunkt bis zum großen Hauptbahnhof.' },
+    { rank: 'Driver', img: 'play.svg', title: 'Fahr Züge als {rank} durchs ganze Netz.', text: 'Tritt der {group} bei und besuche ein {rank}-Training. Danach fährst du ICE, Regionalzüge und S-Bahnen nach echtem Fahrplan.' },
+    { rank: 'Platform Staff', img: 'role-platform.svg', title: 'Sorg als {rank} für pünktliche Abfahrten.', text: 'Sichere den Bahnsteig, lenke die Fahrgäste und gib mit der Kelle den Abfahrtsauftrag. Nach dem Training bist du als {rank} an jedem großen Bahnhof gefragt.' },
+    { rank: 'Conductor', img: 'role-conductor.svg', title: 'Begleite Züge als {rank}.', text: 'Schließ die Türen, prüf die Fahrkarten und mach die Ansagen. Als {rank} bist du das Gesicht des Zuges und sorgst für eine pünktliche Abfahrt.' },
+    { rank: 'Signaller', img: 'training.svg', title: 'Stell als {rank} die Fahrstraßen.', text: 'Übernimm ein Stellwerk wie Hannover Hbf oder Köln Hbf und leite die Züge sicher durch deinen Bereich – Signal für Signal.' },
   ],
 
   routes: [

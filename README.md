@@ -1,6 +1,6 @@
 # Train Sim Germany
 
-Die Web-App zum Roblox-Spiel **Train Sim Germany**: Live-Abfahrten, Server, Statistiken, Spieler und kommende Trainings, alles an einem Ort.
+Die Web-App zum Roblox-Spiel **Train Sim Germany**: Trainings, Server, News, Statistiken und Karriere, alles an einem Ort.
 
 Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie läuft direkt auf GitHub Pages oder jedem anderen Webserver.
 
@@ -8,15 +8,13 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 | Seite | Inhalt |
 |---|---|
-| **Start** | Titelbereich mit Logo, Begrüßung und Suche, Einstiegskarte mit Server / Gruppe / Discord, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, Live-Abfahrten, nächstes Training, Strecken, Kennzahlen, Karriere, News |
-| **Reise** | Reiseauskunft wie im DB Navigator: Von/Nach mit Tauschen, Datum, Routeneinstellungen (Verkehrsmittel, nur direkt, Zwischenhalt), Haltestellen-Auswahl mit Favoriten und Verlauf, Schnelle Suche (Start antippen oder auf das Ziel ziehen), Verbindungen mit einem Umstieg, Reiseplan mit allen Halten, merken & anheften |
-| **Abfahrten** | Live-Abfahrtstafel mit Abfahrten/Ankünften, Bahnhofssuche, Filtern nach Zuggattung, Lokführer und Verspätungen |
+| **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, nächstes Training, Strecken, Kennzahlen, Karriere, News |
 | **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community) und Detailansicht |
 | **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit drei Sektoren: 1. Über dich (Roblox, Discord, Spielzeit, Rang), 2. Grundwissen (Fragen zum Bereich; bei Instructor wählbar: Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (Aktivität und freie Tage per Schieberegler) |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, Top-Strecken |
-| **Spieler** | Podium, Bestenliste (Kilometer / Fahrten / Pünktlichkeit), Spieler der Woche, Ränge |
-| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten, alle kommenden Termine, Anmeldung |
+| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. |
+| **Einstellungen** | Darstellung: Hell, Dunkel oder Mit Gerät synchronisieren (folgt automatisch der Einstellung von Handy oder PC), Roblox-Konto, App installieren |
 
 ## Design
 
@@ -26,8 +24,9 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 - Aktive Elemente (Tabs, Menü, Leiste unten) sind grau eingerahmt mit Hintergrund, Tage mit Trainings haben einen roten Punkt – keine Unterstriche
 - Farben: DB-Rot `#EC0016` und die Cool-Gray-Töne der DB, Gleisnummern im DB-Blau wie an den Bahnhofsschildern
 - Uhr mit deutscher Zeit (MEZ/MESZ) im Menü
+- Kein elastisches Nachfedern beim Scrollen (auf allen Seiten abgeschaltet)
 - Responsiv für Handy, Tablet und Desktop
-- Hell- und Dunkelmodus (folgt dem System, umschaltbar im Menü)
+- Hell- und Dunkelmodus: in den Einstellungen Hell, Dunkel oder Mit Gerät synchronisieren (Standard)
 - Alle Illustrationen sind eigene SVGs in `assets/img`. Sie können jederzeit durch Screenshots aus dem Spiel ersetzt werden (gleicher Dateiname, z. B. als `.png`, dann den Pfad anpassen).
 
 ## App & Spielbild
@@ -47,14 +46,14 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 | `assets/icons/apple-touch-icon.png` | iPhone/iPad-Startbildschirm (180 × 180) |
 | `assets/icons/favicon-32.png` | Browser-Tab |
 
-`manifest.webmanifest` beschreibt die App (Name, Icons, Schnellzugriffe auf Abfahrten, Reise und Trainings), `sw.js` sorgt für den Offline-Modus. Wenn sich Dateien ändern, holt die App sie automatisch neu, solange eine Verbindung besteht.
+`manifest.webmanifest` beschreibt die App (Name, Icons, Schnellzugriffe auf Trainings, Server und News), `sw.js` sorgt für den Offline-Modus. Wenn sich Dateien ändern, holt die App sie automatisch neu, solange eine Verbindung besteht.
 
 ## Navigation & Profil
 
-- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten, Spielen/Gruppe/Discord, Uhr, Hell/Dunkel, App installieren).
+- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten, Spielen/Gruppe/Discord, Uhr, Einstellungen, App installieren).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
-- Unten schwebt die Leiste mit Start, News, Trainings und Profil. Das Profil unten ist dasselbe wie oben.
-- **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
+- Unten schwebt eine komplett runde Leiste mit gleichem Abstand links, rechts und unten: Start, News, Trainings und das Profilbild. Das Profil unten ist dasselbe wie oben.
+- **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Statistik** mit den eigenen Werten (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Lieblingsstrecke, Platz und Fahrten der letzten 7 Tage, Demo-Werte). Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
 
 ## Inhalte anpassen
 
@@ -68,7 +67,7 @@ links: {
 },
 ```
 
-Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Linien und Fahrpläne (daraus werden Live-Abfahrten und Verbindungen berechnet), Server, Spieler, Trainings, Strecken, News und Jobs (`jobs`).
+Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Server, Trainings, Strecken, News und Jobs (`jobs`).
 
 **Fragen im Bewerbungsformular:** Jede Stelle hat unter `quiz` eigene Fragen. Für Instructor kommen die Fragen aus `knowledge`: abgefragt wird der gewählte Bereich und alle Bereiche darunter (Signaller Instructor also auch Conductor, Platform Staff und Driver). Bei jeder Frage ist die erste Antwort die richtige, die App mischt die Reihenfolge.
 
@@ -102,12 +101,12 @@ Danach `http://localhost:8080` (bzw. `:8000`) öffnen.
 ## Struktur
 
 ```
-index.html            Alle Seiten (Hash-Routing: #/abfahrten, #/server, …)
+index.html            Alle Seiten (Hash-Routing: #/trainings, #/server, …)
 manifest.webmanifest  App-Beschreibung (Name, Icons, Schnellzugriffe)
 sw.js                 Service Worker für den Offline-Modus
 assets/css/style.css  Design-System und Layouts
 assets/js/data.js     Inhalte & Beispieldaten
-assets/js/app.js      Routing, Live-Abfahrten, Diagramme, Filter, Anmeldung
+assets/js/app.js      Routing, Trainings, Diagramme, Filter, Profil, Einstellungen
 assets/css/uicons.css Flaticon UIcons (erzeugt)
 assets/img/           Logo bzw. App-Icon und Illustrationen (SVG)
 assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PNG)

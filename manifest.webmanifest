@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Train Sim Germany",
   "short_name": "TSG",
-  "description": "Die App zum Roblox-Spiel Train Sim Germany: Live-Abfahrten, Reiseauskunft, Server, Trainings und Karriere.",
+  "description": "Die App zum Roblox-Spiel Train Sim Germany: Trainings, Server, News, Statistiken und Karriere.",
   "lang": "de",
   "dir": "ltr",
   "start_url": "./#/",
@@ -11,16 +11,16 @@
   "orientation": "any",
   "background_color": "#FFFFFF",
   "theme_color": "#FFFFFF",
-  "categories": ["games", "entertainment", "travel"],
+  "categories": ["games", "entertainment"],
   "icons": [
     { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Abfahrten", "short_name": "Abfahrten", "url": "./#/abfahrten", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] },
-    { "name": "Reiseauskunft", "short_name": "Reise", "url": "./#/reise", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] },
-    { "name": "Trainings", "short_name": "Trainings", "url": "./#/trainings", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] }
+    { "name": "Trainings", "short_name": "Trainings", "url": "./#/trainings", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Server", "short_name": "Server", "url": "./#/server", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Neuigkeiten", "short_name": "News", "url": "./#/news", "icons": [{ "src": "assets/icons/icon-96.png", "sizes": "96x96", "type": "image/png" }] }
   ],
   "screenshots": [
     { "src": "assets/icons/roblox-thumbnail.png", "sizes": "1920x1080", "type": "image/png", "form_factor": "wide", "label": "Train Sim Germany" }
