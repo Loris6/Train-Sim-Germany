@@ -22,10 +22,10 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
 - Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
-- App-Design im Stil moderner Mobile-Apps: dunkler Kopfbereich, weiße Fläche mit runden Ecken, Bildkarten, Tab-Leiste unten
-- Karriere-Seiten: helles Layout in einer zentrierten Spalte, alle Ecken mit kleinem Radius (6 px), Kontur-Buttons in DB-Rot
-- Farben angelehnt an die DB-Farbwelt (Rot `#EC0016`, Cool-Gray-Töne)
-- Responsiv für Handy, Tablet und Desktop: auf dem Handy mit Tab-Leiste unten und Menü-Sheet
+- Aufbau nach dem [DB UX Design System](https://github.com/db-ux-design-system/core-web) (Generation 3, Apache-2.0): weiße Kopfzeile mit roter Markierung für die aktive Seite, Brotkrümel und große Überschriften, Buttons mit 40 px Höhe und 4 px Ecken (Rot für die Hauptaktion, sonst mit Rand), graue Eingabefelder, Karten mit 1 px Rand und 8 px Ecken, Tabs mit roter Linie, blauer Fokusrahmen. Abstände, Ecken und Schatten sind die Werte aus dem DB UX Design System. DB-Logo und DB-Schriften werden nicht verwendet.
+- Farben: DB-Rot `#EC0016` und die Cool-Gray-Töne der DB, Gleisnummern im DB-Blau wie an den Bahnhofsschildern
+- Auf dem Handy: Kopfzeile mit Spielen-Button und Tab-Leiste unten mit Beschriftung
+- Responsiv für Handy, Tablet und Desktop
 - Hell- und Dunkelmodus (folgt dem System, umschaltbar oben rechts)
 - Alle Illustrationen sind eigene SVGs in `assets/img`. Sie können jederzeit durch Screenshots aus dem Spiel ersetzt werden (gleicher Dateiname, z. B. als `.png`, dann den Pfad anpassen).
 

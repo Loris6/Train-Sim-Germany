@@ -29,11 +29,9 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-heart:before{content:"\f7a0"}
 .fi-rr-home:before{content:"\f7b8"}
 .fi-rr-info:before{content:"\f80b"}
-.fi-rr-location-arrow:before{content:"\f8cc"}
 .fi-rr-location-crosshairs:before{content:"\f8ce"}
 .fi-rr-lock:before{content:"\f8d5"}
 .fi-rr-marker:before{content:"\f8fd"}
-.fi-rr-menu-burger:before{content:"\f925"}
 .fi-rr-moon:before{content:"\f972"}
 .fi-rr-newspaper:before{content:"\f9a5"}
 .fi-rr-paper-plane:before{content:"\f9f7"}

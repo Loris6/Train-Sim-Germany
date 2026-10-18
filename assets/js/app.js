@@ -520,20 +520,17 @@
           <button class="glass-btn" type="button" aria-pressed="${fav}" aria-label="${esc(r.title)} merken" data-fav="${esc(r.title)}">${icon('fi-rr-heart', 'fav-off')}${icon('fi-sr-heart', 'fav-on')}</button>
           <span class="line line--${r.cat}">${esc(r.line)}</span>
         </div>
-        <h3>${esc(r.title)}</h3>
-        <p>${esc(r.from)} → ${esc(r.to)}</p>
+        <div class="scard__body">
+          <h3>${esc(r.title)}</h3>
+          <p>${esc(r.from)} → ${esc(r.to)}</p>
+          <small>${fmt(r.km)} km · ${esc(r.dur)} · ${r.stops} Halte</small>
+        </div>
       </article>`;
     }).join('');
   }
 
   function renderNews() {
-    $('[data-news]').innerHTML = D.news.slice(0, 3).map((n, i) => `<button class="news" type="button" data-news-open="${i}">
-      <img src="assets/img/${n.img}" alt="" loading="lazy">
-      <div>
-        <div class="news__meta"><span class="cat-tag cat-tag--${n.cat}">${esc(n.tag)}</span><span>${esc(n.date)}</span></div>
-        <h3>${esc(n.title)}</h3>
-      </div>
-    </button>`).join('');
+    $('[data-news]').innerHTML = D.news.slice(0, 3).map(newsCard).join('');
   }
 
   // ---------- Server ----------
@@ -1109,12 +1106,11 @@
     </a>`;
   }
   function renderCrumbs(job) {
-    const jobs = `${icon('fi-rr-briefcase')}`;
-    const sep = '<span class="crumbs-box__sep" aria-hidden="true">/</span>';
-    let html = jobs;
-    if (!job) html += '<b aria-current="page">Jobs</b>';
-    else if (!state.jobApply) html += `<a href="#/karriere">Jobs</a>${sep}<b aria-current="page">${esc(job.title)}</b>`;
-    else html += `<a href="#/karriere">Jobs</a>${sep}<a href="#/karriere/${job.id}">${esc(job.title)}</a>${sep}<b aria-current="page">Bewerbung</b>`;
+    const sep = icon('fi-rr-angle-small-right');
+    let html = `<a href="#/">Start</a>${sep}`;
+    if (!job) html += '<span aria-current="page">Karriere</span>';
+    else if (!state.jobApply) html += `<a href="#/karriere">Karriere</a>${sep}<span aria-current="page">${esc(job.title)}</span>`;
+    else html += `<a href="#/karriere">Karriere</a>${sep}<a href="#/karriere/${job.id}">${esc(job.title)}</a>${sep}<span aria-current="page">Bewerbung</span>`;
     $('[data-crumbs]').innerHTML = html;
   }
   function careerList() {
@@ -1134,7 +1130,7 @@
         <button class="btn-text" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button>`;
     } else if (!job.open) {
       action = `<div class="note note--bad">${icon('fi-rr-info')}<span>Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.</span></div>
-        <a class="btn-line" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Zum Discord</a>`;
+        <a class="btn-line btn-line--outline" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}Zum Discord</a>`;
     } else {
       action = `<a class="btn-line" href="#/karriere/${job.id}/bewerben">${icon('fi-rr-briefcase')}Jetzt bewerben</a>`;
     }
@@ -1236,7 +1232,7 @@
       <h2>Bewerbung <em>gesendet</em></h2>
       <p class="lead">Danke, ${esc(app.roblox)}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen über Discord.</p>
       <dl class="done__list">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-      <a class="btn-line" href="#/karriere">${icon('fi-rr-briefcase')}Zurück zu den Jobs</a>
+      <a class="btn-line btn-line--outline" href="#/karriere">${icon('fi-rr-arrow-left')}Zurück zu den Jobs</a>
       <button class="btn-text" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button>
     </div>`;
   }
@@ -1385,7 +1381,7 @@
           <label class="time-field">${icon('fi-rr-clock-three')}<span class="sr-only">Uhrzeit</span><input type="time" value="${time}" data-when-time></label>
           <div class="sheet-actions">
             <button class="btn btn--outline btn--lg btn--block" type="button" data-when-now>Jetzt</button>
-            <button class="btn btn--dark btn--lg btn--block" type="button" data-when-apply>Übernehmen</button>
+            <button class="btn btn--primary btn--lg btn--block" type="button" data-when-apply>Übernehmen</button>
           </div>`;
       },
     },
@@ -1401,7 +1397,7 @@
           <section class="opt-section"><h3>Zwischenhalt</h3><div class="via-btn"><button type="button" data-picker="via">${icon('fi-rr-circle-h')}<span class="${d.via ? '' : 'is-empty'}">${d.via ? esc(d.via) : 'Zwischenhalt wählen'}</span></button>${d.via ? `<button class="round-btn round-btn--soft" type="button" data-opt-via-clear aria-label="Zwischenhalt entfernen">${icon('fi-rr-cross-small')}</button>` : ''}</div></section>
           <div class="sheet-actions">
             <button class="btn btn--outline btn--lg btn--block" type="button" data-opt-reset>Zurücksetzen</button>
-            <button class="btn btn--dark btn--lg btn--block" type="button" data-opt-apply>Übernehmen</button>
+            <button class="btn btn--primary btn--lg btn--block" type="button" data-opt-apply>Übernehmen</button>
           </div>`;
       },
     },
