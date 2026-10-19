@@ -96,6 +96,13 @@
     for (let i = rankIdx(type) - 1; i > 0; i--) if (!RANKS[i].staff) return RANKS[i].name;
     return RANKS[0].name;
   }
+  // Trainings, die der Spieler sieht: nur das für seinen nächsten Rang.
+  // Teamränge (Supervisor, Management) leiten Trainings und sehen deshalb alle.
+  function myTrainingTypes() {
+    if (rankOf(state.rank).staff) return null;
+    const next = nextRank(state.rank);
+    return next ? [next.name] : [];
+  }
   const roleBadge = (role) => `<span class="role" style="--rc:${rankOf(role).color}">${esc(role)}</span>`;
 
   // ---------- Zustand ----------
@@ -106,7 +113,6 @@
     range: '24',
     rank: rankIdx(store.get('tsg-rank', '')) >= 0 ? store.get('tsg-rank', '') : D.me.rank,
     trainingDay: null,
-    typeFilter: new Set(store.get('tsg-tfilter', [])),
     showAll: false,
     bell: store.get('tsg-bell', false),
     favs: new Set(store.get('tsg-favs', [])),
@@ -398,6 +404,7 @@
   // Der Wochenplan aus data.js wird für zwei Wochen ausgerollt.
   function trainingsList({ all = false } = {}) {
     const now = berlinNow();
+    const types = myTrainingTypes();
     const out = [];
     for (let week = 0; week < 2; week++) {
       D.trainings.forEach((t, i) => {
@@ -416,7 +423,7 @@
       });
     }
     return out
-      .filter((t) => t.end > now.abs && (all || !state.typeFilter.size || state.typeFilter.has(t.type)))
+      .filter((t) => t.end > now.abs && (all || !types || types.includes(t.type)))
       .sort((a, b) => a.start - b.start);
   }
   const findTraining = (id) => trainingsList({ all: true }).find((t) => t.id === id);
@@ -450,7 +457,8 @@
         <img class="promo-card__img" src="assets/img/group.svg" alt="" loading="lazy">
         <div class="promo-card__body">
           <${heading}>Alle Ausbildungen geschafft</${heading}>
-          <p>Du hast den höchsten Rang erreicht. Hilf jetzt neuen Spielern als Ausbilder.</p>
+          <p>Du hast den höchsten Rang erreicht. Als Supervisor kannst du jetzt selbst Trainings leiten.</p>
+          <a class="btn btn--primary promo-card__btn" href="#/karriere/supervisor">${icon('fi-rr-briefcase')}Als Supervisor bewerben</a>
         </div>
       </article>`;
     }
@@ -501,7 +509,8 @@
 
     $('[data-rank-name]').textContent = me.name;
     $('[data-bell]').setAttribute('aria-pressed', String(state.bell));
-    $('[data-filter-badge]').hidden = !state.typeFilter.size;
+    const types = myTrainingTypes();
+    $('[data-all-title]').textContent = !types ? 'Alle kommenden Trainings' : types.length ? `Kommende ${types[0]}-Trainings` : 'Keine weiteren Trainings';
 
     // Tagesleiste: 14 Tage, roter Punkt = an diesem Tag gibt es Trainings
     const days = Array.from({ length: 14 }, (_, i) => now.day + i);
@@ -525,7 +534,9 @@
     const nextDay = list.find((t) => t.day > state.trainingDay);
     $('[data-day-trainings]').innerHTML = ofDay.length
       ? ofDay.map(tcard).join('')
-      : `<div class="rail-empty">${icon('fi-rr-calendar')}<span>Am ${dayName(state.trainingDay, { long: true }).replace(/^(Heute|Morgen), /, '')} ist kein Training geplant.${nextDay ? ` Nächstes: <button class="link-more" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
+      : types && !types.length
+        ? `<div class="rail-empty">${icon('fi-rr-check-circle')}<span>Für deinen Rang gibt es keine weiteren Trainings.</span></div>`
+        : `<div class="rail-empty">${icon('fi-rr-calendar')}<span>Am ${dayName(state.trainingDay, { long: true }).replace(/^(Heute|Morgen), /, '')} ist kein Training geplant.${nextDay ? ` Nächstes: <button class="link-more" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
 
     // Alle kommenden Trainings (klein)
     const shown = state.showAll ? list : list.slice(0, 6);
@@ -536,7 +547,7 @@
         <div><h3>${esc(t.title)}</h3><p><i style="--rc:${t.color}"></i>${esc(t.type)} · ${t.time} Uhr · ${esc(t.host)}</p></div>
         <span class="pill-state pill-state--${st.cls}">${st.text}</span>
       </button></li>`;
-    }).join('') : '<li class="board-empty">Keine Trainings für diesen Filter.</li>';
+    }).join('') : `<li class="board-empty">${types && !types.length ? 'Für deinen Rang gibt es keine weiteren Trainings.' : 'Gerade sind keine Trainings geplant.'}</li>`;
     const toggle = $('[data-all-toggle]');
     toggle.hidden = list.length <= 6;
     toggle.textContent = state.showAll ? 'Weniger anzeigen' : 'Alle anzeigen';
@@ -572,22 +583,116 @@
   const SINCE = ['Weniger als 1 Monat', '1–3 Monate', '3–6 Monate', '6–12 Monate', 'Mehr als 1 Jahr'];
   const DAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
   const SECTORS = [
-    { title: 'Über dich', text: 'Damit wir dich im Spiel und auf Discord finden.' },
-    { title: 'Grundwissen', text: 'Ein paar Fragen zu deinem Bereich. Du musst nicht alles wissen.' },
-    { title: 'Erfahrung & Zeit', text: 'Erzähl uns, was du mitbringst und wann du Zeit hast.' },
+    { title: 'Über dich', text: 'Damit wir dich im Spiel, auf Discord und per E-Mail erreichen.' },
+    { title: 'Grundwissen', text: '40 Fragen zu deinem Bereich: Auswahl-, Schreib- und Schiebeaufgaben. Bei manchen Fragen sind mehrere Antworten richtig.' },
+    { title: 'Erfahrung & Zeit', text: '20 Fragen zu dir, deiner Erfahrung und deiner Zeit.' },
   ];
-  // Instructor: gemeinsame Fragen + gewählter Bereich + alle Bereiche darunter
-  function quizGroups(job, area) {
-    if (!job.areas) return [{ key: 'job', title: 'Fragen zur Stelle', items: job.quiz || [] }];
-    const groups = [{ key: 'common', title: 'Für alle Instructor', items: job.quiz || [] }];
-    job.areas.slice(0, job.areas.indexOf(area) + 1).forEach((a) => {
-      groups.push({ key: a, title: `${a} · ${rankOf(a).label}`, color: rankOf(a).color, items: D.knowledge[a] || [] });
-    });
-    return groups;
+
+  // Fragenkatalog (assets/js/questions.js) wird erst beim Öffnen einer Bewerbung geladen
+  let questionsLoading = null;
+  function loadQuestions() {
+    if (window.TSG_QUESTIONS) return Promise.resolve(window.TSG_QUESTIONS);
+    if (!questionsLoading) {
+      questionsLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'assets/js/questions.js';
+        s.onload = () => resolve(window.TSG_QUESTIONS);
+        s.onerror = () => { questionsLoading = null; s.remove(); reject(new Error('Fragen nicht erreichbar')); };
+        document.head.appendChild(s);
+      });
+    }
+    return questionsLoading;
   }
-  // Die erste Antwort ist richtig; angezeigt wird eine feste, gemischte Reihenfolge
-  const optionOrder = (q) => q.options.map((_, i) => i).sort((a, b) => hash(q.q + a) - hash(q.q + b));
-  const dataField = (name) => `data-field="${name}"`;
+
+  // 60 Fragen je Bewerbung. Sektor 2 (40): beim Supervisor der gewählte Bereich plus „Bahnbetrieb allgemein“;
+  // der Signaller stellt Signale, die für den Driver gelten – deshalb gehören bei ihm alle Driver-Fragen dazu.
+  function quizGroups(job, area) {
+    const Q = window.TSG_QUESTIONS;
+    if (!job.areas) return [{ key: 'job', title: 'Fachwissen', items: Q.jobs[job.id] }];
+    const ofArea = (a) => ({ key: a, title: `${a} · ${rankOf(a).label}`, color: rankOf(a).color, items: Q.areas[a] });
+    return area === 'Signaller'
+      ? [ofArea('Signaller'), ofArea('Driver')]
+      : [ofArea(area), { key: 'basics', title: 'Bahnbetrieb allgemein', items: Q.basics }];
+  }
+  // Sektor 3 (20): drei feste Fragen, dann Supervisor-Fragen bzw. allgemeine und stellenbezogene Fragen
+  const FIXED = [
+    { key: 'experience', type: 'long', q: 'Welche Erfahrung bringst du für diese Stelle mit?', min: 30, placeholder: 'Beschreibe kurz deine Erfahrung' },
+    { key: 'activity', type: 'scale', q: 'Wie aktiv wärst du, wenn du angenommen wirst?', min: 1, max: 10, labels: ['selten', 'sehr aktiv'] },
+    { key: 'days', type: 'days', q: 'An welchen Tagen hast du meistens Zeit?' },
+  ];
+  function sector3Items(job) {
+    const Q = window.TSG_QUESTIONS;
+    const pool = job.areas ? Q.supervisor : [...Q.common, ...Q.extra[job.id]];
+    return [...FIXED, ...pool.map((q, i) => ({ ...q, key: `x-${i}` }))];
+  }
+  function applyQuestions(job, area) {
+    const s2 = job.areas && !area ? [] : quizGroups(job, area).flatMap((g) => g.items.map((q, i) => ({ ...q, key: `${g.key}-${i}` })));
+    return [...s2, ...sector3Items(job)];
+  }
+
+  // Feste, gemischte Reihenfolge; bei Schiebeaufgaben nie schon richtig sortiert
+  const mixed = (q, list) => list.map((_, i) => i).sort((a, b) => hash(q.q + a) - hash(q.q + b));
+  function orderStart(q) {
+    const o = mixed(q, q.items);
+    return o.every((x, i) => x === i) ? [...o.slice(1), o[0]] : o;
+  }
+  const dataField = (name) => `data-field="${esc(name)}"`;
+  const HINTS = {
+    multi: 'Eine oder mehrere Antworten sind richtig',
+    pick: 'Wähle alles, was auf dich zutrifft',
+    write: 'Schreibaufgabe – kurze Antwort',
+    order: 'Schiebeaufgabe – richtige Reihenfolge',
+  };
+  function questionHtml(q, n) {
+    const fixed = FIXED.includes(q);
+    const name = fixed ? q.key : `q:${q.key}`;
+    const field = fixed ? q.key : name;
+    const id = `q${n}`;
+    const title = `<span class="q__no">${n}</span><span>${esc(q.q)}</span>${HINTS[q.type] ? `<small class="q__hint">${HINTS[q.type]}</small>` : ''}`;
+    const box = (inner) => `<fieldset class="q f" ${dataField(field)} data-q="${q.type}"><legend>${title}</legend>${inner}</fieldset>`;
+    const labelled = (inner) => `<div class="q f" ${dataField(field)} data-q="${q.type}"${q.min ? ` data-min="${q.min}"` : ''}><label class="q__label" for="${id}">${title}</label>${inner}</div>`;
+    switch (q.type) {
+      case 'single':
+      case 'multi':
+      case 'pick': {
+        const type = q.type === 'single' ? 'radio' : 'checkbox';
+        return box(`<div class="q__opts">${mixed(q, q.options).map((o) => `<label class="choice choice--${type}"><input type="${type}" name="${esc(name)}" value="${o}"><span>${esc(q.options[o])}</span></label>`).join('')}</div>`);
+      }
+      case 'write':
+      case 'short':
+        return labelled(`<div class="write">${icon(q.type === 'write' ? 'fi-rr-pencil' : 'fi-rr-edit')}<input id="${id}" name="${esc(name)}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(q.placeholder || 'Antwort eingeben')}"></div>`);
+      case 'long':
+        return labelled(`<textarea id="${id}" name="${esc(name)}" placeholder="${esc(q.placeholder || 'Deine Antwort')}"></textarea><span class="f__hint">Mindestens ${q.min} Zeichen</span>`);
+      case 'order': {
+        const start = orderStart(q);
+        return box(`<ol class="order" data-order>${start.map((o, i) => `<li class="order__item" data-i="${o}">
+            <span class="order__grip" aria-hidden="true">${icon('fi-rr-grip-dots-vertical')}</span>
+            <span class="order__pos">${i + 1}</span><span class="order__text">${esc(q.items[o])}</span>
+            <span class="order__btns"><button type="button" data-move="-1" aria-label="Nach oben">${icon('fi-rr-angle-small-up')}</button><button type="button" data-move="1" aria-label="Nach unten">${icon('fi-rr-angle-small-down')}</button></span>
+          </li>`).join('')}</ol><input type="hidden" name="${esc(name)}" value="${start.join(',')}">`);
+      }
+      case 'scale': {
+        const mid = Math.round((q.min + q.max) / 2);
+        return box(`<div class="slider" data-slider style="--a:0%;--b:${((mid - q.min) / (q.max - q.min)) * 100}%">
+            <output class="slider__out" data-slider-out>${mid} von ${q.max}</output>
+            <div class="slider__track"><input type="range" name="${esc(name)}" min="${q.min}" max="${q.max}" step="1" value="${mid}" aria-label="${esc(q.q)}" data-slider-input="single"></div>
+            <div class="slider__ticks" aria-hidden="true">${Array.from({ length: q.max - q.min + 1 }, (_, i) => `<span>${q.min + i}</span>`).join('')}</div>
+          </div>
+          <div class="scale__legend"><span>${esc(q.labels[0])}</span><span>${esc(q.labels[1])}</span></div>`);
+      }
+      case 'days':
+        return box(`<div class="slider slider--range" data-slider style="--a:0%;--b:100%">
+            <output class="slider__out" data-slider-out>Mo – So</output>
+            <div class="slider__track">
+              <input type="range" name="dayFrom" min="0" max="6" step="1" value="0" aria-label="Von" data-slider-input="from">
+              <input type="range" name="dayTo" min="0" max="6" step="1" value="6" aria-label="Bis" data-slider-input="to">
+            </div>
+            <div class="slider__ticks" aria-hidden="true">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div>
+          </div>`);
+      default:
+        return '';
+    }
+  }
 
   function jobCard(job) {
     return `<a class="job" href="#/karriere/${job.id}">
@@ -610,7 +715,7 @@
     const app = state.applications[job.id];
     let action;
     if (app) {
-      action = `<div class="note note--ok">${icon('fi-rr-check-circle')}<span>Du hast dich am ${new Date(app.at).toLocaleDateString('de-DE')} beworben${app.area ? ` (${esc(app.area)} Instructor)` : ''}. Wir melden uns über Discord bei <b>${esc(app.discord)}</b>.</span></div>
+      action = `<div class="note note--ok">${icon('fi-rr-check-circle')}<span>Du hast dich am ${new Date(app.at).toLocaleDateString('de-DE')} beworben${app.area ? ` (Bereich ${esc(app.area)})` : ''}. Wir melden uns über Discord bei <b>${esc(app.discord)}</b>.</span></div>
         <button class="btn-text" type="button" data-apply-reset="${job.id}">Bewerbung zurückziehen</button>`;
     } else if (!job.open) {
       action = `<div class="note note--bad">${icon('fi-rr-info')}<span>Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.</span></div>
@@ -620,7 +725,7 @@
     }
     const list = (items) => `<ul>${items.map((x) => `<li>${icon('fi-rr-check-circle')}<span>${esc(x)}</span></li>`).join('')}</ul>`;
     const areas = job.areas
-      ? `<section class="checks"><h3>${icon('fi-sr-check')}Bereiche</h3><div class="area-tags">${job.areas.map((a) => `<span style="--rc:${rankOf(a).color}"><i></i>${esc(a)} Instructor</span>`).join('')}</div></section>`
+      ? `<section class="checks"><h3>${icon('fi-sr-check')}Bereiche</h3><div class="area-tags">${job.areas.map((a) => `<span style="--rc:${rankOf(a).color}"><i></i>${esc(a)}</span>`).join('')}</div></section>`
       : '';
     return `<article class="cbox">
       <div class="cbox__meta">${jobStatus(job)}<span class="job__team">${icon('fi-rr-users-alt')}Team ${esc(job.team)}</span></div>
@@ -634,85 +739,69 @@
       <div class="cbox__action">${action}</div>
     </article>`;
   }
-  function quizHtml(job, area, answers = {}) {
+  function quizHtml(job, area) {
     if (job.areas && !area) {
-      return `<div class="quiz-empty">${icon('fi-rr-arrow-small-up')}<span>Wähle zuerst deinen Bereich. Danach erscheinen die passenden Fragen.</span></div>`;
+      return `<div class="quiz-empty">${icon('fi-rr-arrow-small-up')}<span>Wähle zuerst deinen Bereich. Danach erscheinen die 40 passenden Fragen.</span></div>`;
     }
     let n = 0;
     return quizGroups(job, area).map((g) => `<div class="quiz-group">
-        <h4 class="quiz-group__title"${g.color ? ` style="--rc:${g.color}"` : ''}>${g.color ? '<i></i>' : ''}${esc(g.title)}</h4>
-        ${g.items.map((q, i) => {
-          const key = `${g.key}-${i}`;
-          n += 1;
-          return `<fieldset class="q f" ${dataField(`q:${key}`)}>
-            <legend><span class="q__no">${n}</span>${esc(q.q)}</legend>
-            <div class="q__opts">${optionOrder(q).map((o) => `<label class="choice"><input type="radio" name="q:${key}" value="${o}"${answers[key] === String(o) ? ' checked' : ''}><span>${esc(q.options[o])}</span></label>`).join('')}</div>
-          </fieldset>`;
-        }).join('')}
+        <h4 class="quiz-group__title"${g.color ? ` style="--rc:${g.color}"` : ''}>${g.color ? '<i></i>' : ''}${esc(g.title)}<small>${g.items.length} Fragen</small></h4>
+        ${g.items.map((q, i) => { n += 1; return questionHtml({ ...q, key: `${g.key}-${i}` }, n); }).join('')}
       </div>`).join('');
+  }
+  // Bereiche bis zum eigenen Rang sind wählbar, die anderen sind ausgegraut mit Hinweis
+  function areasHtml(job, rank, chosen) {
+    const mine = rankIdx(rank);
+    const any = job.areas.some((a) => mine >= rankIdx(a));
+    return `<div class="areas">${job.areas.map((a) => {
+      const ok = mine >= rankIdx(a);
+      const covers = a === 'Signaller' ? 'Signaller + alle Driver-Fragen' : `${a} + Bahnbetrieb allgemein`;
+      return `<label class="area${ok ? '' : ' is-locked'}" style="--rc:${rankOf(a).color}"${ok ? '' : ` title="Du brauchst mindestens den Rang ${esc(a)}."`}>
+          ${ok ? '' : `<span class="area__lock">${icon('fi-rr-info')}Ab Rang ${esc(a)}</span>`}
+          <input type="radio" name="area" value="${esc(a)}"${ok ? '' : ' disabled'}${ok && a === chosen ? ' checked' : ''}>
+          <span class="area__body"><b>${esc(a)}</b><small>Fragen: ${esc(covers)}</small></span>
+        </label>`;
+    }).join('')}</div>
+      <span class="f__hint">${any
+        ? `Du kannst dich für jeden Bereich bis zu deinem Rang bewerben (gerade: <b>${esc(rank)}</b>).`
+        : 'Für den Supervisor brauchst du mindestens den Rang Driver.'}</span>`;
   }
   function sectorHead(i) {
     const s = SECTORS[i];
-    return `<header class="sector__head"><span class="sector__no" aria-hidden="true">${i + 1}</span><small>Sektor ${i + 1}</small><h3>${s.title}</h3></header>
+    return `<header class="sector__head"><span class="sector__no" aria-hidden="true">${i + 1}</span><small>Sektor ${i + 1}</small><h3 id="sector-${i + 1}">${s.title}</h3></header>
       <p class="sector__text">${s.text}</p>`;
   }
   function careerApply(job) {
     const rankOpts = RANKS.filter((r) => r.name !== 'Management')
       .map((r) => `<option value="${esc(r.name)}"${r.name === state.rank ? ' selected' : ''}>${esc(r.name)} · ${esc(r.label)}</option>`).join('');
     const areaPicker = job.areas ? `<fieldset class="f" ${dataField('area')}>
-        <legend class="f__label">In welchem Bereich möchtest du ausbilden?</legend>
-        <div class="areas">${job.areas.map((a, i) => {
-          const covered = job.areas.slice(0, i + 1);
-          return `<label class="area" style="--rc:${rankOf(a).color}"><input type="radio" name="area" value="${esc(a)}">
-            <span class="area__body"><b>${esc(a)} Instructor</b><small>Wissen: ${covered.length === job.areas.length ? 'alle vier Bereiche' : esc(covered.join(', '))}</small></span></label>`;
-        }).join('')}</div>
-        <span class="f__hint">Jeder Bereich baut auf den vorherigen auf: Signaller Instructor prüft auch Conductor, Platform Staff und Driver.</span>
+        <legend class="f__label">In welchem Bereich möchtest du Trainings leiten?</legend>
+        <div class="area-picker" data-areas>${areasHtml(job, state.rank, null)}</div>
       </fieldset>` : '';
     return `<div class="cbox">
         <h2>Bewerbung als <em>${esc(job.title)}</em></h2>
-        <p class="lead">Fülle die drei Sektoren aus. Das dauert etwa 5 Minuten.</p>
+        <p class="lead">60 Fragen in drei Sektoren. Plane etwa 30 Minuten ein.</p>
         <ol class="sector-steps">${SECTORS.map((s, i) => `<li><button type="button" data-sector-jump="${i + 1}"><span class="sector-steps__no">${i + 1}</span><span class="sector-steps__label">${s.title}</span></button></li>`).join('')}</ol>
       </div>
       <form class="apply" data-apply="${job.id}" novalidate>
         <section class="cbox sector" data-sector="1" aria-labelledby="sector-1">
-          ${sectorHead(0).replace('<h3>', '<h3 id="sector-1">')}
+          ${sectorHead(0)}
           <div class="f" ${dataField('roblox')}><label class="f__label" for="ap-roblox">Roblox-Benutzername</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(state.profile ? state.profile.username : D.me.username)}" placeholder="Dein Roblox-Benutzername"></div>
           <div class="f" ${dataField('discord')}><label class="f__label" for="ap-discord">Discord-Benutzername</label><input id="ap-discord" name="discord" autocomplete="off" placeholder="z. B. lokfuehrer_max"></div>
+          <div class="f" ${dataField('email')}><label class="f__label" for="ap-email">E-Mail-Adresse</label><input id="ap-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="name@beispiel.de"></div>
           <div class="f" ${dataField('since')}><label class="f__label" for="ap-since">Du spielst seit</label><div class="select"><select id="ap-since" name="since"><option value="">Bitte wählen</option>${SINCE.map((x) => `<option>${x}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
           <div class="f" ${dataField('rank')}><label class="f__label" for="ap-rank">Dein aktueller Rang</label><div class="select"><select id="ap-rank" name="rank">${rankOpts}</select>${icon('fi-rr-angle-small-down')}</div></div>
         </section>
 
         <section class="cbox sector" data-sector="2" aria-labelledby="sector-2">
-          ${sectorHead(1).replace('<h3>', '<h3 id="sector-2">')}
+          ${sectorHead(1)}
           ${areaPicker}
           <div class="quiz" data-quiz>${quizHtml(job, null)}</div>
         </section>
 
         <section class="cbox sector" data-sector="3" aria-labelledby="sector-3">
-          ${sectorHead(2).replace('<h3>', '<h3 id="sector-3">')}
-          <div class="f" ${dataField('experience')}><label class="f__label" for="ap-exp">Welche Erfahrung hast du in dieser Rolle?</label><textarea id="ap-exp" name="experience" placeholder="Beschreibe kurz deine Erfahrung"></textarea><span class="f__hint">Mindestens 30 Zeichen</span></div>
-          <div class="f" ${dataField('activity')}>
-            <label class="f__label" for="ap-act">Wie aktiv wärst du, wenn du angenommen wirst?</label>
-            <div class="slider" data-slider style="--a:0%;--b:${(5 - 1) / 9 * 100}%">
-              <output class="slider__out" for="ap-act" data-slider-out>5 von 10</output>
-              <div class="slider__track">
-                <input type="range" id="ap-act" name="activity" min="1" max="10" step="1" value="5" data-slider-input="single">
-              </div>
-              <div class="slider__ticks" aria-hidden="true">${Array.from({ length: 10 }, (_, i) => `<span>${i + 1}</span>`).join('')}</div>
-            </div>
-            <div class="scale__legend"><span>selten</span><span>sehr aktiv</span></div>
-          </div>
-          <div class="f" ${dataField('days')}>
-            <span class="f__label" id="ap-days">An welchen Tagen hast du meistens Zeit?</span>
-            <div class="slider slider--range" data-slider style="--a:0%;--b:100%" role="group" aria-labelledby="ap-days">
-              <output class="slider__out" data-slider-out>Mo – So</output>
-              <div class="slider__track">
-                <input type="range" name="dayFrom" min="0" max="6" step="1" value="0" aria-label="Von" data-slider-input="from">
-                <input type="range" name="dayTo" min="0" max="6" step="1" value="6" aria-label="Bis" data-slider-input="to">
-              </div>
-              <div class="slider__ticks" aria-hidden="true">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div>
-            </div>
-          </div>
+          ${sectorHead(2)}
+          <div class="quiz">${sector3Items(job).map((q, i) => questionHtml(q, 41 + i)).join('')}</div>
           <div class="f" ${dataField('confirm')}><label class="confirm"><input type="checkbox" name="confirm"><span>Ich habe alle Angaben ehrlich gemacht und kenne die Regeln von Train Sim Germany.</span></label></div>
           <button class="btn-line" type="submit">Bewerbung senden ${icon('fi-rr-paper-plane')}</button>
           <p class="f__note">Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.</p>
@@ -720,7 +809,7 @@
       </form>`;
   }
   function careerDone(job, app) {
-    const rows = [['Stelle', job.title], ...(app.area ? [['Bereich', `${app.area} Instructor`]] : []), ['Rang', app.rank], ['Discord', app.discord], ['Gesendet', new Date(app.at).toLocaleDateString('de-DE')]];
+    const rows = [['Stelle', job.title], ...(app.area ? [['Bereich', app.area]] : []), ['Rang', app.rank], ['Discord', app.discord], ...(app.email ? [['E-Mail', app.email]] : []), ['Fragen', `${app.count || 60} beantwortet`], ['Gesendet', new Date(app.at).toLocaleDateString('de-DE')]];
     return `<div class="cbox done">
       <span class="done__ic">${icon('fi-rr-check')}</span>
       <h2>Bewerbung <em>gesendet</em></h2>
@@ -737,7 +826,12 @@
     if (!job) el.innerHTML = careerList();
     else if (!state.jobApply) el.innerHTML = careerDetail(job);
     else if (state.applications[job.id]) el.innerHTML = careerDone(job, state.applications[job.id]);
-    else {
+    else if (!window.TSG_QUESTIONS) {
+      el.innerHTML = `<div class="cbox"><p class="lead">Die Fragen werden geladen …</p></div>`;
+      loadQuestions()
+        .then(() => { if (state.jobApply && state.jobId === job.id) renderCareer(); })
+        .catch(() => { el.innerHTML = `<div class="cbox"><p class="lead">Die Fragen konnten nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.</p></div>`; });
+    } else {
       state.quizAnswers = {};
       el.innerHTML = careerApply(job);
     }
@@ -751,16 +845,19 @@
     const errors = {};
     if (!/^[A-Za-z0-9_]{3,20}$/.test(val('roblox'))) errors.roblox = 'Bitte gib einen gültigen Roblox-Namen ein (3–20 Zeichen: Buchstaben, Zahlen, _).';
     if (!/^([a-z0-9_.]{2,32}|.{2,32}#\d{4})$/i.test(val('discord'))) errors.discord = 'Bitte gib deinen Discord-Namen ein, z. B. lokfuehrer_max.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(val('email'))) errors.email = 'Bitte gib eine gültige E-Mail-Adresse ein, z. B. name@beispiel.de.';
     if (!val('since')) errors.since = 'Bitte wähle aus, seit wann du spielst.';
-    const area = form.querySelector('input[name="area"]:checked');
-    if (job.areas) {
-      if (!area) errors.area = 'Bitte wähle einen Bereich.';
-      else if (rankIdx(val('rank')) < rankIdx(area.value)) errors.area = `Für ${area.value} Instructor brauchst du mindestens den Rang ${area.value}.`;
+    if (job.areas && !form.querySelector('input[name="area"]:checked')) {
+      errors.area = job.areas.some((a) => rankIdx(val('rank')) >= rankIdx(a)) ? 'Bitte wähle einen Bereich.' : 'Für den Supervisor brauchst du mindestens den Rang Driver.';
     }
-    $$('fieldset.q', form).forEach((q) => {
-      if (!$('input:checked', q)) errors[q.dataset.field] = 'Bitte beantworte diese Frage.';
+    $$('[data-q]', form).forEach((q) => {
+      const type = q.dataset.q;
+      const key = q.dataset.field;
+      if (type === 'single' && !$('input:checked', q)) errors[key] = 'Bitte wähle eine Antwort.';
+      else if ((type === 'multi' || type === 'pick') && !$('input:checked', q)) errors[key] = 'Bitte wähle mindestens eine Antwort.';
+      else if ((type === 'write' || type === 'short') && !$('input', q).value.trim()) errors[key] = 'Bitte gib eine Antwort ein.';
+      else if (type === 'long' && $('textarea', q).value.trim().length < +q.dataset.min) errors[key] = `Bitte schreib etwas mehr, mindestens ${q.dataset.min} Zeichen.`;
     });
-    if (val('experience').length < 30) errors.experience = 'Erzähl uns etwas mehr, mindestens 30 Zeichen.';
     if (!f.confirm.checked) errors.confirm = 'Bitte bestätige deine Angaben.';
     return errors;
   }
@@ -787,6 +884,50 @@
     if (er) er.remove();
     $$('[aria-invalid]', field).forEach((x) => { x.removeAttribute('aria-invalid'); x.removeAttribute('aria-describedby'); });
   }
+  // Sektor 2 neu zeigen; Antworten auf Fragen, die erhalten bleiben, werden übernommen
+  function showQuiz(form, job, area) {
+    const quiz = $('[data-quiz]', form);
+    $$('input, textarea', quiz).forEach((x) => {
+      if (x.type === 'radio' || x.type === 'checkbox') { if (x.checked) state.quizAnswers[`${x.name}=${x.value}`] = true; else delete state.quizAnswers[`${x.name}=${x.value}`]; }
+      else state.quizAnswers[x.name] = x.value;
+    });
+    quiz.innerHTML = quizHtml(job, area);
+    $$('input, textarea', quiz).forEach((x) => {
+      if (x.type === 'radio' || x.type === 'checkbox') x.checked = !!state.quizAnswers[`${x.name}=${x.value}`];
+      else if (x.name in state.quizAnswers) x.value = state.quizAnswers[x.name];
+    });
+    $$('[data-order]', quiz).forEach((list) => {
+      const order = list.nextElementSibling.value.split(',');
+      order.forEach((i) => list.append($(`[data-i="${i}"]`, list)));
+      orderSync(list);
+    });
+    $$('[data-slider]', quiz).forEach(updateSlider);
+  }
+  function orderSync(list) {
+    const items = $$('.order__item', list);
+    items.forEach((li, i) => { $('.order__pos', li).textContent = i + 1; });
+    list.nextElementSibling.value = items.map((li) => li.dataset.i).join(',');
+  }
+
+  // Antworten auslesen und bewerten (Auswahl, Mehrfachauswahl, Schreib- und Schiebeaufgaben)
+  function readAnswer(form, q) {
+    const name = `q:${q.key}`;
+    const picked = () => $$('input:checked', form).filter((x) => x.name === name).map((x) => +x.value);
+    if (q.type === 'single') return picked()[0] ?? null;
+    if (q.type === 'multi' || q.type === 'pick') return picked().sort((a, b) => a - b);
+    const el = form.elements.namedItem(name);
+    if (q.type === 'order') return el.value.split(',').map(Number);
+    if (q.type === 'scale') return +el.value;
+    return el.value.trim();
+  }
+  const normAnswer = (x) => String(x).toLowerCase().replace(/×/g, 'x').replace(/[\s.,;:!?„“"'()-]/g, '');
+  function isRight(q, v) {
+    if (q.type === 'single') return v === 0;
+    if (q.type === 'multi') return v.length === q.correct.length && q.correct.every((c) => v.includes(c));
+    if (q.type === 'write') return q.answers.some((a) => normAnswer(a) === normAnswer(v));
+    if (q.type === 'order') return v.every((x, i) => x === i);
+    return null; // Selbsteinschätzung und freie Texte werden nicht bewertet
+  }
   function submitApplication(form) {
     const id = form.dataset.apply;
     const errors = applyErrors(form);
@@ -800,13 +941,22 @@
       return;
     }
     const data = new FormData(form);
+    const job = D.jobs.find((x) => x.id === id);
+    const area = data.get('area');
     const answers = {};
-    for (const [k, v] of data) if (k.startsWith('q:')) answers[k.slice(2)] = +v;
-    const values = Object.values(answers);
+    let score = 0;
+    let total = 0;
+    const questions = applyQuestions(job, area);
+    questions.filter((q) => !FIXED.includes(q)).forEach((q) => {
+      const v = readAnswer(form, q);
+      answers[q.key] = v;
+      const ok = isRight(q, v);
+      if (ok !== null) { total += 1; if (ok) score += 1; }
+    });
     state.applications[id] = {
-      roblox: data.get('roblox').trim(), discord: data.get('discord').trim(),
-      since: data.get('since'), rank: data.get('rank'), area: data.get('area') || null,
-      answers, score: values.filter((v) => v === 0).length, total: values.length,
+      roblox: data.get('roblox').trim(), discord: data.get('discord').trim(), email: data.get('email').trim(),
+      since: data.get('since'), rank: data.get('rank'), area: area || null,
+      answers, score, total, count: questions.length,
       experience: data.get('experience').trim(), activity: +data.get('activity'), days: DAYS.slice(+data.get('dayFrom'), +data.get('dayTo') + 1),
       at: Date.now(),
     };
@@ -1063,18 +1213,6 @@
         <p class="sheet-note">Rote Punkte zeigen Tage mit Trainings.</p>`;
       },
     },
-    filter: {
-      title: 'Trainings filtern',
-      render: () => `<div class="opt-list">${D.trainingTypes.map((t) => {
-        const r = rankOf(t.name);
-        const on = state.typeFilter.has(t.name);
-        return `<button class="opt" type="button" role="checkbox" aria-checked="${on}" data-ttoggle="${t.name}">
-          <i class="dot" style="--rc:${r.color}"></i><span><b>${esc(t.name)}</b><small>${esc(r.label)} · ${esc(r.desc)}</small></span>
-          <span class="opt__check">${on ? icon('fi-rr-check') : ''}</span>
-        </button>`;
-      }).join('')}</div>
-      <div class="btn-stack"><button class="btn btn--soft btn--block" type="button" data-treset>Alle Trainings anzeigen</button></div>`,
-    },
     news: {
       title: 'Neuigkeit',
       render: (i) => {
@@ -1284,7 +1422,7 @@
 
     // Klicks, die überall vorkommen (Seiten und Sheets)
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-open], [data-detail], [data-bell], [data-day], [data-pick-day], [data-rank], [data-ttoggle], [data-treset], [data-fav], [data-theme-set]');
+      const el = e.target.closest('[data-open], [data-detail], [data-bell], [data-day], [data-pick-day], [data-rank], [data-fav], [data-theme-set]');
       if (!el) return;
       const ds = el.dataset;
       if (ds.open) openModal(ds.open);
@@ -1295,23 +1433,12 @@
       else if (ds.rank) {
         state.rank = ds.rank;
         store.set('tsg-rank', ds.rank);
+        state.trainingDay = null;
         closeModal();
         renderTrainings();
         renderMe();
         const next = nextRank(ds.rank);
         toast(next ? `Rang: ${ds.rank} – als Nächstes ${next.name}` : `Rang: ${ds.rank}`);
-      } else if (ds.ttoggle) {
-        if (state.typeFilter.has(ds.ttoggle)) state.typeFilter.delete(ds.ttoggle); else state.typeFilter.add(ds.ttoggle);
-        store.set('tsg-tfilter', Array.from(state.typeFilter));
-        state.trainingDay = null;
-        renderTrainings();
-        refreshModal();
-      } else if ('treset' in ds) {
-        state.typeFilter.clear();
-        store.set('tsg-tfilter', []);
-        state.trainingDay = null;
-        closeModal();
-        renderTrainings();
       } else if (ds.themeSet) setTheme(ds.themeSet);
       else if (ds.fav) {
         const name = ds.fav;
@@ -1381,20 +1508,67 @@
       if (form) {
         const field = target.closest('.f.has-error');
         if (field) clearFieldError(field);
-        // Der Rang entscheidet mit, ob der gewählte Bereich passt
-        const area = target.name === 'rank' && $('[data-field="area"].has-error', form);
-        if (area) clearFieldError(area);
         updateSectors(form);
       }
     });
-    // Bereich gewechselt: passende Fragen zeigen, bisherige Antworten behalten
     document.addEventListener('change', (e) => {
-      if (!e.target.matches('form[data-apply] input[name="area"]')) return;
-      const form = e.target.form;
-      $$('[data-quiz] input:checked', form).forEach((x) => { state.quizAnswers[x.name.slice(2)] = x.value; });
-      $('[data-quiz]', form).innerHTML = quizHtml(D.jobs.find((x) => x.id === form.dataset.apply), e.target.value, state.quizAnswers);
-      updateSectors(form);
+      const form = e.target.closest('form[data-apply]');
+      if (!form) return;
+      const job = D.jobs.find((x) => x.id === form.dataset.apply);
+      // Rang geändert: wählbare Bereiche neu anzeigen (alles bis zum eigenen Rang)
+      if (e.target.name === 'rank' && job.areas) {
+        const box = $('[data-areas]', form);
+        const chosen = $('input[name="area"]:checked', box);
+        box.innerHTML = areasHtml(job, e.target.value, chosen && chosen.value);
+        if (chosen && !$('input[name="area"]:checked', box)) showQuiz(form, job, null);
+        const field = $('[data-field="area"].has-error', form);
+        if (field) clearFieldError(field);
+        updateSectors(form);
+      }
+      // Bereich gewechselt: passende Fragen zeigen, bisherige Antworten behalten
+      if (e.target.name === 'area') {
+        showQuiz(form, job, e.target.value);
+        updateSectors(form);
+      }
     });
+
+    // Schiebeaufgaben: Einträge mit den Pfeilen oder per Ziehen (Maus, Finger am Griff) umsortieren
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('.order [data-move]');
+      if (!btn) return;
+      const item = btn.closest('.order__item');
+      const sib = +btn.dataset.move < 0 ? item.previousElementSibling : item.nextElementSibling;
+      if (!sib) return;
+      if (+btn.dataset.move < 0) sib.before(item); else sib.after(item);
+      orderSync(item.parentElement);
+      btn.focus();
+    });
+    let drag = null;
+    document.addEventListener('pointerdown', (e) => {
+      const item = e.target.closest('.order__item');
+      if (!item || e.target.closest('button') || (e.pointerType !== 'mouse' && !e.target.closest('.order__grip'))) return;
+      e.preventDefault();
+      drag = { item, list: item.parentElement, id: e.pointerId };
+      item.classList.add('is-dragging');
+      item.setPointerCapture(e.pointerId);
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const { item } = drag;
+      const prev = item.previousElementSibling;
+      const next = item.nextElementSibling;
+      const mid = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2; };
+      if (prev && e.clientY < mid(prev)) prev.before(item);
+      else if (next && e.clientY > mid(next)) next.after(item);
+    });
+    const dragEnd = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag.item.classList.remove('is-dragging');
+      orderSync(drag.list);
+      drag = null;
+    };
+    document.addEventListener('pointerup', dragEnd);
+    document.addEventListener('pointercancel', dragEnd);
     document.addEventListener('submit', (e) => {
       const connect = e.target.closest('form[data-connect]');
       if (connect) { e.preventDefault(); connectRoblox(connect); return; }

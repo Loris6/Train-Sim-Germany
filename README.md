@@ -11,9 +11,9 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 | **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, nächstes Training, Strecken mit Nummer (R001, R002, …), Kennzahlen, Karriere, News |
 | **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community) und Detailansicht |
-| **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit drei Sektoren: 1. Über dich (Roblox, Discord, Spielzeit, Rang), 2. Grundwissen (Fragen zum Bereich; bei Instructor wählbar: Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (Aktivität und freie Tage per Schieberegler) |
+| **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit 60 Fragen in drei Sektoren: 1. Über dich (Roblox, Discord, E-Mail, Spielzeit, Rang), 2. Grundwissen (40 Fragen; beim Supervisor im gewählten Bereich Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (20 Fragen, u. a. Aktivität und freie Tage per Schieberegler) |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, meistbefahrene Strecken (mit Streckennummer) |
-| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings), Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. |
+| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings). Angezeigt werden nur die Trainings für den nächsten Rang – ein Conductor sieht also nur Signaller-Trainings; Supervisor und Management sehen alle. Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. |
 | **Einstellungen** | Darstellung: Hell, Dunkel oder Mit Gerät synchronisieren (folgt automatisch der Einstellung von Handy oder PC), Roblox-Konto, App installieren |
 
 ## Design
@@ -21,7 +21,7 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 - Schrift: **Rubik**, lokal eingebunden (`assets/fonts`, SIL Open Font License)
 - Icons: **[UIcons von Flaticon](https://www.flaticon.com/uicons)** (Regular Rounded, Solid Rounded, Brands). Eingebunden sind nur die genutzten Icons (ca. 5 KB). Die Flaticon-Lizenz verlangt eine Namensnennung, sie steht in der Fußzeile.
 - Aufbau nach dem [DB UX Design System](https://github.com/db-ux-design-system/core-web) (Generation 3, Apache-2.0): weiße Kopfzeile, große Überschriften, Buttons mit 40 px Höhe (Rot für die Hauptaktion, sonst grau oder mit Rand), graue Eingabefelder, Karten mit 1 px Rand, blauer Fokusrahmen. Abstände und Schatten sind die Werte aus dem DB UX Design System, die Ecken sind etwas runder (Buttons und Felder 8 px, Karten 12 px). DB-Logo und DB-Schriften werden nicht verwendet.
-- Aktive Elemente (Tabs, Menü, Leiste unten) sind grau eingerahmt mit Hintergrund, Tage mit Trainings haben einen roten Punkt – keine Unterstriche
+- Aktive Elemente (Tabs, Menü) sind grau eingerahmt mit Hintergrund, in der Leiste unten ist das aktive Icon rot mit rotem Punkt darunter, Tage mit Trainings haben einen roten Punkt – keine Unterstriche
 - Farben: DB-Rot `#EC0016` und die Cool-Gray-Töne der DB, Gleisnummern im DB-Blau wie an den Bahnhofsschildern
 - Uhr mit deutscher Zeit (MEZ/MESZ) im Menü
 - Kein elastisches Nachfedern beim Scrollen (auf allen Seiten abgeschaltet)
@@ -52,7 +52,7 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 
 - Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten inkl. Einstellungen direkt unter Statistiken, Spielen/Gruppe/Discord, Uhr, App installieren).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
-- Unten schwebt eine komplett runde Leiste mit gleichem Abstand links, rechts und unten: Start, News, Trainings und das Profilbild. Das Profil unten ist dasselbe wie oben.
+- Unten schwebt eine dunkle, runde Leiste nur mit Icons (Start, News, Trainings). Rechts geht sie in einen größeren Kreis mit dem Profilbild über (Ring in der Rangfarbe). Im Dunkelmodus ist die Leiste etwas heller, damit sie sich vom Hintergrund abhebt. Abstand links, rechts und unten ist gleich. Das Profil unten ist dasselbe wie oben.
 - **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
 
 ## Inhalte anpassen
@@ -73,11 +73,31 @@ Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Server, Trainin
 
 **Züge:** `fleet` enthält die Züge für „Meine Statistik“, getrennt nach Fernverkehr (`fern`), Regio (`regio`) und S-Bahn (`sbahn`).
 
-**Fragen im Bewerbungsformular:** Jede Stelle hat unter `quiz` eigene Fragen. Für Instructor kommen die Fragen aus `knowledge`: abgefragt wird der gewählte Bereich und alle Bereiche darunter (Signaller Instructor also auch Conductor, Platform Staff und Driver). Bei jeder Frage ist die erste Antwort die richtige, die App mischt die Reihenfolge.
+**Fragen im Bewerbungsformular:** Alle Fragen stehen in **`assets/js/questions.js`** (wird erst beim Öffnen einer Bewerbung geladen). Jede Bewerbung hat genau 60 Fragen, die Grunddaten (Roblox, Discord, E-Mail, Spielzeit, Rang) zählen nicht mit:
 
-**Bewerbungen:** Das Formular prüft die Eingaben, speichert Bewerbungen aber nur im Browser (Demo). Für echte Bewerbungen braucht es einen Server, der sie z. B. an einen Discord-Kanal weiterleitet. Eine Discord-Webhook-URL sollte nicht direkt in die Seite eingetragen werden, weil sie sonst öffentlich ist.
+| Stelle | Sektor 2 – Grundwissen (40) | Sektor 3 – Erfahrung & Zeit (20) |
+|---|---|---|
+| Supervisor, Bereich Driver / Platform Staff / Conductor | 20 Fragen des Bereichs (`areas`) + 20 „Bahnbetrieb allgemein“ (`basics`) | 3 feste Fragen + 17 `supervisor` |
+| Supervisor, Bereich Signaller | 20 Signaller-Fragen + **alle 20 Driver-Fragen** (der Signaller stellt die Signale, die für den Driver gelten) | 3 feste Fragen + 17 `supervisor` |
+| Game Developer, Map Builder, Moderator, Social Media | 40 Fachfragen (`jobs`) | 3 feste Fragen + 7 `common` + 10 `extra` |
 
-**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher → Instructor). Supervisor ist ein Teamrang ohne eigenes Training. Jeder Rang hat ein Kürzel (`prefix`, z. B. UD, D, PS, CD, SG, SV) und die Zahl der Spieler (`members`), die auf der Startseite bei den Rollen steht. Die Trainingsseite zeigt immer das Training für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
+Die drei festen Fragen sind Erfahrung (Text), Aktivität (Schieberegler 1–10) und freie Tage (Schieberegler Mo–So). Beim Supervisor (übernimmt die Aufgaben des früheren Instructors) sind nur Bereiche bis zum eigenen Rang wählbar, die anderen sind ausgegraut mit Hinweis oben links.
+
+Fragetypen (`type`):
+
+| Typ | Darstellung | Bewertung |
+|---|---|---|
+| `single` | Auswahl, eine Antwort | erste Option ist richtig, die App mischt |
+| `multi` | Mehrfachauswahl, eine oder mehrere richtig | `correct` = Liste der richtigen Optionen |
+| `write` | Schreibaufgabe, normales Eingabefeld (z. B. „Hp 0“) | `answers` = erlaubte Schreibweisen, Groß/Klein und Leerzeichen egal |
+| `order` | Schiebeaufgabe: Einträge ziehen oder mit Pfeilen sortieren | `items` in richtiger Reihenfolge, die App mischt |
+| `scale` | Schieberegler zur Selbsteinschätzung | nicht bewertet |
+| `long`, `short` | Freitext (mehrzeilig / einzeilig) | nicht bewertet, `long` mit Mindestlänge |
+| `pick` | Mehrfachauswahl ohne richtige Lösung | nicht bewertet |
+
+**Bewerbungen:** Das Formular prüft die Eingaben und berechnet, wie viele bewertete Fragen richtig sind (`score` / `total`). Es speichert Bewerbungen aber nur im Browser (Demo). Für echte Bewerbungen braucht es einen Server, der sie z. B. an einen Discord-Kanal weiterleitet. Eine Discord-Webhook-URL sollte nicht direkt in die Seite eingetragen werden, weil sie sonst öffentlich ist.
+
+**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher). Supervisor ist ein Teamrang ohne eigenes Training (Bewerbung über die Karriere) und leitet die Trainings; den Instructor gibt es nicht mehr. Jeder Rang hat ein Kürzel (`prefix`, z. B. UD, D, PS, CD, SG, SV) und die Zahl der Spieler (`members`), die auf der Startseite bei den Rollen steht. Die Trainingsseite zeigt nur die Trainings für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
 ## Icons hinzufügen
 
@@ -110,7 +130,8 @@ manifest.webmanifest  App-Beschreibung (Name, Icons, Schnellzugriffe)
 sw.js                 Service Worker für den Offline-Modus
 assets/css/style.css  Design-System und Layouts
 assets/js/data.js     Inhalte & Beispieldaten
-assets/js/app.js      Routing, Trainings, Diagramme, Filter, Profil, Einstellungen
+assets/js/questions.js Fragen für die Bewerbungen (je Bewerbung 60)
+assets/js/app.js      Routing, Trainings, Diagramme, Bewerbungen, Profil, Einstellungen
 assets/css/uicons.css Flaticon UIcons (erzeugt)
 assets/img/           Logo bzw. App-Icon und Illustrationen (SVG)
 assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PNG)

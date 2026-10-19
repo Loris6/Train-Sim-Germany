@@ -120,7 +120,7 @@
                 <img class="promo-card__img" src="assets/img/role-dispatcher.svg" alt="" loading="lazy">
                 <div class="promo-card__body">
                   <h3>Werde Teil unseres Teams</h3>
-                  <p><span data-open-jobs>4</span> offene Stellen – vom Game Developer bis zum Instructor.</p>
+                  <p><span data-open-jobs>4</span> offene Stellen – vom Game Developer bis zum Supervisor.</p>
                 </div>
                 <span class="btn btn--primary promo-card__btn">Jobs ansehen</span>
               </a>
@@ -157,7 +157,6 @@
               <i class="fi fi-rr-calendar ic" aria-hidden="true"></i>
               <span data-date-field>Trainingsdatum wählen</span>
             </button>
-            <button class="field__icon" type="button" data-open="filter" aria-label="Trainings filtern"><i class="fi fi-rr-settings-sliders ic" aria-hidden="true"></i><span class="field__badge" data-filter-badge hidden></span></button>
           </div>
         </div>
       </div>
@@ -176,7 +175,7 @@
               <div class="rail rail--xs" data-day-trainings></div>
 
               <div class="sec-head sec-head--tight">
-                <h2>Alle kommenden Trainings</h2>
+                <h2 data-all-title>Alle kommenden Trainings</h2>
                 <button class="link-more" type="button" data-all-toggle>Alle anzeigen</button>
               </div>
               <ul class="tlist" data-all-trainings></ul>
@@ -430,10 +429,12 @@
 
   <!-- Tab-Leiste (Handy & Tablet) -->
   <nav class="tabbar" aria-label="App-Navigation">
-    <a href="#/" data-nav="home"><i class="fi fi-rr-home ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-home ic tab-on" aria-hidden="true"></i><span>Start</span></a>
-    <a href="#/news" data-nav="news"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i><span>News</span></a>
-    <a href="#/trainings" data-nav="trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i><span>Trainings</span></a>
-    <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="avatar-ring" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
+    <div class="tabbar__pill">
+      <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-house-blank ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-house-blank ic tab-on" aria-hidden="true"></i></a>
+      <a href="#/news" data-nav="news" aria-label="News"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i></a>
+      <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i></a>
+    </div>
+    <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="tabbar__avatar" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
   </nav>
 
   <!-- Menü (schiebt sich von links herein) -->

@@ -53,9 +53,8 @@ window.TSG = {
     { name: 'Platform Staff', prefix: 'PS', label: 'Bahnsteigpersonal', desc: 'Bahnsteig sichern, Abfahrtsauftrag geben', color: '#00A099', members: 3120 },
     { name: 'Conductor', prefix: 'CD', label: 'Zugbegleiter', desc: 'Türen, Abfahrt und Fahrgäste', color: '#408335', members: 4380 },
     { name: 'Signaller', prefix: 'SG', label: 'Fahrdienstleiter', desc: 'Stellwerke bedienen, Fahrstraßen stellen', color: '#0C3992', members: 1890 },
-    { name: 'Supervisor', prefix: 'SV', label: 'Aufsicht', desc: 'Betrieb auf den Servern überwachen', color: '#0087B9', members: 140, staff: true },
+    { name: 'Supervisor', prefix: 'SV', label: 'Aufsicht & Ausbildung', desc: 'Trainings leiten, Betrieb überwachen', color: '#0087B9', members: 235, staff: true },
     { name: 'Dispatcher', prefix: 'DS', label: 'Disponent', desc: 'Netz und Fahrplan steuern', color: '#814997', members: 610 },
-    { name: 'Instructor', prefix: 'IN', label: 'Ausbilder', desc: 'Trainings selbst leiten', color: '#F39200', members: 95 },
     { name: 'Management', prefix: 'MG', label: 'Leitung', desc: 'Leitung von Train Sim Germany', color: '#3C414B', members: 12 },
   ],
 
@@ -87,7 +86,6 @@ window.TSG = {
     { day: 3, time: '17:00', dur: 60, type: 'Driver', title: 'ICE auf der Schnellfahrstrecke', host: 'ICEspeed2009', server: 'Westnetz #2', slots: 10, taken: 4 },
     { day: 3, time: '20:00', dur: 60, type: 'Signaller', title: 'Stellwerk Berlin Ostkreuz', host: 'Stellwerk_Tim', server: 'Signaller-Training', slots: 8, taken: 5 },
     { day: 4, time: '17:30', dur: 45, type: 'Platform Staff', title: 'Großbahnhof Köln Hbf', host: 'BahnFan_Lea', server: 'Westnetz #1', slots: 12, taken: 3 },
-    { day: 4, time: '19:30', dur: 90, type: 'Instructor', title: 'Ausbilder-Workshop', host: 'Lokfuehrer_Max', server: 'Signaller-Training', slots: 5, taken: 1 },
     { day: 5, time: '16:00', dur: 45, type: 'Conductor', title: 'Service im Fernverkehr', host: 'S_Bahn_Sven', server: 'Nordnetz #1', slots: 15, taken: 11 },
     { day: 5, time: '20:00', dur: 60, type: 'Dispatcher', title: 'Leitstelle Nordnetz', host: 'Taktfahrplan', server: 'Nordnetz #1', slots: 6, taken: 4 },
     { day: 6, time: '18:00', dur: 60, type: 'Driver', title: 'S-Bahn Hamburg im Takt', host: 'Paula_Pendolino', server: 'Nordnetz #2', slots: 12, taken: 7 },
@@ -100,7 +98,6 @@ window.TSG = {
     { name: 'Conductor', img: 'role-conductor.svg', text: 'Türen, Abfahrtsauftrag und Ansagen: Du sorgst für eine pünktliche Abfahrt.' },
     { name: 'Signaller', img: 'training.svg', text: 'Fahrstraßen stellen und Züge sicher durchs Stellwerk leiten.' },
     { name: 'Dispatcher', img: 'role-dispatcher.svg', text: 'Das ganze Netz im Blick: Fahrplan, Störungen und Umleitungen steuern.' },
-    { name: 'Instructor', img: 'role-instructor.svg', text: 'Lerne, wie du selbst Trainings leitest und neue Spieler ausbildest.' },
   ],
 
   // Startseite: Rollen-Karten. {rank} = Rangname in seiner Farbe, {group} = Link zur Roblox-Gruppe
@@ -150,96 +147,34 @@ window.TSG = {
       text: 'Entwickle neue Strecken, Züge und Spielfunktionen für Train Sim Germany. Erfahrung mit Lua und Roblox Studio ist Voraussetzung.',
       tasks: ['Neue Spielfunktionen in Lua programmieren', 'Fehler finden und beheben', 'Mit Buildern und Testern zusammenarbeiten'],
       needs: ['Sicherer Umgang mit Lua und Roblox Studio', 'Mindestens 5 Stunden pro Woche Zeit', 'Discord-Account und Teamgeist'],
-      quiz: [
-        { q: 'In welcher Sprache werden Roblox-Spiele programmiert?', options: ['Luau (Lua)', 'Python', 'C#'] },
-        { q: 'Wo muss Code laufen, der Ränge oder Belohnungen vergibt?', options: ['Auf dem Server (Script)', 'Auf dem Client (LocalScript)', 'Das ist egal'] },
-        { q: 'Womit tauschen Client und Server Daten aus?', options: ['RemoteEvents und RemoteFunctions', 'Nur über ModuleScripts', 'Gar nicht, das geht automatisch'] },
-      ],
     },
     {
       id: 'map-builder', title: 'Map Builder', open: true, team: 'Entwicklung',
       text: 'Baue Bahnhöfe, Brücken und Landschaften nach echten Vorbildern – von der Nordsee bis in die Alpen.',
       tasks: ['Bahnhöfe und Strecken nach Vorbild bauen', 'Modelle für gute Leistung auf Handys optimieren', 'Feedback aus der Community umsetzen'],
       needs: ['Erfahrung mit Roblox Studio (Bauen, Terrain)', 'Auge für Details', 'Mindestens 4 Stunden pro Woche Zeit'],
-      quiz: [
-        { q: 'Was hilft am meisten, damit eine Map auf Handys flüssig läuft?', options: ['Wenige Teile und optimierte Meshes', 'Möglichst viele Details', 'Viele Lichtquellen'] },
-        { q: 'Wie hoch sind Bahnsteige in Deutschland meistens?', options: ['55 oder 76 cm', 'Etwa 2 Meter', 'Etwa 10 cm'] },
-        { q: 'Womit baust du Landschaften wie Hügel und Flüsse?', options: ['Mit dem Terrain-Editor', 'Mit dem Script-Editor', 'Mit dem Output-Fenster'] },
-      ],
     },
     {
       id: 'moderator', title: 'Moderator', open: false, team: 'Community',
       text: 'Sorge für eine freundliche Community, setze die Regeln durch und hilf Spielern im Spiel und auf Discord.',
       tasks: ['Regeln im Spiel und auf Discord durchsetzen', 'Spielern bei Fragen helfen', 'Meldungen bearbeiten und dokumentieren'],
       needs: ['Mindestens Rang Conductor', 'Ruhig und fair auch in hitzigen Situationen', 'Mindestens 14 Jahre alt'],
-      quiz: [
-        { q: 'Ein Spieler beleidigt andere im Chat. Was tust du?', options: ['Verwarnen und bei Wiederholung nach den Regeln bestrafen', 'Zurück beleidigen', 'Ignorieren'] },
-        { q: 'Wo hältst du eine Strafe fest?', options: ['Im Mod-Log auf Discord', 'Gar nicht', 'Im öffentlichen Chat'] },
-        { q: 'Ein Freund von dir bricht die Regeln. Was tust du?', options: ['Ihn wie alle anderen behandeln', 'Ein Auge zudrücken', 'Einen anderen Spieler bestrafen'] },
-      ],
     },
     {
-      id: 'supervisor', title: 'Supervisor', open: true, team: 'Betrieb',
-      text: 'Behalte den Betrieb auf den Servern im Blick, leite neue Mitarbeiter an und sorge dafür, dass alles nach Fahrplan läuft.',
-      tasks: ['Server-Betrieb und Stellwerke überwachen', 'Neue Crew-Mitglieder einarbeiten', 'Bei Störungen schnell reagieren'],
-      needs: ['Mindestens Rang Signaller', 'Erfahrung als Lokführer und im Stellwerk', 'Zuverlässig und gut organisiert'],
-      quiz: [
-        { q: 'Auf einem Server stauen sich die Züge. Was tust du zuerst?', options: ['Mit dem Signaller die Ursache klären und die Züge neu ordnen', 'Den Server neu starten', 'Abwarten, das löst sich von selbst'] },
-        { q: 'Ein neues Crew-Mitglied macht Fehler. Wie reagierst du?', options: ['Ruhig erklären und zeigen, wie es richtig geht', 'Sofort herabstufen', 'Ignorieren'] },
-        { q: 'Ein Spieler überfährt immer wieder rote Signale. Was tust du?', options: ['Ansprechen, verwarnen und bei Wiederholung melden', 'Nichts, ist ja nur ein Spiel', 'Ihn sofort dauerhaft sperren'] },
-      ],
-    },
-    {
-      id: 'instructor', title: 'Instructor', open: true, team: 'Ausbildung',
-      text: 'Bring neuen Spielern den Bahnbetrieb bei. Als Instructor leitest du die Trainings in deinem Bereich: Driver, Platform Staff, Conductor oder Signaller.',
-      tasks: ['Trainings in deinem Bereich planen und leiten', 'Prüfungen abnehmen und Ränge vergeben', 'Trainingsunterlagen verbessern'],
-      needs: ['Mindestens den Rang deines Bereichs (z. B. Signaller für Signaller Instructor)', 'Geduld und klare Erklärungen', 'Mindestens 2 Trainings pro Woche'],
-      // Bereiche in Reihenfolge des Ausbildungswegs. Abgefragt wird das Wissen
-      // des gewählten Bereichs und aller Bereiche darunter (siehe knowledge).
+      id: 'supervisor', title: 'Supervisor', open: true, team: 'Betrieb & Ausbildung',
+      text: 'Als Supervisor leitest du die Trainings in deinem Bereich – Driver, Platform Staff, Conductor oder Signaller – und behältst den Betrieb auf den Servern im Blick.',
+      tasks: ['Trainings in deinem Bereich planen und leiten', 'Prüfungen abnehmen und Ränge vergeben', 'Server-Betrieb und Stellwerke überwachen', 'Bei Störungen schnell reagieren'],
+      needs: ['Mindestens den Rang deines Bereichs (z. B. Signaller für den Bereich Signaller)', 'Geduld und klare Erklärungen', 'Mindestens 2 Trainings pro Woche'],
+      // Bereiche in Reihenfolge des Ausbildungswegs. Wählbar ist jeder Bereich bis zum eigenen Rang.
       areas: ['Driver', 'Platform Staff', 'Conductor', 'Signaller'],
-      quiz: [
-        { q: 'Ein Teilnehmer versteht eine Aufgabe nicht. Was tust du?', options: ['Ruhig noch einmal anders erklären und vormachen', 'Ihn aus dem Training nehmen', 'Einfach weitermachen'] },
-        { q: 'Wann bekommt ein Teilnehmer den neuen Rang?', options: ['Wenn er Theorie und Praxis bestanden hat', 'Wenn er freundlich danach fragt', 'Nach 10 Minuten Training'] },
-        { q: 'Ein Teilnehmer stört immer wieder das Training. Was tust du?', options: ['Verwarnen und bei Wiederholung aus dem Training nehmen', 'Mitmachen, damit es lustig bleibt', 'Das Training für alle beenden'] },
-      ],
     },
     {
       id: 'social-media', title: 'Social Media', open: false, team: 'Community',
       text: 'Zeig Train Sim Germany auf TikTok, YouTube und Discord – mit Clips, Screenshots und Ankündigungen.',
       tasks: ['Clips und Screenshots aus dem Spiel erstellen', 'Updates und Events ankündigen', 'Kommentare und Fragen beantworten'],
       needs: ['Erfahrung mit Videoschnitt', 'Kreative Ideen', 'Mindestens 3 Stunden pro Woche Zeit'],
-      quiz: [
-        { q: 'Was gehört in eine gute Update-Ankündigung?', options: ['Was neu ist, ab wann es gilt und ein Bild oder Clip', 'Nur ein Emoji', 'Möglichst viel Text ohne Bild'] },
-        { q: 'Welches Format passt am besten zu TikTok?', options: ['Hochformat 9:16', 'Querformat 4:3', 'Quadratisch ohne Ton'] },
-        { q: 'Jemand schreibt einen gemeinen Kommentar. Was tust du?', options: ['Sachlich bleiben oder ihn melden', 'Genauso gemein antworten', 'Den Kanal löschen'] },
-      ],
     },
   ],
-
-  // Grundwissen je Bereich für Instructor-Bewerbungen (Sektor 2).
-  // Die erste Antwort ist jeweils richtig, die App mischt die Reihenfolge.
-  knowledge: {
-    Driver: [
-      { q: 'Ein Hauptsignal zeigt Halt (Hp 0). Was tust du?', options: ['Vor dem Signal anhalten und warten', 'Langsam weiterfahren', 'Hupen und weiterfahren'] },
-      { q: 'Was kündigt dir ein Vorsignal an?', options: ['Den Begriff des nächsten Hauptsignals', 'Die Höchstgeschwindigkeit der Strecke', 'Den Namen des nächsten Bahnhofs'] },
-      { q: 'Wann darfst du am Bahnsteig abfahren?', options: ['Wenn der Abfahrtsauftrag gegeben wurde und das Signal Fahrt zeigt', 'Sobald die Türen geschlossen sind', 'Zur Fahrplanzeit, egal was passiert'] },
-    ],
-    'Platform Staff': [
-      { q: 'Wann gibst du den Abfahrtsauftrag?', options: ['Wenn alle Türen zu sind und das Ausfahrsignal Fahrt zeigt', 'Sobald der Zug hält', 'Wenn der Lokführer hupt'] },
-      { q: 'Ein Fahrgast steht bei Einfahrt zwischen weißer Linie und Bahnsteigkante. Was tust du?', options: ['Ihn auffordern, hinter die Linie zurückzutreten', 'Nichts unternehmen', 'Den Zug durchfahren lassen'] },
-      { q: 'Womit zeigst du dem Lokführer an, dass er abfahren darf?', options: ['Mit der Kelle (Signal Zp 9)', 'Mit einem Daumen nach oben', 'Über den Chat'] },
-    ],
-    Conductor: [
-      { q: 'Was ist kurz vor der Abfahrt deine Aufgabe?', options: ['Türen schließen und prüfen, dass niemand eingeklemmt ist', 'Fahrkarten verkaufen', 'Den Zug fahren'] },
-      { q: 'Ein Fahrgast hat keine Fahrkarte. Wie reagierst du?', options: ['Freundlich bleiben und nach den Regeln eine Fahrkarte verkaufen', 'Ihn sofort aus dem Zug werfen', 'Ignorieren'] },
-      { q: 'Wann sagst du den nächsten Halt an?', options: ['Rechtzeitig vor der Ankunft', 'Erst nach der Abfahrt dort', 'Gar nicht'] },
-    ],
-    Signaller: [
-      { q: 'Was muss passen, bevor du ein Signal auf Fahrt stellst?', options: ['Die Fahrstraße ist eingestellt und frei', 'Der Zug ist schon losgefahren', 'Der Lokführer hat im Chat gefragt'] },
-      { q: 'Zwei Züge sollen auf dasselbe Gleis. Was tust du?', options: ['Einen Zug am Signal warten lassen, bis das Gleis frei ist', 'Beide gleichzeitig einfahren lassen', 'Das Stellwerk verlassen'] },
-      { q: 'Ein Zug steht vor einem gestörten Signal. Was tust du?', options: ['Ihn mit Ersatzsignal (Zs 1) vorbeilassen, wenn der Weg frei ist', 'Warten, bis das Signal von allein wieder geht', 'Dem Lokführer sagen, er soll einfach durchfahren'] },
-    ],
-  },
 
   trainShare: [
     { label: 'ICE', value: 34 },
