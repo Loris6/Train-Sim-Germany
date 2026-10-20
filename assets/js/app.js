@@ -173,8 +173,10 @@
     jobApply: false,
     quizAnswers: {},
     applications: store.get('tsg-applications', {}),
-    // Mit Roblox verbundenes Profil: { userId, username, displayName, avatar }
+    // Mit Roblox verbundenes Profil: { userId, username, displayName, avatar, oauth }
     profile: store.get('tsg-profile', null),
+    // Rang kommt aus der Roblox-Gruppe (über das Backend)
+    rankFromGroup: false,
   };
 
   // ---------- Kennzahlen ----------
@@ -1326,7 +1328,7 @@
       <form class="apply" data-apply="${job.id}" novalidate>
         <section class="cbox sector" data-sector="1" aria-labelledby="sector-1">
           ${sectorHead(0)}
-          <div class="f" ${dataField('roblox')}><label class="f__label" for="ap-roblox">${t('Roblox-Benutzername')}</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(state.profile ? state.profile.username : D.me.username)}" placeholder="${esc(t('Dein Roblox-Benutzername'))}"></div>
+          <div class="f" ${dataField('roblox')}><label class="f__label" for="ap-roblox">${t('Roblox-Benutzername')}</label><input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(state.profile ? state.profile.username : D.me.username)}" placeholder="${esc(t('Dein Roblox-Benutzername'))}"${state.profile && state.profile.oauth ? ' readonly' : ''}></div>
           <div class="f" ${dataField('discord')}><label class="f__label" for="ap-discord">${t('Discord-Benutzername')}</label><input id="ap-discord" name="discord" autocomplete="off" placeholder="${esc(t('z. B. lokfuehrer_max'))}"></div>
           <div class="f" ${dataField('email')}><label class="f__label" for="ap-email">${t('E-Mail-Adresse')}</label><input id="ap-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="${esc(t('name@beispiel.de'))}"></div>
           <div class="f" ${dataField('since')}><label class="f__label" for="ap-since">${t('Du spielst seit')}</label><div class="select"><select id="ap-since" name="since"><option value="">${t('Bitte wählen')}</option>${SINCE.map((x) => `<option value="${esc(x)}">${esc(t(x))}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
@@ -1344,7 +1346,7 @@
           <div class="quiz">${questionBlocks(sector3Items(job), 41)}</div>
           <div class="f" ${dataField('confirm')}><label class="confirm"><input type="checkbox" name="confirm"><span>${t('Ich habe alle Angaben ehrlich gemacht und kenne die Regeln von Train Sim Germany.')}</span></label></div>
           <button class="btn-line" type="submit">${t('Bewerbung senden')} ${icon('fi-rr-paper-plane')}</button>
-          <p class="f__note">${t('Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.')}</p>
+          <p class="f__note">${apiReady() ? t('Die Bewerbung geht mit deinem Roblox-Konto direkt an das Team.') : t('Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.')}</p>
         </section>
       </form>`;
   }
@@ -1357,7 +1359,8 @@
       <p class="lead">${t('Danke, {name}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen über Discord.', { name: esc(app.roblox) })}</p>
       <dl class="done__list">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       <a class="btn-line btn-line--outline" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Zurück zu den Jobs')}</a>
-      <button class="btn-text" type="button" data-apply-reset="${job.id}">${t('Bewerbung zurückziehen')}</button>
+      ${app.sent ? `<p class="f__note">${t('Die Bewerbung ist beim Team angekommen. Zurückziehen kannst du sie über Discord.')}</p>`
+        : `<button class="btn-text" type="button" data-apply-reset="${job.id}">${t('Bewerbung zurückziehen')}</button>`}
     </div>`;
   }
   function renderCareer() {
@@ -1508,7 +1511,17 @@
     if (q.type === 'order') return v.every((x, i) => x === i);
     return null; // Selbsteinschätzung und freie Texte werden nicht bewertet
   }
-  function submitApplication(form) {
+  // Antwort als Text für das Team (Discord), z. B. „B, D“ oder „1. Hp 0 · 2. Hp 1“
+  function answerText(q, v) {
+    if (v === null || v === undefined || v === '' || (Array.isArray(v) && !v.length)) return '–';
+    if (q.type === 'single') return q.options[v];
+    if (q.type === 'multi' || q.type === 'pick') return v.map((i) => q.options[i]).join(', ');
+    if (q.type === 'order') return v.map((i, k) => `${k + 1}. ${q.items[i]}`).join(' · ');
+    if (q.type === 'scale') return `${v} / ${q.max}`;
+    if (q.type === 'links') return v.map((l) => `${(LINK_TYPES[l.type] || {}).label || l.type || '?'}: ${l.url}`).join('\n');
+    return String(v);
+  }
+  async function submitApplication(form) {
     const id = form.dataset.apply;
     const errors = applyErrors(form);
     $$('.f.has-error', form).forEach(clearFieldError);
@@ -1520,10 +1533,17 @@
       $('input, select, textarea', field).focus({ preventScroll: true });
       return;
     }
+    // Mit Backend: nur angemeldet (das Team sieht dann dein echtes Roblox-Konto)
+    if (apiReady() && !sessionToken()) {
+      toast(t('Bitte melde dich zuerst mit Roblox an.'));
+      openModal('profile');
+      return;
+    }
     const data = new FormData(form);
     const job = D.jobs.find((x) => x.id === id);
     const area = data.get('area');
     const answers = {};
+    const report = [];
     let score = 0;
     let total = 0;
     const questions = applyQuestions(job, area);
@@ -1532,14 +1552,40 @@
       answers[q.key] = v;
       const ok = isRight(q, v);
       if (ok !== null) { total += 1; if (ok) score += 1; }
+      report.push({ q: q.q, a: answerText(q, v), ok });
     });
-    state.applications[id] = {
+    const app = {
       roblox: data.get('roblox').trim(), discord: data.get('discord').trim(), email: data.get('email').trim(),
       since: data.get('since'), rank: data.get('rank'), area: area || null,
       answers, score, total, count: questions.length,
       experience: data.get('experience').trim(), activity: +data.get('activity'), days: [0, 1, 2, 3, 4, 5, 6].slice(+data.get('dayFrom'), +data.get('dayTo') + 1).map(dayShort),
       at: Date.now(),
     };
+    if (apiReady()) {
+      const btn = $('button[type="submit"]', form);
+      const label = btn.innerHTML;
+      btn.disabled = true;
+      btn.textContent = t('Wird gesendet …');
+      try {
+        await api('/api/applications', {
+          method: 'POST',
+          body: {
+            job: id, jobTitle: job.title, area: app.area, discord: app.discord, email: app.email, since: app.since, rank: app.rank,
+            experience: app.experience, activity: app.activity, days: app.days, score, total, lang, answers: report,
+          },
+        });
+        app.sent = true;
+      } catch (e) {
+        btn.disabled = false;
+        btn.innerHTML = label;
+        toast(e.status === 429 ? t('Du hast dich gerade erst beworben. Bitte versuch es morgen noch einmal.')
+          : e.status === 401 ? t('Bitte melde dich zuerst mit Roblox an.')
+            : e.status === 503 ? t('Bewerbungen sind gerade nicht möglich. Bitte versuch es später noch einmal.')
+              : t('Die Bewerbung konnte nicht gesendet werden. Bitte versuch es noch einmal.'));
+        return;
+      }
+    }
+    state.applications[id] = app;
     store.set('tsg-applications', state.applications);
     toast(t('Bewerbung gesendet'));
     renderCareer();
@@ -1723,11 +1769,22 @@
       + row('stats', t('Zeige meine Statistik öffentlich an'), t('Andere sehen deine Fahrten, Kilometer, Pünktlichkeit und Spielzeit.'), pv.profile && pv.stats, !pv.profile,
         pv.profile ? '' : t('Geht nur, wenn dein Profil öffentlich ist.'));
   }
-  function setPrivacy(key, on) {
-    const pv = privacy();
-    pv[key] = on;
+  async function setPrivacy(key, on) {
+    const before = privacy();
+    const pv = { ...before, [key]: on };
     store.set('tsg-privacy', pv);
     renderPrivacy();
+    // Angemeldet: im Backend speichern, damit andere es sehen bzw. nicht mehr sehen
+    if (sessionToken()) {
+      try {
+        store.set('tsg-privacy', (await api('/api/me/privacy', { method: 'PUT', body: pv })).privacy);
+      } catch (e) {
+        store.set('tsg-privacy', before);
+        renderPrivacy();
+        toast(t('Das hat nicht geklappt. Bitte versuch es noch einmal.'));
+        return;
+      }
+    }
     refreshModal();
     if (key === 'profile') toast(on ? t('Dein Profil ist jetzt öffentlich') : t('Dein Profil ist jetzt privat'));
     else toast(on ? t('Deine Statistik ist jetzt öffentlich') : t('Deine Statistik sieht jetzt nur du'));
@@ -1742,7 +1799,7 @@
     const r = rankOf(state.rank);
     $('[data-settings-account]').innerHTML = `${ringHTML(p, r, 'avatar-ring--lg')}
       <div class="set-account__who"><b>${p ? esc(p.displayName || p.username) : t('Nicht verbunden')}</b><small>${p ? `@${esc(p.username)}` : t('Verbinde dein Roblox-Konto für Name und Profilbild.')}</small></div>
-      <button class="btn ${p ? 'btn--soft' : 'btn--primary'}" type="button" data-open="profile">${p ? t('Profil') : oauthReady() ? t('Anmelden') : t('Verbinden')}</button>`;
+      <button class="btn ${p ? 'btn--soft' : 'btn--primary'}" type="button" data-open="profile">${p ? t('Profil') : apiReady() ? t('Anmelden') : t('Verbinden')}</button>`;
   }
 
   // ---------- Profil (Kopfzeile, Tab-Leiste, Menü) ----------
@@ -1819,73 +1876,56 @@
     toast(offline ? t('Verbunden als {name} – Profilbild gerade nicht erreichbar', { name }) : t('Verbunden als {name}', { name: state.profile.displayName }));
   }
 
-  // ---------- Roblox-Login (OAuth 2.0 mit PKCE) ----------
-  // Einrichtung: assets/js/config.js (Client-ID eintragen). Ohne Client-ID bleibt die Demo mit dem Roblox-Namen.
-  // Ablauf: Weiterleitung zu Roblox → zurück mit ?code=… → Code gegen Token tauschen → Name und Profilbild laden.
-  // Der Token wird nicht gespeichert, nur das öffentliche Profil (Name, Anzeigename, Profilbild).
-  const OAUTH = 'https://apis.roblox.com/oauth';
-  const oauthCfg = (window.TSG_CONFIG && window.TSG_CONFIG.roblox) || {};
-  const oauthReady = () => !!String(oauthCfg.clientId || '').trim();
-  // Ohne Angabe: Adresse der Seite ohne index.html, z. B. https://name.github.io/Train-Sim-Germany/
-  const redirectUri = () => oauthCfg.redirectUri || location.origin + location.pathname.replace(/index\.html$/, '');
-  const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const randomKey = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
-  async function robloxLogin() {
-    if (!window.crypto || !crypto.subtle) { toast(t('Die Anmeldung geht nur über eine sichere Verbindung (https).')); return; }
-    const verifier = randomKey(48);
-    const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-    const login = { verifier, state: randomKey(), nonce: randomKey(), back: location.hash || '#/' };
-    try { sessionStorage.setItem('tsg-oauth', JSON.stringify(login)); } catch (e) { toast(t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.')); return; }
-    const q = new URLSearchParams({
-      client_id: String(oauthCfg.clientId).trim(), redirect_uri: redirectUri(), scope: oauthCfg.scopes || 'openid profile',
-      response_type: 'code', state: login.state, nonce: login.nonce, code_challenge: challenge, code_challenge_method: 'S256',
-    });
-    location.assign(`${OAUTH}/v1/authorize?${q}`);
+  // ---------- Backend: Roblox-Login, Privatsphäre, Bewerbungen ----------
+  // Alle Schlüssel (Roblox Client-ID/Secret, Discord-Webhook) liegen im Backend (backend/).
+  // Die App kennt nur dessen Adresse (assets/js/config.js → api). Ohne Adresse gilt die Demo.
+  const API = String((window.TSG_CONFIG && window.TSG_CONFIG.api) || '').trim().replace(/\/+$/, '');
+  const apiReady = () => !!API;
+  const sessionToken = () => store.get('tsg-session', null);
+  async function api(path, { method = 'GET', body } = {}) {
+    const headers = {};
+    const token = sessionToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const res = await fetch(API + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 && token) signedOut(t('Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.'));
+    if (!res.ok) throw Object.assign(new Error(data.error || 'api'), { status: res.status });
+    return data;
   }
-  // Rückkehr von Roblox: liefert einen Hinweis für den Toast (oder null, wenn kein Login lief)
-  async function oauthCallback() {
-    const q = new URLSearchParams(location.search);
-    if (!q.has('code') && !q.has('error')) return null;
-    let login = null;
-    try { login = JSON.parse(sessionStorage.getItem('tsg-oauth')); sessionStorage.removeItem('tsg-oauth'); } catch (e) { /* kein Speicher */ }
-    // Code und state aus der Adresse entfernen, zurück zur Seite vor der Anmeldung
-    history.replaceState(null, '', location.pathname + ((login && login.back) || '#/'));
-    if (q.has('error')) return q.get('error') === 'access_denied' ? t('Anmeldung abgebrochen') : t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
-    if (!login || q.get('state') !== login.state || !oauthReady()) return t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
-    try {
-      const body = new URLSearchParams({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: login.verifier, client_id: String(oauthCfg.clientId).trim() });
-      const post = (url) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-      let info;
-      let nonce = null;
-      if (oauthCfg.tokenProxy) {
-        // Eigener Server tauscht den Code und liefert { user, nonce } zurück (tools/oauth-worker.js)
-        const res = await post(oauthCfg.tokenProxy);
-        if (!res.ok) throw new Error('proxy');
-        ({ user: info, nonce } = await res.json());
-      } else {
-        const res = await post(`${OAUTH}/v1/token`);
-        if (!res.ok) throw new Error('token');
-        const tok = await res.json();
-        if (tok.id_token) nonce = JSON.parse(atob(tok.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).nonce || null;
-        const me = await fetch(`${OAUTH}/v1/userinfo`, { headers: { Authorization: `Bearer ${tok.access_token}` } });
-        if (!me.ok) throw new Error('userinfo');
-        info = await me.json();
-        // Den Refresh-Token braucht die Seite nicht: gleich wieder ungültig machen
-        if (tok.refresh_token) {
-          fetch(`${OAUTH}/v1/token/revoke`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: tok.refresh_token, client_id: String(oauthCfg.clientId).trim() }) }).catch(() => {});
-        }
-      }
-      if (nonce && nonce !== login.nonce) throw new Error('nonce');
-      if (!info || !info.sub) throw new Error('profile');
-      state.profile = {
-        userId: info.sub, username: info.preferred_username || info.name, displayName: info.nickname || info.name || info.preferred_username,
-        avatar: info.picture || null, oauth: true,
-      };
-      store.set('tsg-profile', state.profile);
-      return t('Angemeldet als {name}', { name: state.profile.displayName });
-    } catch (e) {
-      return t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
-    }
+  // Anmelden: weiter zum Backend, das zu Roblox weiterleitet und danach hierher zurückkommt
+  function robloxLogin() {
+    location.assign(`${API}/auth/login?return=${encodeURIComponent(location.href)}`);
+  }
+  // Rückkehr vom Backend: #login=<sitzung>&back=<seite> oder #login_error=<grund>&back=<seite>
+  function loginReturn() {
+    const h = location.hash.replace(/^#/, '');
+    if (!/^(login|login_error)=/.test(h)) return null;
+    const q = new URLSearchParams(h);
+    history.replaceState(null, '', location.pathname + location.search + (q.get('back') || '#/'));
+    if (q.get('login')) { store.set('tsg-session', q.get('login')); return 'ok'; }
+    return q.get('login_error') === 'access_denied' ? t('Anmeldung abgebrochen') : t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
+  }
+  // Profil vom Backend: Name, Profilbild, Rang aus der Roblox-Gruppe, Privatsphäre
+  function applyMe(me) {
+    state.profile = { userId: me.userId, username: me.username, displayName: me.displayName, avatar: me.avatar, oauth: true };
+    store.set('tsg-profile', state.profile);
+    if (me.privacy) store.set('tsg-privacy', me.privacy);
+    state.rankFromGroup = !!me.rank && rankIdx(me.rank) >= 0;
+    if (state.rankFromGroup) { state.rank = me.rank; store.set('tsg-rank', me.rank); }
+  }
+  async function loadMe() {
+    if (!apiReady() || !sessionToken()) return;
+    try { applyMe(await api('/api/me')); } catch (e) { /* offline: gespeichertes Profil bleibt */ }
+  }
+  function signedOut(msg) {
+    store.set('tsg-session', null);
+    if (state.profile && state.profile.oauth) { state.profile = null; store.set('tsg-profile', null); }
+    state.rankFromGroup = false;
+    renderMe();
+    if (state.page === 'einstellungen') renderSettings();
+    refreshModal();
+    if (msg) toast(msg);
   }
 
   // ---------- Auswahl-Sheets ----------
@@ -1897,7 +1937,7 @@
       render: () => {
         const p = state.profile;
         const r = rankOf(state.rank);
-        if (!p && oauthReady()) {
+        if (!p && apiReady()) {
           return `<div class="profile-box">
               ${ringHTML(null, r, 'avatar-ring--xl')}
               <h3>${t('Mit Roblox anmelden')}</h3>
@@ -1969,11 +2009,11 @@
     rank: {
       title: () => t('Dein Rang'),
       render: () => `<div class="opt-list" role="radiogroup" aria-label="${esc(t('Rang wählen'))}">${RANKS.filter((r) => r.name !== 'Management').map((r) => `
-        <button class="opt" type="button" role="radio" aria-checked="${r.name === state.rank}" data-rank="${r.name}">
+        <button class="opt" type="button" role="radio" aria-checked="${r.name === state.rank}" data-rank="${r.name}"${state.rankFromGroup ? ' disabled' : ''}>
           ${rankPill(r)}<span><b>${esc(r.name)}</b><small>${esc(t(r.label))} · ${esc(t(r.desc))}</small></span>
           ${r.name === state.rank ? icon('fi-rr-check') : ''}
         </button>`).join('')}</div>
-        <p class="sheet-note">${t('Demo: Später wird dein Rang automatisch aus der Roblox-Gruppe übernommen.')}</p>`,
+        <p class="sheet-note">${state.rankFromGroup ? t('Dein Rang kommt automatisch aus der Roblox-Gruppe.') : t('Demo: Später wird dein Rang automatisch aus der Roblox-Gruppe übernommen.')}</p>`,
     },
     date: {
       title: () => t('Trainingsdatum wählen'),
@@ -2493,13 +2533,17 @@
     document.addEventListener('click', (e) => { if (e.target.closest('[data-roblox-login]')) robloxLogin(); });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('[data-disconnect]')) return;
-      const wasOauth = state.profile && state.profile.oauth;
+      if (sessionToken()) {
+        api('/auth/logout', { method: 'POST' }).catch(() => {});
+        signedOut(t('Abgemeldet'));
+        return;
+      }
       state.profile = null;
       store.set('tsg-profile', null);
       renderMe();
       if (state.page === 'einstellungen') renderSettings();
       refreshModal();
-      toast(wasOauth ? t('Abgemeldet') : t('Verbindung zu Roblox getrennt'));
+      toast(t('Verbindung zu Roblox getrennt'));
     });
 
     // App installieren (Chrome, Edge, Android); auf dem iPhone über „Zum Home-Bildschirm“
@@ -2564,12 +2608,14 @@
   $$('[data-year]').forEach((el) => { el.textContent = berlinNow().y; });
   let loginNote = null;
   setLanguage(langSetting(), { start: true }).then(async () => {
-    loginNote = await oauthCallback();
+    loginNote = loginReturn();
+    await loadMe();
   }).then(() => {
     events();
     renderMe();
     route();
-    if (loginNote) toast(loginNote);
+    if (loginNote === 'ok' && state.profile) toast(t('Angemeldet als {name}', { name: state.profile.displayName }));
+    else if (loginNote && loginNote !== 'ok') toast(loginNote);
     tick();
     lastMinute = berlinNow().abs;
     setInterval(tick, 1000);

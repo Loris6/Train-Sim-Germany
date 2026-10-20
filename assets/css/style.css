@@ -209,6 +209,10 @@ body {
 }
 /* Kein Gummiband-Effekt beim Scrollen – auch nicht in Leisten, Menü und Dialogen */
 .rail, .day-tabs, .chips--scroll, .head-tabs, .news-list, .role-grid, .sheet-modal__panel, .drawer__panel { overscroll-behavior: none; }
+/* Kein Zoomen (Zwei Finger, Doppeltippen) – auch in Bereichen, die selbst scrollen */
+html, .rail, .day-tabs, .chips--scroll, .head-tabs, .news-list, .role-grid, .sheet-modal__panel, .drawer__panel, .dropdown__list { touch-action: pan-x pan-y; }
+/* Schieberegler: waagerecht ziehen bewegt den Regler, senkrecht scrollt die Seite */
+input[type="range"] { touch-action: pan-y; }
 img { max-width: 100%; display: block; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
@@ -1252,6 +1256,10 @@ a.promo-card:hover { box-shadow: var(--elev-md); border-color: transparent; }
 .opt small { display: block; font-size: 13px; color: var(--muted); }
 .opt .ic { margin-left: auto; font-size: 18px; color: var(--ink); }
 .opt[aria-checked="true"] { background: var(--bg-2); box-shadow: inset 0 0 0 1px var(--line); }
+.opt:disabled { cursor: default; }
+.opt:disabled:hover { background: none; }
+.opt:disabled:not([aria-checked="true"]) { opacity: .5; }
+.opt[aria-checked="true"]:disabled:hover { background: var(--bg-2); }
 .opt__check {
   width: 20px; height: 20px; flex: none; margin-left: auto; display: grid; place-items: center;
   border-radius: var(--r-xs); border: 2px solid var(--field-line); color: var(--on-strong);
@@ -1413,6 +1421,7 @@ legend.f__label { width: 100%; margin-bottom: 8px; }
 .f input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):hover, .f textarea:hover, .f select:hover { background: var(--field-hover); }
 .f textarea { height: 150px; padding: 12px; resize: vertical; line-height: 1.5; }
 .f input::placeholder, .f textarea::placeholder { color: var(--muted); font-style: italic; opacity: 1; }
+.f input[readonly] { color: var(--muted); cursor: default; }
 .f input:focus-visible, .f textarea:focus-visible, .f select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .select { position: relative; }
 .select select { appearance: none; -webkit-appearance: none; padding-right: 44px; cursor: pointer; }

@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <title>Datenschutzerklärung · Train Sim Germany</title>
   <meta name="description" content="Datenschutzerklärung von Train Sim Germany: welche Daten die Web-App verarbeitet, wofür und welche Rechte du hast.">
   <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
@@ -34,7 +34,7 @@
       <div class="container legal__wrap">
         <span class="appbar__label">Stand: <span data-legal="updated">20. Oktober 2026</span></span>
         <h1 class="appbar__value">Datenschutzerklärung</h1>
-        <p class="legal__lead">Hier steht, welche Daten Train Sim Germany verarbeitet, wofür und welche Rechte du hast. Kurz gesagt: Wir setzen keine Cookies, keine Werbung und kein Tracking ein. Die meisten Einstellungen bleiben nur auf deinem Gerät.</p>
+        <p class="legal__lead">Hier steht, welche Daten Train Sim Germany verarbeitet, wofür und welche Rechte du hast. Kurz gesagt: Wir nutzen keine Werbung und kein Tracking. Die meisten Einstellungen bleiben nur auf deinem Gerät.</p>
       </div>
     </div>
 
@@ -45,7 +45,7 @@
           <ol>
             <li><a href="#verantwortlicher">Verantwortlicher</a></li>
             <li><a href="#ueberblick">Überblick</a></li>
-            <li><a href="#hosting">Hosting und Server-Protokolle</a></li>
+            <li><a href="#hosting">Hosting, Backend und Server-Protokolle</a></li>
             <li><a href="#geraet">Speicherung auf deinem Gerät</a></li>
             <li><a href="#roblox-login">Anmeldung mit Roblox (OAuth 2.0)</a></li>
             <li><a href="#roblox-name">Verbinden über den Roblox-Namen</a></li>
@@ -73,7 +73,7 @@
           <section id="ueberblick">
             <h2>2. Überblick</h2>
             <ul>
-              <li>Die App setzt <strong>keine Cookies</strong> und nutzt <strong>keine Analyse- oder Werbedienste</strong>.</li>
+              <li>Die App nutzt <strong>keine Analyse- oder Werbedienste</strong> und <strong>keine Tracking-Cookies</strong>. Nur während der Anmeldung mit Roblox setzt unser Server für höchstens 10 Minuten ein technisch notwendiges Cookie.</li>
               <li>Einstellungen wie Darstellung, Sprache oder Rang werden <strong>nur auf deinem Gerät</strong> gespeichert.</li>
               <li>Wenn du dich mit Roblox anmeldest, erhalten wir nur dein <strong>öffentliches Roblox-Profil</strong> (Nutzer-ID, Name, Anzeigename, Profilbild) – nie dein Passwort.</li>
               <li>Dein Profil und deine Statistik sind <strong>standardmäßig privat</strong>. Öffentlich werden sie nur, wenn du das in den Einstellungen einschaltest.</li>
@@ -81,9 +81,10 @@
           </section>
 
           <section id="hosting">
-            <h2>3. Hosting und Server-Protokolle</h2>
+            <h2>3. Hosting, Backend und Server-Protokolle</h2>
             <p>Die App wird über GitHub Pages bereitgestellt (GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA). Beim Aufruf verarbeitet GitHub technisch notwendige Daten, insbesondere deine IP-Adresse, Datum und Uhrzeit des Abrufs, die aufgerufene Datei sowie Browser- und Systemangaben. Das ist nötig, um die Seite auszuliefern und vor Missbrauch zu schützen.</p>
             <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einem sicheren und funktionierenden Angebot). GitHub ist nach dem EU-US Data Privacy Framework zertifiziert. Mehr dazu in der <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">Datenschutzerklärung von GitHub</a>.</p>
+            <p>Für die Anmeldung mit Roblox, die Privatsphäre-Einstellungen und Bewerbungen nutzt die App einen eigenen Server (Backend). Er läuft bei <span data-legal="backendHost">Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA</span>. Auch dort werden beim Aufruf technisch notwendige Daten wie deine IP-Adresse verarbeitet. Auf dem Backend liegen außerdem die Schlüssel für die Anmeldung, sie gelangen nie in die App. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; Anbieter in den USA sind nach dem EU-US Data Privacy Framework zertifiziert bzw. durch Standardvertragsklauseln gebunden.</p>
             <p>Schrift und Icons sind direkt in der App enthalten. Dafür wird keine Verbindung zu Google Fonts oder anderen Schriftanbietern aufgebaut.</p>
           </section>
 
@@ -95,32 +96,33 @@
               <li>dein gewählter Rang, gemerkte Trainings und Erinnerungen</li>
               <li>deine Privatsphäre-Einstellungen (Profil und Statistik öffentlich oder privat)</li>
               <li>das verbundene Roblox-Profil (Nutzer-ID, Name, Anzeigename, Adresse des Profilbilds)</li>
-              <li>Bewerbungen, solange sie nur auf dem Gerät gespeichert werden (siehe Abschnitt 8)</li>
+              <li>nach der Anmeldung ein Sitzungsschlüssel, mit dem dich das Backend erkennt (gültig 30 Tage oder bis zum Abmelden)</li>
+              <li>Bewerbungen bzw. ihre Kurzfassung, damit du siehst, dass du dich beworben hast (siehe Abschnitt 8)</li>
             </ul>
-            <p>Während der Anmeldung mit Roblox legt die App kurz zufällige Prüfwerte im Sitzungsspeicher (Session Storage) ab. Sie werden nach der Rückkehr von Roblox sofort gelöscht.</p>
+            <p>Während der Anmeldung mit Roblox setzt das Backend ein Cookie mit zufälligen Prüfwerten (gültig 10 Minuten). Es schützt die Anmeldung vor Missbrauch und wird nach der Rückkehr von Roblox sofort gelöscht.</p>
             <p>Damit die App auch offline funktioniert, speichert ein Service Worker die Dateien der App (HTML, CSS, JavaScript, Bilder) im Browser-Cache.</p>
             <p>Diese Speicherung ist für die von dir gewünschten Funktionen unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). Du kannst alles jederzeit löschen: über „Verbindung trennen“ bzw. „Abmelden“ im Profil oder indem du die Website-Daten in deinem Browser löschst.</p>
           </section>
 
           <section id="roblox-login">
             <h2>5. Anmeldung mit Roblox (OAuth 2.0)</h2>
-            <p>Du kannst dich mit deinem Roblox-Konto anmelden. Dafür wirst du zu Roblox weitergeleitet und bestätigst dort, welche Daten die App erhalten darf. Die App fragt nur die Berechtigungen <code>openid</code> und <code>profile</code> an. Dein Passwort gibst du nur bei Roblox ein, wir sehen es nie.</p>
+            <p>Du kannst dich mit deinem Roblox-Konto anmelden. Dafür leitet dich unser Backend zu Roblox weiter, und du bestätigst dort, welche Daten die App erhalten darf. Abgefragt werden nur die Berechtigungen <code>openid</code> und <code>profile</code>. Dein Passwort gibst du nur bei Roblox ein, wir sehen es nie.</p>
             <p>Von Roblox erhalten wir:</p>
             <ul>
               <li>deine Roblox-Nutzer-ID</li>
               <li>deinen Benutzernamen und Anzeigenamen</li>
               <li>die Adresse deines Profilbilds</li>
-              <li>das Erstellungsdatum deines Kontos und die Adresse deines Roblox-Profils (diese beiden Angaben speichert die App nicht)</li>
+              <li>das Erstellungsdatum deines Kontos und die Adresse deines Roblox-Profils (diese beiden Angaben speichern wir nicht)</li>
             </ul>
-            <p>Der Zugangsschlüssel (Token) wird nur einmal genutzt, um diese Angaben abzurufen, und danach nicht gespeichert. Ein Schlüssel zum Verlängern der Anmeldung wird sofort wieder ungültig gemacht. Falls die Anmeldung über einen eigenen Token-Server läuft, verarbeitet dieser die Anmeldung nur in diesem Moment und speichert nichts.</p>
-            <p>Zweck ist, dich in der App mit deinem Roblox-Namen und Profilbild anzuzeigen und dir deine Ränge und Statistiken zuzuordnen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Nutzung der von dir gewünschten Funktion). Die Anmeldung ist freiwillig, die App funktioniert auch ohne.</p>
+            <p>Das Backend speichert zu deinem Konto: Nutzer-ID, Benutzername, Anzeigename, Adresse des Profilbilds, deine Rolle in der Roblox-Gruppe von Train Sim Germany (öffentlich bei Roblox abrufbar), deine Privatsphäre-Einstellungen und den Zeitpunkt der letzten Anmeldung. Diese Angaben werden regelmäßig bei Roblox aktualisiert. Der Zugangsschlüssel von Roblox (Token) wird nur einmal genutzt, um die Angaben abzurufen, und nicht gespeichert. Ein Schlüssel zum Verlängern der Anmeldung wird sofort wieder ungültig gemacht.</p>
+            <p>Zweck ist, dich in der App mit deinem Roblox-Namen und Profilbild anzuzeigen, deinen Rang aus der Gruppe zu übernehmen und deine Einstellungen zu speichern. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (Nutzung der von dir gewünschten Funktion). Die Anmeldung ist freiwillig, die App funktioniert auch ohne.</p>
             <p>Für die Verarbeitung bei Roblox ist die Roblox Corporation (3150 South Delaware Street, San Mateo, CA 94403, USA) verantwortlich. Details stehen in der <a href="https://www.roblox.com/info/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Roblox</a>.</p>
             <p>Dein Profilbild wird direkt von Servern der Roblox Corporation (rbxcdn.com) geladen. Dabei wird deine IP-Adresse an Roblox übertragen.</p>
           </section>
 
           <section id="roblox-name">
             <h2>6. Verbinden über den Roblox-Namen</h2>
-            <p>Solange die Anmeldung mit Roblox nicht eingerichtet ist, kannst du stattdessen deinen Roblox-Namen eingeben. Die App lädt dann dein öffentliches Profil (Nutzer-ID, Anzeigename, Profilbild). Weil Roblox solche Abfragen aus dem Browser nicht direkt erlaubt, läuft das über den Dienst roproxy.com. Dabei werden deine IP-Adresse und der eingegebene Name an roproxy.com und Roblox übertragen. Das passiert nur, wenn du auf „Verbinden“ tippst. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.</p>
+            <p>Solange die Anmeldung mit Roblox (Backend) nicht eingerichtet ist, kannst du stattdessen deinen Roblox-Namen eingeben. Die App lädt dann dein öffentliches Profil (Nutzer-ID, Anzeigename, Profilbild). Weil Roblox solche Abfragen aus dem Browser nicht direkt erlaubt, läuft das über den Dienst roproxy.com. Dabei werden deine IP-Adresse und der eingegebene Name an roproxy.com und Roblox übertragen. Das passiert nur, wenn du auf „Verbinden“ tippst. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.</p>
           </section>
 
           <section id="sichtbarkeit">
@@ -130,13 +132,14 @@
               <li><strong>Profil öffentlich:</strong> Andere Spieler sehen deinen Roblox-Namen, dein Profilbild und deinen Rang.</li>
               <li><strong>Statistik öffentlich:</strong> Andere sehen zusätzlich deine Fahrten, Kilometer, Pünktlichkeit und Spielzeit. Das geht nur bei öffentlichem Profil.</li>
             </ul>
-            <p>Beides ist ausgeschaltet, bis du es einschaltest. Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Du kannst sie jederzeit mit demselben Schalter widerrufen, danach wird nichts mehr öffentlich angezeigt.</p>
+            <p>Beides ist ausgeschaltet, bis du es einschaltest. Bist du angemeldet, speichert das Backend deine Wahl, damit sie überall gilt. Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO). Du kannst sie jederzeit mit demselben Schalter widerrufen, danach wird nichts mehr öffentlich angezeigt.</p>
           </section>
 
           <section id="bewerbungen">
             <h2>8. Bewerbungen</h2>
-            <p>Über „Karriere“ kannst du dich für das Team bewerben. Dabei gibst du deinen Roblox- und Discord-Namen, deine E-Mail-Adresse, deine Spielzeit, deinen Rang und deine Antworten auf die Fragen an, bei manchen Stellen auch Links zu deinen Arbeiten.</p>
-            <p>Derzeit werden Bewerbungen nur auf deinem Gerät gespeichert und nicht verschickt. Sobald Bewerbungen an das Team übermittelt werden, nutzen wir die Angaben nur, um deine Bewerbung zu prüfen und dich zu kontaktieren. Rechtsgrundlage ist dann Art. 6 Abs. 1 lit. b DSGVO. Wir löschen die Daten spätestens sechs Monate nach der Entscheidung, außer du wirst ins Team aufgenommen.</p>
+            <p>Über „Karriere“ kannst du dich für das Team bewerben. Dabei gibst du deinen Discord-Namen, deine E-Mail-Adresse, deine Spielzeit, deinen Rang und deine Antworten auf die Fragen an, bei manchen Stellen auch Links zu deinen Arbeiten. Dazu kommt dein angemeldetes Roblox-Konto (Nutzer-ID, Name, Profilbild, Rolle in der Gruppe), damit das Team sieht, wer sich bewirbt.</p>
+            <p>Das Backend leitet die Bewerbung an einen nicht öffentlichen Discord-Kanal des Teams weiter (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA; <a href="https://discord.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Discord</a>). Das Backend selbst speichert nur, wann du dich auf welche Stelle beworben hast (24 Stunden, als Schutz vor Spam). Auf deinem Gerät bleibt eine Kurzfassung, damit du siehst, dass du dich beworben hast.</p>
+            <p>Wir nutzen die Angaben nur, um deine Bewerbung zu prüfen und dich zu kontaktieren. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Wir löschen die Nachricht spätestens sechs Monate nach der Entscheidung, außer du wirst ins Team aufgenommen. Solange das Backend nicht eingerichtet ist, werden Bewerbungen nur auf deinem Gerät gespeichert und nicht verschickt.</p>
           </section>
 
           <section id="dritte">
@@ -167,6 +170,7 @@
     </div>
   </main>
 
+  <script src="assets/js/nozoom.js"></script>
   <script src="assets/js/config.js"></script>
   <script src="assets/js/legal.js"></script>
 </body>

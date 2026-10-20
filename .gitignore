@@ -1,0 +1,5 @@
+# Backend: Schlüssel und Daten nie hochladen
+backend/.env
+backend/data/
+backend/.wrangler/
+node_modules/

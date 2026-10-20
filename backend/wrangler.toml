@@ -1,0 +1,23 @@
+# Train Sim Germany – Backend auf Cloudflare Workers (Anleitung: backend/README.md)
+name = "tsg-backend"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+[vars]
+# Adresse der Web-App (mit / am Ende)
+APP_URL = "https://loris6.github.io/Train-Sim-Germany/"
+# Weitere erlaubte Adressen, mit Komma getrennt (z. B. zum Testen)
+ALLOWED_ORIGINS = "http://localhost:8000"
+# ID der Roblox-Gruppe (Zahl) – leer lassen, wenn der Rang nicht aus der Gruppe kommen soll
+ROBLOX_GROUP_ID = ""
+
+# KV-Speicher für Profile und Privatsphäre: npx wrangler kv namespace create TSG_KV
+[[kv_namespaces]]
+binding = "TSG_KV"
+id = "HIER-DIE-KV-ID-EINTRAGEN"
+
+# Schlüssel NICHT hier eintragen, sondern als Secret:
+#   npx wrangler secret put ROBLOX_CLIENT_ID
+#   npx wrangler secret put ROBLOX_CLIENT_SECRET
+#   npx wrangler secret put SESSION_SECRET
+#   npx wrangler secret put DISCORD_WEBHOOK_URL

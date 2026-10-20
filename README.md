@@ -26,6 +26,7 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 - Farben: DB-Rot `#EC0016` und die Cool-Gray-Töne der DB, Gleisnummern im DB-Blau wie an den Bahnhofsschildern
 - Uhr mit deutscher Zeit (MEZ/MESZ) im Menü
 - Kein elastisches Nachfedern beim Scrollen (auf allen Seiten abgeschaltet)
+- Kein Hineinzoomen auf allen Seiten: weder mit zwei Fingern noch per Doppeltippen, Strg/⌘ + Mausrad bzw. Touchpad oder Strg/⌘ + Plus/Minus (`assets/js/nozoom.js`, Viewport und `touch-action`)
 - Responsiv für Handy, Tablet und Desktop
 - Hell- und Dunkelmodus: in den Einstellungen Hell, Dunkel oder Mit Gerät synchronisieren (Standard)
 - Acht Sprachen, Standard „Automatisch“ (siehe unten)
@@ -55,35 +56,35 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 - Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten inkl. Einstellungen direkt unter Statistiken, Spielen/Gruppe/Discord, Uhr, App installieren).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
 - Unten liegt eine dunkle Leiste über die ganze Breite (`width: 100vw`), fest am unteren Rand, nur mit Icons: Start, News, Trainings und rechts ein kleines Profilbild (Ring in der Rangfarbe). Im Dunkelmodus ist die Leiste etwas heller, damit sie sich vom Hintergrund abhebt. Auf iPhones mit Home-Balken wächst sie um den sicheren Bereich nach unten.
-- **Mit Roblox anmelden:** Ist in `assets/js/config.js` eine Client-ID eingetragen, zeigt der Profil-Dialog „Mit Roblox anmelden“ (echter Login über OAuth 2.0, siehe unten). Ohne Client-ID gilt die Demo:
-- **Mit Roblox verbinden (Demo):** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist noch kein echter Login – dafür die Client-ID eintragen (siehe „Roblox-Login“). Im Profil- und Statistik-Dialog steht, ob Profil bzw. Statistik öffentlich sind, mit Link zu den Einstellungen.
+- **Mit Roblox anmelden:** Ist in `assets/js/config.js` die Adresse des Backends eingetragen (`api`), zeigt der Profil-Dialog „Mit Roblox anmelden“ (echter Login, siehe „Backend“). Ohne Backend gilt die Demo:
+- **Mit Roblox verbinden (Demo):** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist noch kein echter Login – dafür das Backend einrichten (siehe „Backend“). Im Profil- und Statistik-Dialog steht, ob Profil bzw. Statistik öffentlich sind, mit Link zu den Einstellungen.
 
-## Roblox-Login (OAuth 2.0)
+## Backend: Roblox-Login, Privatsphäre, Bewerbungen
 
-Alles ist vorbereitet, es fehlt nur die **Client-ID** in **`assets/js/config.js`**:
+Alle Schlüssel liegen im **Backend** (Ordner [`backend/`](backend/README.md)), nie in der Web-App:
 
-1. Auf [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials) unter **OAuth 2.0 Apps** eine App anlegen.
-2. **Redirect URL:** genau die Adresse der Seite, z. B. `https://<name>.github.io/Train-Sim-Germany/` (mit `/` am Ende, ohne `index.html`, `#` oder `?`). Zum Testen zusätzlich `http://localhost:8000/`.
-3. **Scopes:** `openid` und `profile`.
-4. **Privacy Policy URL:** `https://<name>.github.io/Train-Sim-Germany/privacy.html`, **Terms of Service URL:** `https://<name>.github.io/Train-Sim-Germany/terms.html`.
-5. Die Client-ID in `config.js` bei `clientId` eintragen. Weicht die Adresse ab (eigene Domain), auch `redirectUri` setzen.
+| Schlüssel | Wofür |
+|---|---|
+| `ROBLOX_CLIENT_ID`, `ROBLOX_CLIENT_SECRET` | Roblox-Login (OAuth 2.0 mit PKCE und Client-Secret) |
+| `SESSION_SECRET` | Signiert die Sitzungen (30 Tage gültig) |
+| `DISCORD_WEBHOOK_URL` | Bewerbungen gehen als Nachricht mit allen Antworten in einen Discord-Kanal |
+| `ROBLOX_GROUP_ID` | Rang wird automatisch aus der Roblox-Gruppe übernommen |
 
-```js
-roblox: {
-  clientId: '1234567890123456789', // aus dem Roblox-Dashboard
-  redirectUri: '',                 // leer = Adresse der Seite
-  scopes: 'openid profile',
-  tokenProxy: '',                  // nur falls nötig, siehe unten
-},
-```
+Die Web-App kennt nur die Adresse des Backends (`api` in `assets/js/config.js`). Das Backend läuft kostenlos als **Cloudflare Worker** oder mit **Node.js** auf jedem Server – Schritt-für-Schritt-Anleitung in [`backend/README.md`](backend/README.md).
 
-**Das Client-Secret gehört nie in die Seite** – alles in `config.js` ist öffentlich. Die App meldet sich mit **PKCE** an (Code-Verifier und Challenge mit SHA-256, `state` und `nonce` werden geprüft) und braucht dafür kein Secret. Nach der Rückkehr von Roblox tauscht sie den Code gegen einen Token, lädt Nutzer-ID, Name, Anzeigename und Profilbild (`/oauth/v1/userinfo`), macht den Refresh-Token sofort ungültig und speichert nur das öffentliche Profil im Browser. Danach geht es zurück auf die Seite, von der aus man sich angemeldet hat. „Abmelden“ im Profil entfernt das Profil wieder.
+Was es macht:
 
-**Falls Roblox den Abruf aus dem Browser blockiert** (Toast „Anmeldung fehlgeschlagen“ und ein CORS-Fehler in der Konsole): `tools/oauth-worker.js` als kostenlosen Cloudflare Worker anlegen (Anleitung oben in der Datei, dort liegen Client-ID und Secret als geheime Variablen) und seine Adresse in `config.js` bei `tokenProxy` eintragen.
+- **Anmelden:** „Mit Roblox anmelden“ führt über das Backend zu Roblox und zurück. Das Backend tauscht den Code mit dem Client-Secret, lädt Name, Anzeigename, Profilbild und die Rolle in der Gruppe und gibt der App eine signierte Sitzung (nur im Browser gespeichert). Der Token von Roblox wird nicht gespeichert, der Refresh-Token sofort ungültig gemacht.
+- **Rang aus der Gruppe:** Ist `ROBLOX_GROUP_ID` gesetzt, wird die Rolle in der Gruppe dem Rang der App zugeordnet (Name oder Kürzel, z. B. „Driver“, „[D] Driver“, „SG | Signaller“). Der Rang lässt sich dann nicht mehr von Hand ändern.
+- **Privatsphäre:** Die Schalter „Profil öffentlich“ und „Statistik öffentlich“ werden im Backend gespeichert. `GET /api/players/<id>` liefert ein Profil nur, wenn es öffentlich ist.
+- **Bewerbungen:** nur angemeldet. Sie gehen mit dem echten Roblox-Konto, Ergebnis und allen Fragen und Antworten (als Textdatei) an den Discord-Kanal. Höchstens 3 pro Tag und eine pro Stelle.
+- **Abmelden** macht alle Sitzungen des Kontos ungültig.
+
+Ohne `api` läuft die App weiter als Demo (Verbinden über den Roblox-Namen, Bewerbungen nur auf dem Gerät).
 
 ## Datenschutz & Nutzungsbedingungen
 
-`privacy.html` (Datenschutzerklärung) und `terms.html` (Nutzungsbedingungen) sind eigene Seiten im Design der App. Verlinkt sind sie in der Fußzeile, im Menü, in den Einstellungen und beim Roblox-Login. Name, Anschrift und E-Mail des Betreibers sowie das Datum stehen in `config.js` unter `legal` und werden automatisch eingesetzt. **Bitte vor dem Veröffentlichen ausfüllen und prüfen** – die Texte sind eine Vorlage für dieses Projekt, keine Rechtsberatung. Kommen neue Funktionen hinzu (z. B. Bewerbungen per Server, öffentliche Profile auf einem Server), müssen beide Texte angepasst werden.
+`privacy.html` (Datenschutzerklärung) und `terms.html` (Nutzungsbedingungen) sind eigene Seiten im Design der App. Verlinkt sind sie in der Fußzeile, im Menü, in den Einstellungen und beim Roblox-Login. Name, Anschrift und E-Mail des Betreibers, der Anbieter des Backends (`backendHost`) sowie das Datum stehen in `config.js` unter `legal` und werden automatisch eingesetzt. **Bitte vor dem Veröffentlichen ausfüllen und prüfen** – die Texte sind eine Vorlage für dieses Projekt, keine Rechtsberatung. Kommen neue Funktionen hinzu (z. B. Live-Daten aus dem Spiel oder ein anderer Anbieter für das Backend), müssen beide Texte angepasst werden.
 
 ## Sprachen
 
@@ -147,7 +148,7 @@ Fragetypen (`type`):
 | `pick` | Mehrfachauswahl ohne richtige Lösung | nicht bewertet |
 | `links` | Links mit Art: pro Zeile auswählen, was es ist (YouTube, TikTok, Instagram, Twitch, GitHub, Roblox, Screenshots, Portfolio, Anderer Link), bis zu 5 | nicht bewertet; der Link muss zur gewählten Plattform passen (`LINK_TYPES` in `app.js`) |
 
-**Bewerbungen:** Das Formular prüft die Eingaben und berechnet, wie viele bewertete Fragen richtig sind (`score` / `total`). Es speichert Bewerbungen aber nur im Browser (Demo). Für echte Bewerbungen braucht es einen Server, der sie z. B. an einen Discord-Kanal weiterleitet. Eine Discord-Webhook-URL sollte nicht direkt in die Seite eingetragen werden, weil sie sonst öffentlich ist.
+**Bewerbungen:** Das Formular prüft die Eingaben und berechnet, wie viele bewertete Fragen richtig sind (`score` / `total`). Mit Backend gehen Bewerbungen an einen Discord-Kanal (Webhook nur im Backend, nie in der Seite); ohne Backend werden sie nur im Browser gespeichert (Demo).
 
 **Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher). Supervisor ist ein Teamrang ohne eigenes Training (Bewerbung über die Karriere) und leitet die Trainings; den Instructor gibt es nicht mehr. Jeder Rang hat ein Kürzel (`prefix`, z. B. UD, D, PS, CD, SG, SV) und die Zahl der Spieler (`members`), die auf der Startseite bei den Rollen steht. Die Trainingsseite zeigt nur die Trainings für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
@@ -183,7 +184,8 @@ terms.html            Nutzungsbedingungen
 manifest.webmanifest  App-Beschreibung (Name, Icons, Schnellzugriffe)
 sw.js                 Service Worker für den Offline-Modus
 assets/css/style.css  Design-System und Layouts
-assets/js/config.js   Roblox-Login (Client-ID) und Angaben für die Rechtstexte
+assets/js/config.js   Adresse des Backends und Angaben für die Rechtstexte (keine Schlüssel!)
+assets/js/nozoom.js   Sperrt das Hineinzoomen auf allen Seiten
 assets/js/data.js     Inhalte & Beispieldaten (Server, Linien, Trainings, News …)
 assets/js/legal.js    Setzt die Angaben aus config.js in privacy.html und terms.html ein
 assets/js/app.js      Routing, Sprache, Trainings, Server & Fahrplan, Diagramme, Bewerbungen, Profil, Login, Einstellungen
@@ -196,7 +198,11 @@ assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PN
 assets/fonts/         Rubik und UIcons (woff2)
 tools/build_icons.py  Baut die UIcons-Teilmenge
 tools/render_videos.mjs Erzeugt die News-Clips aus den Illustrationen
-tools/oauth-worker.js Optionaler Token-Server für den Roblox-Login (Cloudflare Worker)
+backend/              Backend mit allen Schlüsseln: Roblox-Login, Privatsphäre, Bewerbungen → Discord
+  app.js              Logik (Web-Standards, läuft überall)
+  worker.js           Start als Cloudflare Worker (wrangler.toml)
+  server.js           Start mit Node.js (.env)
+  .env.example        Alle Einstellungen mit Erklärung
 ```
 
 ---

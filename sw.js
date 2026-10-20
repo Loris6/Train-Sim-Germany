@@ -1,7 +1,7 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v8';
+const CACHE = 'tsg-v9';
 const SHELL = [
   './',
   'index.html',
@@ -10,6 +10,7 @@ const SHELL = [
   'manifest.webmanifest',
   'assets/css/style.css',
   'assets/css/uicons.css',
+  'assets/js/nozoom.js',
   'assets/js/config.js',
   'assets/js/data.js',
   'assets/js/legal.js',
