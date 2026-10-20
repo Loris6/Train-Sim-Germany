@@ -5,7 +5,7 @@ compatibility_date = "2024-09-23"
 
 [vars]
 # Dieselbe Client-ID wie in assets/js/config.js (sie ist nicht geheim)
-ROBLOX_CLIENT_ID = ""
+ROBLOX_CLIENT_ID = "7832208484042432028"
 # Adresse der Web-App (mit / am Ende)
 APP_URL = "https://loris6.github.io/Train-Sim-Germany/"
 # Weitere erlaubte Adressen, mit Komma getrennt (z. B. zum Testen)

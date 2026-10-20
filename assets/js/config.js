@@ -16,7 +16,7 @@
 window.TSG_CONFIG = {
   roblox: {
     // Client-ID der OAuth-App (nur Ziffern). Leer = Demo: Verbinden über den Roblox-Namen
-    clientId: '',
+    clientId: '7832208484042432028',
     // ID der Roblox-Gruppe (aus https://www.roblox.com/share/g/33684346)
     groupId: 33684346,
     // Leer = Adresse der Seite. Muss exakt mit einer Redirect-URL im Roblox-Dashboard übereinstimmen.
