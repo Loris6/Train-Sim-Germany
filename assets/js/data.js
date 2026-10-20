@@ -30,18 +30,18 @@ window.TSG = {
   },
 
   servers: [
-    { name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: '6 Std. 12 Min.', version: '2.4.1', trains: 16, type: 'public' },
-    { name: 'Nordnetz #2', region: 'EU-West', network: 'Hamburg – Kiel – Sylt', players: 18, max: 35, ping: 31, uptime: '2 Std. 40 Min.', version: '2.4.1', trains: 9, type: 'public' },
-    { name: 'Südnetz #1', region: 'EU-Central', network: 'München – Nürnberg – Garmisch', players: 35, max: 35, ping: 24, uptime: '11 Std. 03 Min.', version: '2.4.1', trains: 18, type: 'public' },
-    { name: 'Westnetz #1', region: 'EU-West', network: 'Köln – Düsseldorf – Koblenz', players: 27, max: 35, ping: 33, uptime: '4 Std. 55 Min.', version: '2.4.1', trains: 14, type: 'public' },
-    { name: 'Ostnetz #1', region: 'EU-Central', network: 'Berlin – Leipzig – Dresden', players: 12, max: 35, ping: 38, uptime: '58 Min.', version: '2.4.1', trains: 6, type: 'public' },
-    { name: 'Nachtfahrt-Event', region: 'EU-Central', network: 'Gesamtnetz · Nachtfahrplan', players: 48, max: 50, ping: 41, uptime: '1 Std. 20 Min.', version: '2.4.1', trains: 24, type: 'event' },
-    { name: 'Signaller-Training', region: 'EU-West', network: 'Hannover Hbf · Ausbildung', players: 9, max: 12, ping: 27, uptime: '35 Min.', version: '2.4.1', trains: 4, type: 'training' },
-    { name: 'Driver-Training', region: 'EU-West', network: 'Hamburg – Bremen', players: 6, max: 10, ping: 29, uptime: '22 Min.', version: '2.4.1', trains: 3, type: 'training' },
-    { name: 'Westnetz #2', region: 'EU-West', network: 'Frankfurt – Köln (SFS)', players: 31, max: 35, ping: 35, uptime: '7 Std. 48 Min.', version: '2.4.1', trains: 15, type: 'public' },
-    { name: 'NA Network #1', region: 'US-East', network: 'Gesamtnetz', players: 22, max: 35, ping: 112, uptime: '3 Std. 10 Min.', version: '2.4.1', trains: 11, type: 'public' },
-    { name: 'VIP · Lea & Friends', region: 'EU-West', network: 'Schwarzwaldbahn', players: 5, max: 12, ping: 26, uptime: '1 Std. 05 Min.', version: '2.4.1', trains: 3, type: 'vip' },
-    { name: 'Beta · Update 2.5', region: 'EU-Central', network: 'Linke Rheinstrecke (neu)', players: 19, max: 20, ping: 30, uptime: '45 Min.', version: '2.5.0-beta', trains: 8, type: 'event' },
+    { name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: 372, version: '2.4.1', trains: 16, type: 'public' },
+    { name: 'Nordnetz #2', region: 'EU-West', network: 'Hamburg – Kiel – Sylt', players: 18, max: 35, ping: 31, uptime: 160, version: '2.4.1', trains: 9, type: 'public' },
+    { name: 'Südnetz #1', region: 'EU-Central', network: 'München – Nürnberg – Garmisch', players: 35, max: 35, ping: 24, uptime: 663, version: '2.4.1', trains: 18, type: 'public' },
+    { name: 'Westnetz #1', region: 'EU-West', network: 'Köln – Düsseldorf – Koblenz', players: 27, max: 35, ping: 33, uptime: 295, version: '2.4.1', trains: 14, type: 'public' },
+    { name: 'Ostnetz #1', region: 'EU-Central', network: 'Berlin – Leipzig – Dresden', players: 12, max: 35, ping: 38, uptime: 58, version: '2.4.1', trains: 6, type: 'public' },
+    { name: 'Nachtfahrt-Event', region: 'EU-Central', network: 'Gesamtnetz · Nachtfahrplan', players: 48, max: 50, ping: 41, uptime: 80, version: '2.4.1', trains: 24, type: 'event' },
+    { name: 'Signaller-Training', region: 'EU-West', network: 'Hannover Hbf · Ausbildung', players: 9, max: 12, ping: 27, uptime: 35, version: '2.4.1', trains: 4, type: 'training' },
+    { name: 'Driver-Training', region: 'EU-West', network: 'Hamburg – Bremen', players: 6, max: 10, ping: 29, uptime: 22, version: '2.4.1', trains: 3, type: 'training' },
+    { name: 'Westnetz #2', region: 'EU-West', network: 'Frankfurt – Köln (SFS)', players: 31, max: 35, ping: 35, uptime: 468, version: '2.4.1', trains: 15, type: 'public' },
+    { name: 'NA Network #1', region: 'US-East', network: 'Gesamtnetz', players: 22, max: 35, ping: 112, uptime: 190, version: '2.4.1', trains: 11, type: 'public' },
+    { name: 'VIP · Lea & Friends', region: 'EU-West', network: 'Schwarzwaldbahn', players: 5, max: 12, ping: 26, uptime: 65, version: '2.4.1', trains: 3, type: 'vip' },
+    { name: 'Beta · Update 2.5', region: 'EU-Central', network: 'Linke Rheinstrecke (neu)', players: 19, max: 20, ping: 30, uptime: 45, version: '2.5.0-beta', trains: 8, type: 'event' },
   ],
 
   // Reihenfolge = Ausbildungsweg. Nach jedem Training steigt man einen Rang auf.
@@ -111,16 +111,16 @@ window.TSG = {
 
   // Strecken mit Nummer (R001, R002, …) wie im Spiel
   routes: [
-    { no: 'R001', title: 'Marschbahn', from: 'Hamburg-Altona', to: 'Westerland (Sylt)', line: 'RE 6', cat: 're', km: 237, dur: '3:05 Std.', stops: 14, rating: 4.9, reviews: '2,4K', img: 'route-coast.svg', tag: 'Küste' },
-    { no: 'R002', title: 'Werdenfelsbahn', from: 'München Hbf', to: 'Garmisch-Partenkirchen', line: 'RB 6', cat: 'rb', km: 101, dur: '1:28 Std.', stops: 12, rating: 4.8, reviews: '1,9K', img: 'route-alps.svg', tag: 'Alpen' },
-    { no: 'R003', title: 'Berliner Stadtbahn', from: 'Westkreuz', to: 'Ostbahnhof', line: 'S7', cat: 's', km: 12, dur: '0:24 Std.', stops: 10, rating: 4.7, reviews: '3,1K', img: 'route-city.svg', tag: 'Großstadt' },
-    { no: 'R004', title: 'Linke Rheinstrecke', from: 'Köln Hbf', to: 'Mainz Hbf', line: 'RE 5', cat: 're', km: 185, dur: '2:10 Std.', stops: 18, rating: 4.9, reviews: '980', img: 'route-rhine.svg', tag: 'Neu in 2.5' },
-    { no: 'R005', title: 'Schwarzwaldbahn', from: 'Offenburg', to: 'Konstanz', line: 'RE 2', cat: 're', km: 149, dur: '2:05 Std.', stops: 21, rating: 4.8, reviews: '1,2K', img: 'route-forest.svg', tag: 'Gebirge' },
-    { no: 'R006', title: 'SFS Hannover – Würzburg', from: 'Hannover Hbf', to: 'Würzburg Hbf', line: 'ICE 23', cat: 'ice', km: 327, dur: '1:58 Std.', stops: 4, rating: 4.6, reviews: '2,0K', img: 'play.svg', tag: '280 km/h' },
-    { no: 'R007', title: 'Hamburg – Berlin', from: 'Hamburg Hbf', to: 'Berlin Hbf', line: 'ICE 28', cat: 'ice', km: 289, dur: '1:45 Std.', stops: 3, rating: 4.7, reviews: '2,8K', img: 'play.svg', tag: '230 km/h' },
-    { no: 'R008', title: 'S-Bahn Hamburg', from: 'Wedel', to: 'Poppenbüttel', line: 'S1', cat: 's', km: 46, dur: '1:00 Std.', stops: 25, rating: 4.6, reviews: '2,2K', img: 'route-city.svg', tag: 'Großstadt' },
-    { no: 'R009', title: 'SFS Köln – Frankfurt', from: 'Köln Hbf', to: 'Frankfurt (Main) Hbf', line: 'ICE 41', cat: 'ice', km: 180, dur: '1:10 Std.', stops: 3, rating: 4.7, reviews: '1,6K', img: 'route-rhine.svg', tag: '300 km/h' },
-    { no: 'R010', title: 'Hamburg – Kiel', from: 'Hamburg Hbf', to: 'Kiel Hbf', line: 'RE 7', cat: 're', km: 105, dur: '1:15 Std.', stops: 6, rating: 4.5, reviews: '1,1K', img: 'route-coast.svg', tag: 'Küste' },
+    { no: 'R001', title: 'Marschbahn', from: 'Hamburg-Altona', to: 'Westerland (Sylt)', line: 'RE 6', cat: 're', km: 237, dur: '3:05', stops: 14, rating: 4.9, reviews: '2,4K', img: 'route-coast.svg', tag: 'Küste' },
+    { no: 'R002', title: 'Werdenfelsbahn', from: 'München Hbf', to: 'Garmisch-Partenkirchen', line: 'RB 6', cat: 'rb', km: 101, dur: '1:28', stops: 12, rating: 4.8, reviews: '1,9K', img: 'route-alps.svg', tag: 'Alpen' },
+    { no: 'R003', title: 'Berliner Stadtbahn', from: 'Westkreuz', to: 'Ostbahnhof', line: 'S7', cat: 's', km: 12, dur: '0:24', stops: 10, rating: 4.7, reviews: '3,1K', img: 'route-city.svg', tag: 'Großstadt' },
+    { no: 'R004', title: 'Linke Rheinstrecke', from: 'Köln Hbf', to: 'Mainz Hbf', line: 'RE 5', cat: 're', km: 185, dur: '2:10', stops: 18, rating: 4.9, reviews: '980', img: 'route-rhine.svg', tag: 'Neu in 2.5' },
+    { no: 'R005', title: 'Schwarzwaldbahn', from: 'Offenburg', to: 'Konstanz', line: 'RE 2', cat: 're', km: 149, dur: '2:05', stops: 21, rating: 4.8, reviews: '1,2K', img: 'route-forest.svg', tag: 'Gebirge' },
+    { no: 'R006', title: 'SFS Hannover – Würzburg', from: 'Hannover Hbf', to: 'Würzburg Hbf', line: 'ICE 23', cat: 'ice', km: 327, dur: '1:58', stops: 4, rating: 4.6, reviews: '2,0K', img: 'play.svg', tag: '280 km/h' },
+    { no: 'R007', title: 'Hamburg – Berlin', from: 'Hamburg Hbf', to: 'Berlin Hbf', line: 'ICE 28', cat: 'ice', km: 289, dur: '1:45', stops: 3, rating: 4.7, reviews: '2,8K', img: 'play.svg', tag: '230 km/h' },
+    { no: 'R008', title: 'S-Bahn Hamburg', from: 'Wedel', to: 'Poppenbüttel', line: 'S1', cat: 's', km: 46, dur: '1:00', stops: 25, rating: 4.6, reviews: '2,2K', img: 'route-city.svg', tag: 'Großstadt' },
+    { no: 'R009', title: 'SFS Köln – Frankfurt', from: 'Köln Hbf', to: 'Frankfurt (Main) Hbf', line: 'ICE 41', cat: 'ice', km: 180, dur: '1:10', stops: 3, rating: 4.7, reviews: '1,6K', img: 'route-rhine.svg', tag: '300 km/h' },
+    { no: 'R010', title: 'Hamburg – Kiel', from: 'Hamburg Hbf', to: 'Kiel Hbf', line: 'RE 7', cat: 're', km: 105, dur: '1:15', stops: 6, rating: 4.5, reviews: '1,1K', img: 'route-coast.svg', tag: 'Küste' },
   ],
 
   // Züge für „Meine Statistik“: daraus werden die meistgefahrenen Züge je Bereich angezeigt
@@ -131,13 +131,14 @@ window.TSG = {
   },
 
   // cat: update | event | community
+  // video (optional): eigene Datei (assets/video/…mp4) oder ein YouTube-Link; poster = Vorschaubild
   news: [
-    { date: '15. Okt. 2026', cat: 'update', tag: 'Update 2.5', title: 'Linke Rheinstrecke jetzt in der Beta', text: 'Burgen, Weinberge und 185 km Strecke zwischen Köln und Mainz – teste sie auf dem Beta-Server. Neu sind außerdem 18 Bahnhöfe, das Stellwerk Koblenz und der Fahrzeugtyp BR 429.', img: 'route-rhine.svg' },
-    { date: '12. Okt. 2026', cat: 'event', tag: 'Event', title: 'Nachtfahrt-Wochenende mit Sonderzügen', text: 'Freitag bis Sonntag ab 21 Uhr: Nachtfahrplan, Sonderzüge und doppelte XP auf allen Event-Servern. Wer drei Nachtfahrten pünktlich schafft, bekommt das Abzeichen „Nachteule“.', img: 'route-city.svg' },
-    { date: '08. Okt. 2026', cat: 'community', tag: 'Crew', title: 'Neue Stellwerke für Signaller', text: 'Köln Hbf und Berlin Ostkreuz können jetzt von Spielern besetzt werden. Die passenden Signaller-Trainings starten diese Woche.', img: 'training.svg' },
-    { date: '02. Okt. 2026', cat: 'update', tag: 'Update 2.4.1', title: 'Neue Abfahrtstafeln und weniger Ruckler', text: 'Bahnhöfe zeigen jetzt Live-Abfahrten mit Verspätungen an. Außerdem laufen große Bahnhöfe auf Handys spürbar flüssiger.', img: 'play.svg' },
-    { date: '27. Sep. 2026', cat: 'community', tag: 'Community', title: 'Spieler der Woche: Nordlicht_Mia', text: 'Über 1.800 Fahrten und 98,6 % Pünktlichkeit – Nordlicht_Mia hält den S-Bahn-Takt in Hamburg zuverlässig am Laufen.', img: 'group.svg' },
-    { date: '20. Sep. 2026', cat: 'event', tag: 'Event', title: 'Alpen-Rallye auf der Werdenfelsbahn', text: 'Wer schafft München – Garmisch am schnellsten und trotzdem pünktlich? Die Bestenliste läuft noch bis Sonntag.', img: 'route-alps.svg' },
+    { date: '2026-10-15', cat: 'update', tag: 'Update 2.5', video: 'assets/video/rheinstrecke.mp4', poster: 'assets/video/rheinstrecke.jpg', title: 'Linke Rheinstrecke jetzt in der Beta', text: 'Burgen, Weinberge und 185 km Strecke zwischen Köln und Mainz – teste sie auf dem Beta-Server. Neu sind außerdem 18 Bahnhöfe, das Stellwerk Koblenz und der Fahrzeugtyp BR 429.', img: 'route-rhine.svg' },
+    { date: '2026-10-12', cat: 'event', tag: 'Event', video: 'assets/video/nachtfahrt.mp4', poster: 'assets/video/nachtfahrt.jpg', title: 'Nachtfahrt-Wochenende mit Sonderzügen', text: 'Freitag bis Sonntag ab 21 Uhr: Nachtfahrplan, Sonderzüge und doppelte XP auf allen Event-Servern. Wer drei Nachtfahrten pünktlich schafft, bekommt das Abzeichen „Nachteule“.', img: 'route-city.svg' },
+    { date: '2026-10-08', cat: 'community', tag: 'Crew', title: 'Neue Stellwerke für Signaller', text: 'Köln Hbf und Berlin Ostkreuz können jetzt von Spielern besetzt werden. Die passenden Signaller-Trainings starten diese Woche.', img: 'training.svg' },
+    { date: '2026-10-02', cat: 'update', tag: 'Update 2.4.1', title: 'Neue Abfahrtstafeln und weniger Ruckler', text: 'Bahnhöfe zeigen jetzt Live-Abfahrten mit Verspätungen an. Außerdem laufen große Bahnhöfe auf Handys spürbar flüssiger.', img: 'play.svg' },
+    { date: '2026-09-27', cat: 'community', tag: 'Community', title: 'Spieler der Woche: Nordlicht_Mia', text: 'Über 1.800 Fahrten und 98,6 % Pünktlichkeit – Nordlicht_Mia hält den S-Bahn-Takt in Hamburg zuverlässig am Laufen.', img: 'group.svg' },
+    { date: '2026-09-20', cat: 'event', tag: 'Event', video: 'assets/video/alpen-rallye.mp4', poster: 'assets/video/alpen-rallye.jpg', title: 'Alpen-Rallye auf der Werdenfelsbahn', text: 'Wer schafft München – Garmisch am schnellsten und trotzdem pünktlich? Die Bestenliste läuft noch bis Sonntag.', img: 'route-alps.svg' },
   ],
 
   // Karriere: offene Stellen im Team

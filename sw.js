@@ -1,7 +1,7 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v5';
+const CACHE = 'tsg-v6';
 const SHELL = [
   './',
   'index.html',
@@ -10,7 +10,7 @@ const SHELL = [
   'assets/css/uicons.css',
   'assets/js/data.js',
   'assets/js/app.js',
-  'assets/js/questions.js',
+  'assets/js/questions/de.js',
   'assets/img/logo.svg',
   'assets/icons/icon-192.png',
   'assets/fonts/rubik-latin-wght-normal.woff2',
@@ -33,6 +33,8 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // Videos werden in Teilen geladen (Range) und nicht zwischengespeichert
+  if (req.headers.has('range') || req.destination === 'video') return;
   e.respondWith(fetch(req)
     .then((res) => {
       if (res.ok) {

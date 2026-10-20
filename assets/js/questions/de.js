@@ -19,8 +19,12 @@
  *   long    Freitext mit Mindestlänge min (nicht bewertet)
  *   short   kurzer Freitext (nicht bewertet)
  *   pick    Mehrfachauswahl ohne richtige Lösung (nicht bewertet)
+ *   links   Links mit Art (types = erlaubte Arten, siehe LINK_TYPES in app.js; nicht bewertet)
+ *
+ * Übersetzungen liegen daneben (en.js, fr.js …) und haben genau denselben Aufbau.
  */
-window.TSG_QUESTIONS = {
+window.TSG_QBANK = window.TSG_QBANK || {};
+window.TSG_QBANK.de = {
   // Bahnbetrieb allgemein (Supervisor: Driver, Platform Staff, Conductor)
   basics: [
     { type: 'single', q: 'Was unterscheidet eine Zugfahrt grundsätzlich von einer Rangierfahrt?', options: ['Zugfahrten fahren auf Hauptsignale, Rangierfahrten z. B. auf Rangiersignale', 'Rangierfahrten dürfen schneller fahren als Zugfahrten', 'Rangierfahrten sind nur mit Fahrgästen an Bord erlaubt', 'Es gibt keinen Unterschied, nur die Bezeichnung ist anders'] },
@@ -353,7 +357,7 @@ window.TSG_QUESTIONS = {
       { type: 'single', q: 'Du willst ein Free Model oder Code aus einem Tutorial in TSG verwenden. Was ist am wichtigsten?', options: ['Den Code verstehen und auf Backdoors (z. B. fremde require-IDs) prüfen', 'Nichts – Inhalte aus der Toolbox sind immer sicher', 'Ihn unverändert übernehmen, damit nichts kaputtgeht', 'Das Script umbenennen, dann ist es sicher'] },
       { type: 'pick', q: 'Mit welchen Werkzeugen hast du beim Entwickeln schon gearbeitet?', options: ['Script-Editor in Roblox Studio', 'Visual Studio Code', 'Rojo', 'Git / GitHub', 'Wally (Paketmanager)', 'Studio-Debugger mit Breakpoints'] },
       { type: 'order', q: 'Ein Spieler meldet einen Bug. Bringe die Schritte zur Behebung in eine sinnvolle Reihenfolge.', items: ['Fehlerbeschreibung lesen und den Bug in Studio nachstellen', 'Ursache im Code eingrenzen', 'Fix umsetzen und in Studio testen', 'Update veröffentlichen und das Team informieren'] },
-      { type: 'short', q: 'Link zu einem eigenen Projekt (z. B. Roblox-Spiel oder GitHub-Repository)', placeholder: 'https://…' },
+      { type: 'links', q: 'Zeig uns, was du kannst: Links zu deinen Projekten – wähle bei jedem Link, was es ist', min: 1, types: ['github', 'roblox', 'portfolio', 'youtube', 'other'] },
     ],
     'map-builder': [
       { type: 'long', q: 'Welche Map oder welche Gebäude hast du bereits gebaut? Beschreibe Umfang, Stil und was du dabei gelernt hast.', placeholder: 'Projekt, Umfang, Stil, Erkenntnisse …', min: 60 },
@@ -365,7 +369,7 @@ window.TSG_QUESTIONS = {
       { type: 'single', q: 'Zwei Builder arbeiten per Team Create am selben Bahnhof. Wie vermeidet ihr Konflikte?', options: ['Bereiche aufteilen und absprechen, wer woran baut', 'Jeder baut drauflos – Konflikte lösen sich von selbst', 'Jeder baut in einer eigenen Kopie, am Ende wird ohne Absprache zusammenkopiert', 'Der Schnellere überschreibt einfach die Arbeit des anderen'] },
       { type: 'pick', q: 'Welche Werkzeuge und Programme nutzt du beim Bauen?', options: ['Roblox Studio (Parts, Unions)', 'Terrain-Editor', 'Blender', 'Plugins wie „Building Tools by F3X“ oder „Archimedes“', 'Bildbearbeitung (z. B. GIMP, Photoshop) für Texturen', 'Karten und Gleispläne (z. B. OpenRailwayMap) als Vorlage'] },
       { type: 'order', q: 'Bringe die Schritte bei einem Bauauftrag des Teams in eine sinnvolle Reihenfolge.', items: ['Anforderungen mit dem Team klären', 'Ersten Entwurf bauen und Screenshots zeigen', 'Feedback einarbeiten', 'Fertigen Bau übergeben'] },
-      { type: 'short', q: 'Link zu Screenshots oder deinem Portfolio (z. B. Imgur, Discord-Post, Roblox-Place)', placeholder: 'https://…' },
+      { type: 'links', q: 'Zeig uns deine Bauten: Links zu Places, Screenshots oder deinem Portfolio – wähle bei jedem Link, was es ist', min: 1, types: ['roblox', 'images', 'portfolio', 'youtube', 'other'] },
     ],
     'moderator': [
       { type: 'long', q: 'Beschreibe deine bisherige Moderationserfahrung: Wie lange, welche Aufgaben und wie groß war die Community?', placeholder: 'z. B. Discord-Server mit 500 Mitgliedern, seit einem Jahr …', min: 60 },
@@ -389,7 +393,7 @@ window.TSG_QUESTIONS = {
       { type: 'single', q: 'Du schaffst einen abgesprochenen Posting-Termin nicht. Was ist richtig?', options: ['Frühzeitig im Team Bescheid geben und eine Lösung finden', 'Nichts sagen und hoffen, dass es keiner merkt', 'Ohne Freigabe irgendeinen alten Clip posten', 'Den Plan heimlich ändern'] },
       { type: 'pick', q: 'Welche Programme oder Apps nutzt du für Schnitt und Grafik?', options: ['CapCut', 'DaVinci Resolve', 'Adobe Premiere Pro', 'Final Cut Pro', 'Canva', 'Photoshop oder GIMP', 'Sonstige'] },
       { type: 'order', q: 'Bringe die Erstellung eines Thumbnails in eine sinnvolle Reihenfolge.', items: ['Passende Szene im Spiel aufnehmen', 'Bild auf das richtige Format zuschneiden', 'Text und Effekte ergänzen', 'In kleiner Vorschau die Lesbarkeit prüfen'] },
-      { type: 'short', q: 'Link zu deinem eigenen Kanal oder Portfolio (falls vorhanden)', placeholder: 'https://…' },
+      { type: 'links', q: 'Deine Kanäle: Gib deine Links an und wähle bei jedem die Plattform', min: 1, types: ['youtube', 'tiktok', 'instagram', 'twitch', 'other'] },
     ],
   },
 };

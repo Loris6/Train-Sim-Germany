@@ -6,7 +6,6 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-angle-small-down:before{content:"\f153"}
 .fi-rr-angle-small-left:before{content:"\f154"}
 .fi-rr-angle-small-right:before{content:"\f155"}
-.fi-rr-angle-small-up:before{content:"\f156"}
 .fi-rr-arrow-left:before{content:"\f197"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-arrow-small-up:before{content:"\f19f"}
@@ -23,6 +22,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-download:before{content:"\f591"}
 .fi-rr-edit:before{content:"\f5c1"}
 .fi-rr-gamepad:before{content:"\f6df"}
+.fi-rr-globe:before{content:"\f705"}
 .fi-rr-grip-dots-vertical:before{content:"\f72d"}
 .fi-rr-heart:before{content:"\f7a0"}
 .fi-rr-home:before{content:"\f7b8"}
@@ -35,6 +35,8 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-newspaper:before{content:"\f9a5"}
 .fi-rr-paper-plane:before{content:"\f9f7"}
 .fi-rr-pencil:before{content:"\fa29"}
+.fi-rr-picture:before{content:"\fa78"}
+.fi-rr-plus:before{content:"\faac"}
 .fi-rr-route:before{content:"\fb6f"}
 .fi-rr-search:before{content:"\fbba"}
 .fi-rr-settings:before{content:"\fbd2"}
@@ -65,3 +67,8 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 @font-face{font-family:uicons-brands;src:url(../fonts/uicons-brands.woff2) format("woff2");font-display:block}
 i[class^=fi-brands-]:before,i[class*=" fi-brands-"]:before,span[class^=fi-brands-]:before,span[class*=fi-brands-]:before{font-family:uicons-brands!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .fi-brands-discord:before{content:"\f144"}
+.fi-brands-github:before{content:"\f15d"}
+.fi-brands-instagram:before{content:"\f16e"}
+.fi-brands-tik-tok:before{content:"\f1b9"}
+.fi-brands-twitch:before{content:"\f1bd"}
+.fi-brands-youtube:before{content:"\f1dc"}
