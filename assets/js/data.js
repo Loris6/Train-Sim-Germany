@@ -8,8 +8,8 @@ window.TSG = {
   // Hier die echten Links eintragen
   links: {
     play: 'https://www.roblox.com/games/140440792597921/Unbenannte-Experience',
-    group: 'https://www.roblox.com/search/communities?keyword=Train%20Sim%20Germany',
-    discord: 'https://discord.gg/DEIN-EINLADUNGSCODE',
+    group: 'https://www.roblox.com/share/g/33684346',
+    discord: 'https://discord.gg/tvaSwbh3rE',
   },
 
   // Angemeldeter Spieler (Demo – später aus dem Roblox-Login)
