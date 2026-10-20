@@ -1,30 +1,26 @@
-# Train Sim Germany – Backend
+# Train Sim Germany – Backend (optional)
 
-Hier liegen alle Schlüssel: Roblox **Client-ID** und **Client-Secret**, der Schlüssel für die Sitzungen und der **Discord-Webhook** für Bewerbungen. Die Web-App kennt nur die Adresse des Backends.
+Die Anmeldung mit Roblox braucht **kein** Backend – dafür reicht die Client-ID in `assets/js/config.js`. Das Backend ergänzt:
+
+- **Benachrichtigungen für Trainings per Web-Push**, auch wenn die App geschlossen ist
+- **Bewerbungen an einen privaten Discord-Kanal** (der Webhook bleibt geheim auf dem Server)
+- **Privatsphäre**, die auch für andere gilt (öffentliches Profil)
 
 | Weg | Wofür |
 |---|---|
-| `GET /health` | Zeigt, was eingerichtet ist (`login`, `applications`, `group`) |
-| `GET /auth/login?return=<url>` | Weiter zu Roblox (OAuth 2.0 mit PKCE und Client-Secret) |
-| `GET /auth/callback` | Rückkehr von Roblox, danach zurück zur App mit Sitzung |
+| `GET /health` | Zeigt, was eingerichtet ist |
+| `POST /auth/session` | `{ id_token }` aus dem Roblox-Login → Sitzung fürs Backend (Signatur, Client-ID und Ablauf werden geprüft) |
 | `POST /auth/logout` | Abmelden – alle Sitzungen des Kontos werden ungültig |
 | `GET /api/me` | Eigenes Profil, Rang aus der Roblox-Gruppe, Privatsphäre |
 | `PUT /api/me/privacy` | Privatsphäre speichern: `{ "profile": true, "stats": false }` |
 | `GET /api/players/<id>` | Öffentliches Profil (nur wenn der Spieler es freigegeben hat) |
-| `POST /api/applications` | Bewerbung an den Discord-Kanal senden (nur angemeldet) |
+| `POST /api/applications` | Bewerbung an den Discord-Kanal senden (angemeldet) |
+| `GET /api/push/key` | Öffentlicher Schlüssel für Web-Push |
+| `POST /api/push/reminders` | `{ subscription, reminders }` – Erinnerungen für Trainings speichern |
 
-## 1. Roblox OAuth-App anlegen
+Schlüssel für Sitzungen und Web-Push (VAPID) erzeugt das Backend beim ersten Start selbst und speichert sie.
 
-1. [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials) → **OAuth 2.0 Apps** → **Create OAuth App**
-2. **Redirect URL:** Adresse des Backends + `/auth/callback`, z. B.
-   `https://tsg-backend.<name>.workers.dev/auth/callback`
-   (zum Testen zusätzlich `http://localhost:8787/auth/callback`)
-3. **Scopes:** `openid` und `profile`
-4. **Privacy Policy URL:** `https://loris6.github.io/Train-Sim-Germany/privacy.html`
-   **Terms of Service URL:** `https://loris6.github.io/Train-Sim-Germany/terms.html`
-5. Client-ID und Client-Secret notieren – **nur** ins Backend, nie in die Web-App oder auf GitHub.
-
-## 2a. Backend auf Cloudflare (kostenlos, empfohlen)
+## Auf Cloudflare (kostenlos, empfohlen)
 
 Voraussetzung: kostenloses Konto auf [cloudflare.com](https://dash.cloudflare.com/sign-up) und Node.js.
 
@@ -32,57 +28,39 @@ Voraussetzung: kostenloses Konto auf [cloudflare.com](https://dash.cloudflare.co
 cd backend
 npx wrangler login
 npx wrangler kv namespace create TSG_KV      # die ausgegebene id in wrangler.toml eintragen
-# In wrangler.toml APP_URL, ALLOWED_ORIGINS und (optional) ROBLOX_GROUP_ID anpassen
-npx wrangler secret put ROBLOX_CLIENT_ID
-npx wrangler secret put ROBLOX_CLIENT_SECRET
-npx wrangler secret put SESSION_SECRET        # zufälliger Text, mindestens 32 Zeichen
+# In wrangler.toml ROBLOX_CLIENT_ID (dieselbe wie in config.js), APP_URL und ALLOWED_ORIGINS eintragen
 npx wrangler secret put DISCORD_WEBHOOK_URL   # optional, für Bewerbungen
 npx wrangler deploy
 ```
 
-Die Adresse am Ende (`https://tsg-backend.<name>.workers.dev`) ist die Adresse des Backends.
+Die Adresse am Ende (`https://tsg-backend.<name>.workers.dev`) in `assets/js/config.js` bei `api` eintragen – fertig. Der Zeitplan in `wrangler.toml` (`crons`) verschickt alle 2 Minuten die fälligen Benachrichtigungen.
 
-Einen zufälligen `SESSION_SECRET` erzeugst du z. B. mit:
+Im kostenlosen Tarif von Cloudflare sind 1.000 Schreibvorgänge pro Tag im KV-Speicher enthalten. Für eine kleine Community reicht das; bei sehr vielen Erinnerungen ist der Workers-Tarif für 5 $/Monat nötig.
 
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-```
-
-## 2b. Backend mit Node.js (eigener Server, Raspberry Pi, Render …)
+## Mit Node.js (eigener Server, Raspberry Pi, Render …)
 
 Node.js ab Version 20, keine weiteren Pakete nötig.
 
 ```bash
 cd backend
-cp .env.example .env     # Werte eintragen
+cp .env.example .env     # ROBLOX_CLIENT_ID, APP_URL usw. eintragen
 node server.js           # läuft auf http://localhost:8787
 ```
 
-Daten (Profile, Privatsphäre) liegen in `data/store.json`. `.env` und `data/` stehen in `.gitignore` und werden nie hochgeladen. Läuft der Server hinter einer anderen Adresse (Domain mit https), `BACKEND_URL` auf diese Adresse setzen.
-
-## 3. Web-App verbinden
-
-In `assets/js/config.js` nur die Adresse eintragen:
-
-```js
-api: 'https://tsg-backend.<name>.workers.dev',
-```
-
-Fertig: Der Profil-Dialog zeigt „Mit Roblox anmelden“, die Privatsphäre-Schalter werden im Backend gespeichert und Bewerbungen landen im Discord-Kanal.
+Daten liegen in `data/store.json`, fällige Benachrichtigungen gehen jede Minute raus. `.env` und `data/` stehen in `.gitignore` und werden nie hochgeladen. Für Web-Push muss das Backend über **https** erreichbar sein (z. B. über Render oder einen Reverse-Proxy).
 
 ## Einstellungen
 
 | Name | Pflicht | Bedeutung |
 |---|---|---|
-| `ROBLOX_CLIENT_ID` | ja | Client-ID der OAuth-App |
-| `ROBLOX_CLIENT_SECRET` | ja | Client-Secret der OAuth-App (geheim!) |
-| `SESSION_SECRET` | ja | Zufälliger Text ab 32 Zeichen, signiert die Sitzungen (geheim!) |
+| `ROBLOX_CLIENT_ID` | für Login am Backend | Dieselbe Client-ID wie in `config.js` (nicht geheim) |
 | `APP_URL` | ja | Adresse der Web-App, z. B. `https://loris6.github.io/Train-Sim-Germany/` |
 | `ALLOWED_ORIGINS` | nein | Weitere erlaubte Adressen, mit Komma getrennt (z. B. `http://localhost:8000`) |
-| `BACKEND_URL` | nein | Eigene Adresse (sonst aus der Anfrage) |
-| `ROBLOX_GROUP_ID` | nein | Gruppen-ID: Rang wird aus der Rolle in der Gruppe übernommen |
+| `ROBLOX_GROUP_ID` | nein | Roblox-Gruppe für den Rang (Standard: 33684346) |
 | `DISCORD_WEBHOOK_URL` | nein | Webhook eines privaten Team-Kanals für Bewerbungen (geheim!) |
+| `PUSH_CONTACT` | nein | Kontakt für Web-Push (`mailto:` oder `https:`), sonst `APP_URL` |
+| `SESSION_SECRET` | nein | Eigener Schlüssel für Sitzungen (sonst erzeugt das Backend einen) |
 
-**Rang aus der Gruppe:** Die Rolle wird über den Namen oder das Kürzel zugeordnet – „Driver“, „[D] Driver“ und „D | Driver“ werden alle zu Driver. Kürzel: UD, D, PS, CD, SG, SV, DS, MG. Wer nicht in der Gruppe ist, gilt als Passenger.
+**Rang aus der Gruppe:** Die Rolle wird über Kürzel oder Namen zugeordnet – „[D] Driver“, „D | Driver“ und „Driver“ werden zu Driver. Kürzel: G, UD, D, PS, CD, SG, SV, DS, MG. Wer nicht in der Gruppe ist, ist Guest.
 
-**Sicherheit:** Sitzungen und das Login-Cookie sind mit `SESSION_SECRET` signiert (HMAC-SHA-256). Das Backend prüft `state` und `nonce`, erlaubt Anfragen nur von `APP_URL` und `ALLOWED_ORIGINS` (CORS) und leitet nach dem Login nur dorthin zurück. Bewerbungen: höchstens 3 pro Tag und eine pro Stelle und Konto.
+**Sicherheit:** Das ID-Token wird mit den öffentlichen Schlüsseln von Roblox geprüft (Signatur ES256, Client-ID, Aussteller, Ablauf). Sitzungen sind mit HMAC-SHA-256 signiert. Anfragen werden nur von `APP_URL` und `ALLOWED_ORIGINS` angenommen (CORS). Push-Nachrichten sind Ende-zu-Ende verschlüsselt (aes128gcm).

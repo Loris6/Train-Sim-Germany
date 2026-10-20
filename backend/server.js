@@ -4,14 +4,15 @@
  *   cp .env.example .env    # Werte eintragen
  *   node server.js          # läuft auf http://localhost:8787
  *
- * Daten (Profile, Privatsphäre) liegen in data/store.json.
+ * Daten (Profile, Privatsphäre, Erinnerungen) liegen in data/store.json.
+ * Fällige Benachrichtigungen werden jede Minute verschickt.
  */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { webcrypto } from 'node:crypto';
-import { handle } from './app.js';
+import { handle, sendDue } from './app.js';
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +47,9 @@ function fileStore(file) {
     },
     async put(key, v, { ttl } = {}) { data[key] = { v: structuredClone(v), exp: ttl ? Date.now() + ttl * 1000 : 0 }; save(); },
     async delete(key) { delete data[key]; save(); },
+    async list(prefix, limit = 1000) {
+      return Object.keys(data).filter((k) => k.startsWith(prefix) && !(data[k].exp && data[k].exp < Date.now())).sort().slice(0, limit);
+    },
   };
 }
 const store = fileStore(path.resolve(DIR, env.DATA_FILE || 'data/store.json'));
@@ -80,5 +84,7 @@ const server = http.createServer(async (req, res) => {
 const port = +(env.PORT || 8787);
 server.listen(port, () => {
   console.log(`Train Sim Germany Backend läuft auf http://localhost:${port}`);
-  if (!env.ROBLOX_CLIENT_ID || !env.ROBLOX_CLIENT_SECRET) console.log('Hinweis: ROBLOX_CLIENT_ID und ROBLOX_CLIENT_SECRET fehlen noch (.env).');
+  if (!env.ROBLOX_CLIENT_ID) console.log('Hinweis: ROBLOX_CLIENT_ID fehlt noch (.env) – ohne sie gibt es keine Anmeldung am Backend.');
 });
+// Benachrichtigungen für Trainings: jede Minute nachsehen, was fällig ist
+setInterval(() => { sendDue(store, env).catch((e) => console.error(e)); }, 60000);

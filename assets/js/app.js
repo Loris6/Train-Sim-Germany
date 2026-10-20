@@ -175,8 +175,9 @@
     applications: store.get('tsg-applications', {}),
     // Mit Roblox verbundenes Profil: { userId, username, displayName, avatar, oauth }
     profile: store.get('tsg-profile', null),
-    // Rang kommt aus der Roblox-Gruppe (über das Backend)
+    // Rang kommt aus der Roblox-Gruppe (Roblox-Login)
     rankFromGroup: false,
+    groupRole: null,
   };
 
   // ---------- Kennzahlen ----------
@@ -638,9 +639,7 @@
         </dl>
         <div class="server__foot">
           <span class="avatars">${shown.map((p) => avatar(p.name)).join('')}<small>${t('{n} Spieler', { n: s.players })}</small></span>
-          <a class="server__details" href="#/server/${encodeURIComponent(s.id)}" aria-label="${esc(t('Details zu {name}', { name: t(s.name) }))}">
-            <span>${t('Details')}</span><span class="server__details-ic">${icon('fi-rr-arrow-small-right')}</span>
-          </a>
+          <a class="server__details" href="#/server/${encodeURIComponent(s.id)}" aria-label="${esc(t('Details zu {name}', { name: t(s.name) }))}">${t('Details')}${icon('fi-rr-angle-small-right')}</a>
         </div>
       </article>`;
     }).join('') : `<p class="empty">${t('Kein Server gefunden. Versuch einen anderen Filter.')}</p>`;
@@ -770,9 +769,12 @@
         </div>
         <div class="appbar__actions">${full
           ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
-          : `<a class="btn btn--primary btn--sm" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`}</div>
+          : `<a class="btn btn--primary btn--sm" href="${esc(joinUrl(s))}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`}</div>
       </div>
       <p class="sd-net">${icon('fi-rr-route')}${esc(t(s.network))}</p>
+      <button class="sd-id" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}">
+        <span>${t('Server-ID')}</span><code>${esc(s.id)}</code>${icon('fi-rr-copy')}
+      </button>
       <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Ansicht'))}">
         ${tabBtn('trains', 'fi-rr-train-side', t('Züge'), m.trains.length)}
         ${tabBtn('players', 'fi-rr-users-alt', t('Spieler'), m.players.length)}
@@ -971,19 +973,26 @@
     if (state.page === 'trainings') full.innerHTML = nextStepHTML('h2');
   }
 
+  const bellBtn = (tn, cls) => {
+    const on = isReminded(tn);
+    return `<button class="${cls}" type="button" data-remind="${tn.id}" aria-pressed="${on}" aria-label="${esc(on ? t('Benachrichtigung aus') : t('Benachrichtigen, wenn der Server öffnet'))}">${icon(on ? 'fi-sr-bell-ring' : 'fi-rr-bell')}</button>`;
+  };
   function tcard(tn) {
     const st = trainingState(tn);
-    return `<button class="tcard" type="button" data-detail="${tn.id}">
-      <div class="tcard__media">
-        <img src="assets/img/${tn.img}" alt="" loading="lazy">
-        ${serverPill(tn)}
-        <span class="tcard__role" style="--rc:${tn.color}"><i></i>${esc(tn.type)}</span>
-      </div>
-      <div class="tcard__body">
-        <h3>${esc(t(tn.title))}</h3>
-        <div class="tcard__row"><span>${t('{time} Uhr', { time: tn.time })}</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : ''}">${icon('fi-sr-user')}${tn.taken}/${tn.slots}</span></div>
-      </div>
-    </button>`;
+    return `<article class="tcard">
+      <button class="tcard__main" type="button" data-detail="${tn.id}">
+        <div class="tcard__media">
+          <img src="assets/img/${tn.img}" alt="" loading="lazy">
+          ${serverPill(tn)}
+          <span class="tcard__role" style="--rc:${tn.color}"><i></i>${esc(tn.type)}</span>
+        </div>
+        <div class="tcard__body">
+          <h3>${esc(t(tn.title))}</h3>
+          <div class="tcard__row"><span>${t('{time} Uhr', { time: tn.time })}</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : ''}">${icon('fi-sr-user')}${tn.taken}/${tn.slots}</span></div>
+        </div>
+      </button>
+      ${bellBtn(tn, 'tcard__bell')}
+    </article>`;
   }
 
   function renderTrainings() {
@@ -1028,7 +1037,7 @@
       return `<li><button type="button" data-detail="${tn.id}">
         <div class="tdate${tn.day === now.day ? ' is-today' : ''}"><span>${wdShort(tn.day)}</span><b>${dateOf(tn.day).getUTCDate()}</b></div>
         <div><h3>${esc(t(tn.title))}</h3><p><i style="--rc:${tn.color}"></i>${esc(tn.type)} · ${t('{time} Uhr', { time: tn.time })} · ${esc(tn.host)}</p></div>
-        <span class="pill-state pill-state--${st.cls}">${st.text}</span>
+        <span class="tlist__end">${isReminded(tn) ? `<span class="tlist__bell" title="${esc(t('Benachrichtigung an'))}">${icon('fi-sr-bell-ring')}</span>` : ''}<span class="pill-state pill-state--${st.cls}">${st.text}</span></span>
       </button></li>`;
     }).join('') : `<li class="board-empty">${types && !types.length ? t('Für deinen Rang gibt es keine weiteren Trainings.') : t('Gerade sind keine Trainings geplant.')}</li>`;
     const toggle = $('[data-all-toggle]');
@@ -1346,7 +1355,7 @@
           <div class="quiz">${questionBlocks(sector3Items(job), 41)}</div>
           <div class="f" ${dataField('confirm')}><label class="confirm"><input type="checkbox" name="confirm"><span>${t('Ich habe alle Angaben ehrlich gemacht und kenne die Regeln von Train Sim Germany.')}</span></label></div>
           <button class="btn-line" type="submit">${t('Bewerbung senden')} ${icon('fi-rr-paper-plane')}</button>
-          <p class="f__note">${apiReady() ? t('Die Bewerbung geht mit deinem Roblox-Konto direkt an das Team.') : t('Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.')}</p>
+          <p class="f__note">${apiReady() && loginReady() ? t('Die Bewerbung geht mit deinem Roblox-Konto direkt an das Team.') : t('Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.')}</p>
         </section>
       </form>`;
   }
@@ -1534,7 +1543,8 @@
       return;
     }
     // Mit Backend: nur angemeldet (das Team sieht dann dein echtes Roblox-Konto)
-    if (apiReady() && !sessionToken()) {
+    const viaBackend = apiReady() && loginReady();
+    if (viaBackend && !sessionToken()) {
       toast(t('Bitte melde dich zuerst mit Roblox an.'));
       openModal('profile');
       return;
@@ -1561,7 +1571,7 @@
       experience: data.get('experience').trim(), activity: +data.get('activity'), days: [0, 1, 2, 3, 4, 5, 6].slice(+data.get('dayFrom'), +data.get('dayTo') + 1).map(dayShort),
       at: Date.now(),
     };
-    if (apiReady()) {
+    if (viaBackend) {
       const btn = $('button[type="submit"]', form);
       const label = btn.innerHTML;
       btn.disabled = true;
@@ -1799,7 +1809,7 @@
     const r = rankOf(state.rank);
     $('[data-settings-account]').innerHTML = `${ringHTML(p, r, 'avatar-ring--lg')}
       <div class="set-account__who"><b>${p ? esc(p.displayName || p.username) : t('Nicht verbunden')}</b><small>${p ? `@${esc(p.username)}` : t('Verbinde dein Roblox-Konto für Name und Profilbild.')}</small></div>
-      <button class="btn ${p ? 'btn--soft' : 'btn--primary'}" type="button" data-open="profile">${p ? t('Profil') : apiReady() ? t('Anmelden') : t('Verbinden')}</button>`;
+      <button class="btn ${p ? 'btn--soft' : 'btn--primary'}" type="button" data-open="profile">${p ? t('Profil') : loginReady() ? t('Anmelden') : t('Verbinden')}</button>`;
   }
 
   // ---------- Profil (Kopfzeile, Tab-Leiste, Menü) ----------
@@ -1876,10 +1886,124 @@
     toast(offline ? t('Verbunden als {name} – Profilbild gerade nicht erreichbar', { name }) : t('Verbunden als {name}', { name: state.profile.displayName }));
   }
 
-  // ---------- Backend: Roblox-Login, Privatsphäre, Bewerbungen ----------
-  // Alle Schlüssel (Roblox Client-ID/Secret, Discord-Webhook) liegen im Backend (backend/).
-  // Die App kennt nur dessen Adresse (assets/js/config.js → api). Ohne Adresse gilt die Demo.
-  const API = String((window.TSG_CONFIG && window.TSG_CONFIG.api) || '').trim().replace(/\/+$/, '');
+  // ---------- Roblox-Login (OAuth 2.0 mit PKCE) ----------
+  // Einrichtung: nur die Client-ID in assets/js/config.js eintragen. Die Anmeldung läuft direkt mit Roblox
+  // (PKCE, kein Client-Secret nötig). Ohne Client-ID bleibt die Demo mit dem Roblox-Namen.
+  // Der Rang kommt aus der Rolle in der Roblox-Gruppe; wer nicht in der Gruppe ist, ist [G] Guest.
+  const CFG = window.TSG_CONFIG || {};
+  const RBX = CFG.roblox || {};
+  const OAUTH = 'https://apis.roblox.com/oauth';
+  const clientId = () => String(RBX.clientId || '').trim();
+  const loginReady = () => !!clientId();
+  // Ohne Angabe: Adresse der Seite ohne index.html, z. B. https://name.github.io/Train-Sim-Germany/
+  const redirectUri = () => RBX.redirectUri || location.origin + location.pathname.replace(/index\.html$/, '');
+  const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const fromB64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+  const randomKey = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+  async function robloxLogin() {
+    if (!window.crypto || !crypto.subtle) { toast(t('Die Anmeldung geht nur über eine sichere Verbindung (https).')); return; }
+    const verifier = randomKey(48);
+    const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+    const login = { verifier, state: randomKey(), nonce: randomKey(), back: location.hash || '#/' };
+    try { sessionStorage.setItem('tsg-oauth', JSON.stringify(login)); } catch (e) { toast(t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.')); return; }
+    const q = new URLSearchParams({
+      client_id: clientId(), redirect_uri: redirectUri(), scope: 'openid profile',
+      response_type: 'code', state: login.state, nonce: login.nonce, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    location.assign(`${OAUTH}/v1/authorize?${q}`);
+  }
+  async function headshot(userId) {
+    try {
+      const res = await fetch(`${D.roblox.thumbnailsApi}/v1/users/avatar-headshot?userIds=${encodeURIComponent(userId)}&size=150x150&format=Png&isCircular=false`);
+      const img = ((await res.json()).data || [])[0];
+      return img && img.state === 'Completed' ? img.imageUrl : null;
+    } catch (e) { return null; }
+  }
+  // Rückkehr von Roblox (?code=…&state=…): liefert den Hinweis für den Toast oder null
+  async function oauthCallback() {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('code') && !q.has('error')) return null;
+    let login = null;
+    try { login = JSON.parse(sessionStorage.getItem('tsg-oauth')); sessionStorage.removeItem('tsg-oauth'); } catch (e) { /* kein Speicher */ }
+    // Code und state aus der Adresse entfernen, zurück zur Seite vor der Anmeldung
+    history.replaceState(null, '', location.pathname + ((login && login.back) || '#/'));
+    const failed = t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
+    if (q.has('error')) return q.get('error') === 'access_denied' ? t('Anmeldung abgebrochen') : failed;
+    if (!login || q.get('state') !== login.state || !loginReady()) return failed;
+    try {
+      const form = (data) => ({ method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(data) });
+      const res = await fetch(`${OAUTH}/v1/token`, form({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: login.verifier, client_id: clientId() }));
+      if (!res.ok) throw new Error('token');
+      const tok = await res.json();
+      const claims = tok.id_token ? JSON.parse(new TextDecoder().decode(fromB64url(tok.id_token.split('.')[1]))) : {};
+      if (claims.nonce && claims.nonce !== login.nonce) throw new Error('nonce');
+      const me = await fetch(`${OAUTH}/v1/userinfo`, { headers: { Authorization: `Bearer ${tok.access_token}` } });
+      if (!me.ok) throw new Error('userinfo');
+      const info = await me.json();
+      if (!info.sub) throw new Error('profile');
+      // Den Refresh-Token braucht die App nicht: gleich wieder ungültig machen
+      if (tok.refresh_token) fetch(`${OAUTH}/v1/token/revoke`, form({ token: tok.refresh_token, client_id: clientId() })).catch(() => {});
+      state.profile = {
+        userId: String(info.sub), username: info.preferred_username || info.name, displayName: info.nickname || info.name || info.preferred_username,
+        avatar: info.picture || (await headshot(info.sub)), oauth: true,
+      };
+      store.set('tsg-profile', state.profile);
+      await syncGroupRank({ force: true });
+      // Mit Backend: dort anmelden (für Bewerbungen, Privatsphäre und Push-Benachrichtigungen)
+      if (apiReady() && tok.id_token) {
+        try {
+          const r = await api('/auth/session', { method: 'POST', body: { id_token: tok.id_token } });
+          store.set('tsg-session', r.session);
+          if (r.privacy) store.set('tsg-privacy', r.privacy);
+        } catch (e) { /* Backend nicht erreichbar: Login gilt trotzdem in der App */ }
+      }
+      return 'ok';
+    } catch (e) {
+      return failed;
+    }
+  }
+
+  // ---------- Rang aus der Roblox-Gruppe ----------
+  // Rolle → Rang über das Kürzel („[D] Driver“, „SG | Signaller“) oder den Namen („Platform Staff“).
+  // Nicht in der Gruppe = Guest [G]. Unbekannte Rolle in der Gruppe = Passenger.
+  function rankFromRole(role) {
+    if (!role) return 'Guest';
+    const name = String(role.name || '').toLowerCase();
+    const prefix = (name.match(/^\s*\[?\s*([a-z]{1,3})\s*[\]|:\-]/) || [])[1];
+    const byPrefix = prefix && RANKS.find((r) => r.prefix.toLowerCase() === prefix);
+    const byName = RANKS.slice().sort((x, y) => y.name.length - x.name.length).find((r) => name.includes(r.name.toLowerCase()));
+    return (byPrefix || byName || rankOf('Passenger')).name;
+  }
+  // Rolle öffentlich bei Roblox abfragen (über den Proxy aus data.js, Roblox selbst erlaubt das nicht aus dem Browser)
+  async function syncGroupRank({ force = false } = {}) {
+    const p = state.profile;
+    if (!p || !p.oauth || !RBX.groupId) return;
+    const last = store.get('tsg-group', null);
+    if (!force && last && last.userId === p.userId && Date.now() - last.at < 10 * 60000) return;
+    try {
+      const res = await fetch(`${D.roblox.groupsApi}/v2/users/${encodeURIComponent(p.userId)}/groups/roles`);
+      if (!res.ok) throw new Error('groups');
+      const hit = ((await res.json()).data || []).find((x) => String(x.group && x.group.id) === String(RBX.groupId));
+      const role = hit ? { name: hit.role.name, rank: hit.role.rank } : null;
+      store.set('tsg-group', { userId: p.userId, role, rank: rankFromRole(role), at: Date.now() });
+      applyGroupRank();
+    } catch (e) { /* offline: der letzte Rang bleibt */ }
+  }
+  function applyGroupRank() {
+    const g = store.get('tsg-group', null);
+    const p = state.profile;
+    state.rankFromGroup = !!(g && p && p.oauth && g.userId === p.userId && rankIdx(g.rank) >= 0);
+    state.groupRole = state.rankFromGroup ? g.role : null;
+    if (state.rankFromGroup && state.rank !== g.rank) {
+      state.rank = g.rank;
+      store.set('tsg-rank', g.rank);
+      state.trainingDay = null;
+    }
+  }
+
+  // ---------- Backend (optional): Bewerbungen, Privatsphäre, Push-Benachrichtigungen ----------
+  // Die App kennt nur die Adresse (config.js → api). Ohne Backend läuft alles auf dem Gerät.
+  const API = String(CFG.api || '').trim().replace(/\/+$/, '');
   const apiReady = () => !!API;
   const sessionToken = () => store.get('tsg-session', null);
   async function api(path, { method = 'GET', body } = {}) {
@@ -1889,41 +2013,25 @@
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     const res = await fetch(API + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 && token) signedOut(t('Deine Anmeldung ist abgelaufen. Bitte melde dich neu an.'));
+    if (res.status === 401 && token) store.set('tsg-session', null);
     if (!res.ok) throw Object.assign(new Error(data.error || 'api'), { status: res.status });
     return data;
   }
-  // Anmelden: weiter zum Backend, das zu Roblox weiterleitet und danach hierher zurückkommt
-  function robloxLogin() {
-    location.assign(`${API}/auth/login?return=${encodeURIComponent(location.href)}`);
-  }
-  // Rückkehr vom Backend: #login=<sitzung>&back=<seite> oder #login_error=<grund>&back=<seite>
-  function loginReturn() {
-    const h = location.hash.replace(/^#/, '');
-    if (!/^(login|login_error)=/.test(h)) return null;
-    const q = new URLSearchParams(h);
-    history.replaceState(null, '', location.pathname + location.search + (q.get('back') || '#/'));
-    if (q.get('login')) { store.set('tsg-session', q.get('login')); return 'ok'; }
-    return q.get('login_error') === 'access_denied' ? t('Anmeldung abgebrochen') : t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
-  }
-  // Profil vom Backend: Name, Profilbild, Rang aus der Roblox-Gruppe, Privatsphäre
-  function applyMe(me) {
-    state.profile = { userId: me.userId, username: me.username, displayName: me.displayName, avatar: me.avatar, oauth: true };
-    store.set('tsg-profile', state.profile);
-    if (me.privacy) store.set('tsg-privacy', me.privacy);
-    state.rankFromGroup = !!me.rank && rankIdx(me.rank) >= 0;
-    if (state.rankFromGroup) { state.rank = me.rank; store.set('tsg-rank', me.rank); }
-  }
   async function loadMe() {
     if (!apiReady() || !sessionToken()) return;
-    try { applyMe(await api('/api/me')); } catch (e) { /* offline: gespeichertes Profil bleibt */ }
+    try {
+      const me = await api('/api/me');
+      if (me.privacy) store.set('tsg-privacy', me.privacy);
+    } catch (e) { /* offline */ }
   }
   function signedOut(msg) {
     store.set('tsg-session', null);
+    store.set('tsg-group', null);
     if (state.profile && state.profile.oauth) { state.profile = null; store.set('tsg-profile', null); }
     state.rankFromGroup = false;
+    state.groupRole = null;
     renderMe();
-    if (state.page === 'einstellungen') renderSettings();
+    RENDER[state.page]();
     refreshModal();
     if (msg) toast(msg);
   }
@@ -1937,7 +2045,7 @@
       render: () => {
         const p = state.profile;
         const r = rankOf(state.rank);
-        if (!p && apiReady()) {
+        if (!p && loginReady()) {
           return `<div class="profile-box">
               ${ringHTML(null, r, 'avatar-ring--xl')}
               <h3>${t('Mit Roblox anmelden')}</h3>
@@ -1968,6 +2076,9 @@
             <p>@${esc(p.username)}</p>
             <button class="rank-pill rank-pill--btn" type="button" data-open="rank" style="--rc:${r.color}">[${esc(r.prefix)}] ${esc(r.name)}${icon('fi-rr-angle-small-down')}</button>
           </div>
+          ${p.oauth && RBX.groupId ? `<p class="group-note">${icon('fi-rr-users-alt')}<span>${state.groupRole
+            ? t('Rolle in der Roblox-Gruppe: {role}', { role: `<b>${esc(state.groupRole.name)}</b>` })
+            : state.rankFromGroup ? t('Du bist noch nicht in der Roblox-Gruppe und bist deshalb Gast.') : t('Deine Rolle in der Roblox-Gruppe wird geladen …')}</span>${!state.groupRole && state.rankFromGroup ? `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Beitreten')}</a>` : ''}</p>` : ''}
           ${visibilityNote(privacy().profile, t('Dein Profil ist öffentlich.'), t('Dein Profil ist privat.'))}
           <div class="sheet-actions">
             <button class="btn btn--primary btn--lg btn--block" type="button" data-open="stats">${icon('fi-rr-chart-line-up')}${t('Meine Statistik')}</button>
@@ -2062,7 +2173,7 @@
         const locked = isLocked(tn);
         // „Join Now“ ist nur aktiv (hellblau), solange der Trainingsserver offen ist
         const action = ss.open && !locked
-          ? `<a class="btn btn--join btn--lg btn--block" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}Join Now</a>`
+          ? `<a class="btn btn--join btn--lg btn--block" href="${esc(joinUrl(trainingServer(tn)))}" target="_blank" rel="noopener">${icon('fi-sr-play')}Join Now</a>`
           : `<button class="btn btn--join btn--lg btn--block" type="button" disabled>${icon(locked ? 'fi-rr-lock' : 'fi-sr-play')}Join Now</button>`;
         const hint = locked ? '' : ss.open ? t('Der Trainingsserver ist offen – du kannst jetzt beitreten.') : t('Der Trainingsserver öffnet {n} Minuten vor Beginn.', { n: SERVER_OPENS });
         return `<div class="detail">
@@ -2082,6 +2193,7 @@
           </div>
           ${locked ? `<div class="lock">${icon('fi-rr-lock')}<span>${t('Für dieses Training brauchst du mindestens den Rang {rank}. Dein Rang: {mine}.', { rank: esc(tn.req), mine: esc(state.rank) })}</span></div>` : ''}
           ${action}
+          <button class="btn btn--remind btn--lg btn--block" type="button" data-remind="${tn.id}" aria-pressed="${isReminded(tn)}">${icon(isReminded(tn) ? 'fi-sr-bell-ring' : 'fi-rr-bell')}${isReminded(tn) ? t('Benachrichtigung an') : t('Benachrichtigen, wenn der Server öffnet')}</button>
           ${hint ? `<p class="sheet-note join-hint">${hint}</p>` : ''}
         </div>`;
       },
@@ -2138,12 +2250,149 @@
     document.body.classList.remove('menu-open');
   }
 
-  function toggleBell() {
+  // ---------- Benachrichtigungen für Trainings ----------
+  // Echte Benachrichtigungen des Systems (wie bei YouTube oder Gmail), sobald der Trainingsserver öffnet
+  // (15 Minuten vor Beginn). Ist die App offen oder im Hintergrund, schickt sie die Benachrichtigung selbst.
+  // Mit Backend (config.js → api) kommen sie per Web-Push auch, wenn die App geschlossen ist.
+  // Glocke oben = alle Trainings für deinen nächsten Rang, Glocke auf der Karte = dieses Training.
+  const remind = {
+    ids: new Set(store.get('tsg-remind', [])), // einzeln eingeschaltet
+    off: new Set(store.get('tsg-remind-off', [])), // trotz Glocke oben ausgeschaltet
+    sent: new Set(store.get('tsg-notified', [])), // schon benachrichtigt
+  };
+  const saveRemind = () => {
+    store.set('tsg-remind', [...remind.ids]);
+    store.set('tsg-remind-off', [...remind.off]);
+    store.set('tsg-notified', [...remind.sent].slice(-100));
+  };
+  function remindedIds() {
+    const out = new Set(remind.ids);
+    if (state.bell) trainingsList().forEach((tn) => { if (!remind.off.has(tn.id)) out.add(tn.id); });
+    return out;
+  }
+  const isReminded = (tn) => remindedIds().has(tn.id);
+  const notesSupported = () => 'Notification' in window && 'serviceWorker' in navigator;
+  async function allowNotifications() {
+    if (!notesSupported()) {
+      toast(/iPhone|iPad|iPod/.test(navigator.userAgent)
+        ? t('Auf dem iPhone: In Safari auf „Teilen“ → „Zum Home-Bildschirm“ tippen und die App von dort öffnen. Dann klappen Benachrichtigungen.')
+        : t('Dein Browser unterstützt keine Benachrichtigungen.'));
+      return false;
+    }
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') {
+      toast(t('Benachrichtigungen sind blockiert. Erlaube sie in den Einstellungen deines Browsers.'));
+      return false;
+    }
+    if (await Notification.requestPermission() === 'granted') return true;
+    toast(t('Ohne deine Erlaubnis können wir keine Benachrichtigungen senden.'));
+    return false;
+  }
+  // Benachrichtigung über den Service Worker (geht auch auf Android); sonst direkt
+  async function notify(title, options) {
+    const opts = { icon: 'assets/icons/icon-192.png', badge: 'assets/icons/badge-96.png', lang, ...options };
+    try {
+      const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
+      if (reg) { await reg.showNotification(title, opts); return; }
+    } catch (e) { /* weiter ohne Service Worker */ }
+    try { new Notification(title, opts); } catch (e) { /* nicht möglich */ }
+  }
+  const placeId = (String(D.links.play).match(/games\/(\d+)/) || [])[1];
+  const trainingServer = (tn) => D.servers.find((x) => x.name === tn.server);
+  const joinUrl = (s) => (placeId && s ? `https://www.roblox.com/games/start?placeId=${placeId}&gameInstanceId=${encodeURIComponent(s.id)}` : D.links.play);
+  // Inhalt der Benachrichtigung, wenn der Server öffnet
+  function trainingNote(tn) {
+    return {
+      id: tn.id,
+      title: t('{type}-Training startet in {n} Minuten', { type: tn.type, n: SERVER_OPENS }),
+      body: `${t(tn.title)} · ${t('{time} Uhr', { time: tn.time })}\n${t('Der Server „{server}“ ist jetzt offen. Leitung: {host}', { server: t(tn.server), host: tn.host })}`,
+      tag: `training-${tn.id}`,
+      url: new URL(`#/trainings?t=${encodeURIComponent(tn.id)}`, location.href).href,
+      join: joinUrl(trainingServer(tn)),
+      joinLabel: t('Beitreten'),
+    };
+  }
+  const showTrainingNote = (n) => notify(n.title, { body: n.body, tag: n.tag, data: { url: n.url, join: n.join }, actions: [{ action: 'join', title: n.joinLabel }] });
+  async function toggleReminder(id) {
+    const tn = findTraining(id);
+    if (!tn) return;
+    const on = !isReminded(tn);
+    if (on && !(await allowNotifications())) return;
+    if (on) { remind.ids.add(id); remind.off.delete(id); } else { remind.ids.delete(id); if (state.bell) remind.off.add(id); }
+    saveRemind();
+    renderReminders();
+    if (on) {
+      // Sofort eine echte Benachrichtigung als Bestätigung
+      notify(t('Benachrichtigung aktiviert'), {
+        body: t('Wir melden uns, wenn der Server für „{title}“ öffnet – {day}, {time} Uhr.', { title: t(tn.title), day: dayName(tn.day), time: hhmm(tn.start - SERVER_OPENS) }),
+        tag: 'tsg-remind-confirm', data: { url: trainingNote(tn).url },
+      });
+      toast(t('Benachrichtigung für {title} an', { title: t(tn.title) }));
+    } else toast(t('Benachrichtigung für {title} aus', { title: t(tn.title) }));
+    syncPush();
+  }
+  async function toggleBell() {
+    if (!state.bell && !(await allowNotifications())) return;
     state.bell = !state.bell;
     store.set('tsg-bell', state.bell);
-    $$('[data-bell]').forEach((b) => b.setAttribute('aria-pressed', String(state.bell)));
+    if (state.bell) remind.off.clear();
+    saveRemind();
+    renderReminders();
     const next = nextRank(state.rank);
-    toast(state.bell ? (next ? t('Erinnerungen an – wir melden uns vor {type}-Trainings', { type: next.name }) : t('Erinnerungen an')) : t('Erinnerungen aus'));
+    if (state.bell) {
+      notify(t('Benachrichtigungen aktiviert'), {
+        body: next ? t('Wir melden uns vor jedem {type}-Training, sobald der Server öffnet.', { type: next.name }) : t('Wir melden uns vor jedem Training, sobald der Server öffnet.'),
+        tag: 'tsg-remind-confirm',
+      });
+    }
+    toast(state.bell ? (next ? t('Benachrichtigungen an – wir melden uns vor {type}-Trainings', { type: next.name }) : t('Benachrichtigungen an')) : t('Benachrichtigungen aus'));
+    syncPush();
+  }
+  function renderReminders() {
+    $$('[data-bell]').forEach((b) => b.setAttribute('aria-pressed', String(state.bell)));
+    if (state.page === 'trainings') renderTrainings();
+    if (state.page === 'home') renderNextSteps();
+    if (modalView && modalView.name === 'training') refreshModal();
+  }
+  // Jede Minute: fällige Benachrichtigungen zeigen (solange die App läuft) und Push-Liste abgleichen
+  function remindersTick() {
+    if (!notesSupported() || Notification.permission !== 'granted') return;
+    const now = berlinNow().abs;
+    trainingsList({ all: true }).filter(isReminded).forEach((tn) => {
+      if (now >= tn.start - SERVER_OPENS && now < tn.start + 5 && !remind.sent.has(tn.id)) {
+        remind.sent.add(tn.id);
+        saveRemind();
+        showTrainingNote(trainingNote(tn));
+      }
+    });
+    syncPush();
+  }
+  // Web-Push über das Backend: Liste der kommenden Erinnerungen dort hinterlegen
+  const epochOf = (abs) => Math.round(Date.now() / 1000 + (abs - berlinNow().absSec / 60) * 60);
+  let pushBusy = false;
+  async function syncPush() {
+    if (!apiReady() || pushBusy || !notesSupported() || !('PushManager' in window) || Notification.permission !== 'granted') return;
+    pushBusy = true;
+    try {
+      const now = berlinNow().abs;
+      const list = trainingsList({ all: true }).filter((tn) => isReminded(tn) && tn.start - SERVER_OPENS > now)
+        .map((tn) => ({ ...trainingNote(tn), at: epochOf(tn.start - SERVER_OPENS) }));
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub && !list.length) return;
+      if (!sub) {
+        const { publicKey } = await api('/api/push/key');
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64url(publicKey) });
+      }
+      const sig = JSON.stringify([sub.endpoint, lang, list.map((r) => [r.id, r.at])]);
+      if (sig === store.get('tsg-push-sig', '')) return;
+      await api('/api/push/reminders', { method: 'POST', body: { subscription: sub.toJSON(), reminders: list, lang } });
+      store.set('tsg-push-sig', sig);
+    } catch (e) {
+      /* ohne Push: die Benachrichtigung kommt, solange die App offen ist */
+    } finally {
+      pushBusy = false;
+    }
   }
 
   // ---------- Tooltip & Toast ----------
@@ -2222,7 +2471,7 @@
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, '');
-    const [path] = raw.split('?');
+    const [path, query] = raw.split('?');
     const [first, sub, sub2] = path.split('/');
     const page = PAGES.includes(first) ? first : 'home';
     const jobId = page === 'karriere' ? (sub || null) : null;
@@ -2247,6 +2496,12 @@
     RENDER[page]();
     bind();
     if (changed) window.scrollTo({ top: 0, behavior: 'instant' });
+    // Aus einer Benachrichtigung: #/trainings?t=<id> öffnet das Training
+    const openId = new URLSearchParams(query || '').get('t');
+    if (page === 'trainings' && openId) {
+      history.replaceState(null, '', '#/trainings');
+      if (findTraining(openId)) openModal('training', openId);
+    }
   }
 
   // ---------- Menü ----------
@@ -2285,11 +2540,12 @@
 
     // Klicks, die überall vorkommen (Seiten und Sheets)
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-open], [data-detail], [data-bell], [data-day], [data-pick-day], [data-rank], [data-fav], [data-theme-set], [data-lang-set]');
+      const el = e.target.closest('[data-open], [data-detail], [data-remind], [data-bell], [data-day], [data-pick-day], [data-rank], [data-fav], [data-theme-set], [data-lang-set]');
       if (!el) return;
       const ds = el.dataset;
       if (ds.open) openModal(ds.open);
       else if (ds.detail) openModal('training', ds.detail);
+      else if (ds.remind) toggleReminder(ds.remind);
       else if ('bell' in ds) toggleBell();
       else if (ds.pickDay) { state.trainingDay = +ds.pickDay; closeModal(); renderTrainings(); }
       else if (ds.day) { state.trainingDay = +ds.day; renderTrainings(); }
@@ -2318,6 +2574,15 @@
         el.setAttribute('aria-pressed', String(state.favs.has(name)));
         toast(state.favs.has(name) ? t('{name} gemerkt', { name: t(name) }) : t('{name} entfernt', { name: t(name) }));
       }
+    });
+
+    // Server-ID kopieren
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-copy]');
+      if (!b) return;
+      const done = () => toast(t('Server-ID kopiert'));
+      if (navigator.clipboard) navigator.clipboard.writeText(b.dataset.copy).then(done, () => toast(b.dataset.copy));
+      else toast(b.dataset.copy);
     });
 
     // Sprach-Dropdown
@@ -2533,8 +2798,8 @@
     document.addEventListener('click', (e) => { if (e.target.closest('[data-roblox-login]')) robloxLogin(); });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('[data-disconnect]')) return;
-      if (sessionToken()) {
-        api('/auth/logout', { method: 'POST' }).catch(() => {});
+      if (state.profile && state.profile.oauth) {
+        if (sessionToken()) api('/auth/logout', { method: 'POST' }).catch(() => {});
         signedOut(t('Abgemeldet'));
         return;
       }
@@ -2590,6 +2855,7 @@
     state.online = Math.max(900, state.online + Math.round((Math.random() - 0.48) * 14));
     bind();
     if (!minuteChanged) return;
+    remindersTick();
     // Serverstatus der Trainings (offen / öffnet bald / geschlossen) jede Minute aktualisieren
     if (state.page === 'home') renderNextSteps();
     if (state.page === 'trainings' && modal.hidden) renderTrainings();
@@ -2607,15 +2873,21 @@
   }
   $$('[data-year]').forEach((el) => { el.textContent = berlinNow().y; });
   let loginNote = null;
+  applyGroupRank();
   setLanguage(langSetting(), { start: true }).then(async () => {
-    loginNote = loginReturn();
-    await loadMe();
+    loginNote = await oauthCallback();
+    if (loginNote === null) syncGroupRank().then(() => { renderMe(); if (state.page === 'trainings') renderTrainings(); });
+    loadMe();
   }).then(() => {
     events();
     renderMe();
     route();
-    if (loginNote === 'ok' && state.profile) toast(t('Angemeldet als {name}', { name: state.profile.displayName }));
-    else if (loginNote && loginNote !== 'ok') toast(loginNote);
+    if (loginNote === 'ok' && state.profile) {
+      const r = rankOf(state.rank);
+      toast(state.rankFromGroup ? t('Angemeldet als {name} · Rang: [{prefix}] {rank}', { name: state.profile.displayName, prefix: r.prefix, rank: r.name })
+        : t('Angemeldet als {name}', { name: state.profile.displayName }));
+    } else if (loginNote) toast(loginNote);
+    remindersTick();
     tick();
     lastMinute = berlinNow().abs;
     setInterval(tick, 1000);

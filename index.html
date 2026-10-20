@@ -489,6 +489,10 @@
         <a href="#/statistiken" data-nav="statistiken"><span class="menu__ic"><i class="fi fi-rr-chart-line-up ic" aria-hidden="true"></i></span>Statistiken</a>
         <a href="#/einstellungen" data-nav="einstellungen"><span class="menu__ic"><i class="fi fi-rr-settings ic" aria-hidden="true"></i></span>Einstellungen</a>
       </nav>
+      <nav class="menu__nav menu__nav--legal" aria-label="Rechtliches">
+        <a href="privacy.html"><span class="menu__ic"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i></span>Datenschutz</a>
+        <a href="terms.html"><span class="menu__ic"><i class="fi fi-rr-document ic" aria-hidden="true"></i></span>Nutzungsbedingungen</a>
+      </nav>
       <div class="drawer__actions">
         <a class="btn btn--primary btn--block" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
         <div class="drawer__pair">
@@ -497,13 +501,16 @@
         </div>
       </div>
       <div class="drawer__foot">
-        <span class="drawer__clock"><i class="fi fi-rr-clock-three ic" aria-hidden="true"></i><span data-clock-full>--:--:--</span><small data-tz>MEZ</small></span>
+        <div class="drawer__clock">
+          <span class="drawer__clock-ic"><i class="fi fi-rr-clock-three ic" aria-hidden="true"></i></span>
+          <span class="drawer__clock-text"><small>Uhrzeit in Deutschland</small><b data-clock-full>--:--:--</b></span>
+          <span class="drawer__tz" data-tz>MEZ</span>
+        </div>
         <button class="menu__theme" type="button" data-install hidden>
           <span class="menu__ic"><i class="fi fi-rr-download ic" aria-hidden="true"></i></span>
           App installieren
         </button>
         <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
-        <p class="drawer__legal"><a href="privacy.html">Datenschutz</a><a href="terms.html">Nutzungsbedingungen</a></p>
       </div>
     </aside>
   </div>

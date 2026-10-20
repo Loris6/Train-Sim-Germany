@@ -9,11 +9,11 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 | Seite | Inhalt |
 |---|---|
 | **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, nächstes Training, Strecken mit Nummer (R001, R002, …), Kennzahlen, Karriere, News |
-| **Server** | Serverliste mit Auslastung, Linien (ICE, IC, IRE, RE, RB, S-Bahn), Rollen (Driver, Conductor, Platform Staff, Signaller, Dispatcher, Passenger), Ping, Laufzeit und **Details**-Button. Die Detailseite (`#/server/<id>`) zeigt live alle **Züge** als Karten (Position, Verspätung, Lokführer bzw. KI, Zugbegleiter, Fahrgäste) mit Details-Button für den **Fahrtverlauf**, alle **Spieler** nach Rolle (wer wo Platform Staff ist, wer im Stellwerk sitzt, wer welchen Zug fährt) und alle **Stationen**. Ein Klick auf eine Station zeigt die kommenden Züge mit Gleis, Platform Staff und Stellwerk. Beitreten gibt es auf der Detailseite |
+| **Server** | Serverliste mit Auslastung, Linien (ICE, IC, IRE, RE, RB, S-Bahn), Rollen (Driver, Conductor, Platform Staff, Signaller, Dispatcher, Passenger), Ping, Laufzeit und **Details**-Button. Die Detailseite (`#/server/<id>`) zeigt live alle **Züge** als Karten (Position, Verspätung, Lokführer bzw. KI, Zugbegleiter, Fahrgäste) mit Details-Button für den **Fahrtverlauf**, alle **Spieler** nach Rolle (wer wo Platform Staff ist, wer im Stellwerk sitzt, wer welchen Zug fährt) und alle **Stationen**. Ein Klick auf eine Station zeigt die kommenden Züge mit Gleis, Platform Staff und Stellwerk. Die Adresse ist die Server-ID aus dem Spiel (`#/server/b1cb1816-…`), sie steht auch auf der Detailseite (antippen = kopieren). „Beitreten“ startet Roblox direkt in genau diesem Server |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community), Beiträge mit Video (Play-Symbol auf der Karte). In der Detailansicht beginnt Bild bzw. Video ganz oben in der Rundung, Griff und Schließen liegen darauf |
 | **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit 60 Fragen in drei Sektoren: 1. Über dich (Roblox, Discord, E-Mail, Spielzeit, Rang), 2. Grundwissen (40 Fragen; beim Supervisor im gewählten Bereich Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (20 Fragen, u. a. Aktivität und freie Tage per Schieberegler, bei Game Developer, Map Builder und Social Media Links mit Art). Oben zählt „x von 60 Fragen beantwortet“ mit |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, meistbefahrene Strecken (mit Streckennummer) |
-| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings). Angezeigt werden nur die Trainings für den nächsten Rang – ein Conductor sieht also nur Signaller-Trainings; Supervisor und Management sehen alle. Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. |
+| **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings). Angezeigt werden nur die Trainings für den nächsten Rang – ein Conductor sieht also nur Signaller-Trainings; Supervisor und Management sehen alle. Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. **Benachrichtigungen:** Oben links auf jeder Trainingskarte (gegenüber der Server-Anzeige) und im Detail sitzt eine Glocke. Eingeschaltet leuchtet sie rot, und das Gerät bekommt eine echte Benachrichtigung (wie bei YouTube oder Gmail), sobald der Server öffnet – mit Training, Uhrzeit, Server, Leitung und Knopf „Beitreten“. Die Glocke oben schaltet das für alle Trainings des nächsten Rangs ein |
 | **Einstellungen** | Darstellung: Hell, Dunkel oder Mit Gerät synchronisieren (folgt automatisch der Einstellung von Handy oder PC), Sprache als Dropdown mit Flagge (Automatisch = Gerätesprache, Deutsch, English, Français, Español, Italiano, Nederlands, Polski, Türkçe), Privatsphäre mit zwei Schaltern („Profil öffentlich“ und „Zeige meine Statistik öffentlich an“, beide standardmäßig aus; die Statistik geht nur bei öffentlichem Profil), Roblox-Konto, App installieren, Links zu Datenschutz und Nutzungsbedingungen |
 | **Datenschutz** · **Nutzungsbedingungen** | Eigene Seiten `privacy.html` und `terms.html` (z. B. für die Roblox-OAuth-App). Name, Adresse, E-Mail und Datum kommen aus `assets/js/config.js` |
 
@@ -53,34 +53,52 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 
 ## Navigation & Profil
 
-- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten inkl. Einstellungen direkt unter Statistiken, Spielen/Gruppe/Discord, Uhr, App installieren).
+- Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt: alle Seiten, darunter Datenschutz und Nutzungsbedingungen als gleiche Buttons, Spielen/Gruppe/Discord und unten die Uhrzeit in Deutschland als Karte (Uhr, Zeit und Zeitzone auf einer Linie).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
-- Unten liegt eine dunkle Leiste über die ganze Breite (`width: 100vw`), fest am unteren Rand, nur mit Icons: Start, News, Trainings und rechts ein kleines Profilbild (Ring in der Rangfarbe). Im Dunkelmodus ist die Leiste etwas heller, damit sie sich vom Hintergrund abhebt. Auf iPhones mit Home-Balken wächst sie um den sicheren Bereich nach unten.
-- **Mit Roblox anmelden:** Ist in `assets/js/config.js` die Adresse des Backends eingetragen (`api`), zeigt der Profil-Dialog „Mit Roblox anmelden“ (echter Login, siehe „Backend“). Ohne Backend gilt die Demo:
-- **Mit Roblox verbinden (Demo):** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist noch kein echter Login – dafür das Backend einrichten (siehe „Backend“). Im Profil- und Statistik-Dialog steht, ob Profil bzw. Statistik öffentlich sind, mit Link zu den Einstellungen.
+- Unten liegt eine dunkle Leiste über die ganze Breite (`width: 100vw`), fest am unteren Rand, nur mit Icons: Start, News, Trainings und rechts ein kleines Profilbild (Ring in der Rangfarbe). Icons und Profil liegen senkrecht genau in der Mitte – auf iPhones mit Home-Balken über die ganze Höhe der Leiste. Im Dunkelmodus ist die Leiste etwas heller.
+- Die Fußzeile (Logo, Buttons, Seiten, Hinweise) ist mittig untereinander angeordnet.
+- **Mit Roblox anmelden:** Ist in `assets/js/config.js` die Client-ID eingetragen, zeigt der Profil-Dialog „Mit Roblox anmelden“ (siehe „Roblox-Login“). Ohne Client-ID gilt die Demo:
+- **Mit Roblox verbinden (Demo):** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist noch kein echter Login – dafür die Client-ID eintragen (siehe „Roblox-Login“). Im Profil- und Statistik-Dialog steht, ob Profil bzw. Statistik öffentlich sind, mit Link zu den Einstellungen.
 
-## Backend: Roblox-Login, Privatsphäre, Bewerbungen
+## Roblox-Login: nur die Client-ID eintragen
 
-Alle Schlüssel liegen im **Backend** (Ordner [`backend/`](backend/README.md)), nie in der Web-App:
+1. Auf [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials) unter **OAuth 2.0 Apps** eine App anlegen.
+2. **Redirect URL:** genau die Adresse der Seite, z. B. `https://loris6.github.io/Train-Sim-Germany/` (mit `/` am Ende, ohne `index.html`, `#` oder `?`). Zum Testen zusätzlich `http://localhost:8000/`.
+3. **Scopes:** `openid` und `profile`.
+4. **Privacy Policy URL:** `…/privacy.html`, **Terms of Service URL:** `…/terms.html`.
+5. In **`assets/js/config.js`** die Client-ID eintragen – fertig:
 
-| Schlüssel | Wofür |
+```js
+roblox: {
+  clientId: '1234567890123456789', // aus dem Roblox-Dashboard
+  groupId: 33684346,               // Roblox-Gruppe von Train Sim Germany
+  redirectUri: '',                 // leer = Adresse der Seite
+},
+```
+
+Die Anmeldung läuft mit **PKCE** direkt zwischen Browser und Roblox (Roblox erlaubt das ausdrücklich für reine Web-Apps, CORS ist freigeschaltet). Ein Client-Secret wird nicht gebraucht und gehört nie in die Seite. Die App prüft `state` und `nonce`, lädt Nutzer-ID, Name, Anzeigename und Profilbild, macht den Refresh-Token sofort ungültig und speichert nur das öffentliche Profil im Browser. Danach geht es zurück auf die Seite, von der aus man sich angemeldet hat.
+
+**Rang aus der Roblox-Gruppe:** Nach dem Login fragt die App die Rolle des Spielers in der Gruppe (`groupId`) ab und gibt ihm den passenden Rang – über das Kürzel oder den Namen der Rolle: „[D] Driver“, „D | Driver“ und „Driver“ werden alle zu Driver, „[UD] …“ zu Passenger, „[SG] Signaller“ zu Signaller usw. **Wer nicht in der Gruppe ist, ist [G] Guest (Gast)** und bekommt im Profil den Hinweis mit Link zur Gruppe. Eine Rolle ohne passenden Namen oder Kürzel zählt als Passenger. Der Rang aus der Gruppe lässt sich nicht von Hand ändern und wird spätestens alle 10 Minuten beim Öffnen der App aktualisiert. Die Abfrage läuft über `groupsApi` in `data.js` (roproxy.com), weil Roblox sie nicht direkt aus dem Browser erlaubt.
+
+## Benachrichtigungen für Trainings
+
+Die Glocke auf den Trainingskarten (oben links, gegenüber der Server-Anzeige), im Training-Detail und oben auf der Trainingsseite (alle Trainings des nächsten Rangs) schaltet echte Benachrichtigungen des Geräts ein. Beim ersten Mal fragt der Browser um Erlaubnis, danach kommt sofort eine Bestätigung. Sobald der Trainingsserver öffnet (15 Minuten vor Beginn), meldet sich das Gerät mit Training, Uhrzeit, Server und Leitung; „Beitreten“ in der Benachrichtigung startet Roblox direkt im Trainingsserver, ein Tippen auf die Benachrichtigung öffnet das Training in der App.
+
+- **Ohne Backend** kommen die Benachrichtigungen, solange die App offen oder im Hintergrund ist.
+- **Mit Backend** (`api` in `config.js`) kommen sie per **Web-Push** auch bei geschlossener App – auf Android und am PC in Chrome, Edge und Firefox, auf dem iPhone/iPad ab iOS 16.4, wenn die App über „Zum Home-Bildschirm“ installiert ist.
+
+## Backend (optional)
+
+Für alles, was ein Server braucht, liegt im Ordner [`backend/`](backend/README.md) ein kleines Backend (kostenlos als **Cloudflare Worker** oder mit **Node.js**, keine Pakete nötig):
+
+| Funktion | Was es macht |
 |---|---|
-| `ROBLOX_CLIENT_ID`, `ROBLOX_CLIENT_SECRET` | Roblox-Login (OAuth 2.0 mit PKCE und Client-Secret) |
-| `SESSION_SECRET` | Signiert die Sitzungen (30 Tage gültig) |
-| `DISCORD_WEBHOOK_URL` | Bewerbungen gehen als Nachricht mit allen Antworten in einen Discord-Kanal |
-| `ROBLOX_GROUP_ID` | Rang wird automatisch aus der Roblox-Gruppe übernommen |
+| **Web-Push** | Speichert, wer für welches Training benachrichtigt werden will, und schickt die Benachrichtigung zur richtigen Zeit (verschlüsselt nach RFC 8291, VAPID-Schlüssel erzeugt es selbst) |
+| **Bewerbungen** | Sendet Bewerbungen mit dem angemeldeten Roblox-Konto, Ergebnis und allen Antworten an einen privaten Discord-Kanal (`DISCORD_WEBHOOK_URL`, bleibt geheim). Höchstens 3 pro Tag und eine pro Stelle |
+| **Privatsphäre** | Speichert „Profil öffentlich“ und „Statistik öffentlich“; `GET /api/players/<id>` liefert ein Profil nur, wenn es öffentlich ist |
+| **Sitzung** | Nach dem Login schickt die App das von Roblox signierte ID-Token; das Backend prüft Signatur, Client-ID und Ablauf und gibt eine eigene Sitzung (30 Tage, Abmelden beendet alle) |
 
-Die Web-App kennt nur die Adresse des Backends (`api` in `assets/js/config.js`). Das Backend läuft kostenlos als **Cloudflare Worker** oder mit **Node.js** auf jedem Server – Schritt-für-Schritt-Anleitung in [`backend/README.md`](backend/README.md).
-
-Was es macht:
-
-- **Anmelden:** „Mit Roblox anmelden“ führt über das Backend zu Roblox und zurück. Das Backend tauscht den Code mit dem Client-Secret, lädt Name, Anzeigename, Profilbild und die Rolle in der Gruppe und gibt der App eine signierte Sitzung (nur im Browser gespeichert). Der Token von Roblox wird nicht gespeichert, der Refresh-Token sofort ungültig gemacht.
-- **Rang aus der Gruppe:** Ist `ROBLOX_GROUP_ID` gesetzt, wird die Rolle in der Gruppe dem Rang der App zugeordnet (Name oder Kürzel, z. B. „Driver“, „[D] Driver“, „SG | Signaller“). Der Rang lässt sich dann nicht mehr von Hand ändern.
-- **Privatsphäre:** Die Schalter „Profil öffentlich“ und „Statistik öffentlich“ werden im Backend gespeichert. `GET /api/players/<id>` liefert ein Profil nur, wenn es öffentlich ist.
-- **Bewerbungen:** nur angemeldet. Sie gehen mit dem echten Roblox-Konto, Ergebnis und allen Fragen und Antworten (als Textdatei) an den Discord-Kanal. Höchstens 3 pro Tag und eine pro Stelle.
-- **Abmelden** macht alle Sitzungen des Kontos ungültig.
-
-Ohne `api` läuft die App weiter als Demo (Verbinden über den Roblox-Namen, Bewerbungen nur auf dem Gerät).
+Einrichten: Schritt-für-Schritt in [`backend/README.md`](backend/README.md), danach die Adresse in `config.js` bei `api` eintragen. Ohne Backend läuft alles andere wie gewohnt (Bewerbungen bleiben dann auf dem Gerät).
 
 ## Datenschutz & Nutzungsbedingungen
 
@@ -110,7 +128,7 @@ links: {
 
 Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Server, Trainings, News und Jobs (`jobs`).
 
-**Server & Fahrplan:** Jeder Server in `servers` hat eine `id` (Adresse der Detailseite `#/server/<id>`) und eine Liste `lines` mit den Linien, die dort fahren. Die Linien stehen in `lines`:
+**Server & Fahrplan:** Jeder Server in `servers` hat als `id` seine Server-ID aus dem Spiel (JobId, z. B. `b1cb1816-7d85-457c-9f32-2a1422d00e17`). Sie ist die Adresse der Detailseite (`#/server/<id>`) und sorgt dafür, dass „Beitreten“ direkt in diesen Server führt. `lines` sind die Linien, die dort fahren. Die Linien stehen in `lines`:
 
 ```js
 'ice-28': { name: 'ICE 28', cat: 'ice', train: 'ICE 4', every: 60, offset: 24, no: 500,
@@ -150,7 +168,7 @@ Fragetypen (`type`):
 
 **Bewerbungen:** Das Formular prüft die Eingaben und berechnet, wie viele bewertete Fragen richtig sind (`score` / `total`). Mit Backend gehen Bewerbungen an einen Discord-Kanal (Webhook nur im Backend, nie in der Seite); ohne Backend werden sie nur im Browser gespeichert (Demo).
 
-**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher). Supervisor ist ein Teamrang ohne eigenes Training (Bewerbung über die Karriere) und leitet die Trainings; den Instructor gibt es nicht mehr. Jeder Rang hat ein Kürzel (`prefix`, z. B. UD, D, PS, CD, SG, SV) und die Zahl der Spieler (`members`), die auf der Startseite bei den Rollen steht. Die Trainingsseite zeigt nur die Trainings für den nächsten Rang an. `me` ist der angemeldete Spieler (Demo); später kann der Rang aus der Roblox-Gruppe kommen. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
+**Ränge & Trainings:** `ranks` legt den Ausbildungsweg fest (Guest → Passenger → Driver → Platform Staff → Conductor → Signaller → Dispatcher). Guest [G] ist, wer nicht in der Roblox-Gruppe ist. Supervisor ist ein Teamrang ohne eigenes Training (Bewerbung über die Karriere) und leitet die Trainings; den Instructor gibt es nicht mehr. Jeder Rang hat ein Kürzel (`prefix`, z. B. UD, D, PS, CD, SG, SV) und die Zahl der Spieler (`members`), die auf der Startseite bei den Rollen steht. Die Trainingsseite zeigt nur die Trainings für den nächsten Rang an. `me` ist der Spieler im Demo-Modus; mit Roblox-Login kommt der Rang aus der Roblox-Gruppe. `trainings` ist ein Wochenplan, den die App für zwei Wochen ausrollt. Aktuell sind das Beispieldaten. Später können sie über eine API mit echten Spieldaten befüllt werden.
 
 ## Icons hinzufügen
 
@@ -182,9 +200,9 @@ index.html            Alle Seiten (Hash-Routing: #/trainings, #/server, #/server
 privacy.html          Datenschutzerklärung
 terms.html            Nutzungsbedingungen
 manifest.webmanifest  App-Beschreibung (Name, Icons, Schnellzugriffe)
-sw.js                 Service Worker für den Offline-Modus
+sw.js                 Service Worker für den Offline-Modus und Benachrichtigungen
 assets/css/style.css  Design-System und Layouts
-assets/js/config.js   Adresse des Backends und Angaben für die Rechtstexte (keine Schlüssel!)
+assets/js/config.js   Roblox-Client-ID, Gruppe, Adresse des Backends und Angaben für die Rechtstexte (keine Geheimnisse!)
 assets/js/nozoom.js   Sperrt das Hineinzoomen auf allen Seiten
 assets/js/data.js     Inhalte & Beispieldaten (Server, Linien, Trainings, News …)
 assets/js/legal.js    Setzt die Angaben aus config.js in privacy.html und terms.html ein
@@ -198,8 +216,10 @@ assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PN
 assets/fonts/         Rubik und UIcons (woff2)
 tools/build_icons.py  Baut die UIcons-Teilmenge
 tools/render_videos.mjs Erzeugt die News-Clips aus den Illustrationen
-backend/              Backend mit allen Schlüsseln: Roblox-Login, Privatsphäre, Bewerbungen → Discord
+backend/              Optionales Backend: Web-Push, Bewerbungen → Discord, Privatsphäre
   app.js              Logik (Web-Standards, läuft überall)
+  webpush.js          Web-Push (VAPID, Verschlüsselung nach RFC 8291, Zeitplan)
+  lib.js              Kleine Hilfen
   worker.js           Start als Cloudflare Worker (wrangler.toml)
   server.js           Start mit Node.js (.env)
   .env.example        Alle Einstellungen mit Erklärung

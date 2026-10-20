@@ -10,6 +10,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-arrow-small-up:before{content:"\f19f"}
 .fi-rr-arrow-up-right-from-square:before{content:"\f1b3"}
+.fi-rr-bell:before{content:"\f239"}
 .fi-rr-bolt:before{content:"\f26c"}
 .fi-rr-briefcase:before{content:"\f2e9"}
 .fi-rr-calendar:before{content:"\f339"}
@@ -17,6 +18,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-check:before{content:"\f3c8"}
 .fi-rr-check-circle:before{content:"\f3c4"}
 .fi-rr-clock-three:before{content:"\f453"}
+.fi-rr-copy:before{content:"\f4dd"}
 .fi-rr-cross-small:before{content:"\f4f6"}
 .fi-rr-database:before{content:"\f525"}
 .fi-rr-document:before{content:"\f57a"}
@@ -62,6 +64,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 @font-face{font-family:uicons-solid-rounded;src:url(../fonts/uicons-solid-rounded.woff2) format("woff2");font-display:block}
 i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,span[class*=fi-sr-]:before{font-family:uicons-solid-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .fi-sr-bell:before{content:"\f237"}
+.fi-sr-bell-ring:before{content:"\f233"}
 .fi-sr-calendar:before{content:"\f336"}
 .fi-sr-check:before{content:"\f3c0"}
 .fi-sr-heart:before{content:"\f794"}

@@ -29,22 +29,23 @@ window.TSG = {
     tripsToday: 18430,
   },
 
-  // id = Adresse der Detailseite (#/server/<id>), lines = Linien aus `lines`, die auf dem Server fahren.
+  // id = Server-ID aus dem Spiel (JobId), zugleich Adresse der Detailseite (#/server/<id>) und für „Beitreten“.
+  // lines = Linien aus `lines`, die auf dem Server fahren.
   // focus = Rang, den ein Trainingsserver vor allem ausbildet. Züge, Spieler und Stationen
   // berechnet die App aus dem Fahrplan (Demo – später live aus dem Spiel).
   servers: [
-    { id: 'nordnetz-1', name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: 372, version: '2.4.1', type: 'public', lines: ['ice-28', 'ice-22', 'ic-31', 'ire-1', 're-3', 's-3'] },
-    { id: 'nordnetz-2', name: 'Nordnetz #2', region: 'EU-West', network: 'Hamburg – Kiel – Sylt', players: 18, max: 35, ping: 31, uptime: 160, version: '2.4.1', type: 'public', lines: ['ice-31', 'ic-26', 're-6', 're-7', 'rb-61', 's-3p'] },
-    { id: 'suednetz-1', name: 'Südnetz #1', region: 'EU-Central', network: 'München – Nürnberg – Garmisch', players: 35, max: 35, ping: 24, uptime: 663, version: '2.4.1', type: 'public', lines: ['ice-29', 'ic-87', 're-1', 'rb-6', 's-8m'] },
-    { id: 'westnetz-1', name: 'Westnetz #1', region: 'EU-West', network: 'Köln – Düsseldorf – Koblenz', players: 27, max: 35, ping: 33, uptime: 295, version: '2.4.1', type: 'public', lines: ['ice-43', 'ic-35', 're-5', 'rb-26', 's-6'] },
-    { id: 'ostnetz-1', name: 'Ostnetz #1', region: 'EU-Central', network: 'Berlin – Leipzig – Dresden', players: 12, max: 35, ping: 38, uptime: 58, version: '2.4.1', type: 'public', lines: ['ice-15', 'ic-17', 're-50', 're-3b', 's-7', 's-1d'] },
-    { id: 'nachtfahrt', name: 'Nachtfahrt-Event', region: 'EU-Central', network: 'Gesamtnetz · Nachtfahrplan', players: 48, max: 50, ping: 41, uptime: 80, version: '2.4.1', type: 'event', lines: ['ice-28', 'ice-22', 'ire-1', 're-6', 're-7', 'ice-29', 'rb-6', 'ice-41', 're-5', 're-50', 's-7'] },
-    { id: 'signaller-training', name: 'Signaller-Training', region: 'EU-West', network: 'Hannover Hbf · Ausbildung', players: 9, max: 12, ping: 27, uptime: 35, version: '2.4.1', type: 'training', focus: 'Signaller', lines: ['ice-22', 'ic-31', 're-2', 's-5'] },
-    { id: 'driver-training', name: 'Driver-Training', region: 'EU-West', network: 'Hamburg – Bremen', players: 6, max: 10, ping: 29, uptime: 22, version: '2.4.1', type: 'training', focus: 'Driver', lines: ['ic-30', 're-4'] },
-    { id: 'westnetz-2', name: 'Westnetz #2', region: 'EU-West', network: 'Frankfurt – Köln (SFS)', players: 31, max: 35, ping: 35, uptime: 468, version: '2.4.1', type: 'public', lines: ['ice-41', 'ice-78', 're-9', 's-8f'] },
-    { id: 'na-1', name: 'NA Network #1', region: 'US-East', network: 'Gesamtnetz', players: 22, max: 35, ping: 112, uptime: 190, version: '2.4.1', type: 'public', lines: ['ice-28', 'ice-29', 'ice-41', 'ic-17', 're-6', 're-1', 'rb-26', 's-3'] },
-    { id: 'vip-lea', name: 'VIP · Lea & Friends', region: 'EU-West', network: 'Schwarzwaldbahn', players: 5, max: 12, ping: 26, uptime: 65, version: '2.4.1', type: 'vip', lines: ['re-2s', 'rb-37'] },
-    { id: 'beta-25', name: 'Beta · Update 2.5', region: 'EU-Central', network: 'Linke Rheinstrecke (neu)', players: 19, max: 20, ping: 30, uptime: 45, version: '2.5.0-beta', type: 'event', lines: ['ic-35r', 're-5r', 'rb-26r'] },
+    { id: 'b1cb1816-7d85-457c-9f32-2a1422d00e17', name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: 372, version: '2.4.1', type: 'public', lines: ['ice-28', 'ice-22', 'ic-31', 'ire-1', 're-3', 's-3'] },
+    { id: '5bb7fb0f-d8d9-415b-8725-460b8ce504db', name: 'Nordnetz #2', region: 'EU-West', network: 'Hamburg – Kiel – Sylt', players: 18, max: 35, ping: 31, uptime: 160, version: '2.4.1', type: 'public', lines: ['ice-31', 'ic-26', 're-6', 're-7', 'rb-61', 's-3p'] },
+    { id: 'ce9c02e4-aafb-4062-97ff-bbaaeca05990', name: 'Südnetz #1', region: 'EU-Central', network: 'München – Nürnberg – Garmisch', players: 35, max: 35, ping: 24, uptime: 663, version: '2.4.1', type: 'public', lines: ['ice-29', 'ic-87', 're-1', 'rb-6', 's-8m'] },
+    { id: '0583542f-4cd5-413d-8c6e-3438c63be5a9', name: 'Westnetz #1', region: 'EU-West', network: 'Köln – Düsseldorf – Koblenz', players: 27, max: 35, ping: 33, uptime: 295, version: '2.4.1', type: 'public', lines: ['ice-43', 'ic-35', 're-5', 'rb-26', 's-6'] },
+    { id: 'e35fd989-b021-4ac8-8c31-76236de8809a', name: 'Ostnetz #1', region: 'EU-Central', network: 'Berlin – Leipzig – Dresden', players: 12, max: 35, ping: 38, uptime: 58, version: '2.4.1', type: 'public', lines: ['ice-15', 'ic-17', 're-50', 're-3b', 's-7', 's-1d'] },
+    { id: 'dde53f64-b9a5-4b5f-b3c1-8c1b55270a2c', name: 'Nachtfahrt-Event', region: 'EU-Central', network: 'Gesamtnetz · Nachtfahrplan', players: 48, max: 50, ping: 41, uptime: 80, version: '2.4.1', type: 'event', lines: ['ice-28', 'ice-22', 'ire-1', 're-6', 're-7', 'ice-29', 'rb-6', 'ice-41', 're-5', 're-50', 's-7'] },
+    { id: '2e432cd4-4edb-4a59-89e3-2949b3995201', name: 'Signaller-Training', region: 'EU-West', network: 'Hannover Hbf · Ausbildung', players: 9, max: 12, ping: 27, uptime: 35, version: '2.4.1', type: 'training', focus: 'Signaller', lines: ['ice-22', 'ic-31', 're-2', 's-5'] },
+    { id: '8a1e6f91-0951-4549-a823-213cb38eb51c', name: 'Driver-Training', region: 'EU-West', network: 'Hamburg – Bremen', players: 6, max: 10, ping: 29, uptime: 22, version: '2.4.1', type: 'training', focus: 'Driver', lines: ['ic-30', 're-4'] },
+    { id: '5fbd48da-8157-4056-9496-0b4de48e224b', name: 'Westnetz #2', region: 'EU-West', network: 'Frankfurt – Köln (SFS)', players: 31, max: 35, ping: 35, uptime: 468, version: '2.4.1', type: 'public', lines: ['ice-41', 'ice-78', 're-9', 's-8f'] },
+    { id: '1a306ce2-9f4a-4d58-afb7-fb492f5fca05', name: 'NA Network #1', region: 'US-East', network: 'Gesamtnetz', players: 22, max: 35, ping: 112, uptime: 190, version: '2.4.1', type: 'public', lines: ['ice-28', 'ice-29', 'ice-41', 'ic-17', 're-6', 're-1', 'rb-26', 's-3'] },
+    { id: 'db4b4019-d184-4f29-8669-d2723a604f08', name: 'VIP · Lea & Friends', region: 'EU-West', network: 'Schwarzwaldbahn', players: 5, max: 12, ping: 26, uptime: 65, version: '2.4.1', type: 'vip', lines: ['re-2s', 'rb-37'] },
+    { id: '233308a8-c720-4ded-8418-4a04f387583b', name: 'Beta · Update 2.5', region: 'EU-Central', network: 'Linke Rheinstrecke (neu)', players: 19, max: 20, ping: 30, uptime: 45, version: '2.5.0-beta', type: 'event', lines: ['ic-35r', 're-5r', 'rb-26r'] },
   ],
 
   // Linien im Spiel. stops = [Bahnhof, Minuten ab dem ersten Halt]. Gefahren wird in beide Richtungen.
@@ -95,9 +96,12 @@ window.TSG = {
   },
 
   // Reihenfolge = Ausbildungsweg. Nach jedem Training steigt man einen Rang auf.
+  // Guest = nicht in der Roblox-Gruppe. Beim Roblox-Login kommt der Rang aus der Rolle in der Gruppe
+  // (Name oder Kürzel der Rolle, z. B. „Driver“ oder „[D] Driver“).
   // prefix = Kürzel vor dem Profilbild, members = Spieler mit diesem Rang in der Gruppe.
   // staff = Teamrang ohne eigenes Training (zählt nicht als Voraussetzung für Trainings).
   ranks: [
+    { name: 'Guest', prefix: 'G', label: 'Gast', desc: 'Noch nicht in der Roblox-Gruppe', color: '#AFB4BB', members: 0, guest: true },
     { name: 'Passenger', prefix: 'UD', label: 'Fahrgast', desc: 'Neu im Spiel, noch ohne Ausbildung', color: '#878C96', members: 18420 },
     { name: 'Driver', prefix: 'D', label: 'Lokführer', desc: 'Züge sicher und pünktlich fahren', color: '#EC0016', members: 9650 },
     { name: 'Platform Staff', prefix: 'PS', label: 'Bahnsteigpersonal', desc: 'Bahnsteig sichern, Abfahrtsauftrag geben', color: '#00A099', members: 3120 },
@@ -108,12 +112,13 @@ window.TSG = {
     { name: 'Management', prefix: 'MG', label: 'Leitung', desc: 'Leitung von Train Sim Germany', color: '#3C414B', members: 12 },
   ],
 
-  // Demo ohne Login: öffentliche Roblox-Daten (Name, Profilbild) über einen Proxy mit CORS laden.
-  // Roblox selbst erlaubt keine Abfragen direkt aus dem Browser.
-  // Der echte Login (OAuth 2.0) wird in assets/js/config.js eingerichtet.
+  // Öffentliche Roblox-Daten (Name, Profilbild, Rolle in der Gruppe) über einen Proxy mit CORS laden.
+  // Roblox selbst erlaubt diese Abfragen nicht direkt aus dem Browser.
+  // Der Login (OAuth 2.0) wird in assets/js/config.js eingerichtet (nur die Client-ID).
   roblox: {
     usersApi: 'https://users.roproxy.com',
     thumbnailsApi: 'https://thumbnails.roproxy.com',
+    groupsApi: 'https://groups.roproxy.com',
   },
 
   // Spielernamen für die Besatzung auf den Servern (Demo)

@@ -1,24 +1,30 @@
 /*
- * Train Sim Germany – Backend
+ * Train Sim Germany – Backend (optional)
  *
- * Hier liegen alle Schlüssel: Roblox Client-ID und Client-Secret, der Schlüssel für die
- * Sitzungen und der Discord-Webhook für Bewerbungen. Die Web-App kennt nur die Adresse
- * des Backends (assets/js/config.js → api).
+ * Die Anmeldung mit Roblox läuft direkt in der Web-App (nur Client-ID, PKCE). Das Backend ergänzt:
+ *   - Benachrichtigungen für Trainings per Web-Push, auch wenn die App geschlossen ist
+ *   - Bewerbungen an den Discord-Kanal des Teams (der Webhook bleibt geheim)
+ *   - Privatsphäre-Einstellungen, die auch andere sehen (öffentliches Profil)
  *
  * Diese Datei nutzt nur Web-Standards (fetch, Request, Response, crypto.subtle) und läuft
- * deshalb als Cloudflare Worker (worker.js) und mit Node.js (server.js).
+ * als Cloudflare Worker (worker.js) und mit Node.js (server.js).
  *
  *   GET  /health                  Was ist eingerichtet?
- *   GET  /auth/login?return=URL   Weiter zu Roblox (OAuth 2.0 mit PKCE und Client-Secret)
- *   GET  /auth/callback           Rückkehr von Roblox → zurück zur App mit Sitzung
+ *   POST /auth/session            { id_token } aus dem Roblox-Login → Sitzung fürs Backend
  *   POST /auth/logout             Abmelden (alle Sitzungen des Kontos werden ungültig)
  *   GET  /api/me                  Eigenes Profil, Rang aus der Roblox-Gruppe, Privatsphäre
  *   PUT  /api/me/privacy          Privatsphäre speichern: { profile, stats }
  *   GET  /api/players/<id>        Öffentliches Profil eines Spielers (nur wenn freigegeben)
- *   POST /api/applications        Bewerbung an den Discord-Kanal des Teams senden
+ *   POST /api/applications        Bewerbung an den Discord-Kanal senden (angemeldet)
+ *   GET  /api/push/key            Öffentlicher Schlüssel für Web-Push
+ *   POST /api/push/reminders      { subscription, reminders } – Erinnerungen für Trainings
  *
- * Einstellungen (Umgebungsvariablen bzw. Secrets): siehe .env.example
+ * Einstellungen: siehe .env.example bzw. README.md
  */
+import { enc, b64u, fromB64u, randomKey, now, clip, jsonPart } from './lib.js';
+import { vapidKeys, saveReminders, sendDue } from './webpush.js';
+
+export { sendDue };
 
 const ROBLOX = {
   oauth: 'https://apis.roblox.com/oauth',
@@ -26,66 +32,55 @@ const ROBLOX = {
   groups: 'https://groups.roblox.com',
   thumbnails: 'https://thumbnails.roblox.com',
 };
-// Ränge der App mit Kürzel. Rollen in der Roblox-Gruppe werden über Name oder Kürzel zugeordnet,
-// z. B. „Driver“, „[D] Driver“ oder „D | Driver“.
+// Ränge der App mit Kürzel. Die Rolle in der Roblox-Gruppe wird über Kürzel oder Name zugeordnet,
+// z. B. „[D] Driver“, „SG | Signaller“ oder „Platform Staff“. Nicht in der Gruppe = Guest.
 const RANKS = [
-  ['Management', 'MG'], ['Dispatcher', 'DS'], ['Supervisor', 'SV'], ['Signaller', 'SG'],
-  ['Conductor', 'CD'], ['Platform Staff', 'PS'], ['Driver', 'D'], ['Passenger', 'UD'],
+  ['Management', 'MG'], ['Dispatcher', 'DS'], ['Supervisor', 'SV'], ['Signaller', 'SG'], ['Conductor', 'CD'],
+  ['Platform Staff', 'PS'], ['Passenger', 'UD'], ['Driver', 'D'], ['Guest', 'G'],
 ];
 const SESSION_DAYS = 30;
-const LOGIN_MINUTES = 10;
 const REFRESH_MINUTES = 10;
 const APPS_PER_DAY = 3;
+const DEFAULT_GROUP = '33684346';
 
-const enc = new TextEncoder();
-const dec = new TextDecoder();
-
-// ---------- Hilfen ----------
-const b64u = (bytes) => {
-  let s = '';
-  new Uint8Array(bytes).forEach((b) => { s += String.fromCharCode(b); });
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
-const fromB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
-const randomKey = (n = 32) => b64u(crypto.getRandomValues(new Uint8Array(n)));
-const now = () => Math.floor(Date.now() / 1000);
 const robloxUrl = (env, name) => (env[`ROBLOX_${name.toUpperCase()}_URL`] || ROBLOX[name]).replace(/\/+$/, '');
-const clip = (v, n) => String(v ?? '').slice(0, n);
+const groupId = (env) => String(env.ROBLOX_GROUP_ID || DEFAULT_GROUP);
+const loginReady = (env) => !!env.ROBLOX_CLIENT_ID;
 
+// ---------- Geheimer Schlüssel für Sitzungen (wird beim ersten Start erzeugt, außer SESSION_SECRET ist gesetzt) ----------
 const keyCache = new Map();
-async function hmacKey(env) {
-  const secret = env.SESSION_SECRET;
+async function hmacKey(env, store) {
+  let secret = env.SESSION_SECRET;
+  if (!secret) {
+    secret = await store.get('config:session-secret');
+    if (!secret) { secret = randomKey(32); await store.put('config:session-secret', secret); }
+  }
   if (!keyCache.has(secret)) {
     keyCache.set(secret, crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']));
   }
   return keyCache.get(secret);
 }
-// Signierte Daten (für Sitzung und Login-Cookie): <daten>.<signatur>
-async function seal(env, data) {
+async function seal(env, store, data) {
   const body = b64u(enc.encode(JSON.stringify(data)));
-  const sig = await crypto.subtle.sign('HMAC', await hmacKey(env), enc.encode(body));
+  const sig = await crypto.subtle.sign('HMAC', await hmacKey(env, store), enc.encode(body));
   return `${body}.${b64u(sig)}`;
 }
-async function unseal(env, token) {
+async function unseal(env, store, token) {
   const [body, sig, extra] = String(token || '').split('.');
   if (!body || !sig || extra !== undefined) return null;
   try {
-    if (!await crypto.subtle.verify('HMAC', await hmacKey(env), fromB64u(sig), enc.encode(body))) return null;
-    const data = JSON.parse(dec.decode(fromB64u(body)));
+    if (!await crypto.subtle.verify('HMAC', await hmacKey(env, store), fromB64u(sig), enc.encode(body))) return null;
+    const data = jsonPart(body);
     return data.exp && data.exp > now() ? data : null;
   } catch (e) {
     return null;
   }
 }
 
-const loginReady = (env) => !!(env.ROBLOX_CLIENT_ID && env.ROBLOX_CLIENT_SECRET && String(env.SESSION_SECRET || '').length >= 32 && env.APP_URL);
-const appOrigins = (env) => {
-  const list = [env.APP_URL, ...String(env.ALLOWED_ORIGINS || '').split(',')].map((x) => x.trim()).filter(Boolean);
-  return list.map((x) => { try { return new URL(x).origin; } catch (e) { return null; } }).filter(Boolean);
-};
-const publicBase = (req, env) => (env.BACKEND_URL ? env.BACKEND_URL.replace(/\/+$/, '') : new URL(req.url).origin);
-const isHttps = (req, env) => publicBase(req, env).startsWith('https:');
-
+// ---------- CORS & Antworten ----------
+const appOrigins = (env) => [env.APP_URL, ...String(env.ALLOWED_ORIGINS || '').split(',')]
+  .map((x) => String(x || '').trim()).filter(Boolean)
+  .map((x) => { try { return new URL(x).origin; } catch (e) { return null; } }).filter(Boolean);
 function cors(req, env) {
   const origin = req.headers.get('Origin');
   if (!origin || !appOrigins(env).includes(origin)) return {};
@@ -101,22 +96,10 @@ const json = (req, env, data, status = 200) => new Response(JSON.stringify(data)
   status,
   headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...cors(req, env) },
 });
-const redirect = (url, headers = {}) => new Response(null, { status: 302, headers: { Location: url, 'Cache-Control': 'no-store', ...headers } });
-const cookies = (req) => Object.fromEntries(String(req.headers.get('Cookie') || '').split(';').map((c) => c.trim().split('=')).filter((p) => p[0]).map(([k, ...v]) => [k, v.join('=')]));
-
-// Zurück zur App: #login=<sitzung>&back=<seite> bzw. #login_error=<grund>&back=<seite>
-function backToApp(env, ret, params) {
-  const target = new URL(ret || env.APP_URL);
-  const back = target.hash || '#/';
-  target.hash = '';
-  return `${target}#${new URLSearchParams({ ...params, back })}`;
-}
-function safeReturn(env, ret) {
-  try {
-    const u = new URL(ret);
-    if (appOrigins(env).includes(u.origin)) return u.toString();
-  } catch (e) { /* ungültig */ }
-  return env.APP_URL;
+async function readJson(req, max = 100000) {
+  const text = await req.text();
+  if (text.length > max) throw Object.assign(new Error('too_large'), { status: 413 });
+  try { return JSON.parse(text || '{}'); } catch (e) { throw Object.assign(new Error('bad_json'), { status: 400 }); }
 }
 
 // ---------- Roblox ----------
@@ -125,28 +108,27 @@ async function getJson(url, init) {
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
   return res.json();
 }
-function matchRank(roleName) {
-  const name = String(roleName || '').toLowerCase();
+export function matchRank(role) {
+  if (!role) return 'Guest';
+  const name = String(role.name || '').toLowerCase();
   const prefix = (name.match(/^\s*\[?\s*([a-z]{1,3})\s*[\]|:\-]/) || [])[1];
-  const hit = RANKS.find(([rank]) => name.includes(rank.toLowerCase())) || RANKS.find(([, p]) => p.toLowerCase() === prefix);
-  return hit ? hit[0] : null;
+  const hit = (prefix && RANKS.find(([, p]) => p.toLowerCase() === prefix))
+    || RANKS.slice().sort((a, b) => b[0].length - a[0].length).find(([rank]) => name.includes(rank.toLowerCase()));
+  return hit ? hit[0] : 'Passenger';
 }
 // Aktuelle Angaben von Roblox: Name, Anzeigename, Profilbild, Rolle in der Gruppe. Fehler sind egal (alte Werte bleiben).
 async function refreshUser(env, user) {
   const id = encodeURIComponent(user.sub);
-  const jobs = [
+  await Promise.allSettled([
     getJson(`${robloxUrl(env, 'users')}/v1/users/${id}`).then((u) => { user.username = u.name || user.username; user.displayName = u.displayName || user.displayName; }),
     getJson(`${robloxUrl(env, 'thumbnails')}/v1/users/avatar-headshot?userIds=${id}&size=150x150&format=Png&isCircular=false`)
       .then((r) => { const img = (r.data || [])[0]; if (img && img.state === 'Completed') user.avatar = img.imageUrl; }),
-  ];
-  if (env.ROBLOX_GROUP_ID) {
-    jobs.push(getJson(`${robloxUrl(env, 'groups')}/v2/users/${id}/groups/roles`).then((r) => {
-      const hit = (r.data || []).find((x) => String(x.group && x.group.id) === String(env.ROBLOX_GROUP_ID));
+    getJson(`${robloxUrl(env, 'groups')}/v2/users/${id}/groups/roles`).then((r) => {
+      const hit = (r.data || []).find((x) => String(x.group && x.group.id) === groupId(env));
       user.groupRole = hit ? { name: hit.role.name, rank: hit.role.rank } : null;
-      user.rank = hit ? matchRank(hit.role.name) : 'Passenger';
-    }));
-  }
-  await Promise.allSettled(jobs);
+      user.rank = matchRank(user.groupRole);
+    }),
+  ]);
   user.refreshed = now();
   return user;
 }
@@ -155,89 +137,70 @@ const publicUser = (user) => ({
   rank: user.rank || null, groupRole: user.groupRole || null,
 });
 
-// ---------- Anmeldung ----------
-async function login(req, env) {
-  if (!loginReady(env)) return new Response('Roblox-Login ist nicht eingerichtet (ROBLOX_CLIENT_ID, ROBLOX_CLIENT_SECRET, SESSION_SECRET, APP_URL).', { status: 503 });
-  const url = new URL(req.url);
-  const verifier = randomKey(48);
-  const challenge = b64u(await crypto.subtle.digest('SHA-256', enc.encode(verifier)));
-  const state = randomKey();
-  const nonce = randomKey();
-  const ret = safeReturn(env, url.searchParams.get('return'));
-  const cookie = await seal(env, { state, verifier, nonce, ret, exp: now() + LOGIN_MINUTES * 60 });
-  const q = new URLSearchParams({
-    client_id: env.ROBLOX_CLIENT_ID, redirect_uri: `${publicBase(req, env)}/auth/callback`, scope: 'openid profile',
-    response_type: 'code', state, nonce, code_challenge: challenge, code_challenge_method: 'S256',
-  });
-  return redirect(`${robloxUrl(env, 'oauth')}/v1/authorize?${q}`, {
-    'Set-Cookie': `tsg_login=${cookie}; Path=/auth; Max-Age=${LOGIN_MINUTES * 60}; HttpOnly; SameSite=Lax${isHttps(req, env) ? '; Secure' : ''}`,
-  });
+// ID-Token aus dem Roblox-Login prüfen: Signatur (Schlüssel von Roblox), für unsere Client-ID, nicht abgelaufen
+const jwks = { at: 0, keys: [] };
+async function robloxKeys(env, fresh = false) {
+  if (fresh || !jwks.keys.length || Date.now() - jwks.at > 3600000) {
+    jwks.keys = (await getJson(`${robloxUrl(env, 'oauth')}/v1/certs`)).keys || [];
+    jwks.at = Date.now();
+  }
+  return jwks.keys;
+}
+export async function verifyIdToken(env, token) {
+  const [h, p, s, extra] = String(token || '').split('.');
+  if (!h || !p || !s || extra !== undefined) throw new Error('format');
+  const header = jsonPart(h);
+  const claims = jsonPart(p);
+  const algs = {
+    ES256: [{ name: 'ECDSA', namedCurve: 'P-256' }, { name: 'ECDSA', hash: 'SHA-256' }],
+    RS256: [{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, { name: 'RSASSA-PKCS1-v1_5' }],
+  };
+  if (!algs[header.alg]) throw new Error('alg');
+  const find = (keys) => keys.find((k) => k.kid === header.kid);
+  const jwk = find(await robloxKeys(env)) || find(await robloxKeys(env, true));
+  if (!jwk) throw new Error('kid');
+  const key = await crypto.subtle.importKey('jwk', { ...jwk, key_ops: undefined, alg: header.alg }, algs[header.alg][0], false, ['verify']);
+  if (!await crypto.subtle.verify(algs[header.alg][1], key, fromB64u(s), enc.encode(`${h}.${p}`))) throw new Error('signature');
+  const aud = [].concat(claims.aud).map(String);
+  if (!aud.includes(String(env.ROBLOX_CLIENT_ID))) throw new Error('aud');
+  if (!String(claims.iss || '').startsWith(robloxUrl(env, 'oauth'))) throw new Error('iss');
+  if (!claims.exp || claims.exp < now() - 60) throw new Error('exp');
+  if (!claims.sub) throw new Error('sub');
+  return claims;
 }
 
-async function callback(req, env, store) {
-  const url = new URL(req.url);
-  const saved = await unseal(env, cookies(req).tsg_login);
-  const clear = { 'Set-Cookie': `tsg_login=; Path=/auth; Max-Age=0; HttpOnly; SameSite=Lax${isHttps(req, env) ? '; Secure' : ''}` };
-  const ret = saved ? saved.ret : env.APP_URL;
-  const fail = (reason) => redirect(backToApp(env, ret, { login_error: reason }), clear);
-  if (!loginReady(env)) return fail('not_configured');
-  if (url.searchParams.get('error')) return fail(url.searchParams.get('error') === 'access_denied' ? 'access_denied' : 'failed');
-  if (!saved || url.searchParams.get('state') !== saved.state || !url.searchParams.get('code')) return fail('failed');
+async function createSession(req, env, store) {
+  if (!loginReady(env)) return json(req, env, { error: 'not_configured' }, 503);
+  const body = await readJson(req, 20000);
+  let claims;
   try {
-    const oauth = robloxUrl(env, 'oauth');
-    const tok = await getJson(`${oauth}/v1/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code', code: url.searchParams.get('code'), code_verifier: saved.verifier,
-        client_id: env.ROBLOX_CLIENT_ID, client_secret: env.ROBLOX_CLIENT_SECRET,
-      }),
-    });
-    // nonce aus dem ID-Token prüfen (der Token kommt direkt von Roblox über https)
-    if (tok.id_token) {
-      const claims = JSON.parse(dec.decode(fromB64u(tok.id_token.split('.')[1])));
-      if (claims.nonce !== saved.nonce) throw new Error('nonce');
-    }
-    const info = await getJson(`${oauth}/v1/userinfo`, { headers: { Authorization: `Bearer ${tok.access_token}` } });
-    if (!info.sub) throw new Error('userinfo');
-    // Den Refresh-Token braucht das Backend nicht: sofort ungültig machen
-    if (tok.refresh_token) {
-      await fetch(`${oauth}/v1/token/revoke`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ token: tok.refresh_token, client_id: env.ROBLOX_CLIENT_ID, client_secret: env.ROBLOX_CLIENT_SECRET }),
-      }).catch(() => {});
-    }
-    const old = (await store.get(`user:${info.sub}`)) || {};
-    const user = {
-      privacy: { profile: false, stats: false }, ver: 1, ...old,
-      sub: String(info.sub), username: info.preferred_username || info.name, displayName: info.nickname || info.name, avatar: info.picture || old.avatar || null,
-      lastLogin: now(),
-    };
-    await refreshUser(env, user);
-    await store.put(`user:${user.sub}`, user);
-    const session = await seal(env, { sub: user.sub, ver: user.ver, iat: now(), exp: now() + SESSION_DAYS * 86400 });
-    return redirect(backToApp(env, ret, { login: session }), clear);
+    claims = await verifyIdToken(env, body.id_token);
   } catch (e) {
-    console.error('Login fehlgeschlagen:', e.message);
-    return fail('failed');
+    return json(req, env, { error: 'invalid_token' }, 401);
   }
+  const old = (await store.get(`user:${claims.sub}`)) || {};
+  const user = {
+    privacy: { profile: false, stats: false }, ver: 1, ...old,
+    sub: String(claims.sub),
+    username: claims.preferred_username || claims.name || old.username || String(claims.sub),
+    displayName: claims.nickname || claims.name || old.displayName || claims.preferred_username,
+    avatar: claims.picture || old.avatar || null,
+    lastLogin: now(),
+  };
+  await refreshUser(env, user);
+  await store.put(`user:${user.sub}`, user);
+  const session = await seal(env, store, { sub: user.sub, ver: user.ver, iat: now(), exp: now() + SESSION_DAYS * 86400 });
+  return json(req, env, { session, ...publicUser(user), privacy: user.privacy });
 }
 
 // Angemeldeter Nutzer aus „Authorization: Bearer <sitzung>“
 async function authUser(req, env, store) {
-  if (!loginReady(env)) return null;
   const token = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-  const s = await unseal(env, token);
+  if (!token) return null;
+  const s = await unseal(env, store, token);
   if (!s) return null;
   const user = await store.get(`user:${s.sub}`);
   return user && user.ver === s.ver ? user : null;
-}
-
-async function readJson(req, max = 100000) {
-  const text = await req.text();
-  if (text.length > max) throw Object.assign(new Error('too_large'), { status: 413 });
-  try { return JSON.parse(text || '{}'); } catch (e) { throw Object.assign(new Error('bad_json'), { status: 400 }); }
 }
 
 // ---------- Bewerbungen → Discord ----------
@@ -255,6 +218,7 @@ async function sendApplication(req, env, store, user) {
   const title = `${clip(a.jobTitle || a.job, 80)}${a.area ? ` – ${clip(a.area, 40)}` : ''}`;
   const profile = `https://www.roblox.com/users/${encodeURIComponent(user.sub)}/profile`;
   const score = Number.isFinite(+a.total) && +a.total > 0 ? `${+a.score} von ${+a.total} richtig (${Math.round((+a.score / +a.total) * 100)} %)` : '–';
+  const role = user.groupRole ? `\nGruppe: ${user.groupRole.name}` : '\nNicht in der Gruppe';
   const field = (name, value, inline = true) => ({ name, value: clip(value || '–', 1024), inline });
   const embed = {
     title: clip(`Neue Bewerbung: ${title}`, 256),
@@ -267,7 +231,7 @@ async function sendApplication(req, env, store, user) {
       field('Discord', clip(a.discord, 100)),
       field('E-Mail', clip(a.email, 200)),
       field('Spielt seit', clip(a.since, 60)),
-      field('Rang', `${clip(a.rank, 40)} (angegeben)${user.groupRole ? `\nGruppe: ${user.groupRole.name}` : ''}`),
+      field('Rang', `${clip(a.rank, 40)} (angegeben)${role}`),
       field('Ergebnis', score),
       field('Aktivität', a.activity ? `${+a.activity} / 10` : '–'),
       field('Freie Tage', clip((a.days || []).join(', '), 100)),
@@ -283,7 +247,7 @@ async function sendApplication(req, env, store, user) {
     `Discord: ${clip(a.discord, 100)}`,
     `E-Mail: ${clip(a.email, 200)}`,
     `Spielt seit: ${clip(a.since, 60)}`,
-    `Rang (angegeben): ${clip(a.rank, 40)}${user.groupRole ? ` · Rolle in der Gruppe: ${user.groupRole.name}` : ''}`,
+    `Rang (angegeben): ${clip(a.rank, 40)} · ${user.groupRole ? `Rolle in der Gruppe: ${user.groupRole.name}` : 'nicht in der Gruppe'}`,
     `Ergebnis: ${score}`,
     `Aktivität: ${a.activity ? `${+a.activity} / 10` : '–'} · Freie Tage: ${clip((a.days || []).join(', '), 100) || '–'}`,
     `Sprache: ${clip(a.lang, 10)} · Gesendet: ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`,
@@ -298,14 +262,10 @@ async function sendApplication(req, env, store, user) {
       `   ${clip(x.a, 3000).replace(/\n/g, '\n   ')}`,
     ]),
   ];
+  const file = `bewerbung-${user.username}-${a.job}.txt`;
   const form = new FormData();
-  form.append('payload_json', JSON.stringify({
-    username: 'Train Sim Germany',
-    allowed_mentions: { parse: [] },
-    embeds: [embed],
-    attachments: [{ id: 0, filename: `bewerbung-${user.username}-${a.job}.txt` }],
-  }));
-  form.append('files[0]', new Blob([lines.join('\n')], { type: 'text/plain; charset=utf-8' }), `bewerbung-${user.username}-${a.job}.txt`);
+  form.append('payload_json', JSON.stringify({ username: 'Train Sim Germany', allowed_mentions: { parse: [] }, embeds: [embed], attachments: [{ id: 0, filename: file }] }));
+  form.append('files[0]', new Blob([lines.join('\n')], { type: 'text/plain; charset=utf-8' }), file);
   const res = await fetch(`${env.DISCORD_WEBHOOK_URL}${env.DISCORD_WEBHOOK_URL.includes('?') ? '&' : '?'}wait=true`, { method: 'POST', body: form });
   if (!res.ok) {
     console.error('Discord:', res.status, await res.text().catch(() => ''));
@@ -323,10 +283,14 @@ export async function handle(req, env, store) {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req, env) });
   try {
     if (path === '/' || path === '/health') {
-      return json(req, env, { ok: true, login: loginReady(env), applications: !!env.DISCORD_WEBHOOK_URL, group: !!env.ROBLOX_GROUP_ID });
+      return json(req, env, { ok: true, login: loginReady(env), applications: !!env.DISCORD_WEBHOOK_URL, push: true, group: groupId(env) });
     }
-    if (path === '/auth/login' && req.method === 'GET') return await login(req, env);
-    if (path === '/auth/callback' && req.method === 'GET') return await callback(req, env, store);
+    if (path === '/auth/session' && req.method === 'POST') return await createSession(req, env, store);
+    if (path === '/api/push/key' && req.method === 'GET') return json(req, env, { publicKey: (await vapidKeys(store)).publicKey });
+    if (path === '/api/push/reminders' && req.method === 'POST') {
+      const body = await readJson(req, 60000);
+      return json(req, env, await saveReminders(store, body).then((r) => ({ count: r.count })));
+    }
 
     const player = path.match(/^\/api\/players\/(\d{1,20})$/);
     if (player && req.method === 'GET') {
