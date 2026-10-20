@@ -19,8 +19,10 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-clock-three:before{content:"\f453"}
 .fi-rr-cross-small:before{content:"\f4f6"}
 .fi-rr-database:before{content:"\f525"}
+.fi-rr-document:before{content:"\f57a"}
 .fi-rr-download:before{content:"\f591"}
 .fi-rr-edit:before{content:"\f5c1"}
+.fi-rr-eye:before{content:"\f5f8"}
 .fi-rr-gamepad:before{content:"\f6df"}
 .fi-rr-globe:before{content:"\f705"}
 .fi-rr-grip-dots-vertical:before{content:"\f72d"}
@@ -30,6 +32,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-info:before{content:"\f80b"}
 .fi-rr-link-alt:before{content:"\f8b5"}
 .fi-rr-lock:before{content:"\f8d5"}
+.fi-rr-marker:before{content:"\f8fd"}
 .fi-rr-menu-burger:before{content:"\f925"}
 .fi-rr-moon:before{content:"\f972"}
 .fi-rr-newspaper:before{content:"\f9a5"}
@@ -41,16 +44,20 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-search:before{content:"\fbba"}
 .fi-rr-settings:before{content:"\fbd2"}
 .fi-rr-shield-check:before{content:"\fbdb"}
+.fi-rr-sign-in-alt:before{content:"\fc0b"}
 .fi-rr-signal-alt-2:before{content:"\fc11"}
 .fi-rr-smartphone:before{content:"\fc44"}
 .fi-rr-star:before{content:"\fce9"}
 .fi-rr-sun:before{content:"\fd17"}
 .fi-rr-time-fast:before{content:"\fda4"}
+.fi-rr-traffic-light:before{content:"\fddc"}
 .fi-rr-train-side:before{content:"\fddf"}
+.fi-rr-train-station:before{content:"\fde1"}
 .fi-rr-triangle-warning:before{content:"\fe33"}
 .fi-rr-trophy:before{content:"\fe39"}
 .fi-rr-user-add:before{content:"\fe7a"}
 .fi-rr-users-alt:before{content:"\fea1"}
+.fi-rr-whistle:before{content:"\ff01"}
 
 @font-face{font-family:uicons-solid-rounded;src:url(../fonts/uicons-solid-rounded.woff2) format("woff2");font-display:block}
 i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,span[class*=fi-sr-]:before{font-family:uicons-solid-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}

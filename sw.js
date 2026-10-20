@@ -1,14 +1,18 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v7';
+const CACHE = 'tsg-v8';
 const SHELL = [
   './',
   'index.html',
+  'privacy.html',
+  'terms.html',
   'manifest.webmanifest',
   'assets/css/style.css',
   'assets/css/uicons.css',
+  'assets/js/config.js',
   'assets/js/data.js',
+  'assets/js/legal.js',
   'assets/js/app.js',
   'assets/js/questions/de.js',
   'assets/img/logo.svg',
@@ -32,7 +36,10 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  // Rückkehr vom Roblox-Login (?code=…) nicht zwischenspeichern
+  if (url.search) return;
   // Videos werden in Teilen geladen (Range) und nicht zwischengespeichert
   if (req.headers.has('range') || req.destination === 'video') return;
   e.respondWith(fetch(req)

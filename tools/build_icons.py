@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Baut die Flaticon-UIcons für die Seite.
 
-Durchsucht index.html und assets/js/*.js nach Icon-Klassen wie fi-rr-home,
+Durchsucht alle .html-Seiten und assets/js/*.js nach Icon-Klassen wie fi-rr-home,
 fi-sr-star oder fi-brands-discord, schneidet die UIcons-Schriften auf genau
 diese Icons zu und schreibt:
 
@@ -41,7 +41,7 @@ def main():
         sys.exit(f'UIcons-Paket nicht gefunden: {PKG}\nZuerst: npm install --no-save @flaticon/flaticon-uicons')
 
     used = {style: set() for style in STYLES}
-    for path in [ROOT / 'index.html', *sorted((ROOT / 'assets/js').glob('*.js'))]:
+    for path in [*sorted(ROOT.glob('*.html')), *sorted((ROOT / 'assets/js').glob('*.js'))]:
         for style, name in re.findall(r'fi-(rr|sr|brands)-([a-z0-9]+(?:-[a-z0-9]+)*)', path.read_text(encoding='utf-8')):
             used[style].add(name)
 

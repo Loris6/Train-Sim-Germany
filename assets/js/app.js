@@ -154,6 +154,11 @@
     page: 'home',
     serverType: 'all',
     serverQuery: '',
+    // Server-Details (#/server/<id>): Ansicht und Filter
+    serverId: null,
+    sdTab: 'trains',
+    sdCat: 'all',
+    sdRole: 'all',
     range: '24',
     rank: rankIdx(store.get('tsg-rank', '')) >= 0 ? store.get('tsg-rank', '') : D.me.rank,
     trainingDay: null,
@@ -384,17 +389,205 @@
 
   // ---------- Server ----------
   const CREW = D.crew;
-  function serverRoles(s) {
-    const roles = [
-      ['Driver', t('Lokführer'), Math.round(s.players * 0.32)],
-      ['Conductor', t('Zugbegleiter'), Math.round(s.players * 0.2)],
-      ['Signaller', t('Fahrdienstleiter'), Math.max(1, Math.round(s.players * 0.08))],
-    ];
-    roles.push(['Passenger', t('Fahrgäste'), Math.max(0, s.players - roles.reduce((sum, r) => sum + r[2], 0))]);
-    return roles;
-  }
+  const serverById = (id) => D.servers.find((s) => s.id === id);
   // Laufzeit in Minuten → „6 Std. 12 Min.“
   const uptime = (min) => (min >= 60 ? t('{h} Std. {m} Min.', { h: Math.floor(min / 60), m: pad(min % 60) }) : t('{m} Min.', { m: min }));
+
+  // ---------- Fahrplan: Züge, Spieler und Stationen eines Servers ----------
+  // Jede Linie aus D.lines fährt im Takt in beide Richtungen. Daraus ergeben sich die Züge, die gerade
+  // unterwegs sind, und die nächsten Abfahrten an jedem Bahnhof (Demo – später live aus dem Spiel).
+  const CATS = [
+    { id: 'ice', name: 'ICE' }, { id: 'ic', name: 'IC' }, { id: 'ire', name: 'IRE' },
+    { id: 're', name: 'RE' }, { id: 'rb', name: 'RB' }, { id: 's', name: 'S-Bahn' },
+  ];
+  const CAT_ORDER = CATS.map((c) => c.id);
+  const MAX_DELAY = 16;
+  const lineEnd = (L) => L.stops[L.stops.length - 1][1];
+  const lineOffset = (L, dir) => (dir ? (L.offset + Math.floor(L.every / 2)) % L.every : L.offset);
+  const lineBadge = (L) => `<span class="line line--${L.cat}">${esc(L.name)}</span>`;
+  // Eine Fahrt: dir 0 = Richtung wie in data.js, 1 = Gegenrichtung, start = Abfahrt am ersten Halt (Minuten)
+  function tripOf(lineId, dir, start) {
+    const L = D.lines[lineId];
+    const end = lineEnd(L);
+    const raw = dir ? L.stops.map(([name, m]) => [name, end - m]).reverse() : L.stops;
+    // 1 Minute Halt an jedem Zwischenhalt
+    const stops = raw.map(([name, m], i) => ({ name, arr: start + m, dep: start + m + (i > 0 && i < raw.length - 1 ? 1 : 0) }));
+    const perDay = 1440 / L.every;
+    const idx = ((((start - lineOffset(L, dir)) / L.every) % perDay) + perDay) % perDay;
+    const h = hash(`${lineId}/${dir}/${start}`);
+    const r = h % 100;
+    const delay = r < 60 ? 0 : r < 80 ? 1 + ((h >>> 8) % 2) : r < 94 ? 3 + ((h >>> 8) % 4) : 7 + ((h >>> 8) % 9);
+    return {
+      id: `${lineId}~${dir}~${start}`, lineId, line: L, dir, start, stops, delay,
+      no: `${L.name.split(' ')[0]} ${L.no + idx * 2 + dir}`, from: stops[0].name, to: stops[stops.length - 1].name,
+    };
+  }
+  function tripById(id) {
+    const [lineId, dir, start] = String(id).split('~');
+    return D.lines[lineId] ? tripOf(lineId, +dir, +start) : null;
+  }
+  function tripsBetween(lineId, dir, a, b) {
+    const L = D.lines[lineId];
+    const off = lineOffset(L, dir);
+    const out = [];
+    for (let k = Math.ceil((a - off) / L.every); off + k * L.every <= b; k++) out.push(tripOf(lineId, dir, off + k * L.every));
+    return out;
+  }
+  // Wo ist der Zug gerade? now = Minuten mit Sekundenanteil
+  function tripState(tr, now) {
+    const at = now - tr.delay;
+    const s = tr.stops;
+    const last = s.length - 1;
+    if (at < s[0].dep) return { phase: 'wait', i: 0, at, progress: 0 };
+    if (at >= s[last].arr) return { phase: 'done', i: last, at, progress: 1 };
+    const progress = (at - s[0].dep) / (s[last].arr - s[0].dep);
+    for (let i = 0; i < last; i++) {
+      if (at < s[i].dep) return { phase: 'stop', i, at, progress };
+      if (at < s[i + 1].arr) return { phase: 'run', i, at, progress, seg: (at - s[i].dep) / (s[i + 1].arr - s[i].dep) };
+    }
+    return { phase: 'done', i: last, at, progress: 1 };
+  }
+  // Züge, die gerade fahren, an einem Bahnhof halten oder in den nächsten 3 Minuten abfahren
+  function serverTrains(s, now) {
+    const out = [];
+    s.lines.forEach((lineId) => {
+      const L = D.lines[lineId];
+      [0, 1].forEach((dir) => tripsBetween(lineId, dir, now - lineEnd(L) - MAX_DELAY, now + 3).forEach((tr) => {
+        const st = tripState(tr, now);
+        if (st.phase === 'done' || (st.phase === 'wait' && tr.stops[0].dep - st.at > 3)) return;
+        tr.st = st;
+        out.push(tr);
+      }));
+    });
+    return out.sort((a, b) => CAT_ORDER.indexOf(a.line.cat) - CAT_ORDER.indexOf(b.line.cat)
+      || a.line.name.localeCompare(b.line.name, 'de', { numeric: true }) || a.start - b.start);
+  }
+  // Bahnhöfe des Servers, wichtige zuerst. box = mit Stellwerk
+  function serverStations(s) {
+    const map = new Map();
+    s.lines.forEach((lineId) => D.lines[lineId].stops.forEach(([name]) => {
+      if (!map.has(name)) map.set(name, { name, lines: [] });
+      const st = map.get(name);
+      if (!st.lines.includes(lineId)) st.lines.push(lineId);
+    }));
+    return Array.from(map.values()).map((st) => {
+      const big = /Hbf|Fernbf/.test(st.name);
+      st.platforms = big ? Math.min(16, 4 + st.lines.length * 2) : Math.max(2, Math.min(6, st.lines.length + 1));
+      st.box = big || st.lines.length >= 3;
+      st.staff = [];
+      st.signallers = [];
+      return st;
+    }).sort((a, b) => b.box - a.box || b.lines.length - a.lines.length || a.name.localeCompare(b.name, 'de'));
+  }
+  const platformOf = (st, lineId, dir) => (st ? 1 + (hash(`${st.name}/${lineId}/${dir}`) % st.platforms) : 1);
+
+  // Spieler: Namen aus D.crew und erzeugte Roblox-Namen, Rollen nach festen Anteilen (Rest = Fahrgäste)
+  const NAME_A = ['Lok', 'Bahn', 'Gleis', 'Signal', 'Weichen', 'Takt', 'Zug', 'Schiene', 'Express', 'Regio', 'Rail', 'Tf', 'Strecke', 'Bahnhof', 'Rangier', 'Kelle'];
+  const NAME_B = ['Max', 'Lena', 'Tom', 'Mia', 'Ben', 'Emma', 'Paul', 'Lea', 'Finn', 'Noah', 'Jana', 'Luca', 'Nele', 'Timo', 'Ida', 'Ole', 'Fan', 'Profi', 'Held', 'Fuchs'];
+  const ROLE_SHARE = [['Driver', 0.34], ['Conductor', 0.14], ['Platform Staff', 0.12], ['Signaller', 0.08]];
+  const ROLE_ORDER = ['Supervisor', 'Dispatcher', 'Signaller', 'Platform Staff', 'Driver', 'Conductor', 'Passenger'];
+  const ROLE_LABEL = {
+    Driver: 'Lokführer', Conductor: 'Zugbegleiter', 'Platform Staff': 'Bahnsteigpersonal', Signaller: 'Fahrdienstleiter',
+    Dispatcher: 'Disponent', Supervisor: 'Aufsicht', Passenger: 'Fahrgäste',
+  };
+  const playerCache = {};
+  function serverPlayers(s) {
+    if (playerCache[s.id]) return playerCache[s.id];
+    const n = s.players;
+    const host = s.type === 'training' ? (D.trainings.find((x) => x.server === s.name) || {}).host : null;
+    const names = host ? [host] : [];
+    CREW.forEach((name, i) => { if ((hash(s.id) + i) % 3 === 0 && !names.includes(name)) names.push(name); });
+    for (let i = 0; names.length < n; i++) {
+      const h = hash(`${s.id}#${i}`);
+      const a = NAME_A[h % NAME_A.length];
+      const b = NAME_B[(h >>> 5) % NAME_B.length];
+      const k = (h >>> 11) % 100;
+      const name = [`${a}_${b}`, `${b}${a}${pad(k)}`, `${a}${b}${2005 + (k % 14)}`, `${b}_${a}${k}`][(h >>> 18) % 4];
+      if (!names.includes(name)) names.push(name);
+    }
+    const roles = [];
+    if (host) roles.push('Supervisor');
+    if (s.focus) for (let i = Math.round((n - roles.length) * 0.6); i > 0; i--) roles.push(s.focus);
+    ROLE_SHARE.forEach(([role, share]) => {
+      const want = Math.max(role === 'Signaller' && n >= 6 ? 1 : 0, Math.round(n * share));
+      for (let i = roles.filter((r) => r === role).length; i < want && roles.length < n; i++) roles.push(role);
+    });
+    if (n >= 25 && roles.length < n) roles.push('Dispatcher');
+    while (roles.length < n) roles.push('Passenger');
+    // Gemischte Reihenfolge, die Trainingsleitung behält ihre Rolle
+    const rest = names.slice(host ? 1 : 0, n).sort((x, y) => hash(x + s.id) - hash(y + s.id));
+    const list = (host ? [host] : []).concat(rest).map((name, i) => ({
+      name, role: roles[i], since: 3 + (hash(`${name}@${s.id}`) % Math.max(4, Math.min(s.uptime, 300))),
+    }));
+    playerCache[s.id] = list.sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.name.localeCompare(b.name));
+    return playerCache[s.id];
+  }
+  // Wer sitzt in welchem Zug? Einmal vergeben, bleibt ein Spieler bis zum Ende der Fahrt in seinem Zug.
+  const seatMemo = {};
+  function serverModel(s) {
+    const now = berlinNow().absSec / 60;
+    const trains = serverTrains(s, now);
+    const stations = serverStations(s);
+    const stationMap = new Map(stations.map((st) => [st.name, st]));
+    const players = serverPlayers(s).map((p) => ({ ...p }));
+    const active = new Map(trains.map((tr) => [tr.id, tr]));
+    const memo = seatMemo[s.id] || (seatMemo[s.id] = new Map());
+    players.forEach((p) => { const id = memo.get(p.name); if (id && active.has(id)) p.trainId = id; });
+    trains.forEach((tr) => { tr.crew = {}; tr.riders = []; });
+    const seat = (role, eligible) => {
+      const pool = players.filter((p) => p.role === role);
+      pool.forEach((p) => { if (p.trainId) active.get(p.trainId).crew[role] = p; });
+      trains.filter(eligible).sort((a, b) => a.start - b.start).forEach((tr) => {
+        if (tr.crew[role]) return;
+        const free = pool.filter((p) => !p.trainId);
+        if (!free.length) return;
+        const p = free.reduce((best, x) => (hash(x.name + tr.id) > hash(best.name + tr.id) ? x : best));
+        p.trainId = tr.id;
+        tr.crew[role] = p;
+        memo.set(p.name, tr.id);
+      });
+    };
+    seat('Driver', () => true);
+    seat('Conductor', (tr) => tr.crew.Driver && tr.line.cat !== 's');
+    const hubs = stations.slice(0, Math.min(3, stations.length));
+    const boxes = stations.filter((st) => st.box);
+    let staffN = 0;
+    let boxN = 0;
+    players.forEach((p) => {
+      if (p.trainId) {
+        p.train = active.get(p.trainId);
+        if (p.role === 'Passenger') p.train.riders.push(p);
+      } else if (p.role === 'Platform Staff') {
+        p.station = stations[staffN++ % stations.length];
+        p.station.staff.push(p);
+      } else if (p.role === 'Signaller') {
+        p.station = (boxes.length ? boxes : stations)[boxN++ % (boxes.length || stations.length)];
+        p.station.signallers.push(p);
+      } else if (p.role === 'Passenger' && trains.length && hash(p.name) % 10 < 7) {
+        // Fahrgäste: 70 % sitzen in einem Zug, die anderen warten am Bahnsteig
+        const tr = trains.reduce((best, x) => (hash(p.name + x.id) > hash(p.name + best.id) ? x : best));
+        p.train = tr;
+        tr.riders.push(p);
+        memo.set(p.name, tr.id);
+      } else if (p.role !== 'Dispatcher' && p.role !== 'Supervisor') {
+        p.station = hubs[hash(p.name) % hubs.length];
+        p.waiting = true;
+      }
+    });
+    // Bahnsteige auf das Platform Staff eines Bahnhofs aufteilen
+    stations.forEach((st) => st.staff.forEach((p, k) => {
+      const per = Math.ceil(st.platforms / st.staff.length);
+      p.tracks = [k * per + 1, Math.min(st.platforms, (k + 1) * per)];
+    }));
+    return { s, now, trains, stations, stationMap, players };
+  }
+  const tracksText = (p) => (p.tracks[0] === p.tracks[1] ? t('Gleis {n}', { n: p.tracks[0] }) : t('Gleis {a}–{b}', { a: p.tracks[0], b: p.tracks[1] }));
+  function roleCounts(players) {
+    const out = ROLE_ORDER.map((role) => [role, players.filter((p) => p.role === role).length]).filter(([, n]) => n);
+    // Fahrgäste zuletzt
+    return out.sort((a, b) => (a[0] === 'Passenger') - (b[0] === 'Passenger') || rankIdx(a[0]) - rankIdx(b[0]));
+  }
+
   function renderServers() {
     const free = D.servers.reduce((sum, x) => sum + Math.max(0, x.max - x.players), 0);
     const ping = Math.round(D.servers.reduce((sum, x) => sum + x.ping, 0) / D.servers.length);
@@ -407,43 +600,283 @@
     const list = D.servers.filter((s) => {
       if (state.serverType === 'free' && s.players >= s.max * 0.8) return false;
       if (!['all', 'free'].includes(state.serverType) && s.type !== state.serverType) return false;
-      return !q || norm(`${s.name} ${s.network} ${s.region}`).includes(q);
+      return !q || norm(`${s.name} ${s.network} ${s.region} ${s.lines.map((id) => D.lines[id].name).join(' ')}`).includes(q);
     });
     const typeTag = { public: ['', t('Öffentlich')], event: ['tag--red', t('Event')], training: ['tag--info', t('Training')], vip: ['tag--warn', 'VIP'] };
     $('[data-servers]').innerHTML = list.length ? list.map((s) => {
+      const m = serverModel(s);
       const ratio = s.players / s.max;
       const full = s.players >= s.max;
       const level = full ? 'bad' : ratio >= 0.85 ? 'warn' : 'ok';
       const label = full ? t('Voll') : ratio >= 0.85 ? t('Fast voll') : t('{n} frei', { n: s.max - s.players });
       const [tagCls, tagText] = typeTag[s.type];
-      const names = CREW.filter((_, i) => (hash(s.name) + i) % 5 === 0).slice(0, 3);
+      const lines = [];
+      s.lines.forEach((id) => { if (!lines.some((L) => L.name === D.lines[id].name)) lines.push(D.lines[id]); });
+      lines.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));
+      const shown = m.players.filter((p) => p.role !== 'Passenger').slice(0, 3);
       return `<article class="server">
         <div class="server__head">
           <div class="server__name">
             <span class="server__ic">${icon(s.type === 'training' ? 'fi-rr-calendar' : s.type === 'event' ? 'fi-rr-bolt' : 'fi-rr-database')}</span>
-            <div><h3>${esc(t(s.name))}</h3><small><span class="live-dot live-dot--sm"></span>${esc(s.region)} · v${esc(s.version)}</small></div>
+            <div><h3>${esc(t(s.name))}</h3><small><span class="live-dot"></span>${esc(s.region)} · v${esc(s.version)}</small></div>
           </div>
           <span class="tag ${tagCls}">${tagText}</span>
         </div>
         <p class="server__net">${icon('fi-rr-route')}${esc(t(s.network))}</p>
+        <div class="server__lines">${lines.map(lineBadge).join('')}</div>
         <div class="occ">
           <div class="occ__row"><span class="status status--${level}">${label}</span><b>${s.players}/${s.max}</b></div>
           <div class="bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
         </div>
-        <div class="server__roles"><span class="server__roles-title">${t('Rollen')}</span>${serverRoles(s).map(([r, label, n]) => `<span class="role-count" style="--rc:${rankOf(r).color}"><i></i><span>${label}</span><b>${n}</b></span>`).join('')}</div>
+        <div class="server__roles"><span class="server__roles-title">${t('Rollen')}</span>${roleCounts(m.players).map(([r, n]) => `<span class="role-count" style="--rc:${rankOf(r).color}"><i></i><span>${esc(r)}</span><b>${n}</b></span>`).join('')}</div>
         <dl class="server__meta">
           <div><dt>${icon('fi-rr-signal-alt-2')}Ping</dt><dd>${s.ping} ms</dd></div>
-          <div><dt>${icon('fi-rr-train-side')}${t('Züge')}</dt><dd>${s.trains}</dd></div>
+          <div><dt>${icon('fi-rr-train-side')}${t('Züge')}</dt><dd>${m.trains.length}</dd></div>
           <div><dt>${icon('fi-rr-clock-three')}${t('Laufzeit')}</dt><dd>${uptime(s.uptime)}</dd></div>
         </dl>
         <div class="server__foot">
-          <span class="avatars">${names.map((n) => avatar(n)).join('')}<small>+${Math.max(0, s.players - names.length)}</small></span>
-          ${full
-            ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
-            : `<a class="btn btn--primary btn--sm" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`}
+          <span class="avatars">${shown.map((p) => avatar(p.name)).join('')}<small>${t('{n} Spieler', { n: s.players })}</small></span>
+          <a class="server__details" href="#/server/${encodeURIComponent(s.id)}" aria-label="${esc(t('Details zu {name}', { name: t(s.name) }))}">
+            <span>${t('Details')}</span><span class="server__details-ic">${icon('fi-rr-arrow-small-right')}</span>
+          </a>
         </div>
       </article>`;
     }).join('') : `<p class="empty">${t('Kein Server gefunden. Versuch einen anderen Filter.')}</p>`;
+  }
+
+  // ---------- Server-Details ----------
+  const delayHtml = (d) => (d ? `<span class="delay delay--${d > 5 ? 'bad' : 'warn'}">${t('+{n} Min.', { n: d })}</span>` : `<span class="delay delay--ok">${t('pünktlich')}</span>`);
+  // Uhrzeit nach Fahrplan, darunter die erwartete Zeit (grün = pünktlich, rot = verspätet)
+  const timeHtml = (sched, delay) => `<b>${hhmm(sched)}</b><small class="${delay ? 'is-late' : 'is-ok'}">${hhmm(sched + delay)}</small>`;
+  const riders = (n) => (n === 1 ? t('1 Fahrgast') : t('{n} Fahrgäste', { n }));
+  const stationBtn = (name) => `<button class="link-btn" type="button" data-station="${esc(name)}">${esc(name)}</button>`;
+  const crewHtml = (p, role) => {
+    const r = rankOf(role);
+    return `<span class="crew">${p ? avatar(p.name) : `<span class="crew__ai">${icon('fi-rr-gamepad')}</span>`}
+      <span class="crew__text"><small>${esc(t(r.label))}</small><b>${p ? esc(p.name) : t('KI')}</b></span></span>`;
+  };
+  function trainWhere(m, tr) {
+    const st = tr.st;
+    const stop = tr.stops[st.i];
+    const gleis = platformOf(m.stationMap.get(stop.name), tr.lineId, tr.dir);
+    if (st.phase === 'wait') return t('Steht in {station} auf Gleis {n} bereit', { station: stop.name, n: gleis });
+    if (st.phase === 'stop') return t('Hält in {station} auf Gleis {n}', { station: stop.name, n: gleis });
+    return t('Zwischen {a} und {b}', { a: stop.name, b: tr.stops[st.i + 1].name });
+  }
+  function trainCard(m, tr) {
+    const st = tr.st;
+    const next = tr.stops[st.phase === 'run' ? st.i + 1 : Math.min(st.i + 1, tr.stops.length - 1)];
+    const pctDone = Math.max(0, Math.min(100, st.progress * 100));
+    const last = tr.stops[tr.stops.length - 1];
+    return `<article class="train">
+      <div class="train__head">
+        ${lineBadge(tr.line)}
+        <div class="train__title"><h3>${t('nach {to}', { to: esc(tr.to) })}</h3><small>${esc(tr.no)} · ${esc(tr.line.train)}</small></div>
+        ${delayHtml(tr.delay)}
+      </div>
+      <p class="train__now">${icon(st.phase === 'run' ? 'fi-rr-train-side' : 'fi-rr-marker')}<span>${esc(trainWhere(m, tr))}</span></p>
+      <div class="train__track" aria-hidden="true"><span style="width:${pctDone}%"></span><i style="left:${pctDone}%"></i></div>
+      <div class="train__ends"><span>${esc(tr.from)}<b>${hhmm(tr.stops[0].dep)}</b></span><span>${esc(tr.to)}<b>${hhmm(last.arr)}</b></span></div>
+      <p class="train__next">${st.phase === 'wait' ? t('Abfahrt {time}', { time: hhmm(tr.stops[0].dep + tr.delay) }) : t('Nächster Halt: {station}, {time}', { station: esc(next.name), time: hhmm(next.arr + tr.delay) })}</p>
+      <div class="train__crew">
+        ${crewHtml(tr.crew.Driver, 'Driver')}
+        ${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
+        ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}
+      </div>
+      <button class="sd-btn" type="button" data-trip="${esc(tr.id)}">${icon('fi-rr-route')}<span>${t('Details')}<small>${t('Fahrtverlauf')}</small></span>${icon('fi-rr-arrow-small-right', 'sd-btn__arrow')}</button>
+    </article>`;
+  }
+  function playerWhere(p) {
+    if (p.role === 'Supervisor') return `${icon('fi-rr-calendar')}<span>${t('Leitet das Training')}</span>`;
+    if (p.role === 'Dispatcher') return `${icon('fi-rr-signal-alt-2')}<span>${t('Leitstelle')}</span>`;
+    if (p.train) {
+      return `${icon('fi-rr-train-side')}<button class="link-btn" type="button" data-trip="${esc(p.train.id)}">${lineBadge(p.train.line)}<span>${t('nach {to}', { to: esc(p.train.to) })}</span></button>`;
+    }
+    if (!p.station) return '';
+    if (p.role === 'Platform Staff') return `${icon('fi-rr-marker')}<span>${stationBtn(p.station.name)} · ${tracksText(p)}</span>`;
+    if (p.role === 'Signaller') return `${icon('fi-rr-traffic-light')}<span>${t('Stellwerk')} ${stationBtn(p.station.name)}</span>`;
+    return `${icon('fi-rr-clock-three')}<span>${t('Wartet in')} ${stationBtn(p.station.name)}</span>`;
+  }
+  function playerRow(p) {
+    const r = rankOf(p.role);
+    return `<li class="player">
+      ${avatar(p.name)}
+      <div class="player__main"><b>${esc(p.name)}</b><span class="player__where">${playerWhere(p)}</span></div>
+      <span class="player__side">${rankPill(r)}<small>${t('seit {time}', { time: uptime(p.since) })}</small></span>
+    </li>`;
+  }
+  function stationCard(m, st) {
+    const deps = departures(m, st, 1);
+    const next = deps[0];
+    return `<button class="station" type="button" data-station="${esc(st.name)}">
+      <span class="station__head">
+        <span class="station__ic">${icon('fi-rr-train-station')}</span>
+        <span class="station__name"><b>${esc(st.name)}</b><small>${t('{n} Gleise', { n: st.platforms })}${st.box ? ` · ${t('Stellwerk')}` : ''}</small></span>
+        ${icon('fi-rr-angle-small-right', 'station__chev')}
+      </span>
+      <span class="station__lines">${st.lines.map((id) => lineBadge(D.lines[id])).join('')}</span>
+      <span class="station__staff">${icon('fi-rr-whistle')}${st.staff.length
+        ? `<span><b>Platform Staff:</b> ${st.staff.map((p) => esc(p.name)).join(', ')}</span>`
+        : `<span class="muted">${t('Kein Platform Staff')}</span>`}</span>
+      ${next ? `<span class="station__next">${icon('fi-rr-clock-three')}<span>${t('Nächster Zug')}: <b>${hhmm(next.time + next.tr.delay)}</b> ${esc(next.tr.line.name)} ${next.last ? t('aus {from}', { from: esc(next.tr.from) }) : t('nach {to}', { to: esc(next.tr.to) })}</span></span>` : ''}
+    </button>`;
+  }
+  // Kommende Züge an einem Bahnhof: Abfahrten, am Endbahnhof Ankünfte
+  function departures(m, st, limit = 12, within = 90) {
+    const now = m.now;
+    const out = [];
+    st.lines.filter((id) => m.s.lines.includes(id)).forEach((lineId) => {
+      const L = D.lines[lineId];
+      const end = lineEnd(L);
+      [0, 1].forEach((dir) => {
+        const j = (dir ? [...L.stops].reverse() : L.stops).findIndex(([name]) => name === st.name);
+        const off = dir ? end - L.stops[L.stops.length - 1 - j][1] : L.stops[j][1];
+        tripsBetween(lineId, dir, now - off - MAX_DELAY - 2, now - off + within).forEach((tr) => {
+          const stop = tr.stops[j];
+          const last = j === tr.stops.length - 1;
+          const time = last ? stop.arr : stop.dep;
+          if (time + tr.delay < now - 0.5 || time > now + within) return;
+          const s2 = tripState(tr, now);
+          out.push({ tr, j, time, last, here: (s2.phase === 'stop' || s2.phase === 'wait') && s2.i === j && !last, gleis: platformOf(st, lineId, dir) });
+        });
+      });
+    });
+    return out.sort((a, b) => (a.time + a.tr.delay) - (b.time + b.tr.delay)).slice(0, limit);
+  }
+
+  function renderServerDetail() {
+    const s = serverById(state.serverId);
+    const head = $('[data-sd-head]');
+    const body = $('[data-sd-body]');
+    const back = `<a class="back-link" href="#/server">${icon('fi-rr-arrow-left')}${t('Alle Server')}</a>`;
+    if (!s) {
+      head.innerHTML = `${back}<h1 class="appbar__value">${t('Server nicht gefunden')}</h1>`;
+      body.innerHTML = `<p class="empty">${t('Diesen Server gibt es nicht mehr. Vielleicht wurde er gerade geschlossen.')}</p>`;
+      return;
+    }
+    document.title = `${t(s.name)} · ${t(TITLES.server)}`;
+    const m = serverModel(s);
+    const full = s.players >= s.max;
+    const typeName = { public: t('Öffentlich'), event: t('Event'), training: t('Training'), vip: 'VIP' }[s.type];
+    const tab = state.sdTab;
+    const tabBtn = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${tab === id}" data-sd-tab="${id}">${icon(ic)}${label}<span class="head-tabs__n">${n}</span></button>`;
+    head.innerHTML = `${back}
+      <div class="appbar">
+        <div class="appbar__title">
+          <span class="appbar__label"><span class="live-dot"></span>${t('Live')} · ${esc(s.region)} · v${esc(s.version)} · ${typeName}</span>
+          <h1 class="appbar__value">${esc(t(s.name))}</h1>
+        </div>
+        <div class="appbar__actions">${full
+          ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
+          : `<a class="btn btn--primary btn--sm" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`}</div>
+      </div>
+      <p class="sd-net">${icon('fi-rr-route')}${esc(t(s.network))}</p>
+      <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Ansicht'))}">
+        ${tabBtn('trains', 'fi-rr-train-side', t('Züge'), m.trains.length)}
+        ${tabBtn('players', 'fi-rr-users-alt', t('Spieler'), m.players.length)}
+        ${tabBtn('stations', 'fi-rr-train-station', t('Stationen'), m.stations.length)}
+      </div>`;
+
+    const stats = `<div class="stat-row stat-row--4">
+      <div class="stat"><span>${t('Spieler')}</span><b>${s.players}/${s.max}</b></div>
+      <div class="stat"><span>${t('Züge unterwegs')}</span><b>${m.trains.length}</b></div>
+      <div class="stat"><span>${t('Laufzeit')}</span><b>${uptime(s.uptime)}</b></div>
+      <div class="stat"><span>Ping</span><b>${s.ping} ms</b></div>
+    </div>`;
+    let content = '';
+    if (tab === 'trains') {
+      const cats = CATS.filter((c) => s.lines.some((id) => D.lines[id].cat === c.id));
+      if (!cats.some((c) => c.id === state.sdCat)) state.sdCat = 'all';
+      const list = m.trains.filter((tr) => state.sdCat === 'all' || tr.line.cat === state.sdCat);
+      content = `<div class="chips chips--scroll chips--block" role="group" aria-label="${esc(t('Zuggattung'))}">
+          <button class="chip${state.sdCat === 'all' ? ' is-active' : ''}" type="button" data-sd-cat="all">${t('Alle')} · ${m.trains.length}</button>
+          ${cats.map((c) => `<button class="chip${state.sdCat === c.id ? ' is-active' : ''}" type="button" data-sd-cat="${c.id}">${c.name} · ${m.trains.filter((tr) => tr.line.cat === c.id).length}</button>`).join('')}
+        </div>
+        <div class="train-grid">${list.length ? list.map((tr) => trainCard(m, tr)).join('') : `<p class="empty">${t('Gerade ist kein Zug dieser Gattung unterwegs.')}</p>`}</div>`;
+    } else if (tab === 'players') {
+      const roles = roleCounts(m.players);
+      if (!roles.some(([r]) => r === state.sdRole)) state.sdRole = 'all';
+      const groups = roles.filter(([r]) => state.sdRole === 'all' || r === state.sdRole);
+      content = `<div class="chips chips--scroll chips--block" role="group" aria-label="${esc(t('Rolle'))}">
+          <button class="chip${state.sdRole === 'all' ? ' is-active' : ''}" type="button" data-sd-role="all">${t('Alle')} · ${m.players.length}</button>
+          ${roles.map(([r, n]) => `<button class="chip${state.sdRole === r ? ' is-active' : ''}" type="button" data-sd-role="${esc(r)}">${esc(r)} · ${n}</button>`).join('')}
+        </div>
+        ${groups.map(([r, n]) => `<section class="pgroup">
+          <h2 class="pgroup__title"><i style="--rc:${rankOf(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${n}</small></h2>
+          <ul class="player-list">${m.players.filter((p) => p.role === r).map(playerRow).join('')}</ul>
+        </section>`).join('')}`;
+    } else {
+      content = `<div class="station-grid">${m.stations.map((st) => stationCard(m, st)).join('')}</div>`;
+    }
+    body.innerHTML = stats + content;
+  }
+
+  // Dialoge: Fahrtverlauf eines Zuges und kommende Züge an einem Bahnhof
+  function tripView(id) {
+    const s = serverById(state.serverId);
+    const base = tripById(id);
+    if (!s || !base) return `<p class="muted">${t('Diese Fahrt gibt es nicht mehr.')}</p>`;
+    const m = serverModel(s);
+    const live = m.trains.find((x) => x.id === id);
+    const tr = live || Object.assign(base, { st: tripState(base, m.now), crew: {}, riders: [] });
+    const st = tr.st;
+    const items = [];
+    tr.stops.forEach((stop, i) => {
+      const station = m.stationMap.get(stop.name);
+      const passed = st.phase === 'done' || (st.phase !== 'wait' && (i < st.i || (i === st.i && st.phase === 'run')));
+      const here = (st.phase === 'stop' || st.phase === 'wait') && i === st.i;
+      const time = i === 0 ? stop.dep : stop.arr;
+      const staff = station ? station.staff.map((p) => esc(p.name)).join(', ') : '';
+      items.push(`<li class="journey__stop${passed ? ' is-passed' : ''}${here ? ' is-here' : ''}">
+        <span class="journey__time">${timeHtml(time, tr.delay)}</span>
+        <span class="journey__dot" aria-hidden="true"></span>
+        <span class="journey__body">${stationBtn(stop.name)}
+          <small>${t('Gleis {n}', { n: platformOf(station, tr.lineId, tr.dir) })}${here ? ` · <b>${t('Zug steht hier')}</b>` : ''}${staff ? ` · Platform Staff: ${staff}` : ''}</small></span>
+      </li>`);
+      if (st.phase === 'run' && i === st.i) {
+        const left = Math.max(1, Math.ceil(tr.stops[i + 1].arr - st.at));
+        items.push(`<li class="journey__train"><span class="journey__time"></span><span class="journey__dot" aria-hidden="true">${icon('fi-rr-train-side')}</span>
+          <span class="journey__body"><b>${t('Zug fährt gerade')}</b><small>${t('Noch {n} Min. bis {station}', { n: left, station: esc(tr.stops[i + 1].name) })}</small></span></li>`);
+      }
+    });
+    const status = st.phase === 'done' ? t('Angekommen') : st.phase === 'wait'
+      ? t('Abfahrt in {n} Min.', { n: Math.max(0, Math.ceil(tr.stops[0].dep - st.at)) }) : trainWhere(m, tr);
+    return `<div class="trip">
+      <div class="trip__head">${lineBadge(tr.line)}<div class="train__title"><h3>${t('nach {to}', { to: esc(tr.to) })}</h3><small>${esc(tr.no)} · ${esc(tr.line.train)}</small></div>${delayHtml(tr.delay)}</div>
+      <p class="train__now">${icon('fi-rr-marker')}<span>${esc(status)}</span></p>
+      ${live ? `<div class="train__crew">${crewHtml(tr.crew.Driver, 'Driver')}${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
+        ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}</div>`
+        : `<p class="sheet-note">${st.phase === 'done' ? t('Diese Fahrt ist beendet.') : t('Die Besatzung steht kurz vor der Abfahrt fest.')}</p>`}
+      <h4 class="sheet-sub">${t('Fahrtverlauf')}</h4>
+      <ol class="journey">${items.join('')}</ol>
+      <p class="sheet-note">${t('Oben die Zeit laut Fahrplan, darunter die erwartete Zeit. Tippe auf einen Bahnhof für die kommenden Züge.')}</p>
+    </div>`;
+  }
+  function stationView(name) {
+    const s = serverById(state.serverId);
+    const m = s && serverModel(s);
+    const st = m && m.stationMap.get(name);
+    if (!st) return `<p class="muted">${t('Diesen Bahnhof gibt es auf diesem Server nicht.')}</p>`;
+    const deps = departures(m, st);
+    const person = (p, extra) => `<li>${avatar(p.name)}<span><b>${esc(p.name)}</b><small>${extra}</small></span></li>`;
+    return `<div class="stview">
+      <p class="stview__meta">${icon('fi-rr-train-station')}${t('{n} Gleise', { n: st.platforms })}${st.box ? ` · ${t('Stellwerk')}` : ''}</p>
+      <div class="station__lines">${st.lines.map((id) => lineBadge(D.lines[id])).join('')}</div>
+      <div class="stview__crew">
+        <div><h4 class="sheet-sub">Platform Staff</h4>${st.staff.length
+          ? `<ul class="people">${st.staff.map((p) => person(p, tracksText(p))).join('')}</ul>`
+          : `<p class="muted">${t('Gerade niemand – die Abfertigung übernimmt die KI.')}</p>`}</div>
+        ${st.box ? `<div><h4 class="sheet-sub">${t('Stellwerk')}</h4>${st.signallers.length
+          ? `<ul class="people">${st.signallers.map((p) => person(p, 'Signaller')).join('')}</ul>`
+          : `<p class="muted">${t('Nicht besetzt – die KI stellt die Fahrstraßen.')}</p>`}</div>` : ''}
+      </div>
+      <h4 class="sheet-sub">${t('Kommende Züge')}</h4>
+      ${deps.length ? `<ol class="board">${deps.map((d) => `<li><button class="board__row" type="button" data-trip="${esc(d.tr.id)}">
+          <span class="board__time">${timeHtml(d.time, d.tr.delay)}</span>
+          <span class="board__main">${lineBadge(d.tr.line)}<span class="board__dest"><b>${esc(d.last ? t('aus {from}', { from: d.tr.from }) : d.tr.to)}</b><small>${d.last ? t('Endet hier') : esc(d.tr.stops.slice(d.j + 1, -1).slice(0, 2).map((x) => x.name).join(' · ')) || esc(d.tr.no)}${d.here ? ` · <b>${t('Steht am Gleis')}</b>` : ''}</small></span></span>
+          <span class="board__track"><small>${t('Gleis')}</small><b>${d.gleis}</b></span>
+        </button></li>`).join('')}</ol>` : `<p class="muted">${t('In den nächsten 90 Minuten fährt hier kein Zug.')}</p>`}
+    </div>`;
   }
 
   // ---------- Trainings ----------
@@ -1213,7 +1646,7 @@
     renderMe();
     RENDER[state.page]();
     bind();
-    document.title = t(TITLES[state.page]);
+    if (!state.serverId) document.title = t(TITLES[state.page]);
     refreshModal();
   }
   // Fester Text aus index.html: beim ersten Aufruf merken, danach immer vom deutschen Original übersetzen
@@ -1236,25 +1669,80 @@
     staticText.attrs.forEach(({ el, a, text }) => el.setAttribute(a, t(text)));
   }
   const langName = (code) => { try { return new Intl.DisplayNames([locale], { type: 'language' }).of(code); } catch (e) { return ''; } };
+  // Sprache als Dropdown: Knopf mit Flagge, darunter die Liste (Pfeiltasten, Esc, Klick daneben schließt)
+  const langFlag = (code) => (code === 'auto'
+    ? `<span class="flag flag--auto">${icon('fi-rr-smartphone')}</span>`
+    : `<img class="flag" src="assets/img/flags/${langOf(code).flag}.svg" alt="" width="32" height="24">`);
   function renderLangPicker() {
     const box = $('[data-lang-picker]');
     if (!box) return;
     const setting = langSetting();
-    const row = (code, flagHtml, name, sub) => `<button type="button" data-lang-set="${code}" aria-pressed="${setting === code}">
-        ${flagHtml}<span class="lang-picker__text"><b>${esc(name)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`;
-    box.innerHTML = row('auto', `<span class="flag flag--auto">${icon('fi-rr-smartphone')}</span>`, t('Automatisch'),
-      t('Wie dein Gerät – gerade: {name}', { name: langOf(deviceLang()).name }))
-      + LANGS.map((l) => row(l.code, `<img class="flag" src="assets/img/flags/${l.flag}.svg" alt="" width="32" height="24">`, l.name,
-        l.code === lang ? '' : langName(l.code))).join('');
+    const name = (code) => (code === 'auto' ? t('Automatisch') : langOf(code).name);
+    const sub = (code) => (code === 'auto' ? t('Wie dein Gerät – gerade: {name}', { name: langOf(deviceLang()).name }) : code === lang ? '' : langName(code));
+    const text = (code) => `<span class="dropdown__text"><b>${esc(name(code))}</b>${sub(code) ? `<small>${esc(sub(code))}</small>` : ''}</span>`;
+    box.innerHTML = `<button class="dropdown__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-list" aria-label="${esc(t('Sprache'))}: ${esc(name(setting))}" data-lang-toggle>
+        ${langFlag(setting)}${text(setting)}${icon('fi-rr-angle-small-down', 'dropdown__chev')}
+      </button>
+      <div class="dropdown__list" id="lang-list" role="listbox" aria-label="${esc(t('Sprache'))}" hidden>
+        ${['auto', ...LANGS.map((l) => l.code)].map((code) => `<button type="button" role="option" tabindex="-1" aria-selected="${setting === code}" data-lang-set="${code}">
+          ${langFlag(code)}${text(code)}${setting === code ? icon('fi-rr-check', 'dropdown__check') : ''}</button>`).join('')}
+      </div>`;
   }
+  function langMenu(open, { focus = true } = {}) {
+    const box = $('[data-lang-picker]');
+    if (!box) return;
+    const btn = $('[data-lang-toggle]', box);
+    const list = $('.dropdown__list', box);
+    if (!btn || !list) return;
+    if (open === list.hidden) {
+      list.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      box.classList.toggle('is-open', open);
+    }
+    // Liste ganz sichtbar machen (nicht unter der Leiste unten)
+    if (open) list.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (!focus) return;
+    if (open) ($('[aria-selected="true"]', list) || $('[role="option"]', list)).focus({ preventScroll: true });
+    else btn.focus();
+  }
+
+  // ---------- Privatsphäre ----------
+  // Beides ist standardmäßig aus. Später werden die Werte mit dem Roblox-Konto auf dem Server gespeichert.
+  const privacy = () => ({ profile: false, stats: false, ...store.get('tsg-privacy', {}) });
+  const statsPublic = () => { const pv = privacy(); return pv.profile && pv.stats; };
+  function renderPrivacy() {
+    const box = $('[data-privacy]');
+    if (!box) return;
+    const pv = privacy();
+    const row = (key, title, text, on, off, note) => `<label class="toggle${off ? ' is-disabled' : ''}">
+        <span class="toggle__text"><b>${title}</b><small>${text}</small>${note ? `<small class="toggle__note">${icon('fi-rr-info')}${note}</small>` : ''}</span>
+        <input type="checkbox" role="switch" data-privacy-set="${key}"${on ? ' checked' : ''}${off ? ' disabled' : ''}>
+        <span class="toggle__ui" aria-hidden="true"></span>
+      </label>`;
+    box.innerHTML = row('profile', t('Profil öffentlich'), t('Andere Spieler sehen deinen Roblox-Namen, dein Profilbild und deinen Rang.'), pv.profile)
+      + row('stats', t('Zeige meine Statistik öffentlich an'), t('Andere sehen deine Fahrten, Kilometer, Pünktlichkeit und Spielzeit.'), pv.profile && pv.stats, !pv.profile,
+        pv.profile ? '' : t('Geht nur, wenn dein Profil öffentlich ist.'));
+  }
+  function setPrivacy(key, on) {
+    const pv = privacy();
+    pv[key] = on;
+    store.set('tsg-privacy', pv);
+    renderPrivacy();
+    refreshModal();
+    if (key === 'profile') toast(on ? t('Dein Profil ist jetzt öffentlich') : t('Dein Profil ist jetzt privat'));
+    else toast(on ? t('Deine Statistik ist jetzt öffentlich') : t('Deine Statistik sieht jetzt nur du'));
+  }
+  // Hinweis im Profil- und Statistik-Dialog
+  const visibilityNote = (on, onText, offText) => `<p class="vis-note">${icon(on ? 'fi-rr-eye' : 'fi-rr-lock')}<span>${on ? onText : offText}</span><a href="#/einstellungen">${t('Ändern')}</a></p>`;
   function renderSettings() {
     renderLangPicker();
+    renderPrivacy();
     $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === themeMode())));
     const p = state.profile;
     const r = rankOf(state.rank);
     $('[data-settings-account]').innerHTML = `${ringHTML(p, r, 'avatar-ring--lg')}
       <div class="set-account__who"><b>${p ? esc(p.displayName || p.username) : t('Nicht verbunden')}</b><small>${p ? `@${esc(p.username)}` : t('Verbinde dein Roblox-Konto für Name und Profilbild.')}</small></div>
-      <button class="btn ${p ? 'btn--soft' : 'btn--primary'}" type="button" data-open="profile">${p ? t('Profil') : t('Verbinden')}</button>`;
+      <button class="btn ${p ? 'btn--soft' : 'btn--primary'}" type="button" data-open="profile">${p ? t('Profil') : oauthReady() ? t('Anmelden') : t('Verbinden')}</button>`;
   }
 
   // ---------- Profil (Kopfzeile, Tab-Leiste, Menü) ----------
@@ -1331,6 +1819,75 @@
     toast(offline ? t('Verbunden als {name} – Profilbild gerade nicht erreichbar', { name }) : t('Verbunden als {name}', { name: state.profile.displayName }));
   }
 
+  // ---------- Roblox-Login (OAuth 2.0 mit PKCE) ----------
+  // Einrichtung: assets/js/config.js (Client-ID eintragen). Ohne Client-ID bleibt die Demo mit dem Roblox-Namen.
+  // Ablauf: Weiterleitung zu Roblox → zurück mit ?code=… → Code gegen Token tauschen → Name und Profilbild laden.
+  // Der Token wird nicht gespeichert, nur das öffentliche Profil (Name, Anzeigename, Profilbild).
+  const OAUTH = 'https://apis.roblox.com/oauth';
+  const oauthCfg = (window.TSG_CONFIG && window.TSG_CONFIG.roblox) || {};
+  const oauthReady = () => !!String(oauthCfg.clientId || '').trim();
+  // Ohne Angabe: Adresse der Seite ohne index.html, z. B. https://name.github.io/Train-Sim-Germany/
+  const redirectUri = () => oauthCfg.redirectUri || location.origin + location.pathname.replace(/index\.html$/, '');
+  const b64url = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const randomKey = (n = 32) => b64url(crypto.getRandomValues(new Uint8Array(n)));
+  async function robloxLogin() {
+    if (!window.crypto || !crypto.subtle) { toast(t('Die Anmeldung geht nur über eine sichere Verbindung (https).')); return; }
+    const verifier = randomKey(48);
+    const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
+    const login = { verifier, state: randomKey(), nonce: randomKey(), back: location.hash || '#/' };
+    try { sessionStorage.setItem('tsg-oauth', JSON.stringify(login)); } catch (e) { toast(t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.')); return; }
+    const q = new URLSearchParams({
+      client_id: String(oauthCfg.clientId).trim(), redirect_uri: redirectUri(), scope: oauthCfg.scopes || 'openid profile',
+      response_type: 'code', state: login.state, nonce: login.nonce, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    location.assign(`${OAUTH}/v1/authorize?${q}`);
+  }
+  // Rückkehr von Roblox: liefert einen Hinweis für den Toast (oder null, wenn kein Login lief)
+  async function oauthCallback() {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('code') && !q.has('error')) return null;
+    let login = null;
+    try { login = JSON.parse(sessionStorage.getItem('tsg-oauth')); sessionStorage.removeItem('tsg-oauth'); } catch (e) { /* kein Speicher */ }
+    // Code und state aus der Adresse entfernen, zurück zur Seite vor der Anmeldung
+    history.replaceState(null, '', location.pathname + ((login && login.back) || '#/'));
+    if (q.has('error')) return q.get('error') === 'access_denied' ? t('Anmeldung abgebrochen') : t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
+    if (!login || q.get('state') !== login.state || !oauthReady()) return t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
+    try {
+      const body = new URLSearchParams({ grant_type: 'authorization_code', code: q.get('code'), code_verifier: login.verifier, client_id: String(oauthCfg.clientId).trim() });
+      const post = (url) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+      let info;
+      let nonce = null;
+      if (oauthCfg.tokenProxy) {
+        // Eigener Server tauscht den Code und liefert { user, nonce } zurück (tools/oauth-worker.js)
+        const res = await post(oauthCfg.tokenProxy);
+        if (!res.ok) throw new Error('proxy');
+        ({ user: info, nonce } = await res.json());
+      } else {
+        const res = await post(`${OAUTH}/v1/token`);
+        if (!res.ok) throw new Error('token');
+        const tok = await res.json();
+        if (tok.id_token) nonce = JSON.parse(atob(tok.id_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).nonce || null;
+        const me = await fetch(`${OAUTH}/v1/userinfo`, { headers: { Authorization: `Bearer ${tok.access_token}` } });
+        if (!me.ok) throw new Error('userinfo');
+        info = await me.json();
+        // Den Refresh-Token braucht die Seite nicht: gleich wieder ungültig machen
+        if (tok.refresh_token) {
+          fetch(`${OAUTH}/v1/token/revoke`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ token: tok.refresh_token, client_id: String(oauthCfg.clientId).trim() }) }).catch(() => {});
+        }
+      }
+      if (nonce && nonce !== login.nonce) throw new Error('nonce');
+      if (!info || !info.sub) throw new Error('profile');
+      state.profile = {
+        userId: info.sub, username: info.preferred_username || info.name, displayName: info.nickname || info.name || info.preferred_username,
+        avatar: info.picture || null, oauth: true,
+      };
+      store.set('tsg-profile', state.profile);
+      return t('Angemeldet als {name}', { name: state.profile.displayName });
+    } catch (e) {
+      return t('Anmeldung fehlgeschlagen. Bitte versuch es noch einmal.');
+    }
+  }
+
   // ---------- Auswahl-Sheets ----------
   const modal = $('[data-modal]');
   let modalView = null;
@@ -1340,6 +1897,19 @@
       render: () => {
         const p = state.profile;
         const r = rankOf(state.rank);
+        if (!p && oauthReady()) {
+          return `<div class="profile-box">
+              ${ringHTML(null, r, 'avatar-ring--xl')}
+              <h3>${t('Mit Roblox anmelden')}</h3>
+              <p>${t('Du wirst zu Roblox weitergeleitet und bestätigst dort die Anmeldung. Wir erhalten nur deinen Namen, Anzeigenamen und dein Profilbild – nie dein Passwort.')}</p>
+            </div>
+            <div class="sheet-actions">
+              <button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('fi-rr-sign-in-alt')}${t('Mit Roblox anmelden')}</button>
+            </div>
+            <p class="sheet-note">${t('Mit der Anmeldung akzeptierst du die {terms} und die {privacy}.', {
+              terms: `<a href="terms.html">${t('Nutzungsbedingungen')}</a>`, privacy: `<a href="privacy.html">${t('Datenschutzerklärung')}</a>`,
+            })}</p>`;
+        }
         if (!p) {
           return `<div class="profile-box">
               ${ringHTML(null, r, 'avatar-ring--xl')}
@@ -1358,10 +1928,11 @@
             <p>@${esc(p.username)}</p>
             <button class="rank-pill rank-pill--btn" type="button" data-open="rank" style="--rc:${r.color}">[${esc(r.prefix)}] ${esc(r.name)}${icon('fi-rr-angle-small-down')}</button>
           </div>
+          ${visibilityNote(privacy().profile, t('Dein Profil ist öffentlich.'), t('Dein Profil ist privat.'))}
           <div class="sheet-actions">
             <button class="btn btn--primary btn--lg btn--block" type="button" data-open="stats">${icon('fi-rr-chart-line-up')}${t('Meine Statistik')}</button>
             ${p.userId ? `<a class="btn btn--outline btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(p.userId)}/profile" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}${t('Roblox-Profil ansehen')}</a>` : ''}
-            <button class="btn btn--soft btn--lg btn--block" type="button" data-disconnect>${t('Verbindung trennen')}</button>
+            <button class="btn btn--soft btn--lg btn--block" type="button" data-disconnect>${p.oauth ? t('Abmelden') : t('Verbindung trennen')}</button>
           </div>`;
       },
     },
@@ -1374,6 +1945,7 @@
         const max = Math.max(...st.week.map((d) => d.min), 1);
         return `<div class="mystats">
           <div class="mystats__head">${ringHTML(p, r, 'avatar-ring--lg')}<div><b>${esc(p ? p.displayName || p.username : D.me.username)}</b>${rankPill(r, ` ${esc(r.name)}`)}</div></div>
+          ${visibilityNote(statsPublic(), t('Deine Statistik ist öffentlich.'), t('Deine Statistik sieht nur du.'))}
           <dl class="mystats__grid">
             ${st.tiles.map((x) => `<div${x.wide ? ' class="is-wide"' : ''}><dt>${icon(x.ic)}${x.label}</dt><dd>${x.value}</dd></div>`).join('')}
           </dl>
@@ -1415,6 +1987,14 @@
         </div>
         <p class="sheet-note">${t('Rote Punkte zeigen Tage mit Trainings.')}</p>`;
       },
+    },
+    trip: {
+      title: () => t('Fahrtverlauf'),
+      render: (id) => tripView(id),
+    },
+    station: {
+      title: (name) => name,
+      render: (name) => stationView(name),
     },
     news: {
       title: () => t('Neuigkeit'),
@@ -1482,12 +2062,18 @@
     }
     return `<div class="detail__media detail__media--video"><video src="${esc(n.video)}" poster="${esc(n.poster || `assets/img/${n.img}`)}" controls playsinline preload="metadata"></video></div>`;
   }
-  function openModal(name, arg) {
+  // Wechsel zwischen Zug und Bahnhof im offenen Dialog: vorige Ansicht merken (Zurück-Knopf)
+  let modalStack = [];
+  const modalBody = (name, arg) => (modalStack.length
+    ? `<button class="modal-back" type="button" data-modal-back>${icon('fi-rr-arrow-left')}${esc(t('Zurück zu {name}', { name: modalTitle(modalStack[modalStack.length - 1]) }))}</button>` : '') + VIEWS[name].render(arg);
+  const modalTitle = (v) => { const title = VIEWS[v.name].title; return typeof title === 'function' ? title(v.arg) : title; };
+  function openModal(name, arg, { stack = false } = {}) {
     closeMenu();
+    if (stack && !modal.hidden && modalView) modalStack.push(modalView);
+    else if (!stack) modalStack = [];
     modalView = { name, arg };
-    const title = VIEWS[name].title;
-    $('[data-modal-title]').textContent = typeof title === 'function' ? title(arg) : title;
-    $('[data-modal-body]').innerHTML = VIEWS[name].render(arg);
+    $('[data-modal-title]').textContent = modalTitle(modalView);
+    $('[data-modal-body]').innerHTML = modalBody(name, arg);
     // Ansichten mit Bild/Video: Inhalt beginnt oben in der Rundung, Griff und Schließen liegen darüber
     $('.sheet-modal__panel', modal).classList.toggle('is-hero', !!VIEWS[name].hero);
     $('.sheet-modal__panel', modal).scrollTop = 0;
@@ -1498,10 +2084,9 @@
   }
   function refreshModal() {
     if (modal.hidden || !modalView) return;
-    const title = VIEWS[modalView.name].title;
-    $('[data-modal-title]').textContent = typeof title === 'function' ? title(modalView.arg) : title;
+    $('[data-modal-title]').textContent = modalTitle(modalView);
     // Laufendes Video nicht neu laden
-    if (!$('[data-modal-body] video, [data-modal-body] iframe')) $('[data-modal-body]').innerHTML = VIEWS[modalView.name].render(modalView.arg);
+    if (!$('[data-modal-body] video, [data-modal-body] iframe')) $('[data-modal-body]').innerHTML = modalBody(modalView.name, modalView.arg);
   }
   function closeModal() {
     if (modal.hidden) return;
@@ -1509,6 +2094,7 @@
     $('[data-modal-body]').innerHTML = '';
     modal.hidden = true;
     modalView = null;
+    modalStack = [];
     document.body.classList.remove('menu-open');
   }
 
@@ -1585,7 +2171,11 @@
     news() { renderNewsPage(); },
     karriere() { renderCareer(); },
     trainings() { renderTrainings(); },
-    server() { $('[data-server-search]').value = state.serverQuery; renderServers(); },
+    server() {
+      if (state.serverId) { renderServerDetail(); return; }
+      $('[data-server-search]').value = state.serverQuery;
+      renderServers();
+    },
     statistiken() { renderStatsKpis(); renderChart(); renderBars(); },
     einstellungen() { renderSettings(); },
   };
@@ -1597,13 +2187,17 @@
     const page = PAGES.includes(first) ? first : 'home';
     const jobId = page === 'karriere' ? (sub || null) : null;
     const jobApply = !!jobId && sub2 === 'bewerben';
-    const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply;
+    const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
+    const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId;
+    if (serverId !== state.serverId) Object.assign(state, { sdTab: 'trains', sdCat: 'all', sdRole: 'all' });
     state.page = page;
     state.jobId = jobId;
     state.jobApply = jobApply;
+    state.serverId = serverId;
     document.body.dataset.page = page;
+    const view = serverId ? 'server-detail' : page;
 
-    $$('.page').forEach((p) => { p.hidden = p.dataset.page !== page; });
+    $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
     $$('[data-nav]').forEach((a) => {
       if (a.dataset.nav === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -1669,13 +2263,69 @@
         const next = nextRank(ds.rank);
         toast(next ? t('Rang: {rank} – als Nächstes {next}', { rank: ds.rank, next: next.name }) : t('Rang: {rank}', { rank: ds.rank }));
       } else if (ds.themeSet) setTheme(ds.themeSet);
-      else if (ds.langSet) setLanguage(ds.langSet).then(() => toast(t('Sprache: {name}', { name: ds.langSet === 'auto' ? `${t('Automatisch')} (${langOf(lang).name})` : langOf(lang).name })));
+      else if (ds.langSet) {
+        langMenu(false, { focus: false });
+        setLanguage(ds.langSet).then(() => {
+          const btn = $('[data-lang-toggle]');
+          if (btn) btn.focus();
+          toast(t('Sprache: {name}', { name: ds.langSet === 'auto' ? `${t('Automatisch')} (${langOf(lang).name})` : langOf(lang).name }));
+        });
+      }
       else if (ds.fav) {
         const name = ds.fav;
         if (state.favs.has(name)) state.favs.delete(name); else state.favs.add(name);
         store.set('tsg-favs', Array.from(state.favs));
         el.setAttribute('aria-pressed', String(state.favs.has(name)));
         toast(state.favs.has(name) ? t('{name} gemerkt', { name: t(name) }) : t('{name} entfernt', { name: t(name) }));
+      }
+    });
+
+    // Sprach-Dropdown
+    document.addEventListener('click', (e) => {
+      const box = $('[data-lang-picker]');
+      const list = box && $('.dropdown__list', box);
+      if (!list) return;
+      if (e.target.closest('[data-lang-toggle]')) langMenu(list.hidden);
+      else if (!box.contains(e.target)) langMenu(false, { focus: false });
+    });
+    document.addEventListener('keydown', (e) => {
+      const box = e.target.closest && e.target.closest('[data-lang-picker]');
+      if (!box) return;
+      const opts = $$('[role="option"]', box);
+      const i = opts.indexOf(e.target);
+      if (e.target.matches('[data-lang-toggle]') && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { e.preventDefault(); langMenu(true); return; }
+      if (i < 0) return;
+      const go = (k) => { e.preventDefault(); opts[(k + opts.length) % opts.length].focus(); };
+      if (e.key === 'ArrowDown') go(i + 1);
+      else if (e.key === 'ArrowUp') go(i - 1);
+      else if (e.key === 'Home') go(0);
+      else if (e.key === 'End') go(opts.length - 1);
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); langMenu(false); }
+      else if (e.key === 'Tab') langMenu(false, { focus: false });
+    });
+    // Privatsphäre-Schalter
+    document.addEventListener('change', (e) => {
+      const sw = e.target.closest('[data-privacy-set]');
+      if (sw) setPrivacy(sw.dataset.privacySet, sw.checked);
+    });
+
+    // Server-Details: Tabs, Filter, Zug- und Bahnhofsdialog
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-sd-tab], [data-sd-cat], [data-sd-role], [data-trip], [data-station], [data-modal-back]');
+      if (!el) return;
+      const ds = el.dataset;
+      const inModal = !!el.closest('[data-modal]');
+      if (ds.sdTab) { state.sdTab = ds.sdTab; renderServerDetail(); }
+      else if (ds.sdCat) { state.sdCat = ds.sdCat; renderServerDetail(); }
+      else if (ds.sdRole) { state.sdRole = ds.sdRole; renderServerDetail(); }
+      else if (ds.trip) openModal('trip', ds.trip, { stack: inModal });
+      else if (ds.station) openModal('station', ds.station, { stack: inModal });
+      else if ('modalBack' in ds && modalStack.length) {
+        const prev = modalStack.pop();
+        modalView = prev;
+        $('[data-modal-title]').textContent = modalTitle(prev);
+        $('[data-modal-body]').innerHTML = modalBody(prev.name, prev.arg);
+        $('.sheet-modal__panel', modal).scrollTop = 0;
       }
     });
 
@@ -1840,13 +2490,16 @@
       submitApplication(form);
     });
 
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-roblox-login]')) robloxLogin(); });
     document.addEventListener('click', (e) => {
       if (!e.target.closest('[data-disconnect]')) return;
+      const wasOauth = state.profile && state.profile.oauth;
       state.profile = null;
       store.set('tsg-profile', null);
       renderMe();
+      if (state.page === 'einstellungen') renderSettings();
       refreshModal();
-      toast(t('Verbindung zu Roblox getrennt'));
+      toast(wasOauth ? t('Abgemeldet') : t('Verbindung zu Roblox getrennt'));
     });
 
     // App installieren (Chrome, Edge, Android); auf dem iPhone über „Zum Home-Bildschirm“
@@ -1897,6 +2550,10 @@
     if (state.page === 'home') renderNextSteps();
     if (state.page === 'trainings' && modal.hidden) renderTrainings();
     if (modalView && modalView.name === 'training') refreshModal();
+    if (state.page === 'server') {
+      if (modal.hidden) RENDER.server();
+      else if (modalView && (modalView.name === 'trip' || modalView.name === 'station')) refreshModal();
+    }
   }
 
   // ---------- Start ----------
@@ -1905,10 +2562,14 @@
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
   }
   $$('[data-year]').forEach((el) => { el.textContent = berlinNow().y; });
-  setLanguage(langSetting(), { start: true }).then(() => {
+  let loginNote = null;
+  setLanguage(langSetting(), { start: true }).then(async () => {
+    loginNote = await oauthCallback();
+  }).then(() => {
     events();
     renderMe();
     route();
+    if (loginNote) toast(loginNote);
     tick();
     lastMinute = berlinNow().abs;
     setInterval(tick, 1000);

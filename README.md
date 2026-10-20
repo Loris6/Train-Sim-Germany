@@ -9,12 +9,13 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 | Seite | Inhalt |
 |---|---|
 | **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Passenger, Driver, Platform Staff, Conductor, Signaller) mit Spielerzahl, nächstes Training, Strecken mit Nummer (R001, R002, …), Kennzahlen, Karriere, News |
-| **Server** | Serverliste mit Auslastung, Rollen (Lokführer, Zugbegleiter, Fahrdienstleiter, Fahrgäste), Ping, Laufzeit und Beitreten-Button |
+| **Server** | Serverliste mit Auslastung, Linien (ICE, IC, IRE, RE, RB, S-Bahn), Rollen (Driver, Conductor, Platform Staff, Signaller, Dispatcher, Passenger), Ping, Laufzeit und **Details**-Button. Die Detailseite (`#/server/<id>`) zeigt live alle **Züge** als Karten (Position, Verspätung, Lokführer bzw. KI, Zugbegleiter, Fahrgäste) mit Details-Button für den **Fahrtverlauf**, alle **Spieler** nach Rolle (wer wo Platform Staff ist, wer im Stellwerk sitzt, wer welchen Zug fährt) und alle **Stationen**. Ein Klick auf eine Station zeigt die kommenden Züge mit Gleis, Platform Staff und Stellwerk. Beitreten gibt es auf der Detailseite |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community), Beiträge mit Video (Play-Symbol auf der Karte). In der Detailansicht beginnt Bild bzw. Video ganz oben in der Rundung, Griff und Schließen liegen darauf |
 | **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit 60 Fragen in drei Sektoren: 1. Über dich (Roblox, Discord, E-Mail, Spielzeit, Rang), 2. Grundwissen (40 Fragen; beim Supervisor im gewählten Bereich Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (20 Fragen, u. a. Aktivität und freie Tage per Schieberegler, bei Game Developer, Map Builder und Social Media Links mit Art). Oben zählt „x von 60 Fragen beantwortet“ mit |
 | **Statistiken** | Kennzahlen, Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit, meistbefahrene Strecken (mit Streckennummer) |
 | **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings). Angezeigt werden nur die Trainings für den nächsten Rang – ein Conductor sieht also nur Signaller-Trainings; Supervisor und Management sehen alle. Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. |
-| **Einstellungen** | Darstellung: Hell, Dunkel oder Mit Gerät synchronisieren (folgt automatisch der Einstellung von Handy oder PC), Sprache mit Flagge (Automatisch = Gerätesprache, Deutsch, English, Français, Español, Italiano, Nederlands, Polski, Türkçe), Roblox-Konto, App installieren |
+| **Einstellungen** | Darstellung: Hell, Dunkel oder Mit Gerät synchronisieren (folgt automatisch der Einstellung von Handy oder PC), Sprache als Dropdown mit Flagge (Automatisch = Gerätesprache, Deutsch, English, Français, Español, Italiano, Nederlands, Polski, Türkçe), Privatsphäre mit zwei Schaltern („Profil öffentlich“ und „Zeige meine Statistik öffentlich an“, beide standardmäßig aus; die Statistik geht nur bei öffentlichem Profil), Roblox-Konto, App installieren, Links zu Datenschutz und Nutzungsbedingungen |
+| **Datenschutz** · **Nutzungsbedingungen** | Eigene Seiten `privacy.html` und `terms.html` (z. B. für die Roblox-OAuth-App). Name, Adresse, E-Mail und Datum kommen aus `assets/js/config.js` |
 
 ## Design
 
@@ -53,8 +54,36 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 
 - Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt (alle Seiten inkl. Einstellungen direkt unter Statistiken, Spielen/Gruppe/Discord, Uhr, App installieren).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
-- Unten schwebt eine dunkle, runde Leiste nur mit Icons (Start, News, Trainings). Rechts geht sie in einen größeren Kreis mit dem Profilbild über (Ring in der Rangfarbe). Im Dunkelmodus ist die Leiste etwas heller, damit sie sich vom Hintergrund abhebt. Abstand links, rechts und unten ist gleich. Das Profil unten ist dasselbe wie oben.
-- **Mit Roblox verbinden:** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist kein echter Login – dafür bräuchte es Roblox-OAuth mit einem eigenen Server.
+- Unten liegt eine dunkle Leiste über die ganze Breite (`width: 100vw`), fest am unteren Rand, nur mit Icons: Start, News, Trainings und rechts ein kleines Profilbild (Ring in der Rangfarbe). Im Dunkelmodus ist die Leiste etwas heller, damit sie sich vom Hintergrund abhebt. Auf iPhones mit Home-Balken wächst sie um den sicheren Bereich nach unten.
+- **Mit Roblox anmelden:** Ist in `assets/js/config.js` eine Client-ID eingetragen, zeigt der Profil-Dialog „Mit Roblox anmelden“ (echter Login über OAuth 2.0, siehe unten). Ohne Client-ID gilt die Demo:
+- **Mit Roblox verbinden (Demo):** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist noch kein echter Login – dafür die Client-ID eintragen (siehe „Roblox-Login“). Im Profil- und Statistik-Dialog steht, ob Profil bzw. Statistik öffentlich sind, mit Link zu den Einstellungen.
+
+## Roblox-Login (OAuth 2.0)
+
+Alles ist vorbereitet, es fehlt nur die **Client-ID** in **`assets/js/config.js`**:
+
+1. Auf [create.roblox.com/dashboard/credentials](https://create.roblox.com/dashboard/credentials) unter **OAuth 2.0 Apps** eine App anlegen.
+2. **Redirect URL:** genau die Adresse der Seite, z. B. `https://<name>.github.io/Train-Sim-Germany/` (mit `/` am Ende, ohne `index.html`, `#` oder `?`). Zum Testen zusätzlich `http://localhost:8000/`.
+3. **Scopes:** `openid` und `profile`.
+4. **Privacy Policy URL:** `https://<name>.github.io/Train-Sim-Germany/privacy.html`, **Terms of Service URL:** `https://<name>.github.io/Train-Sim-Germany/terms.html`.
+5. Die Client-ID in `config.js` bei `clientId` eintragen. Weicht die Adresse ab (eigene Domain), auch `redirectUri` setzen.
+
+```js
+roblox: {
+  clientId: '1234567890123456789', // aus dem Roblox-Dashboard
+  redirectUri: '',                 // leer = Adresse der Seite
+  scopes: 'openid profile',
+  tokenProxy: '',                  // nur falls nötig, siehe unten
+},
+```
+
+**Das Client-Secret gehört nie in die Seite** – alles in `config.js` ist öffentlich. Die App meldet sich mit **PKCE** an (Code-Verifier und Challenge mit SHA-256, `state` und `nonce` werden geprüft) und braucht dafür kein Secret. Nach der Rückkehr von Roblox tauscht sie den Code gegen einen Token, lädt Nutzer-ID, Name, Anzeigename und Profilbild (`/oauth/v1/userinfo`), macht den Refresh-Token sofort ungültig und speichert nur das öffentliche Profil im Browser. Danach geht es zurück auf die Seite, von der aus man sich angemeldet hat. „Abmelden“ im Profil entfernt das Profil wieder.
+
+**Falls Roblox den Abruf aus dem Browser blockiert** (Toast „Anmeldung fehlgeschlagen“ und ein CORS-Fehler in der Konsole): `tools/oauth-worker.js` als kostenlosen Cloudflare Worker anlegen (Anleitung oben in der Datei, dort liegen Client-ID und Secret als geheime Variablen) und seine Adresse in `config.js` bei `tokenProxy` eintragen.
+
+## Datenschutz & Nutzungsbedingungen
+
+`privacy.html` (Datenschutzerklärung) und `terms.html` (Nutzungsbedingungen) sind eigene Seiten im Design der App. Verlinkt sind sie in der Fußzeile, im Menü, in den Einstellungen und beim Roblox-Login. Name, Anschrift und E-Mail des Betreibers sowie das Datum stehen in `config.js` unter `legal` und werden automatisch eingesetzt. **Bitte vor dem Veröffentlichen ausfüllen und prüfen** – die Texte sind eine Vorlage für dieses Projekt, keine Rechtsberatung. Kommen neue Funktionen hinzu (z. B. Bewerbungen per Server, öffentliche Profile auf einem Server), müssen beide Texte angepasst werden.
 
 ## Sprachen
 
@@ -79,6 +108,15 @@ links: {
 ```
 
 Dort stehen auch die Rollen-Karten der Startseite (`roleCards`), Server, Trainings, News und Jobs (`jobs`).
+
+**Server & Fahrplan:** Jeder Server in `servers` hat eine `id` (Adresse der Detailseite `#/server/<id>`) und eine Liste `lines` mit den Linien, die dort fahren. Die Linien stehen in `lines`:
+
+```js
+'ice-28': { name: 'ICE 28', cat: 'ice', train: 'ICE 4', every: 60, offset: 24, no: 500,
+  stops: [['Hamburg Hbf', 0], ['Ludwigslust', 52], ['Berlin-Spandau', 92], ['Berlin Hbf', 105]] },
+```
+
+`cat` ist die Gattung (`ice`, `ic`, `ire`, `re`, `rb`, `s`), `stops` sind die Halte mit Minuten ab dem ersten Halt, `every` der Takt, `offset` die erste Abfahrt nach Mitternacht und `no` die erste Zugnummer. Jede Linie fährt in beide Richtungen. Daraus berechnet die App jede Minute, welche Züge gerade wo sind (inkl. Verspätung), die Abfahrten an jedem Bahnhof mit Gleis und – aus `players` – welche Spieler welchen Zug fahren, wo Platform Staff steht und wer welches Stellwerk besetzt (Bahnhöfe mit „Hbf“ oder mindestens drei Linien haben ein Stellwerk). Züge ohne Spieler fährt die KI. `focus` bei Trainingsservern legt fest, welche Rolle dort vor allem gespielt wird. Das sind Demo-Daten; später können Züge und Spieler live aus dem Spiel kommen.
 
 **Videos in News:** `video` ist entweder eine eigene Datei (`assets/video/…mp4`, mit `poster` als Vorschaubild) oder ein YouTube-Link. YouTube wird erst nach dem Antippen geladen (`youtube-nocookie.com`). Die drei Beispiel-Clips sind aus den eigenen Illustrationen erzeugt (`node tools/render_videos.mjs`, braucht Playwright und ffmpeg) und können durch echte Spielvideos ersetzt werden.
 
@@ -139,12 +177,16 @@ Danach `http://localhost:8080` (bzw. `:8000`) öffnen.
 ## Struktur
 
 ```
-index.html            Alle Seiten (Hash-Routing: #/trainings, #/server, …)
+index.html            Alle Seiten (Hash-Routing: #/trainings, #/server, #/server/<id>, …)
+privacy.html          Datenschutzerklärung
+terms.html            Nutzungsbedingungen
 manifest.webmanifest  App-Beschreibung (Name, Icons, Schnellzugriffe)
 sw.js                 Service Worker für den Offline-Modus
 assets/css/style.css  Design-System und Layouts
-assets/js/data.js     Inhalte & Beispieldaten
-assets/js/app.js      Routing, Sprache, Trainings, Diagramme, Bewerbungen, Profil, Einstellungen
+assets/js/config.js   Roblox-Login (Client-ID) und Angaben für die Rechtstexte
+assets/js/data.js     Inhalte & Beispieldaten (Server, Linien, Trainings, News …)
+assets/js/legal.js    Setzt die Angaben aus config.js in privacy.html und terms.html ein
+assets/js/app.js      Routing, Sprache, Trainings, Server & Fahrplan, Diagramme, Bewerbungen, Profil, Login, Einstellungen
 assets/js/i18n/       Übersetzungen der Oberfläche und Inhalte (en, fr, es, it, nl, pl, tr)
 assets/js/questions/  Fragen für die Bewerbungen je Sprache (de.js ist das Original)
 assets/css/uicons.css Flaticon UIcons (erzeugt)
@@ -154,6 +196,7 @@ assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PN
 assets/fonts/         Rubik und UIcons (woff2)
 tools/build_icons.py  Baut die UIcons-Teilmenge
 tools/render_videos.mjs Erzeugt die News-Clips aus den Illustrationen
+tools/oauth-worker.js Optionaler Token-Server für den Roblox-Login (Cloudflare Worker)
 ```
 
 ---

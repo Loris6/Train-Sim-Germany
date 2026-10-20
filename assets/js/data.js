@@ -29,20 +29,70 @@ window.TSG = {
     tripsToday: 18430,
   },
 
+  // id = Adresse der Detailseite (#/server/<id>), lines = Linien aus `lines`, die auf dem Server fahren.
+  // focus = Rang, den ein Trainingsserver vor allem ausbildet. Züge, Spieler und Stationen
+  // berechnet die App aus dem Fahrplan (Demo – später live aus dem Spiel).
   servers: [
-    { name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: 372, version: '2.4.1', trains: 16, type: 'public' },
-    { name: 'Nordnetz #2', region: 'EU-West', network: 'Hamburg – Kiel – Sylt', players: 18, max: 35, ping: 31, uptime: 160, version: '2.4.1', trains: 9, type: 'public' },
-    { name: 'Südnetz #1', region: 'EU-Central', network: 'München – Nürnberg – Garmisch', players: 35, max: 35, ping: 24, uptime: 663, version: '2.4.1', trains: 18, type: 'public' },
-    { name: 'Westnetz #1', region: 'EU-West', network: 'Köln – Düsseldorf – Koblenz', players: 27, max: 35, ping: 33, uptime: 295, version: '2.4.1', trains: 14, type: 'public' },
-    { name: 'Ostnetz #1', region: 'EU-Central', network: 'Berlin – Leipzig – Dresden', players: 12, max: 35, ping: 38, uptime: 58, version: '2.4.1', trains: 6, type: 'public' },
-    { name: 'Nachtfahrt-Event', region: 'EU-Central', network: 'Gesamtnetz · Nachtfahrplan', players: 48, max: 50, ping: 41, uptime: 80, version: '2.4.1', trains: 24, type: 'event' },
-    { name: 'Signaller-Training', region: 'EU-West', network: 'Hannover Hbf · Ausbildung', players: 9, max: 12, ping: 27, uptime: 35, version: '2.4.1', trains: 4, type: 'training' },
-    { name: 'Driver-Training', region: 'EU-West', network: 'Hamburg – Bremen', players: 6, max: 10, ping: 29, uptime: 22, version: '2.4.1', trains: 3, type: 'training' },
-    { name: 'Westnetz #2', region: 'EU-West', network: 'Frankfurt – Köln (SFS)', players: 31, max: 35, ping: 35, uptime: 468, version: '2.4.1', trains: 15, type: 'public' },
-    { name: 'NA Network #1', region: 'US-East', network: 'Gesamtnetz', players: 22, max: 35, ping: 112, uptime: 190, version: '2.4.1', trains: 11, type: 'public' },
-    { name: 'VIP · Lea & Friends', region: 'EU-West', network: 'Schwarzwaldbahn', players: 5, max: 12, ping: 26, uptime: 65, version: '2.4.1', trains: 3, type: 'vip' },
-    { name: 'Beta · Update 2.5', region: 'EU-Central', network: 'Linke Rheinstrecke (neu)', players: 19, max: 20, ping: 30, uptime: 45, version: '2.5.0-beta', trains: 8, type: 'event' },
+    { id: 'nordnetz-1', name: 'Nordnetz #1', region: 'EU-West', network: 'Hamburg – Hannover – Berlin', players: 33, max: 35, ping: 28, uptime: 372, version: '2.4.1', type: 'public', lines: ['ice-28', 'ice-22', 'ic-31', 'ire-1', 're-3', 's-3'] },
+    { id: 'nordnetz-2', name: 'Nordnetz #2', region: 'EU-West', network: 'Hamburg – Kiel – Sylt', players: 18, max: 35, ping: 31, uptime: 160, version: '2.4.1', type: 'public', lines: ['ice-31', 'ic-26', 're-6', 're-7', 'rb-61', 's-3p'] },
+    { id: 'suednetz-1', name: 'Südnetz #1', region: 'EU-Central', network: 'München – Nürnberg – Garmisch', players: 35, max: 35, ping: 24, uptime: 663, version: '2.4.1', type: 'public', lines: ['ice-29', 'ic-87', 're-1', 'rb-6', 's-8m'] },
+    { id: 'westnetz-1', name: 'Westnetz #1', region: 'EU-West', network: 'Köln – Düsseldorf – Koblenz', players: 27, max: 35, ping: 33, uptime: 295, version: '2.4.1', type: 'public', lines: ['ice-43', 'ic-35', 're-5', 'rb-26', 's-6'] },
+    { id: 'ostnetz-1', name: 'Ostnetz #1', region: 'EU-Central', network: 'Berlin – Leipzig – Dresden', players: 12, max: 35, ping: 38, uptime: 58, version: '2.4.1', type: 'public', lines: ['ice-15', 'ic-17', 're-50', 're-3b', 's-7', 's-1d'] },
+    { id: 'nachtfahrt', name: 'Nachtfahrt-Event', region: 'EU-Central', network: 'Gesamtnetz · Nachtfahrplan', players: 48, max: 50, ping: 41, uptime: 80, version: '2.4.1', type: 'event', lines: ['ice-28', 'ice-22', 'ire-1', 're-6', 're-7', 'ice-29', 'rb-6', 'ice-41', 're-5', 're-50', 's-7'] },
+    { id: 'signaller-training', name: 'Signaller-Training', region: 'EU-West', network: 'Hannover Hbf · Ausbildung', players: 9, max: 12, ping: 27, uptime: 35, version: '2.4.1', type: 'training', focus: 'Signaller', lines: ['ice-22', 'ic-31', 're-2', 's-5'] },
+    { id: 'driver-training', name: 'Driver-Training', region: 'EU-West', network: 'Hamburg – Bremen', players: 6, max: 10, ping: 29, uptime: 22, version: '2.4.1', type: 'training', focus: 'Driver', lines: ['ic-30', 're-4'] },
+    { id: 'westnetz-2', name: 'Westnetz #2', region: 'EU-West', network: 'Frankfurt – Köln (SFS)', players: 31, max: 35, ping: 35, uptime: 468, version: '2.4.1', type: 'public', lines: ['ice-41', 'ice-78', 're-9', 's-8f'] },
+    { id: 'na-1', name: 'NA Network #1', region: 'US-East', network: 'Gesamtnetz', players: 22, max: 35, ping: 112, uptime: 190, version: '2.4.1', type: 'public', lines: ['ice-28', 'ice-29', 'ice-41', 'ic-17', 're-6', 're-1', 'rb-26', 's-3'] },
+    { id: 'vip-lea', name: 'VIP · Lea & Friends', region: 'EU-West', network: 'Schwarzwaldbahn', players: 5, max: 12, ping: 26, uptime: 65, version: '2.4.1', type: 'vip', lines: ['re-2s', 'rb-37'] },
+    { id: 'beta-25', name: 'Beta · Update 2.5', region: 'EU-Central', network: 'Linke Rheinstrecke (neu)', players: 19, max: 20, ping: 30, uptime: 45, version: '2.5.0-beta', type: 'event', lines: ['ic-35r', 're-5r', 'rb-26r'] },
   ],
+
+  // Linien im Spiel. stops = [Bahnhof, Minuten ab dem ersten Halt]. Gefahren wird in beide Richtungen.
+  // every = Takt in Minuten, offset = erste Abfahrt nach Mitternacht (Minute), no = erste Zugnummer,
+  // train = Fahrzeug, cat = Gattung (ice, ic, ire, re, rb, s).
+  lines: {
+    'ice-28': { name: 'ICE 28', cat: 'ice', train: 'ICE 4', every: 60, offset: 24, no: 500, stops: [['Hamburg Hbf', 0], ['Ludwigslust', 52], ['Berlin-Spandau', 92], ['Berlin Hbf', 105]] },
+    'ice-22': { name: 'ICE 22', cat: 'ice', train: 'ICE 3', every: 60, offset: 46, no: 570, stops: [['Hamburg Hbf', 0], ['Hamburg-Harburg', 10], ['Lüneburg', 28], ['Uelzen', 47], ['Celle', 68], ['Hannover Hbf', 84]] },
+    'ice-31': { name: 'ICE 31', cat: 'ice', train: 'ICE 4', every: 120, offset: 50, no: 1080, stops: [['Hamburg Hbf', 0], ['Hamburg Dammtor', 4], ['Neumünster', 42], ['Kiel Hbf', 68]] },
+    'ice-29': { name: 'ICE 29', cat: 'ice', train: 'ICE 4', every: 60, offset: 55, no: 1500, stops: [['München Hbf', 0], ['Ingolstadt Hbf', 36], ['Nürnberg Hbf', 66]] },
+    'ice-43': { name: 'ICE 43', cat: 'ice', train: 'ICE 3', every: 60, offset: 12, no: 600, stops: [['Düsseldorf Hbf', 0], ['Köln Hbf', 24], ['Bonn Hbf', 44], ['Koblenz Hbf', 78]] },
+    'ice-41': { name: 'ICE 41', cat: 'ice', train: 'ICE 3', every: 60, offset: 54, no: 1020, stops: [['Köln Hbf', 0], ['Siegburg/Bonn', 17], ['Montabaur', 37], ['Limburg Süd', 47], ['Frankfurt Flughafen Fernbf', 60], ['Frankfurt (Main) Hbf', 70]] },
+    'ice-78': { name: 'ICE 78', cat: 'ice', train: 'ICE 3', every: 120, offset: 20, no: 1110, stops: [['Köln Hbf', 0], ['Frankfurt Flughafen Fernbf', 50], ['Frankfurt (Main) Hbf', 62]] },
+    'ice-15': { name: 'ICE 15', cat: 'ice', train: 'ICE T', every: 60, offset: 30, no: 1700, stops: [['Berlin Hbf', 0], ['Berlin Südkreuz', 7], ['Lutherstadt Wittenberg', 38], ['Bitterfeld', 55], ['Leipzig Hbf', 70]] },
+    'ic-31': { name: 'IC 31', cat: 'ic', train: 'IC 2', every: 120, offset: 10, no: 2170, stops: [['Hamburg Hbf', 0], ['Hamburg-Harburg', 11], ['Lüneburg', 30], ['Uelzen', 50], ['Celle', 72], ['Hannover Hbf', 88]] },
+    'ic-26': { name: 'IC 26', cat: 'ic', train: 'IC 1', every: 120, offset: 40, no: 2070, stops: [['Hamburg Hbf', 0], ['Elmshorn', 22], ['Itzehoe', 42], ['Heide (Holst)', 72], ['Husum', 98], ['Niebüll', 126], ['Westerland (Sylt)', 160]] },
+    'ic-87': { name: 'IC 87', cat: 'ic', train: 'IC 1', every: 120, offset: 18, no: 2080, stops: [['München Hbf', 0], ['München-Pasing', 8], ['Weilheim (Oberbay)', 36], ['Murnau', 52], ['Garmisch-Partenkirchen', 72]] },
+    'ic-35': { name: 'IC 35', cat: 'ic', train: 'IC 1', every: 120, offset: 28, no: 2000, stops: [['Düsseldorf Hbf', 0], ['Köln Hbf', 24], ['Bonn Hbf', 44], ['Remagen', 62], ['Andernach', 75], ['Koblenz Hbf', 88]] },
+    'ic-35r': { name: 'IC 35', cat: 'ic', train: 'IC 1', every: 120, offset: 0, no: 2010, stops: [['Köln Hbf', 0], ['Bonn Hbf', 20], ['Koblenz Hbf', 56], ['Bingen (Rhein) Hbf', 93], ['Mainz Hbf', 112]] },
+    'ic-17': { name: 'IC 17', cat: 'ic', train: 'IC 2', every: 120, offset: 37, no: 2430, stops: [['Berlin Hbf', 0], ['Berlin Südkreuz', 7], ['Doberlug-Kirchhain', 64], ['Elsterwerda', 76], ['Dresden-Neustadt', 112], ['Dresden Hbf', 120]] },
+    'ic-30': { name: 'IC 30', cat: 'ic', train: 'IC 2', every: 120, offset: 55, no: 2200, stops: [['Hamburg Hbf', 0], ['Hamburg-Harburg', 10], ['Bremen Hbf', 56]] },
+    'ire-1': { name: 'IRE 1', cat: 'ire', train: 'Doppelstock', every: 120, offset: 52, no: 4270, stops: [['Hamburg Hbf', 0], ['Büchen', 32], ['Hagenow Land', 50], ['Ludwigslust', 66], ['Wittenberge', 92], ['Berlin-Spandau', 140], ['Berlin Hbf', 152]] },
+    're-3': { name: 'RE 3', cat: 're', train: 'Doppelstock', every: 60, offset: 5, no: 82100, stops: [['Hamburg Hbf', 0], ['Hamburg-Harburg', 11], ['Winsen (Luhe)', 22], ['Lüneburg', 32], ['Bad Bevensen', 46], ['Uelzen', 56]] },
+    're-4': { name: 'RE 4', cat: 're', train: 'Doppelstock', every: 60, offset: 38, no: 82000, stops: [['Hamburg Hbf', 0], ['Hamburg-Harburg', 11], ['Buchholz (Nordheide)', 25], ['Tostedt', 36], ['Rotenburg (Wümme)', 55], ['Bremen Hbf', 75]] },
+    're-6': { name: 'RE 6', cat: 're', train: 'Doppelstock', every: 60, offset: 15, no: 11000, stops: [['Hamburg-Altona', 0], ['Elmshorn', 22], ['Itzehoe', 45], ['Heide (Holst)', 80], ['Husum', 108], ['Niebüll', 140], ['Westerland (Sylt)', 185]] },
+    're-7': { name: 'RE 7', cat: 're', train: 'FLIRT 3', every: 60, offset: 30, no: 21000, stops: [['Hamburg Hbf', 0], ['Hamburg Dammtor', 4], ['Elmshorn', 24], ['Neumünster', 48], ['Kiel Hbf', 75]] },
+    're-1': { name: 'RE 1', cat: 're', train: 'Talent 2', every: 60, offset: 25, no: 4000, stops: [['München Hbf', 0], ['Petershausen', 24], ['Ingolstadt Hbf', 46], ['Kinding (Altmühltal)', 66], ['Allersberg', 80], ['Nürnberg Hbf', 100]] },
+    're-5': { name: 'RE 5', cat: 're', train: 'Desiro HC', every: 60, offset: 40, no: 10500, stops: [['Düsseldorf Hbf', 0], ['Düsseldorf-Benrath', 10], ['Köln Hbf', 28], ['Bonn Hbf', 52], ['Remagen', 70], ['Andernach', 84], ['Koblenz Hbf', 98]] },
+    're-5r': { name: 'RE 5', cat: 're', train: 'Desiro HC', every: 60, offset: 22, no: 10600, stops: [['Köln Hbf', 0], ['Bonn Hbf', 20], ['Remagen', 37], ['Andernach', 50], ['Koblenz Hbf', 63], ['Boppard Hbf', 80], ['St. Goar', 92], ['Oberwesel', 98], ['Bacharach', 104], ['Bingen (Rhein) Hbf', 115], ['Mainz Hbf', 130]] },
+    're-9': { name: 'RE 9', cat: 're', train: 'FLIRT 3', every: 60, offset: 36, no: 10900, stops: [['Köln Hbf', 0], ['Köln Messe/Deutz', 4], ['Troisdorf', 16], ['Siegburg/Bonn', 21], ['Eitorf', 38], ['Au (Sieg)', 55], ['Siegen Hbf', 82]] },
+    're-50': { name: 'RE 50', cat: 're', train: 'Doppelstock', every: 60, offset: 12, no: 16000, stops: [['Leipzig Hbf', 0], ['Wurzen', 17], ['Oschatz', 33], ['Riesa', 45], ['Coswig (b Dresden)', 66], ['Dresden-Neustadt', 80], ['Dresden Hbf', 87]] },
+    're-3b': { name: 'RE 3', cat: 're', train: 'KISS', every: 60, offset: 50, no: 3300, stops: [['Berlin Hbf', 0], ['Berlin Südkreuz', 7], ['Ludwigsfelde', 21], ['Jüterbog', 50], ['Lutherstadt Wittenberg', 76]] },
+    're-2': { name: 'RE 2', cat: 're', train: 'Doppelstock', every: 60, offset: 20, no: 82800, stops: [['Hannover Hbf', 0], ['Hannover Messe/Laatzen', 8], ['Sarstedt', 14], ['Nordstemmen', 22], ['Elze (Han)', 28], ['Alfeld (Leine)', 40], ['Kreiensen', 60], ['Göttingen', 85]] },
+    're-2s': { name: 'RE 2', cat: 're', train: 'Doppelstock', every: 60, offset: 5, no: 4700, stops: [['Offenburg', 0], ['Gengenbach', 10], ['Hausach', 24], ['Hornberg', 34], ['Triberg', 45], ['St. Georgen (Schwarzw)', 57], ['Villingen (Schwarzw)', 68], ['Donaueschingen', 80], ['Singen (Hohentwiel)', 105], ['Radolfzell', 113], ['Konstanz', 125]] },
+    'rb-61': { name: 'RB 61', cat: 'rb', train: 'FLIRT 3', every: 60, offset: 45, no: 21600, stops: [['Hamburg Hbf', 0], ['Hamburg Dammtor', 4], ['Pinneberg', 18], ['Elmshorn', 28], ['Glückstadt', 40], ['Itzehoe', 52]] },
+    'rb-6': { name: 'RB 6', cat: 'rb', train: 'Talent 2', every: 60, offset: 32, no: 59400, stops: [['München Hbf', 0], ['München-Pasing', 8], ['Starnberg', 24], ['Tutzing', 34], ['Weilheim (Oberbay)', 46], ['Murnau', 62], ['Oberau', 77], ['Garmisch-Partenkirchen', 88]] },
+    'rb-26': { name: 'RB 26', cat: 'rb', train: 'FLIRT 3', every: 60, offset: 8, no: 25000, stops: [['Köln Hbf', 0], ['Bonn Hbf', 25], ['Remagen', 45], ['Andernach', 62], ['Koblenz Hbf', 80]] },
+    'rb-26r': { name: 'RB 26', cat: 'rb', train: 'FLIRT 3', every: 60, offset: 52, no: 25300, stops: [['Köln Hbf', 0], ['Bonn Hbf', 25], ['Remagen', 45], ['Andernach', 62], ['Koblenz Hbf', 80], ['Boppard Hbf', 99], ['St. Goar', 113], ['Oberwesel', 120], ['Bacharach', 127], ['Bingen (Rhein) Hbf', 141], ['Ingelheim', 152], ['Mainz Hbf', 165]] },
+    'rb-37': { name: 'RB 37', cat: 'rb', train: 'LINT 41', every: 60, offset: 35, no: 87300, stops: [['Offenburg', 0], ['Gengenbach', 12], ['Biberach (Baden)', 20], ['Haslach', 27], ['Hausach', 34]] },
+    's-3': { name: 'S 3', cat: 's', train: 'BR 490', every: 10, offset: 2, no: 31100, stops: [['Hamburg-Altona', 0], ['Landungsbrücken', 5], ['Jungfernstieg', 9], ['Hamburg Hbf', 11], ['Hamburg-Harburg', 22]] },
+    's-3p': { name: 'S 3', cat: 's', train: 'BR 490', every: 10, offset: 6, no: 31500, stops: [['Pinneberg', 0], ['Elbgaustraße', 9], ['Hamburg-Altona', 18], ['Jungfernstieg', 24], ['Hamburg Hbf', 27]] },
+    's-8m': { name: 'S 8', cat: 's', train: 'BR 423', every: 20, offset: 4, no: 8100, stops: [['München-Pasing', 0], ['München Hbf', 7], ['Marienplatz', 11], ['München Ost', 15], ['Ismaning', 33], ['Flughafen München', 46]] },
+    's-6': { name: 'S 6', cat: 's', train: 'BR 430', every: 20, offset: 14, no: 30600, stops: [['Düsseldorf Hbf', 0], ['Düsseldorf-Benrath', 12], ['Leverkusen Mitte', 28], ['Köln-Mülheim', 38], ['Köln Hbf', 46]] },
+    's-8f': { name: 'S 8', cat: 's', train: 'BR 423', every: 15, offset: 3, no: 35800, stops: [['Frankfurt Flughafen Regionalbf', 0], ['Frankfurt-Stadion', 4], ['Frankfurt (Main) Hbf', 11], ['Hauptwache', 14], ['Konstablerwache', 16], ['Offenbach Ost', 27]] },
+    's-7': { name: 'S 7', cat: 's', train: 'BR 481', every: 10, offset: 1, no: 7700, stops: [['Westkreuz', 0], ['Zoologischer Garten', 5], ['Berlin Hbf', 10], ['Friedrichstraße', 12], ['Alexanderplatz', 16], ['Ostbahnhof', 20], ['Ostkreuz', 24]] },
+    's-1d': { name: 'S 1', cat: 's', train: 'Doppelstock', every: 30, offset: 9, no: 33100, stops: [['Meißen Triebischtal', 0], ['Coswig (b Dresden)', 16], ['Radebeul Ost', 26], ['Dresden-Neustadt', 36], ['Dresden Hbf', 43]] },
+    's-5': { name: 'S 5', cat: 's', train: 'BR 424', every: 30, offset: 11, no: 34500, stops: [['Hannover Flughafen', 0], ['Langenhagen Mitte', 7], ['Hannover Hbf', 18], ['Hannover Messe/Laatzen', 28]] },
+  },
 
   // Reihenfolge = Ausbildungsweg. Nach jedem Training steigt man einen Rang auf.
   // prefix = Kürzel vor dem Profilbild, members = Spieler mit diesem Rang in der Gruppe.
@@ -58,9 +108,9 @@ window.TSG = {
     { name: 'Management', prefix: 'MG', label: 'Leitung', desc: 'Leitung von Train Sim Germany', color: '#3C414B', members: 12 },
   ],
 
-  // Profil mit Roblox verbinden: öffentliche Roblox-Daten (Name, Profilbild) über einen
-  // Proxy mit CORS laden. Roblox selbst erlaubt keine Abfragen direkt aus dem Browser.
-  // Für einen echten Login (OAuth) braucht es einen eigenen Server.
+  // Demo ohne Login: öffentliche Roblox-Daten (Name, Profilbild) über einen Proxy mit CORS laden.
+  // Roblox selbst erlaubt keine Abfragen direkt aus dem Browser.
+  // Der echte Login (OAuth 2.0) wird in assets/js/config.js eingerichtet.
   roblox: {
     usersApi: 'https://users.roproxy.com',
     thumbnailsApi: 'https://thumbnails.roproxy.com',

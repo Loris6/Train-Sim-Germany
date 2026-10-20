@@ -248,6 +248,16 @@
       </div>
     </section>
 
+    <!-- ===================== SERVER-DETAILS (#/server/<id>) ===================== -->
+    <section class="page" data-page="server-detail" aria-label="Server-Details" hidden>
+      <div class="page-head">
+        <div class="container" data-sd-head></div>
+      </div>
+      <div class="sheet">
+        <div class="container" data-sd-body></div>
+      </div>
+    </section>
+
     <!-- ===================== STATISTIKEN ===================== -->
     <section class="page" data-page="statistiken" aria-label="Statistiken" hidden>
       <div class="page-head">
@@ -386,7 +396,13 @@
           <section class="card set-card" aria-labelledby="h-lang">
             <h2 class="card__title" id="h-lang">Sprache</h2>
             <p class="card__sub">In welcher Sprache möchtest du Train Sim Germany nutzen?</p>
-            <div class="lang-picker" role="group" aria-label="Sprache" data-lang-picker></div>
+            <div class="dropdown" data-lang-picker></div>
+          </section>
+
+          <section class="card set-card" aria-labelledby="h-privacy">
+            <h2 class="card__title" id="h-privacy">Privatsphäre</h2>
+            <p class="card__sub">Lege fest, was andere Spieler von dir sehen.</p>
+            <div class="toggles" data-privacy></div>
           </section>
 
           <section class="card set-card" aria-labelledby="h-account">
@@ -401,6 +417,14 @@
               <button class="btn btn--primary" type="button" data-install hidden><i class="fi fi-rr-download ic" aria-hidden="true"></i>App installieren</button>
             </div>
             <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
+          </section>
+
+          <section class="card set-card" aria-labelledby="h-legal">
+            <h2 class="card__title" id="h-legal">Rechtliches</h2>
+            <div class="set-links">
+              <a href="privacy.html"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i><span>Datenschutzerklärung</span><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></a>
+              <a href="terms.html"><i class="fi fi-rr-document ic" aria-hidden="true"></i><span>Nutzungsbedingungen</span><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></a>
+            </div>
           </section>
         </div>
       </div>
@@ -430,18 +454,18 @@
         <a href="#/statistiken">Statistiken</a>
         <a href="#/einstellungen">Einstellungen</a>
       </nav>
-      <p class="footer__legal">© <span data-year>2026</span> Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation · Icons: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a></p>
+      <p class="footer__legal">© <span data-year>2026</span> Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation · <a href="privacy.html">Datenschutz</a> · <a href="terms.html">Nutzungsbedingungen</a> · Icons: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a></p>
     </div>
   </footer>
 
   <!-- Tab-Leiste (Handy & Tablet) -->
   <nav class="tabbar" aria-label="App-Navigation">
-    <div class="tabbar__pill">
+    <div class="tabbar__inner">
       <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-house-blank ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-house-blank ic tab-on" aria-hidden="true"></i></a>
       <a href="#/news" data-nav="news" aria-label="News"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i></a>
       <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i></a>
+      <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="tabbar__avatar" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
     </div>
-    <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="tabbar__avatar" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
   </nav>
 
   <!-- Menü (schiebt sich von links herein) -->
@@ -479,6 +503,7 @@
           App installieren
         </button>
         <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
+        <p class="drawer__legal"><a href="privacy.html">Datenschutz</a><a href="terms.html">Nutzungsbedingungen</a></p>
       </div>
     </aside>
   </div>
@@ -499,6 +524,7 @@
   <div class="toast" role="status" aria-live="polite" data-toast hidden></div>
   <div class="tooltip" data-tooltip hidden></div>
 
+  <script src="assets/js/config.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
