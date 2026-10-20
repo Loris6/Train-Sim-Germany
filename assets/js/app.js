@@ -1195,13 +1195,13 @@
   }
   // Sprache wählen: 'auto' (Gerätesprache) oder ein Sprachcode
   async function setLanguage(setting, { start = false } = {}) {
-    if (!start) store.set('tsg-lang', setting);
     const code = setting === 'auto' ? deviceLang() : setting;
     if (code !== 'de' && !(window.TSG_I18N && window.TSG_I18N[code])) {
       try { await loadScript(`assets/js/i18n/${code}.js`); } catch (e) { /* offline: Sprache bleibt */ }
     }
     const ok = code === 'de' || (window.TSG_I18N && window.TSG_I18N[code]);
-    if (!ok && !start) return;
+    if (!ok && !start) { toast(t('Diese Sprache ist gerade nicht erreichbar.')); return; }
+    if (!start) store.set('tsg-lang', setting);
     lang = ok ? code : 'de';
     dict = lang === 'de' ? {} : window.TSG_I18N[lang];
     setLocale();
