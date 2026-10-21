@@ -159,6 +159,8 @@
     sdTab: 'trains',
     sdCat: 'all',
     sdRole: 'all',
+    board: { name: '', cat: 'all', back: 0, more: 0 },
+    tripMid: true,
     range: '24',
     rank: rankIdx(store.get('tsg-rank', '')) >= 0 ? store.get('tsg-rank', '') : D.me.rank,
     trainingDay: null,
@@ -413,6 +415,7 @@
   const lineEnd = (L) => L.stops[L.stops.length - 1][1];
   const lineOffset = (L, dir) => (dir ? (L.offset + Math.floor(L.every / 2)) % L.every : L.offset);
   const lineBadge = (L) => `<span class="line line--${L.cat}">${esc(L.name)}</span>`;
+  const lineChip = (L) => `<span class="line line--${L.cat} line--chip">${icon('fi-rr-train-side')}${esc(L.name)}</span>`;
   // Eine Fahrt: dir 0 = Richtung wie in data.js, 1 = Gegenrichtung, start = Abfahrt am ersten Halt (Minuten)
   function tripOf(lineId, dir, start) {
     const L = D.lines[lineId];
@@ -488,6 +491,14 @@
     }).sort((a, b) => b.box - a.box || b.lines.length - a.lines.length || a.name.localeCompare(b.name, 'de'));
   }
   const platformOf = (st, lineId, dir) => (st ? 1 + (hash(`${st.name}/${lineId}/${dir}`) % st.platforms) : 1);
+  // Gleis einer Fahrt an einem Bahnhof: planmäßig je Linie und Richtung, ab und zu ein Gleiswechsel
+  function gleisOf(st, tr) {
+    const plan = platformOf(st, tr.lineId, tr.dir);
+    if (!st || st.platforms < 2 || hash(`${tr.id}@${st.name}`) % 11) return { n: plan, plan, changed: false };
+    return { n: 1 + ((plan + (hash(tr.id) % (st.platforms - 1))) % st.platforms), plan, changed: true };
+  }
+  // Gleis als Schild: dunkelblau (Start und Ziel), grau (Zwischenhalt), rot bei Gleiswechsel
+  const glHtml = (g, strong) => `<span class="gl${g.changed ? ' is-changed' : strong ? ' is-strong' : ''}"${g.changed ? ` title="${esc(t('Gleiswechsel – planmäßig Gl. {n}', { n: g.plan }))}"` : ''}>${t('Gl. {n}', { n: g.n })}</span>`;
 
   // Spieler: Namen aus D.crew und erzeugte Roblox-Namen, Rollen nach festen Anteilen (Rest = Fahrgäste)
   const NAME_A = ['Lok', 'Bahn', 'Gleis', 'Signal', 'Weichen', 'Takt', 'Zug', 'Schiene', 'Express', 'Regio', 'Rail', 'Tf', 'Strecke', 'Bahnhof', 'Rangier', 'Kelle'];
@@ -668,7 +679,7 @@
   function trainWhere(m, tr) {
     const st = tr.st;
     const stop = tr.stops[st.i];
-    const gleis = platformOf(m.stationMap.get(stop.name), tr.lineId, tr.dir);
+    const gleis = gleisOf(m.stationMap.get(stop.name), tr).n;
     if (st.phase === 'wait') return t('Steht in {station} auf Gleis {n} bereit', { station: stop.name, n: gleis });
     if (st.phase === 'stop') return t('Hält in {station} auf Gleis {n}', { station: stop.name, n: gleis });
     return t('Zwischen {a} und {b}', { a: stop.name, b: tr.stops[st.i + 1].name });
@@ -744,7 +755,7 @@
     </button>`;
   }
   // Kommende Züge an einem Bahnhof: Abfahrten, am Endbahnhof Ankünfte
-  function departures(m, st, limit = 12, within = 90) {
+  function departures(m, st, limit = 12, within = 90, back = 0) {
     const now = m.now;
     const out = [];
     st.lines.filter((id) => m.s.lines.includes(id)).forEach((lineId) => {
@@ -753,17 +764,23 @@
       [0, 1].forEach((dir) => {
         const j = (dir ? [...L.stops].reverse() : L.stops).findIndex(([name]) => name === st.name);
         const off = dir ? end - L.stops[L.stops.length - 1 - j][1] : L.stops[j][1];
-        tripsBetween(lineId, dir, now - off - MAX_DELAY - 2, now - off + within).forEach((tr) => {
+        tripsBetween(lineId, dir, now - off - MAX_DELAY - 2 - back, now - off + within).forEach((tr) => {
           const stop = tr.stops[j];
           const last = j === tr.stops.length - 1;
           const time = last ? stop.arr : stop.dep;
-          if (time + tr.delay < now - 0.5 || time > now + within) return;
+          if (time + tr.delay < now - 0.5 - back || time > now + within) return;
           const s2 = tripState(tr, now);
-          out.push({ tr, j, time, last, here: (s2.phase === 'stop' || s2.phase === 'wait') && s2.i === j && !last, gleis: platformOf(st, lineId, dir) });
+          out.push({
+            tr, j, time, last, gone: time + tr.delay < now - 0.5,
+            here: (s2.phase === 'stop' || s2.phase === 'wait') && s2.i === j && !last, gleis: gleisOf(st, tr),
+          });
         });
       });
     });
-    return out.sort((a, b) => (a.time + a.tr.delay) - (b.time + b.tr.delay)).slice(0, limit);
+    // Wie am Bahnhof: nach Fahrplanzeit, bei gleicher Zeit nach der erwarteten
+    const sorted = out.sort((a, b) => a.time - b.time || a.tr.delay - b.tr.delay);
+    // Frühere Züge zusätzlich zur Anzahl der kommenden
+    return sorted.slice(0, limit + sorted.filter((d) => d.gone).length);
   }
 
   function renderServerDetail() {
@@ -908,56 +925,113 @@
           ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}</div>` : ''}
       </section>`;
 
-    // Fahrtverlauf: Linie schwarz bis zur aktuellen Position, Gleis am Start und Ziel hervorgehoben
+    // Reiseplan wie im DB Navigator: Start und Ziel mit Gleis-Schild, dazwischen die Zwischenhalte (ein- und ausblendbar).
+    // Die Linie ist bis zur aktuellen Position dunkel, der Zug fährt als roter Punkt mit.
+    const mids = lastI - 1;
+    const open = state.tripMid || mids < 1;
+    const progress = st.phase === 'done' ? 1 : st.phase === 'wait' ? 0 : Math.max(0, Math.min(1, st.progress));
     const fillOf = (i) => (st.phase === 'done' || i < st.i ? 1 : i === st.i && st.phase === 'run' ? st.seg : 0);
-    const rows = tr.stops.map((stop, i) => {
+    const marker = (fill, top) => (fill > 0 && fill < 1 ? `<span class="tl__train" style="top:calc(${top}px + ${(fill * 100).toFixed(1)}%)">${icon('fi-rr-train-side')}</span>` : '');
+    const row = (i, kind) => {
+      const stop = tr.stops[i];
       const station = m.stationMap.get(stop.name);
+      const g = gleisOf(station, tr);
       const ph = stopPhase(tr, i);
-      const time = i === lastI ? stop.arr : stop.dep;
-      const fill = fillOf(i);
+      const time = kind === 'end' ? stop.arr : stop.dep;
+      const fill = kind === 'end' ? 0 : kind === 'start' ? +(progress > 0) : fillOf(i);
       const people = station ? [...station.signallers.map((p) => [p, 'Signaller']), ...station.staff.map((p) => [p, 'Platform Staff'])] : [];
-      return `<li class="tl__row is-${ph}">
-        <span class="tl__time"><b${tr.delay ? ' class="is-struck"' : ''}>${hhmm(time)}</b><small class="${tr.delay ? 'is-late' : 'is-ok'}">${hhmm(time + tr.delay)}</small></span>
-        <span class="tl__rail" style="--fill:${fill.toFixed(3)}">${i === lastI ? icon(st.phase === 'done' ? 'fi-sr-marker' : 'fi-rr-marker', 'tl__pin') : '<i class="tl__dot"></i>'}${fill > 0 && fill < 1
-          ? `<span class="tl__train" style="top:calc(12px + ${(fill * 100).toFixed(1)}%)">${icon('fi-rr-train-side')}</span>` : ''}</span>
+      const dot = kind === 'end' ? icon(st.phase === 'done' ? 'fi-sr-marker' : 'fi-rr-marker', 'tl__pin') : `<i class="tl__dot${kind === 'start' ? ' tl__dot--start' : ''}"></i>`;
+      return `<li class="tl__row tl__row--${kind} is-${ph}">
+        <span class="tl__time"><b>${hhmm(time)}</b><small class="${tr.delay ? 'is-late' : 'is-ok'}">${hhmm(time + tr.delay)}</small></span>
+        <span class="tl__rail" style="--fill:${fill.toFixed(3)}">${dot}${kind === 'mid' ? marker(fill, 12) : ''}</span>
         <span class="tl__body">
-          <span class="tl__head">${stationBtn(stop.name)}<span class="tl__gl${i === 0 || i === lastI ? ' is-end' : ''}">${t('Gl. {n}', { n: platformOf(station, tr.lineId, tr.dir) })}</span></span>
-          ${ph === 'here' ? `<small class="tl__note">${t('Zug steht hier')}</small>` : ''}
+          <span class="tl__head">${stationBtn(stop.name)}${glHtml(g, kind !== 'mid')}</span>
+          ${ph === 'here' || g.changed ? `<span class="tl__notes">${ph === 'here' ? `<small class="tl__note">${t('Zug steht hier')}</small>` : ''}${g.changed ? `<small class="tl__note tl__note--gl">${t('Gleiswechsel – planmäßig Gl. {n}', { n: g.plan })}</small>` : ''}</span>` : ''}
           ${people.length ? `<span class="tl__chips">${people.map(([p, role]) => `<span class="tl-chip" style="--rc:${rankOf(role).color}">${avatar(p.name)}<span>${role}: <b>${esc(p.name)}</b></span></span>`).join('')}</span>` : ''}
         </span>
       </li>`;
-    });
+    };
+    // Abschnitt mit der Linie zwischen Start und erstem Zwischenhalt (eingeklappt: bis zum Ziel)
+    const legFill = open ? fillOf(0) : progress;
+    const leg = `<li class="tl__row tl__row--leg">
+        <span class="tl__time"></span>
+        <span class="tl__rail" style="--fill:${legFill.toFixed(3)}">${marker(legFill, 0)}</span>
+        <span class="tl__body">
+          <span class="tl-leg">${lineChip(tr.line)}<b>${t('nach {to}', { to: esc(tr.to) })}</b></span>
+          ${mids ? `<button class="tl-toggle" type="button" data-trip-mid aria-expanded="${open}">${open ? t('Zwischenhalte ausblenden') : mids === 1 ? t('1 Zwischenhalt anzeigen') : t('{n} Zwischenhalte anzeigen', { n: mids })}${icon('fi-rr-angle-small-down')}</button>` : ''}
+        </span>
+      </li>`;
+    const dur = Math.max(0, Math.round(tr.stops[lastI].arr - tr.stops[0].dep));
+    const rows = [row(0, 'start'), leg, ...(open ? tr.stops.slice(1, -1).map((x, k) => row(k + 1, 'mid')) : []), row(lastI, 'end')];
     return `<div class="tv">
       ${head}
       ${unit}
-      <section class="tv-card tv-line"><ol class="tl">${rows.join('')}</ol></section>
-      <p class="sheet-note">${t('Oben die Zeit laut Fahrplan, darunter die erwartete Zeit. Tippe auf einen Bahnhof für die kommenden Züge.')}</p>
+      <section class="tv-card tv-line">
+        <header class="rp-head">
+          <h4>${esc(tr.from)} <span aria-hidden="true">→</span> ${esc(tr.to)}</h4>
+          <p>${t('Heute')} <i aria-hidden="true">•</i> ${t('Dauer: {d}', { d: `${Math.floor(dur / 60)}:${String(dur % 60).padStart(2, '0')}` })} <i aria-hidden="true">•</i> ${t('0 Umstiege')}</p>
+        </header>
+        <ol class="tl">${rows.join('')}</ol>
+      </section>
+      <p class="sheet-note">${t('Oben die Zeit laut Fahrplan, darunter die erwartete Zeit. Tippe auf einen Bahnhof für die Abfahrten dort.')}</p>
     </div>`;
   }
+  // Abfahrtstafel eines Bahnhofs (wie im DB Navigator): Filter nach Zuggattung, früher/später blättern
+  const BOARD_GROUPS = [
+    { id: 'fern', label: 'Fernverkehr', cats: ['ice', 'ec', 'ic'] },
+    { id: 'regio', label: 'Regional', cats: ['ire', 're', 'rb'] },
+    { id: 's', label: 'S-Bahn', cats: ['s'] },
+  ];
   function stationView(name) {
     const s = serverById(state.serverId);
     const m = s && serverModel(s);
     const st = m && m.stationMap.get(name);
     if (!st) return `<p class="muted">${t('Diesen Bahnhof gibt es auf diesem Server nicht.')}</p>`;
-    const deps = departures(m, st);
-    const person = (p, extra) => `<li>${avatar(p.name)}<span><b>${esc(p.name)}</b><small>${extra}</small></span></li>`;
-    return `<div class="stview">
-      <p class="stview__meta">${icon('fi-rr-train-station')}${t('{n} Gleise', { n: st.platforms })}${st.box ? ` · ${t('Stellwerk')}` : ''}</p>
-      <div class="station__lines">${st.lines.map((id) => lineBadge(D.lines[id])).join('')}</div>
-      <div class="stview__crew">
-        <div><h4 class="sheet-sub">Platform Staff</h4>${st.staff.length
-          ? `<ul class="people">${st.staff.map((p) => person(p, tracksText(p))).join('')}</ul>`
-          : `<p class="muted">${t('Gerade niemand – die Abfertigung übernimmt die KI.')}</p>`}</div>
-        ${st.box ? `<div><h4 class="sheet-sub">${t('Stellwerk')}</h4>${st.signallers.length
-          ? `<ul class="people">${st.signallers.map((p) => person(p, 'Signaller')).join('')}</ul>`
-          : `<p class="muted">${t('Nicht besetzt – die KI stellt die Fahrstraßen.')}</p>`}</div>` : ''}
+    if (state.board.name !== name) state.board = { name, cat: 'all', back: 0, more: 0 };
+    const b = state.board;
+    const cats = st.lines.filter((id) => m.s.lines.includes(id)).map((id) => D.lines[id].cat);
+    const groups = BOARD_GROUPS.filter((g) => g.cats.some((c) => cats.includes(c)));
+    if (!groups.some((g) => g.id === b.cat)) b.cat = 'all';
+    const group = BOARD_GROUPS.find((g) => g.id === b.cat);
+    const list = departures(m, st, 500, 90 + b.more * 5, b.back).filter((d) => !group || group.cats.includes(d.tr.line.cat));
+    let left = 12 + b.more;
+    const shown = list.filter((d) => d.gone || left-- > 0);
+    const crew = (ic, label, people, extra, none) => `<div class="sb-crew__row">
+        <span class="sb-crew__label">${icon(ic)}${label}</span>
+        ${people.length ? `<span class="tl__chips">${people.map((p) => `<span class="tl-chip" style="--rc:${rankOf(p.role).color}">${avatar(p.name)}<span><b>${esc(p.name)}</b>${extra(p) ? ` · ${extra(p)}` : ''}</span></span>`).join('')}</span>`
+          : `<small class="muted">${none}</small>`}
+      </div>`;
+    const row = (d) => {
+      const tr = d.tr;
+      const via = tr.stops.slice(d.j + 1, -1).slice(0, 3).map((x) => x.name).join(' · ');
+      const note = d.gone ? (d.last ? t('Angekommen') : t('Abgefahren'))
+        : d.here ? `<b>${t('Steht am Gleis')}</b>` : d.last ? t('Endet hier') : via ? esc(t('Über {via}', { via })) : esc(tr.no);
+      return `<li><button class="sb-row${d.gone ? ' is-gone' : ''}" type="button" data-trip="${esc(tr.id)}">
+          <span class="sb-row__time"><b>${hhmm(d.time)}</b><b class="${tr.delay ? 'is-late' : 'is-ok'}">${hhmm(d.time + tr.delay)}</b></span>
+          <span class="sb-row__main">
+            <span class="sb-row__line">${lineChip(tr.line)}<b>${esc(d.last ? t('Von {from}', { from: tr.from }) : t('Nach {to}', { to: tr.to }))}</b></span>
+            ${d.gleis.changed && !d.gone ? `<small class="sb-row__warn">${icon('fi-rr-info')}${t('Gleiswechsel, statt Gl. {p}', { p: d.gleis.plan })}</small>` : ''}
+            <small class="sb-row__note">${note}</small>
+          </span>
+          ${glHtml(d.gleis, false)}
+        </button></li>`;
+    };
+    return `<div class="sb">
+      <header class="sb-head">
+        <span class="sb-head__ic">${icon('fi-rr-train-station')}</span>
+        <span class="sb-head__text"><h3>${esc(st.name)}</h3><small>${t('{n} Gleise', { n: st.platforms })}${st.box ? ` · ${t('Stellwerk')}` : ''} · ${t('Stand {time}', { time: hhmm(Math.floor(m.now)) })}</small></span>
+      </header>
+      <div class="sb-crew">
+        ${crew('fi-rr-whistle', 'Platform Staff', st.staff, tracksText, t('Gerade niemand – die Abfertigung übernimmt die KI.'))}
+        ${st.box ? crew('fi-rr-traffic-light', t('Stellwerk'), st.signallers, () => '', t('Nicht besetzt – die KI stellt die Fahrstraßen.')) : ''}
       </div>
-      <h4 class="sheet-sub">${t('Kommende Züge')}</h4>
-      ${deps.length ? `<ol class="board">${deps.map((d) => `<li><button class="board__row" type="button" data-trip="${esc(d.tr.id)}">
-          <span class="board__time">${timeHtml(d.time, d.tr.delay)}</span>
-          <span class="board__main">${lineBadge(d.tr.line)}<span class="board__dest"><b>${esc(d.last ? t('aus {from}', { from: d.tr.from }) : d.tr.to)}</b><small>${d.last ? t('Endet hier') : esc(d.tr.stops.slice(d.j + 1, -1).slice(0, 2).map((x) => x.name).join(' · ')) || esc(d.tr.no)}${d.here ? ` · <b>${t('Steht am Gleis')}</b>` : ''}</small></span></span>
-          <span class="board__track"><small>${t('Gleis')}</small><b>${d.gleis}</b></span>
-        </button></li>`).join('')}</ol>` : `<p class="muted">${t('In den nächsten 90 Minuten fährt hier kein Zug.')}</p>`}
+      ${groups.length > 1 ? `<div class="sb-tabs" role="tablist" aria-label="${esc(t('Zuggattung'))}">
+        <button type="button" role="tab" aria-selected="${b.cat === 'all'}" data-board-cat="all">${t('Alle')}</button>
+        ${groups.map((g) => `<button type="button" role="tab" aria-selected="${b.cat === g.id}" data-board-cat="${g.id}">${esc(t(g.label))}</button>`).join('')}
+      </div>` : ''}
+      ${b.back < 120 ? `<button class="sb-more" type="button" data-board-earlier>${icon('fi-rr-angle-small-down', 'is-up')}${t('Früher')}</button>` : ''}
+      ${shown.length ? `<ol class="sb-list">${shown.map(row).join('')}</ol>` : `<p class="sb-empty">${t('In den nächsten 90 Minuten fährt hier kein Zug.')}</p>`}
+      ${b.more < 48 && list.length > shown.length ? `<button class="sb-more" type="button" data-board-later>${icon('fi-rr-angle-small-down')}${t('Später')}</button>` : ''}
     </div>`;
   }
 
@@ -3050,10 +3124,21 @@
     $$('[data-chat-dot]').forEach((el) => { el.hidden = !n; });
   }
   // Team ab Supervisor: vom Backend oder direkt aus der Roblox-Gruppe (über den Proxy)
+  // Jede Person nur einmal (höchster Rang, Profilbild von welchem Eintrag auch immer)
+  function uniqueStaff(list) {
+    const byId = new Map();
+    (list || []).forEach((p) => {
+      const id = String(p.userId);
+      const had = byId.get(id);
+      const avatar = (had && had.avatar) || p.avatar || null;
+      byId.set(id, { ...(!had || rankIdx(p.rank) > rankIdx(had.rank) ? p : had), userId: id, avatar });
+    });
+    return [...byId.values()];
+  }
   async function loadStaff() {
     if (chat.staff && Date.now() - chat.staffAt < 30 * 60000) return;
     const cached = store.get('tsg-staff', null);
-    if (!chat.staff && cached && Date.now() - cached.at < 30 * 60000) { chat.staff = cached.list; chat.staffAt = cached.at; return; }
+    if (!chat.staff && cached && Date.now() - cached.at < 30 * 60000) { chat.staff = uniqueStaff(cached.list); chat.staffAt = cached.at; return; }
     try {
       let list;
       if (apiReady()) list = (await api('/api/staff')).staff;
@@ -3067,12 +3152,14 @@
           const res = await j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles/${r.id}/users?limit=100&sortOrder=Asc`);
           (res.data || []).forEach((u) => list.push({ userId: String(u.userId), username: u.username, displayName: u.displayName || u.username, rank: r.rankName, role: r.name }));
         }
+        list = uniqueStaff(list);
         for (let i = 0; i < list.length; i += 100) {
           const part = list.slice(i, i + 100);
           const r = await j(`${R.thumbnailsApi}/v1/users/avatar-headshot?userIds=${part.map((x) => x.userId).join(',')}&size=150x150&format=Png&isCircular=false`).catch(() => ({ data: [] }));
           (r.data || []).forEach((img) => { const p = part.find((x) => x.userId === String(img.targetId)); if (p && img.state === 'Completed') p.avatar = img.imageUrl; });
         }
       }
+      list = uniqueStaff(list);
       chat.staff = list;
       chat.staffAt = Date.now();
       store.set('tsg-staff', { at: chat.staffAt, list });
@@ -3166,9 +3253,9 @@
       <div data-chat-team>${chatTeamList()}</div>`;
   }
   function chatTeamList() {
-    const me = chat.list ? chat.list.me : state.profile && String(state.profile.userId);
+    const me = String((chat.list && chat.list.me) || (state.profile && state.profile.userId) || '');
     const q = norm(chat.query.trim());
-    const list = chat.staff.filter((p) => p.userId !== me && (!q || norm(`${p.displayName} ${p.username} ${p.rank} ${rankOf(p.rank).prefix}`).includes(q)));
+    const list = chat.staff.filter((p) => String(p.userId) !== me && (!q || norm(`${p.displayName} ${p.username} ${p.rank} ${rankOf(p.rank).prefix}`).includes(q)));
     const groups = RANKS.slice().reverse().filter((r) => rankIdx(r.name) >= rankIdx('Supervisor')).map((r) => [r, list.filter((p) => p.rank === r.name)]).filter(([, l]) => l.length);
     return groups.length ? groups.map(([r, l]) => `<section class="team-group">
           <h2 class="pgroup__title"><i style="--rc:${r.color}"></i>${esc(r.name)}<small>${esc(t(r.label))} · ${l.length}</small></h2>
@@ -3267,26 +3354,49 @@
       </li>`;
     }).join('');
   }
+  // Kopf eines Gesprächs: zurück, Bild, Name mit Rang und Stand – bleibt beim Scrollen oben
   function chatConvHead(c) {
     const area = c.kind === 'ticket' ? areaOf(c.area) : null;
     const other = chatOther(c);
-    return `<a class="back-link" href="${chat.list && chat.list.areas.includes(c.area) && c.from.sub !== chat.list.me && !(c.claimedBy && c.claimedBy.sub === chat.list.me) ? '#/chat/anfragen' : '#/chat'}">${icon('fi-rr-arrow-left')}${t('Alle Gespräche')}</a>
-      <div class="conv-head">
-        ${other ? personImg(other, 'avatar--lg') : `<span class="chat-row__ic chat-row__ic--lg">${icon(area ? area.icon : 'fi-rr-comments')}</span>`}
-        <div class="conv-head__text">
+    const me = chat.list && chat.list.me;
+    const back = chat.list && chat.list.areas.includes(c.area) && c.from.sub !== me && !(c.claimedBy && c.claimedBy.sub === me) ? '#/chat/anfragen' : '#/chat';
+    const [tone, state] = c.status === 'closed' ? ['done', t('Erledigt')]
+      : c.kind === 'direct' ? ['lock', t('Privat')]
+        : c.status === 'open' ? ['warn', t('Wartet auf Annahme')] : ['ok', t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })];
+    const sub = [
+      other && other.rank ? rankPill(rankOf(other.rank)) : '',
+      area ? `<span>${esc(t(area.label))}</span>` : '',
+      `<span class="conv-state conv-state--${tone}">${tone === 'lock' ? icon('fi-rr-lock') : '<i></i>'}${state}</span>`,
+    ].filter(Boolean).join('');
+    return `<div class="conv-bar">
+        <a class="conv-bar__back" href="${back}" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-rr-arrow-left')}</a>
+        ${other ? personImg(other, 'conv-bar__avatar') : `<span class="conv-bar__ic">${icon(area ? area.icon : 'fi-rr-comments')}</span>`}
+        <div class="conv-bar__text">
           <h1>${esc(chatTitle(c))}</h1>
-          <p>${area ? `${esc(t(area.label))} · ` : ''}${c.kind === 'ticket' && other && c.from.sub !== (chat.list && chat.list.me) ? `${esc(t(reasonOf(c.reason).label))} · ` : ''}${chatStatus(c)}</p>
+          <p>${sub}</p>
         </div>
-        ${c.canClose ? `<button class="btn btn--soft btn--sm" type="button" data-chat-close="${esc(c.id)}">${icon('fi-rr-check')}${t('Beenden')}</button>` : ''}
+        ${c.canClose ? `<button class="conv-bar__close" type="button" data-chat-close="${esc(c.id)}">${icon('fi-rr-check')}<span>${t('Beenden')}</span></button>` : ''}
       </div>`;
+  }
+  // Hinweis am Anfang des Gesprächs: wer sieht es, worum geht es
+  function chatIntro(c) {
+    const me = chat.list && chat.list.me;
+    if (c.kind === 'direct') {
+      const other = chatOther(c);
+      return `<li class="msg-intro">${icon('fi-rr-lock')}<span>${t('Privates Gespräch mit {name}. Nur ihr beide seht diese Nachrichten.', { name: `<b>${esc(other ? other.displayName || other.username : '')}</b>` })}</span></li>`;
+    }
+    const area = areaOf(c.area);
+    return `<li class="msg-intro">${icon(area ? area.icon : 'fi-rr-comments')}<span><b>${esc(t(reasonOf(c.reason).label))}</b>${area ? ` · ${esc(t(area.label))}` : ''}<br>${c.from.sub === me
+      ? t('Alle aus dem Team dieses Bereichs sehen deine Anfrage. Wer sie annimmt, antwortet dir hier – du siehst, wer es ist.')
+      : t('Anfrage von {name}', { name: `<b>${esc(c.from.displayName || c.from.username)}</b>` })}</span></li>`;
   }
   function chatComposer(c) {
     if (c.canClaim) {
       return `<div class="compose compose--claim"><p>${t('Diese Anfrage wartet auf jemanden aus deinem Bereich.')}</p>
         <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-claim="${esc(c.id)}">${icon('fi-rr-hand-wave')}${t('Anfrage annehmen')}</button></div>`;
     }
-    if (c.status === 'closed') return `<p class="compose compose--note">${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
-    if (!c.canWrite) return `<p class="compose compose--note">${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
+    if (c.status === 'closed') return `<p class="compose compose--note">${icon('fi-rr-check-circle')}${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
+    if (!c.canWrite) return `<p class="compose compose--note">${icon('fi-rr-lock')}${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
     return `<form class="compose" data-chat-send="${esc(c.id)}">
       <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
       <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(t('Nachricht schreiben …'))}"></textarea>
@@ -3303,7 +3413,7 @@
     markSeen(c);
     return {
       head: chatConvHead(c),
-      body: `<ol class="msgs" data-chat-msgs>${chatMessages(c)}</ol><div data-chat-compose>${chatComposer(c)}</div>`,
+      body: `<ol class="msgs" data-chat-msgs>${chatIntro(c)}${chatMessages(c)}</ol><div class="compose-dock" data-chat-compose>${chatComposer(c)}</div>`,
     };
   }
   async function openConv(id, { since = 0 } = {}) {
@@ -3330,7 +3440,7 @@
     if (!list || !c || c.error) { renderChat(); return; }
     const atEnd = window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
     $('[data-chat-head]').innerHTML = chatConvHead(c);
-    list.innerHTML = chatMessages(c);
+    list.innerHTML = chatIntro(c) + chatMessages(c);
     const box = $('[data-chat-compose]');
     const wasForm = !!$('form', box);
     if (!wasForm || !c.canWrite) box.innerHTML = chatComposer(c);
@@ -3620,7 +3730,7 @@
       render: (id) => tripView(id),
     },
     station: {
-      title: (name) => name,
+      title: () => t('Abfahrten'),
       render: (name) => stationView(name),
     },
     news: {
@@ -4240,11 +4350,15 @@
 
     // Server-Details: Tabs, Filter, Zug- und Bahnhofsdialog
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-sd-tab], [data-sd-cat], [data-sd-role], [data-trip], [data-station], [data-modal-back]');
+      const el = e.target.closest('[data-board-cat], [data-board-earlier], [data-board-later], [data-trip-mid], [data-sd-tab], [data-sd-cat], [data-sd-role], [data-trip], [data-station], [data-modal-back]');
       if (!el) return;
       const ds = el.dataset;
       const inModal = !!el.closest('[data-modal]');
-      if (ds.sdTab) { state.sdTab = ds.sdTab; renderServerDetail(); }
+      if (ds.boardCat) { state.board.cat = ds.boardCat; refreshModal(); }
+      else if ('boardEarlier' in ds) { state.board.back = Math.min(120, state.board.back + 30); refreshModal(); }
+      else if ('boardLater' in ds) { state.board.more += 12; refreshModal(); }
+      else if ('tripMid' in ds) { state.tripMid = !state.tripMid; refreshModal(); }
+      else if (ds.sdTab) { state.sdTab = ds.sdTab; renderServerDetail(); }
       else if (ds.sdCat) { state.sdCat = ds.sdCat; renderServerDetail(); }
       else if (ds.sdRole) { state.sdRole = ds.sdRole; renderServerDetail(); }
       else if (ds.trip) openModal('trip', ds.trip, { stack: inModal });

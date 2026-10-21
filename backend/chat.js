@@ -239,7 +239,7 @@ async function getJson(url) {
   return res.json();
 }
 export async function staffList(store, env) {
-  const cached = await store.get('cache:staff');
+  const cached = await store.get('cache:staff2');
   if (cached && Date.now() - cached.at < 30 * 60000) return cached.list;
   const group = String(env.ROBLOX_GROUP_ID || '33684346');
   const groups = (env.ROBLOX_GROUPS_URL || 'https://groups.roblox.com').replace(/\/+$/, '');
@@ -247,23 +247,29 @@ export async function staffList(store, env) {
   try {
     const roles = ((await getJson(`${groups}/v1/groups/${group}/roles`)).roles || [])
       .map((r) => ({ ...r, rankName: matchRank(r) })).filter((r) => r.rank > 0 && atLeast(r.rankName, 'Supervisor'));
-    const list = [];
+    // Jede Person nur einmal – taucht jemand bei mehreren Rollen auf, zählt der höchste Rang
+    const byId = new Map();
     for (const r of roles) {
       let cursor = '';
       for (let page = 0; page < 5; page++) {
         const res = await getJson(`${groups}/v1/groups/${group}/roles/${r.id}/users?limit=100&sortOrder=Asc${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
-        (res.data || []).forEach((u) => list.push({ userId: String(u.userId), username: u.username, displayName: u.displayName || u.username, rank: r.rankName, role: r.name }));
-        if (!res.nextPageCursor) break;
+        (res.data || []).forEach((u) => {
+          const id = String(u.userId);
+          const had = byId.get(id);
+          if (!had || level(r.rankName) > level(had.rank)) byId.set(id, { userId: id, username: u.username, displayName: u.displayName || u.username, rank: r.rankName, role: r.name });
+        });
+        if (!res.nextPageCursor || res.nextPageCursor === cursor) break;
         cursor = res.nextPageCursor;
       }
     }
+    const list = [...byId.values()];
     for (let i = 0; i < list.length; i += 100) {
       const part = list.slice(i, i + 100);
       const r = await getJson(`${thumbs}/v1/users/avatar-headshot?userIds=${part.map((x) => x.userId).join(',')}&size=150x150&format=Png&isCircular=false`).catch(() => ({ data: [] }));
-      (r.data || []).forEach((img) => { const p = part.find((x) => x.userId === String(img.targetId)); if (p && img.state === 'Completed') p.avatar = img.imageUrl; });
+      (r.data || []).forEach((img) => { const p = byId.get(String(img.targetId)); if (p && img.state === 'Completed') p.avatar = img.imageUrl; });
     }
     list.sort((a, b) => level(b.rank) - level(a.rank) || a.username.localeCompare(b.username));
-    await store.put('cache:staff', { at: Date.now(), list });
+    await store.put('cache:staff2', { at: Date.now(), list });
     return list;
   } catch (e) {
     if (cached) return cached.list;
