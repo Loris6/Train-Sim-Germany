@@ -25,7 +25,7 @@ window.TSG_CONFIG = {
 
   // Optional: Adresse des Backends (Ordner backend/) für Benachrichtigungen bei geschlossener App,
   // Bewerbungen an Discord und gespeicherte Privatsphäre, z. B. 'https://tsg-backend.<name>.workers.dev'
-  api: '',
+  api: 'https://tsg-backend.lorismziray01.workers.dev',
 
   // Angaben für Datenschutzerklärung und Nutzungsbedingungen (privacy.html, terms.html)
   legal: {
