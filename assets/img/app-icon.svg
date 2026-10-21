@@ -1,19 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- App-Icon und Roblox-Spielbild: randlose rote Fläche (die Ecken rundet das System), Zug im sicheren Bereich. -->
-  <defs>
-    <linearGradient id="tsg-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF3549"/><stop offset=".52" stop-color="#E3001B"/><stop offset="1" stop-color="#9B000F"/></linearGradient>
-    <linearGradient id="tsg-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/></linearGradient>
-  </defs>
-  <rect width="512" height="512" fill="url(#tsg-bg)"/>
-  <rect width="512" height="512" fill="url(#tsg-gloss)"/>
-  <g transform="translate(256 256) scale(.86) translate(-256 -256)">
-  <g transform="translate(14 -34)">
-    <path d="M150 196H296C364 196 418 238 441 306C444 316 437 326 427 326H150C139 326 130 317 130 306V216C130 205 139 196 150 196Z" fill="#FFFFFF"/>
-    <path d="M309 218C344 220 373 240 392 270H309C302 270 297 265 297 258V230C297 223 302 218 309 218Z" fill="#C4001C"/>
-    <rect x="62" y="214" width="50" height="16" rx="8" fill="#FFFFFF" fill-opacity=".55"/>
-    <rect x="40" y="252" width="72" height="16" rx="8" fill="#FFFFFF" fill-opacity=".85"/>
-    <rect x="72" y="290" width="40" height="16" rx="8" fill="#FFFFFF" fill-opacity=".55"/>
-    <rect x="96" y="366" width="322" height="16" rx="8" fill="#FFFFFF"/>
+  <!-- App-Icon und Roblox-Spielbild: das Zeichen mittig auf Weiß (die Ecken rundet das System). -->
+  <rect width="512" height="512" rx="0" fill="#FFFFFF"/>
+  <g transform="translate(66.0 168.6) scale(0.9500)"><defs><clipPath id="tsga"><path d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z"/></clipPath></defs>
+  <path d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z" fill="#E3001B"/>
+  <g clip-path="url(#tsga)">
+    <path d="M68 54H262C304 56 340 78 362 110H68C61 110 56 105 56 98V66C56 59 61 54 68 54Z" fill="#1B1F27"/>
+    <path d="M78 64H262C290 65 314 74 333 88H78C74 88 72 86 72 83V69C72 66 74 64 78 64Z" fill="#FFFFFF" fill-opacity=".14"/>
+    <rect x="0" y="126" width="400" height="12" fill="#1B1F27"/>
+    <rect x="0" y="144" width="400" height="12" fill="#FFC400"/>
   </g>
-  </g>
+  <rect x="34" y="188" width="362" height="11" rx="5.5" fill="#8A909A"/><rect x="2" y="188" width="20" height="11" rx="5.5" fill="#8A909A"/></g>
 </svg>

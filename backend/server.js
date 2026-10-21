@@ -4,7 +4,7 @@
  *   cp .env.example .env    # Werte eintragen
  *   node server.js          # läuft auf http://localhost:8787
  *
- * Daten (Profile, Privatsphäre, Erinnerungen) liegen in data/store.json.
+ * Daten (Profile, Chats, Bewerbungen …) liegen in data/store.json, Fotos und Videos aus dem Chat in data/store.json.files/.
  * Fällige Benachrichtigungen werden jede Minute verschickt.
  */
 import http from 'node:http';
@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { webcrypto } from 'node:crypto';
 import { handle, sendDue } from './app.js';
+import { cleanupFiles } from './files.js';
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -29,24 +30,41 @@ function readEnv(file) {
 }
 const env = { ...readEnv(path.join(DIR, '.env')), ...process.env };
 
-// Einfacher Speicher in einer JSON-Datei
+// Einfacher Speicher in einer JSON-Datei. Bytes (Fotos, Videos aus dem Chat) liegen daneben als eigene Dateien.
 function fileStore(file) {
   let data = {};
   try { data = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* neu */ }
+  const binDir = `${file}.files`;
+  const binPath = (key) => path.join(binDir, Buffer.from(key).toString('base64url'));
   const save = () => {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(`${file}.tmp`, JSON.stringify(data));
     fs.renameSync(`${file}.tmp`, file);
   };
+  const drop = (key) => {
+    if (data[key] && data[key].bin) fs.rmSync(binPath(key), { force: true });
+    delete data[key];
+  };
   return {
     async get(key) {
       const e = data[key];
       if (!e) return null;
-      if (e.exp && e.exp < Date.now()) { delete data[key]; save(); return null; }
+      if (e.exp && e.exp < Date.now()) { drop(key); save(); return null; }
+      if (e.bin) {
+        try { return new Uint8Array(fs.readFileSync(binPath(key))); } catch (err) { return null; }
+      }
       return structuredClone(e.v);
     },
-    async put(key, v, { ttl } = {}) { data[key] = { v: structuredClone(v), exp: ttl ? Date.now() + ttl * 1000 : 0 }; save(); },
-    async delete(key) { delete data[key]; save(); },
+    async put(key, v, { ttl } = {}) {
+      const exp = ttl ? Date.now() + ttl * 1000 : 0;
+      if (v instanceof Uint8Array) {
+        fs.mkdirSync(binDir, { recursive: true });
+        fs.writeFileSync(binPath(key), v);
+        data[key] = { bin: true, exp };
+      } else data[key] = { v: structuredClone(v), exp };
+      save();
+    },
+    async delete(key) { drop(key); save(); },
     async list(prefix, limit = 1000) {
       return Object.keys(data).filter((k) => k.startsWith(prefix) && !(data[k].exp && data[k].exp < Date.now())).sort().slice(0, limit);
     },
@@ -60,7 +78,7 @@ const server = http.createServer(async (req, res) => {
     let size = 0;
     for await (const c of req) {
       size += c.length;
-      if (size > 2000000) { res.writeHead(413).end(); return; }
+      if (size > 2200000) { res.writeHead(413).end(); return; }
       chunks.push(c);
     }
     const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
@@ -88,3 +106,5 @@ server.listen(port, () => {
 });
 // Benachrichtigungen für Trainings: jede Minute nachsehen, was fällig ist
 setInterval(() => { sendDue(store, env).catch((e) => console.error(e)); }, 60000);
+// Abgelaufene Fotos und Videos aus dem Chat: stündlich löschen
+setInterval(() => { cleanupFiles(store).catch((e) => console.error(e)); }, 3600000);

@@ -5,7 +5,7 @@ Die Anmeldung mit Roblox braucht **kein** Backend – dafür reicht die Client-I
 - **Trainings anbieten** (ab Supervisor) – immer für genau eine Rolle (QD, PS, CD oder SG), löschen nur die eigenen
 - **Neuigkeiten schreiben** (ab Public Relations Department) – Foto oder Video, Tag, bis zu 2 Buttons (Discord, YouTube, Roblox oder beliebiger Link)
 - **Karriere verwalten** (ab PRD) – Stellen öffnen/schließen, Zeitraum (Vorlagen 7/14/30 Tage oder eigene Zeit), Höchstzahl an Bewerbungen, „Dringend gesucht“, Hinweis für Bewerber, Verlauf; Bewerbungen prüfen – das Ergebnis geht sofort als Nachricht `[✅ PASSED]` / `[❌ FAILED]` vom Prüfer in den Chat, als Benachrichtigung und per E-Mail; die Bestandenen gesammelt an Discord senden
-- **Chat** – Anfragen mit Grund und Bereich, die das zuständige Team annimmt, und Direktnachrichten: Spieler schreiben dem Team, das Team kann jeden Spieler anschreiben
+- **Chat** – Spieler an Spieler, Gruppen (privat oder öffentlich, mit Regeln, Rechten und Befehlen), Anfragen ans Team, Fotos/Videos/PDFs; Moderation ab Supervisor
 - **Benachrichtigungen, auch bei geschlossener App** – neue Chat-Nachrichten (für beide Seiten), Ergebnis einer Bewerbung, fürs Team neue Anfragen und Bewerbungen, Trainings
 - **E-Mails an Bewerber** – nach dem Absenden die ganze Bewerbung, nach der Auswertung das Ergebnis (Brevo oder Resend)
 - **Shop** – Coins, Züge und Strecken aus dem Spiel; Käufe in der App verbucht das Spiel (Skript `game/TSGAppSync.server.lua`)
@@ -87,7 +87,7 @@ Mit einer eigenen Domain geht auch **Resend** (`RESEND_API_KEY` + `EMAIL_FROM` m
 
 In der App unter *Einstellungen → Benachrichtigungen* einschalten. Das Gerät meldet sich dann beim Backend an (bis zu 6 Geräte pro Konto) und bekommt Web-Push für:
 
-- **Chat** – jede neue Nachricht an die jeweils andere Seite, „Anfrage angenommen“
+- **Chat** – jede neue Nachricht an alle anderen im Gespräch, „Anfrage angenommen“, „… hat dich zur Gruppe hinzugefügt“. **Nicht**, wer das Gespräch (oder die Chat-Übersicht) gerade offen hat, und nicht bei stummgeschalteten Gesprächen
 - **Bewerbungen** – das Ergebnis `[✅ PASSED]` / `[❌ FAILED]`
 - **Team** (ab Supervisor) – neue Anfragen im eigenen Bereich, ab PRD auch neue Bewerbungen
 - **Trainings** – wie bisher über die Glocke
@@ -98,11 +98,17 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 
 ## Chat
 
-- **Anfrage:** Grund (Training, Rang, Fehler, Spieler melden, Bewerbung, Shop, Sonstiges) und Bereich wählen. Alle, die den Bereich betreuen, sehen sie unter *Anfragen*; nicht angenommene stehen oben (wer am längsten wartet, zuerst). Wer annimmt, steht im Gespräch – danach schreiben nur noch Spieler und diese Person.
+- **Gespräche:** Jeder angemeldete Spieler kann jedem Roblox-Spieler schreiben (per Name). Gibt es schon ein offenes Gespräch zwischen den beiden, geht es dort weiter.
+- **Gruppen** (bis 50 Leute): privat (nur auf Einladung) oder öffentlich (unter *Gruppen* zu finden, jeder kann beitreten). Inhaber und Admins stellen ein: Name, Beschreibung, Farbe, **Regeln**, wer Leute hinzufügen darf (Inhaber / Admins / alle), wer schreiben darf (alle / nur Admins), Fotos und Videos, Langsam-Modus (5 s bis 5 min) und **Befehle** (für alle / nur Admins / aus, einzeln wählbar). Rollen: Inhaber, Admin, Mitglied. Wer entfernt wurde, kann einer öffentlichen Gruppe nicht wieder beitreten, bis ihn jemand einlädt. Verlässt der Inhaber die Gruppe, wird ein Admin (oder das älteste Mitglied) Inhaber.
+- **Befehle** (`commands.js`): `/help`, `/rules`, `/GetGroupData`, `/GetUser <Name>`, `/GetRank <Name>`, `/GetServers`, `/GetOnline`, `/GetStats`, `/GetTrainings`, `/Coins`. Die Antwort schreibt der **TSG-Bot**; Fehler und persönliche Antworten (`/Coins`) sieht nur, wer gefragt hat. `/GetServers`, `/GetOnline` und „Im Spiel“ bei `/GetUser` brauchen das Spiel-Skript `game/TSGAppSync.server.lua` – es meldet alle 30 Sekunden seinen Server.
+- **Fotos, Videos, PDFs** (`files.js`): Fotos verkleinert die App vorher (max. 1920 px), Videos bis 80 MB, PDFs bis 20 MB, bis 10 Dateien je Nachricht, 300 MB pro Person und Tag. Hochgeladen wird in Stücken zu 1 MB; abgerufen wird über signierte Links (nur wer das Gespräch sehen darf bekommt sie; gültig bis Ende des nächsten Tages), Videos lassen sich vorspulen. Gespeichert wird alles im Durable Object (Bytes unter `blob:`), gelöscht mit der Nachricht, dem Gespräch oder nach 180 Tagen.
+- **Anfrage ans Team:** Grund (Training, Rang, Fehler, Spieler melden, Bewerbung, Shop, Sonstiges) und Bereich wählen. Alle, die den Bereich betreuen, sehen sie unter *Anfragen*; nicht angenommene stehen oben (wer am längsten wartet, zuerst). Wer annimmt, steht im Gespräch – danach schreiben nur noch Spieler und diese Person.
 - **Wer betreut was** (`AREAS` in `chat.js`): Qualified Driver / Platform Staff / Conductor / Signaller → Supervisor und der jeweilige Manager · Karriere → Public Relations Department · Technik → Project Engineer · Meldungen → alle ab Supervisor · Allgemein → Supervisor und PRD. Operation Manager, Community Director und Chief Engineer sehen alles.
-- **Direktnachricht:** Spieler schreiben jeder Person ab Supervisor (Liste aus der Roblox-Gruppe, mit Suche). Das Team kann **jeden Spieler** anschreiben (unter *Team → Spieler anschreiben* per Roblox-Name oder direkt aus einer Bewerbung). Spieler untereinander können sich nicht schreiben. Nur die beiden sehen das Gespräch, beide bekommen eine Benachrichtigung bei neuen Nachrichten.
+- **Moderation (alle über Junior Supervisor, also ab Supervisor):** Reiter *Moderation* mit allen Gesprächen (Suche, Filter, gemeldete zuerst). Jedes Gespräch lässt sich **unsichtbar beobachten** oder **sichtbar beitreten** (alle sehen dann „… (Moderation) ist beigetreten“); Moderation kann Nachrichten löschen, Leute entfernen und Gespräche für alle löschen. Ausgenommen sind Gespräche mit jemandem, der einen **höheren Rang** hat. Jedes Beobachten und Beitreten wird im Gespräch vermerkt (nur für die Moderation sichtbar).
+- **Melden:** Im Gespräch unter *Info → Gespräch melden* – daraus wird eine Anfrage an „Meldungen“ mit Link auf das Gespräch.
+- **Löschen:** *Für mich löschen* nimmt das Gespräch aus der eigenen Liste, bis jemand Neues schreibt. *Für alle löschen* (Inhaber einer Gruppe, Moderation) löscht es samt Fotos und Videos. Eigene Nachrichten lassen sich löschen (antippen).
 - **Ergebnis einer Bewerbung:** kommt als eigene Karte `[✅ PASSED]` / `[❌ FAILED]` vom Prüfer in einem Gespräch mit dem Bewerber – er kann direkt antworten.
-- Gespräche werden 180 Tage nach der letzten Nachricht gelöscht. Pro Konto gehen höchstens 6 neue Gespräche am Tag (Team: 60).
+- Gespräche werden 180 Tage nach der letzten Nachricht gelöscht, von jedem Gespräch bleiben die letzten 500 Nachrichten. Pro Konto gehen höchstens 15 neue Gespräche und 8 neue Gruppen am Tag (Team: 80 bzw. 40).
 
 ## Wege (API)
 
@@ -128,9 +134,15 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `GET /api/shop` · `POST /api/shop/buy` | Katalog, eigene Coins und Besitz · `{ kind: "train" \| "route", id }` kaufen |
 | `POST /api/game/sync` | Abgleich mit dem Spiel (`Authorization: Bearer <GAME_API_KEY>`) |
 | `GET /api/staff` | Team ab Supervisor aus der Roblox-Gruppe |
-| `GET /api/chats` · `POST /api/chats` | Eigene Gespräche und offene Anfragen des Bereichs · neue Anfrage oder Direktnachricht |
-| `GET /api/chats/<id>?since=<ms>` | Gespräch lesen (mit `since` nur, wenn sich etwas geändert hat) |
-| `POST /api/chats/<id>/messages` · `/claim` · `/close` | Schreiben · Anfrage annehmen · beenden |
+| `GET /api/chats` · `POST /api/chats` | Eigene Gespräche und offene Anfragen des Bereichs · neue Anfrage, Direktnachricht oder Gruppe |
+| `GET /api/chats/public` · `GET /api/chats/moderation` | Öffentliche Gruppen · alle Gespräche für die Moderation (ab Supervisor) |
+| `GET /api/chats/<id>?since=<ms>` | Gespräch lesen (mit `since` nur, wenn sich etwas geändert hat; `observe=1` = Moderation schaut zu) |
+| `PUT` · `DELETE /api/chats/<id>` | Gruppe bearbeiten · für alle löschen |
+| `POST /api/chats/<id>/messages` · `DELETE …/messages/<id>` | Schreiben (Text, Dateien, Befehle) · Nachricht löschen |
+| `POST /api/chats/<id>/files` · `PUT /api/files/<id>/<n>` · `GET /api/files/<id>` | Datei anmelden · Stück hochladen · abrufen (signierter Link) |
+| `POST /api/chats/<id>/members` · `PUT`/`DELETE …/members/<id>` | Leute hinzufügen · Rolle ändern · entfernen |
+| `POST /api/chats/<id>/join` · `/leave` · `/mute` · `/hide` · `/report` | Beitreten (`{ mod: true }` = sichtbar als Moderation) · verlassen · stumm · für mich löschen · melden |
+| `POST /api/chats/<id>/claim` · `/close` | Anfrage annehmen · beenden |
 | `GET /api/push/key` · `POST /api/push/reminders` | Web-Push: öffentlicher Schlüssel · Erinnerungen für Trainings speichern |
 | `POST /api/push/subscribe` · `/unsubscribe` · `/test` | Gerät für Benachrichtigungen anmelden (mit Auswahl Chat/Bewerbungen/Team) · abmelden · Probe senden |
 | `GET /api/players/find?q=<name>` | Spieler per Roblox-Name suchen, um ihn anzuschreiben (ab Supervisor) |

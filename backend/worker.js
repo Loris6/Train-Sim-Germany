@@ -4,10 +4,12 @@
  *
  * Alle Daten liegen in einem Durable Object (SQLite, im kostenlosen Tarif enthalten). Jede Anfrage läuft dort,
  * dadurch sehen alle sofort denselben Stand – wichtig für Chat, Käufe und Bewerbungen.
- * Der Zeitplan (wrangler.toml → crons) verschickt alle 2 Minuten die fälligen Benachrichtigungen.
+ * Der Zeitplan (wrangler.toml → crons) verschickt alle 2 Minuten die fälligen Benachrichtigungen
+ * und räumt einmal pro Stunde abgelaufene Dateien aus dem Chat auf.
  */
 import { DurableObject } from 'cloudflare:workers';
 import { handle, sendDue } from './app.js';
+import { cleanupFiles } from './files.js';
 
 // Speicher im Durable Object: { v: Wert, exp: Ablauf in ms (0 = nie) }
 const doStore = (storage) => ({
@@ -35,9 +37,12 @@ export class TSGStore extends DurableObject {
   }
   async cron() {
     await sendDue(this.store, this.env);
-    // Abgelaufene Einträge aufräumen
+    // Abgelaufene Dateien aus dem Chat (Bytes liegen unter blob:, siehe files.js)
+    if (new Date().getUTCMinutes() < 2) await cleanupFiles(this.store);
+    // Abgelaufene Einträge aufräumen – ohne den Bereich blob: (der würde alle Videos in den Speicher laden)
     const t = Date.now();
-    const old = [...(await this.ctx.storage.list({ limit: 2000 }))].filter(([, e]) => e && e.exp && e.exp < t).map(([k]) => k);
+    const entries = [...await this.ctx.storage.list({ end: 'blob:', limit: 2000 }), ...await this.ctx.storage.list({ start: 'blob;', limit: 2000 })];
+    const old = entries.filter(([, e]) => e && e.exp && e.exp < t).map(([k]) => k);
     for (let i = 0; i < old.length; i += 128) await this.ctx.storage.delete(old.slice(i, i + 128));
   }
 }

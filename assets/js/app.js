@@ -3069,17 +3069,39 @@
     toast(t('Gekauft: {name}', { name: kind === 'routes' ? t(item.route.title) : item.name }));
   }
 
-  // ---------- Chat: Anfragen ans Team und Direktnachrichten ----------
-  // Spieler wählen Grund und Bereich; alle aus dem Team des Bereichs können die Anfrage annehmen.
-  // Direkt anschreiben kann man jeden ab Supervisor (Liste aus der Roblox-Gruppe mit Suche).
+  // ---------- Chat ----------
+  // Gespräche: Anfragen ans Team, Nachrichten an jeden Spieler und Gruppen (privat oder öffentlich) mit eigenen Regeln,
+  // Fotos, Videos, Dateien und Befehlen wie /GetGroupData. Ab Supervisor gibt es die Moderation: jedes Gespräch
+  // unsichtbar beobachten oder sichtbar beitreten, Nachrichten und Gespräche löschen.
   const CHAT = D.chat;
-  const chat = { list: null, at: 0, staff: null, staffAt: 0, query: '', conv: {}, busy: false, timer: null };
+  const chat = {
+    list: null, at: 0, staff: null, staffAt: 0, query: '', conv: {}, busy: false, timer: null, edit: false,
+    pub: null, pubAt: 0, pubQuery: '', mod: null, modAt: 0, modQuery: '', modKind: '',
+    pending: {}, sending: false, found: null, members: [],
+  };
+  // Gleiche Liste wie backend/commands.js
+  const CHAT_COMMANDS = [
+    { id: 'help', usage: '/help', desc: 'Alle Befehle in diesem Chat' },
+    { id: 'rules', usage: '/rules', desc: 'Regeln dieses Chats' },
+    { id: 'getgroupdata', usage: '/GetGroupData', desc: 'Roblox-Gruppe: Mitglieder und Ränge' },
+    { id: 'getuser', usage: '/GetUser <Name>', desc: 'Roblox-Profil, Rang und ob jemand im Spiel ist' },
+    { id: 'getrank', usage: '/GetRank <Name>', desc: 'Rang eines Spielers in der Gruppe' },
+    { id: 'getservers', usage: '/GetServers', desc: 'Laufende Server im Spiel' },
+    { id: 'getonline', usage: '/GetOnline', desc: 'Wer gerade im Spiel ist' },
+    { id: 'getstats', usage: '/GetStats', desc: 'Spieler, Besuche, Favoriten, Discord' },
+    { id: 'gettrainings', usage: '/GetTrainings', desc: 'Die nächsten Trainings' },
+    { id: 'coins', usage: '/Coins', desc: 'Deine Coins und Züge aus dem Spiel (nur du siehst die Antwort)' },
+  ];
+  const GROUP_DEFAULTS = { visibility: 'private', invite: 'admins', write: 'all', media: true, slow: 0, cmd: 'all', cmds: CHAT_COMMANDS.map((c) => c.id) };
+  const GROUP_COLORS = ['#EC0016', '#1455C0', '#408335', '#B35900', '#7A4BD1', '#0F8C8C', '#C2185B', '#3C414B'];
   const reasonOf = (id) => CHAT.reasons.find((r) => r.id === id) || CHAT.reasons[CHAT.reasons.length - 1];
   const areaOf = (id) => CHAT.areas.find((a) => a.id === id) || CHAT.areas[CHAT.areas.length - 1];
   const chatReady = () => apiReady() && !!sessionToken();
+  const meSub = () => String((chat.list && chat.list.me) || (state.profile && state.profile.userId) || '');
+  const isModHere = () => isTeam('Supervisor');
   const seenChats = () => store.get('tsg-chat-seen', {});
   const markSeen = (c) => { const s = seenChats(); s[c.id] = c.updated; store.set('tsg-chat-seen', s); };
-  const isUnread = (c) => !!(chat.list && c.last && c.last.by !== chat.list.me && c.last.by !== 'system' && c.updated > (seenChats()[c.id] || 0));
+  const isUnread = (c) => !!(c.last && c.last.by !== meSub() && c.last.by !== 'system' && c.updated > (seenChats()[c.id] || 0));
   const chatAgo = (ms) => {
     const min = Math.round((Date.now() - ms) / 60000);
     if (min < 1) return t('gerade eben');
@@ -3087,36 +3109,91 @@
     if (min < 1440) return t('vor {n} Std.', { n: Math.round(min / 60) });
     return fmtDate(ms);
   };
-  // Mit wem spreche ich? (für Titel und Bild)
+  const sizeText = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1).replace('.', ',')} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+  const loadingHtml = () => `<p class="empty">${t('Wird geladen …')}</p>`;
+  function chatError(e) {
+    const map = {
+      slow: t('Langsam-Modus: Bitte warte kurz, bevor du wieder schreibst.'),
+      no_media: t('In diesem Chat sind keine Fotos und Videos erlaubt.'),
+      quota: t('Du hast heute schon sehr viel hochgeladen. Morgen geht es weiter.'),
+      too_large: t('Die Datei ist zu groß.'),
+      bad_type: t('Diese Dateiart kann man nicht senden. Erlaubt sind Fotos, Videos und PDFs.'),
+      full: t('Die Gruppe ist voll (höchstens 50 Leute).'),
+      rate_limited: t('Du hast heute schon viele Gespräche gestartet. Bitte versuch es morgen wieder.'),
+      not_found: t('Nicht gefunden.'),
+      bad_name: t('Bitte gib einen gültigen Namen ein.'),
+      forbidden: t('Das darfst du hier nicht.'),
+      file_incomplete: t('Eine Datei ist noch nicht ganz hochgeladen.'),
+    };
+    return map[e.message] || errorText(e);
+  }
+
+  // ---------- Wer, was, wie heißt es? ----------
   function chatOther(c) {
-    const me = chat.list && chat.list.me;
+    const me = meSub();
     if (c.kind === 'direct') return c.from.sub === me ? c.to : c.from;
+    if (c.kind === 'group') return null;
     if (c.from.sub === me) return c.claimedBy || null;
     return c.from;
   }
+  const nameOfP = (p) => (p ? p.displayName || p.username : '?');
   function chatTitle(c) {
-    const other = chatOther(c);
-    if (c.kind === 'direct') return other ? other.displayName || other.username : t('Direktnachricht');
+    if (c.kind === 'group') return c.name || t('Gruppe');
+    const me = meSub();
+    if (c.kind === 'direct') {
+      // Moderation schaut zu: beide Namen
+      if (c.to && c.from.sub !== me && c.to.sub !== me) return `${nameOfP(c.from)} & ${nameOfP(c.to)}`;
+      return nameOfP(chatOther(c));
+    }
     return t(reasonOf(c.reason).label);
   }
+  const groupBadge = (c, cls = '') => `<span class="group-badge ${cls}" style="--gc:${esc(c.color || '#3C414B')}" aria-hidden="true">${esc(initials(c.name || 'G'))}</span>`;
+  function chatImg(c, cls = '') {
+    if (c.kind === 'group') return groupBadge(c, cls);
+    const other = chatOther(c);
+    if (other) return personImg(other, cls);
+    return `<span class="chat-row__ic ${cls}">${icon(c.kind === 'ticket' ? areaOf(c.area).icon : 'fi-rr-comments')}</span>`;
+  }
+  const memberCount = (c) => c.count || (c.members || []).length;
   function chatStatus(c) {
     if (c.status === 'closed') return `<span class="pill">${t('Erledigt')}</span>`;
+    if (c.kind === 'group') {
+      const pub = (c.visibility || (c.settings && c.settings.visibility)) === 'public';
+      return `<span class="pill${pub ? ' pill--ok' : ''}">${icon(pub ? 'fi-rr-globe' : 'fi-rr-lock')}${pub ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: memberCount(c) })}</span>`;
+    }
     if (c.kind === 'direct') return `<span class="pill pill--info">${icon('fi-rr-lock')}${t('Privat')}</span>`;
     if (c.status === 'open') return `<span class="pill pill--warn">${t('Wartet auf Annahme')}</span>`;
     return `<span class="pill pill--ok">${t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</span>`;
   }
 
+  // ---------- Laden ----------
   async function loadChats(force = false) {
     if (!chatReady() || chat.busy || (!force && chat.list && Date.now() - chat.at < 10000)) return;
     chat.busy = true;
+    // Nur wer die Übersicht gerade sieht, bekommt keine Benachrichtigungen (view=1)
+    const watching = state.page === 'chat' && ['mine', 'queue'].includes(state.chatView) && document.visibilityState === 'visible';
     try {
-      chat.list = await api('/api/chats');
+      chat.list = await api(`/api/chats${watching ? '?view=1' : ''}`);
     } catch (e) { /* später nochmal */ } finally {
       chat.busy = false;
       chat.at = Date.now();
     }
     chatDot();
     if (state.page === 'chat' && ['mine', 'queue'].includes(state.chatView)) renderChat();
+  }
+  async function loadPublic(force = false) {
+    if (!chatReady() || (!force && chat.pub && Date.now() - chat.pubAt < 20000)) return;
+    chat.pubAt = Date.now();
+    try { chat.pub = (await api(`/api/chats/public?q=${encodeURIComponent(chat.pubQuery)}`)).chats; } catch (e) { chat.pub = chat.pub || []; }
+    const box = $('[data-chat-pub]');
+    if (state.page === 'chat' && state.chatView === 'public' && box) box.innerHTML = chatPublicList();
+  }
+  async function loadMod(force = false) {
+    if (!chatReady() || (!force && chat.mod && Date.now() - chat.modAt < 20000)) return;
+    chat.modAt = Date.now();
+    try { chat.mod = (await api(`/api/chats/moderation?q=${encodeURIComponent(chat.modQuery)}&kind=${chat.modKind}`)).chats; } catch (e) { chat.mod = chat.mod || []; }
+    const box = $('[data-chat-modlist]');
+    if (state.page === 'chat' && state.chatView === 'mod' && box) box.innerHTML = chatModList();
   }
   function chatDot() {
     const l = chat.list;
@@ -3170,64 +3247,80 @@
     if (state.page === 'chat' && ['team', 'direct'].includes(state.chatView)) renderChat();
   }
 
+  // ---------- Kopf mit Reitern ----------
   function chatHead() {
     const v = state.chatView;
-    const staffAreas = chat.list ? chat.list.areas : [];
-    const tab = (id, href, label, n) => `<a role="tab" href="${href}" aria-selected="${v === id}">${label}${n ? `<span class="head-tabs__n">${n}</span>` : ''}</a>`;
-    const open = chat.list ? chat.list.queue.filter((x) => x.status === 'open').length : 0;
-    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
+    const l = chat.list;
+    const tab = (id, href, ic, label, n) => `<a role="tab" href="${href}" aria-selected="${v === id}">${icon(ic)}<span>${label}</span>${n ? `<span class="head-tabs__n">${n}</span>` : ''}</a>`;
+    const open = l ? l.queue.filter((x) => x.status === 'open').length : 0;
+    const unread = l ? l.chats.filter(isUnread).length : 0;
     return `<div class="appbar">
-        <div class="appbar__title"><span class="appbar__label">${t('Hilfe & Team')}</span><h1 class="appbar__value">${t('Chat')}</h1></div>
-        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neue Anfrage')}</a></div>
+        <div class="appbar__title"><span class="appbar__label">${t('Spieler, Gruppen und Team')}</span><h1 class="appbar__value">${t('Chat')}</h1></div>
+        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neu')}</a></div>
       </div>
-      <div class="head-tabs" role="tablist" aria-label="${esc(t('Chat'))}">
-        ${tab('mine', '#/chat', t('Gespräche'), unread)}
-        ${staffAreas.length || mayTrain() ? tab('queue', '#/chat/anfragen', t('Anfragen'), open) : ''}
-        ${tab('team', '#/chat/team', t('Team'))}
+      <div class="head-tabs head-tabs--chat" role="tablist" aria-label="${esc(t('Chat'))}">
+        ${tab('mine', '#/chat', 'fi-rr-comments', t('Gespräche'), unread)}
+        ${(l && l.areas.length) || mayTrain() ? tab('queue', '#/chat/anfragen', 'fi-rr-envelope-open', t('Anfragen'), open) : ''}
+        ${tab('public', '#/chat/gruppen', 'fi-rr-globe', t('Gruppen'))}
+        ${tab('team', '#/chat/team', 'fi-rr-users-alt', t('Team'))}
+        ${isModHere() ? tab('mod', '#/chat/moderation', 'fi-rr-shield-check', t('Moderation'), l && l.reported) : ''}
       </div>`;
   }
   function chatGate() {
     if (!apiReady()) {
       return mayTrain() ? `<div class="cbox">${backendSetupHtml()}</div>`
-        : `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Der Chat startet bald')}</h2><p>${t('Sobald der App-Server läuft, kannst du hier dem Team schreiben. Wer im Team ist, siehst du schon unter „Team“.')}</p>
+        : `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Der Chat startet bald')}</h2><p>${t('Sobald der App-Server läuft, kannst du hier mit anderen Spielern und dem Team schreiben. Wer im Team ist, siehst du schon unter „Team“.')}</p>
           <a class="btn btn--soft" href="#/chat/team">${icon('fi-rr-users-alt')}${t('Team ansehen')}</a></div>`;
     }
     if (!sessionToken()) {
-      return `<div class="chat-empty">${icon('fi-rr-sign-in-alt')}<h2>${t('Mit Roblox anmelden')}</h2><p>${t('Damit das Team weiß, wer schreibt, meldest du dich einmal mit Roblox an.')}</p>
+      return `<div class="chat-empty">${icon('fi-rr-sign-in-alt')}<h2>${t('Mit Roblox anmelden')}</h2><p>${t('Damit alle wissen, wer schreibt, meldest du dich einmal mit Roblox an.')}</p>
         <button class="btn btn--primary" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
     }
     return '';
   }
-  function chatRow(c, { queue = false } = {}) {
-    const other = chatOther(c);
-    const area = areaOf(c.area);
-    const img = other ? personImg(other) : `<span class="chat-row__ic">${icon(c.kind === 'ticket' ? area.icon : 'fi-rr-comments')}</span>`;
-    const preview = c.last ? (c.last.by === 'system' ? '' : `${c.last.by === (chat.list && chat.list.me) ? `${t('Du')}: ` : ''}${esc(c.last.text)}`) : '';
-    return `<a class="chat-row${isUnread(c) ? ' is-unread' : ''}${c.status === 'open' && c.kind === 'ticket' ? ' is-waiting' : ''}" href="#/chat/${esc(c.id)}">
-      ${img}
-      <span class="chat-row__main">
-        <span class="chat-row__top"><b>${queue ? esc(c.from.displayName || c.from.username) : esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>
-        <span class="chat-row__sub">${queue ? `${esc(t(reasonOf(c.reason).label))} · ` : ''}${c.kind === 'ticket' ? esc(t(area.label)) : t('Direktnachricht')}</span>
-        ${preview ? `<span class="chat-row__text">${preview}</span>` : ''}
-        <span class="chat-row__status">${chatStatus(c)}</span>
-      </span>
-    </a>`;
+
+  // ---------- Listen ----------
+  function chatRow(c, { queue = false, mod = false } = {}) {
+    const last = c.last;
+    const me = meSub();
+    const who = last && last.by !== 'system' ? (last.by === me ? `${t('Du')}: ` : last.name && c.kind !== 'direct' ? `${esc(last.name)}: ` : '') : '';
+    const preview = last ? `${who}${esc(last.text)}` : '';
+    const sub = c.kind === 'ticket' ? `${queue ? `${esc(t(reasonOf(c.reason).label))} · ` : ''}${esc(t(areaOf(c.area).label))}`
+      : c.kind === 'group' ? esc(c.desc || t('Gruppe')) : mod ? t('Privat-Chat') : t('Direktnachricht');
+    return `<div class="chat-row-wrap">
+      <a class="chat-row${isUnread(c) ? ' is-unread' : ''}${c.status === 'open' && c.kind === 'ticket' ? ' is-waiting' : ''}" href="#/chat/${esc(c.id)}">
+        ${chatImg(c)}
+        <span class="chat-row__main">
+          <span class="chat-row__top"><b>${queue ? esc(nameOfP(c.from)) : esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>
+          <span class="chat-row__sub">${sub}</span>
+          ${preview ? `<span class="chat-row__text">${preview}</span>` : ''}
+          <span class="chat-row__status">${chatStatus(c)}${c.reported ? `<span class="pill pill--bad">${icon('fi-rr-flag')}${t('Gemeldet')}</span>` : ''}${c.ref ? `<span class="pill pill--bad">${icon('fi-rr-flag')}${t('Meldung')}</span>` : ''}</span>
+        </span>
+      </a>
+      ${chat.edit && !queue && !mod ? `<button class="chat-row__del" type="button" data-chat-hide="${esc(c.id)}" aria-label="${esc(t('Für mich löschen'))}">${icon('fi-rr-trash')}</button>` : ''}
+    </div>`;
   }
+  const newButtons = () => `<div class="chat-empty__btns">
+      <a class="btn btn--primary" href="#/chat/neu/spieler">${icon('fi-rr-user-add')}${t('Spieler anschreiben')}</a>
+      <a class="btn btn--soft" href="#/chat/neu/gruppe">${icon('fi-rr-users-alt')}${t('Gruppe erstellen')}</a>
+      <a class="btn btn--soft" href="#/chat/neu/anfrage">${icon('fi-rr-comments-question')}${t('Anfrage ans Team')}</a></div>`;
   function chatMine() {
     const gate = chatGate();
     if (gate) return gate;
-    if (!chat.list) { loadChats(); return `<p class="empty">${t('Wird geladen …')}</p>`; }
+    if (!chat.list) { loadChats(); return loadingHtml(); }
     const list = chat.list.chats.slice().sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || b.updated - a.updated);
     if (!list.length) {
-      return `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Stell dem Team eine Frage oder schreib jemandem direkt.')}</p>
-        <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neue Anfrage')}</a><a class="btn btn--soft" href="#/chat/team">${icon('fi-rr-users-alt')}${t('Team')}</a></div></div>`;
+      return `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
     }
-    return `<div class="chat-list">${list.map((c) => chatRow(c)).join('')}</div>`;
+    return `<div class="chat-tools"><span>${list.length === 1 ? t('1 Gespräch') : t('{n} Gespräche', { n: list.length })}</span>
+        <button class="link-btn" type="button" data-chat-edit>${chat.edit ? t('Fertig') : `${icon('fi-rr-trash')}${t('Löschen')}`}</button></div>
+      ${chat.edit ? `<p class="chat-hint">${icon('fi-rr-info')}<span>${t('Gelöschte Gespräche verschwinden nur bei dir. Schreibt jemand Neues, sind sie wieder da.')}</span></p>` : ''}
+      <div class="chat-list">${list.map((c) => chatRow(c)).join('')}</div>`;
   }
   function chatQueue() {
     const gate = chatGate();
     if (gate) return gate;
-    if (!chat.list) { loadChats(); return `<p class="empty">${t('Wird geladen …')}</p>`; }
+    if (!chat.list) { loadChats(); return loadingHtml(); }
     if (!chat.list.areas.length) return `<p class="empty">${t('Anfragen annehmen kann das Team ab Supervisor.')}</p>`;
     const q = chat.list.queue;
     // Nicht angenommene zuerst – wer am längsten wartet, steht oben
@@ -3239,21 +3332,48 @@
       ${open.length ? `<div class="chat-list">${open.map((c) => chatRow(c, { queue: true })).join('')}</div>` : `<p class="empty">${t('Alles erledigt – keine offenen Anfragen.')}</p>`}
       ${taken.length ? `<h2 class="chat-sec">${t('Angenommen')}<span>${taken.length}</span></h2><div class="chat-list">${taken.map((c) => chatRow(c, { queue: true })).join('')}</div>` : ''}`;
   }
+  const searchField = (attr, value, placeholder) => `<label class="field chat-search">${icon('fi-rr-search')}<span class="field__input"><span class="sr-only">${esc(placeholder)}</span><input type="search" ${attr} value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off"></span></label>`;
+  function chatPublic() {
+    const gate = chatGate();
+    if (gate) return gate;
+    loadPublic();
+    return `${searchField('data-chat-pubsearch', chat.pubQuery, t('Öffentliche Gruppen suchen …'))}
+      <a class="chat-alt" href="#/chat/neu/gruppe">${icon('fi-rr-plus')}<span>${t('Eigene Gruppe erstellen')}<small>${t('Privat oder öffentlich – mit eigenen Regeln und Befehlen')}</small></span>${icon('fi-rr-angle-small-right')}</a>
+      <div data-chat-pub>${chatPublicList()}</div>`;
+  }
+  function chatPublicList() {
+    if (!chat.pub) return loadingHtml();
+    if (!chat.pub.length) return `<p class="empty">${chat.pubQuery ? t('Keine Gruppe gefunden.') : t('Noch keine öffentlichen Gruppen. Erstell die erste!')}</p>`;
+    return `<div class="chat-list">${chat.pub.map((c) => `<div class="pub-row">
+        <a class="pub-row__link" href="#/chat/${esc(c.id)}">${groupBadge(c)}
+          <span class="pub-row__main"><b>${esc(c.name)}</b><small>${t('{n} Mitglieder', { n: c.count })} · ${chatAgo(c.updated)}</small>${c.desc ? `<span>${esc(c.desc)}</span>` : ''}</span></a>
+        ${c.joined ? `<a class="btn btn--soft btn--sm" href="#/chat/${esc(c.id)}">${t('Öffnen')}</a>` : `<button class="btn btn--primary btn--sm" type="button" data-chat-join="${esc(c.id)}">${t('Beitreten')}</button>`}
+      </div>`).join('')}</div>`;
+  }
+  function chatMod() {
+    if (!isModHere()) return `<p class="empty">${t('Die Moderation gibt es ab Supervisor.')}</p>`;
+    const gate = chatGate();
+    if (gate) return gate;
+    loadMod();
+    const kinds = [['', t('Alle')], ['direct', t('Privat-Chats')], ['group', t('Gruppen')], ['ticket', t('Anfragen')]];
+    return `<p class="chat-hint chat-hint--mod">${icon('fi-rr-shield-check')}<span>${t('Zur Sicherheit kannst du jedes Gespräch unsichtbar beobachten oder sichtbar beitreten – außer bei Leuten mit höherem Rang. Jeder Blick wird vermerkt.')}</span></p>
+      ${searchField('data-chat-modsearch', chat.modQuery, t('Name, Gruppe oder Spieler …'))}
+      <div class="chips chips--block" role="group" aria-label="${esc(t('Art'))}">${kinds.map(([id, label]) => `<button class="chip${chat.modKind === id ? ' is-active' : ''}" type="button" data-mod-kind="${id}">${label}</button>`).join('')}</div>
+      <div data-chat-modlist>${chatModList()}</div>`;
+  }
+  function chatModList() {
+    if (!chat.mod) return loadingHtml();
+    if (!chat.mod.length) return `<p class="empty">${t('Keine Gespräche gefunden.')}</p>`;
+    return `<div class="chat-list">${chat.mod.map((c) => chatRow(c, { mod: true })).join('')}</div>`;
+  }
   function chatTeam() {
     if (!chat.staff) { loadStaff(); return `<p class="empty">${t('Team wird geladen …')}</p>`; }
-    // Team: jeden Spieler per Roblox-Name anschreiben
-    const write = mayTrain() && chatReady() ? `<form class="find-player" data-find-player>
-        <label class="f__label" for="fp-name">${icon('fi-rr-paper-plane')}${t('Spieler anschreiben')}</label>
-        <div class="find-player__row"><input id="fp-name" name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name, z. B. Lokfuehrer_Max'))}">
-        <button class="btn btn--primary" type="submit">${t('Suchen')}</button></div>
-        <small>${t('Als Team kannst du jeden Spieler anschreiben. Spieler selbst können nur dem Team schreiben.')}</small>
-      </form>` : '';
-    return `${write}<label class="field chat-search">${icon('fi-rr-search')}<span class="field__input"><span class="sr-only">${t('Team durchsuchen')}</span><input type="search" data-chat-search value="${esc(chat.query)}" placeholder="${esc(t('Name oder Rang suchen …'))}" autocomplete="off"></span></label>
-      <p class="chat-hint">${icon('fi-rr-lock')}<span>${t('Direktnachrichten sieht nur die Person, der du schreibst.')}</span></p>
+    return `<a class="chat-alt" href="#/chat/neu/spieler">${icon('fi-rr-user-add')}<span>${t('Jemand anderem schreiben?')}<small>${t('Jeden Roblox-Spieler per Name finden')}</small></span>${icon('fi-rr-angle-small-right')}</a>
+      ${searchField('data-chat-search', chat.query, t('Name oder Rang suchen …'))}
       <div data-chat-team>${chatTeamList()}</div>`;
   }
   function chatTeamList() {
-    const me = String((chat.list && chat.list.me) || (state.profile && state.profile.userId) || '');
+    const me = meSub();
     const q = norm(chat.query.trim());
     const list = chat.staff.filter((p) => String(p.userId) !== me && (!q || norm(`${p.displayName} ${p.username} ${p.rank} ${rankOf(p.rank).prefix}`).includes(q)));
     const groups = RANKS.slice().reverse().filter((r) => rankIdx(r.name) >= rankIdx('Supervisor')).map((r) => [r, list.filter((p) => p.rank === r.name)]).filter(([, l]) => l.length);
@@ -3267,11 +3387,38 @@
           </li>`).join('')}</ul>
         </section>`).join('') : `<p class="empty">${q ? t('Niemanden gefunden.') : t('Gerade ist niemand im Team eingetragen.')}</p>`;
   }
-  function chatNew() {
+
+  // ---------- Neu: Spieler, Gruppe, Anfrage ----------
+  const backTo = (href, label) => `<a class="back-link" href="${href}">${icon('fi-rr-arrow-left')}${label}</a>`;
+  function chatNewChoice() {
+    const gate = chatGate();
+    const card = (href, ic, title, text) => `<a class="new-card" href="${href}"><span class="new-card__ic">${icon(ic)}</span><span class="new-card__text"><b>${title}</b><small>${text}</small></span>${icon('fi-rr-angle-small-right', 'new-card__chev')}</a>`;
+    return `${backTo('#/chat', t('Chat'))}
+      ${gate || `<div class="new-grid">
+        ${card('#/chat/neu/spieler', 'fi-rr-user-add', t('Spieler anschreiben'), t('Privat mit einer Person schreiben – jeden Roblox-Spieler per Name'))}
+        ${card('#/chat/neu/gruppe', 'fi-rr-users-alt', t('Gruppe erstellen'), t('Mehrere Leute, privat oder öffentlich, mit eigenen Regeln und Befehlen'))}
+        ${card('#/chat/neu/anfrage', 'fi-rr-comments-question', t('Anfrage ans Team'), t('Frage, Fehler oder Meldung – das zuständige Team antwortet'))}
+      </div>`}`;
+  }
+  function chatNewDm() {
+    const gate = chatGate();
+    const f = chat.found;
+    return `${backTo('#/chat/neu', t('Neu'))}
+      ${gate || `<form class="find-player" data-find-player>
+        <label class="f__label" for="fp-name">${icon('fi-rr-search')}${t('Wem möchtest du schreiben?')}</label>
+        <div class="find-player__row"><input id="fp-name" name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name, z. B. Lokfuehrer_Max'))}">
+        <button class="btn btn--primary" type="submit">${t('Suchen')}</button></div>
+        <small>${t('Du kannst jedem Roblox-Spieler schreiben. Eine Benachrichtigung bekommt, wer die App nutzt.')}</small>
+      </form>
+      ${f ? `<div class="dm-card">${personImg(f, 'avatar--lg')}<span><b>${esc(f.displayName)}</b><small>@${esc(f.username)}</small></span>
+        <a class="btn btn--primary btn--sm" href="#/chat/an/${esc(f.userId)}">${icon('fi-rr-paper-plane')}${t('Schreiben')}</a></div>` : ''}
+      <a class="chat-alt" href="#/chat/team">${icon('fi-rr-users-alt')}<span>${t('Jemandem aus dem Team schreiben?')}<small>${t('Alle ab Supervisor mit Suche')}</small></span>${icon('fi-rr-angle-small-right')}</a>`}`;
+  }
+  function chatNewTicket() {
     const gate = chatGate();
     const next = nextRank(state.rank);
     const nextArea = next && CHAT.areas.find((a) => a.rank === next.name);
-    return `<a class="back-link" href="#/chat">${icon('fi-rr-arrow-left')}${t('Chat')}</a>
+    return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="cform chat-form" data-chat-new novalidate>
         <fieldset class="f"><legend class="f__label">${t('Worum geht es?')}</legend>
           <div class="pick-grid">${CHAT.reasons.map((r) => `<label class="pick"><input type="radio" name="reason" value="${r.id}" data-area-hint="${esc(r.area || (nextArea ? nextArea.id : 'driver'))}"><span>${icon(r.icon)}${esc(t(r.label))}</span></label>`).join('')}</div>
@@ -3282,43 +3429,124 @@
         <div class="f"><label class="f__label" for="ch-text">${t('Deine Nachricht')}</label><textarea id="ch-text" name="text" rows="5" maxlength="2000" placeholder="${esc(t('Beschreib kurz, worum es geht …'))}"></textarea></div>
         <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Anfrage senden')}</button>
         <p class="f__note">${t('Alle aus dem Team dieses Bereichs sehen deine Anfrage. Wer sie annimmt, antwortet dir hier – du siehst, wer es ist.')}</p>
-        <a class="chat-alt" href="#/chat/team">${icon('fi-rr-users-alt')}<span>${t('Lieber jemand Bestimmtem schreiben?')}<small>${t('Alle ab Supervisor im Team')}</small></span>${icon('fi-rr-angle-small-right')}</a>
       </form>`}`;
   }
-  // Spieler, die das Team anschreibt (nicht in der Teamliste)
+  // Einstellungen einer Gruppe (beim Erstellen und unter „Info“)
+  function groupSettingsFields(st) {
+    const opt = (name, value, label) => `<option value="${value}"${String(st[name]) === String(value) ? ' selected' : ''}>${label}</option>`;
+    return `<div class="gset__grid">
+      <label class="f"><span class="f__label">${t('Wer darf Leute hinzufügen?')}</span><select name="invite">${opt('invite', 'owner', t('Nur der Inhaber'))}${opt('invite', 'admins', t('Inhaber und Admins'))}${opt('invite', 'all', t('Alle Mitglieder'))}</select></label>
+      <label class="f"><span class="f__label">${t('Wer darf schreiben?')}</span><select name="write">${opt('write', 'all', t('Alle Mitglieder'))}${opt('write', 'admins', t('Nur Inhaber und Admins'))}</select></label>
+      <label class="f"><span class="f__label">${t('Langsam-Modus')}</span><select name="slow">${opt('slow', 0, t('Aus'))}${[5, 10, 30, 60].map((s) => opt('slow', s, t('Alle {n} Sekunden', { n: s }))).join('')}${opt('slow', 300, t('Alle 5 Minuten'))}</select></label>
+      <label class="f"><span class="f__label">${t('Befehle wie /GetGroupData')}</span><select name="cmd">${opt('cmd', 'all', t('Für alle'))}${opt('cmd', 'admins', t('Nur Inhaber und Admins'))}${opt('cmd', 'off', t('Aus'))}</select></label>
+    </div>
+    <label class="toggle"><span class="toggle__text"><b>${t('Fotos, Videos und Dateien')}</b><small>${t('Aus = nur Inhaber und Admins dürfen Medien senden.')}</small></span>
+      <input type="checkbox" role="switch" name="media"${st.media ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+    <fieldset class="cmd-pick"><legend>${t('Erlaubte Befehle')}</legend>
+      ${CHAT_COMMANDS.map((c) => `<label class="cmd-pick__row"><input type="checkbox" name="cmds" value="${c.id}"${st.cmds.includes(c.id) ? ' checked' : ''}><span><code>${esc(c.usage)}</code><small>${esc(t(c.desc))}</small></span></label>`).join('')}
+    </fieldset>`;
+  }
+  function readGroupSettings(form) {
+    const f = form.elements;
+    return {
+      visibility: (form.querySelector('input[name="visibility"]:checked') || {}).value || 'private',
+      invite: f.invite.value, write: f.write.value, slow: +f.slow.value, cmd: f.cmd.value, media: f.media.checked,
+      cmds: [...form.querySelectorAll('input[name="cmds"]:checked')].map((x) => x.value),
+    };
+  }
+  const visPick = (value) => `<div class="vis-grid">
+      <label class="vis"><input type="radio" name="visibility" value="private"${value !== 'public' ? ' checked' : ''}><span>${icon('fi-rr-lock')}<b>${t('Privat')}</b><small>${t('Nur wer eingeladen wird')}</small></span></label>
+      <label class="vis"><input type="radio" name="visibility" value="public"${value === 'public' ? ' checked' : ''}><span>${icon('fi-rr-globe')}<b>${t('Öffentlich')}</b><small>${t('Jeder kann sie finden und beitreten')}</small></span></label>
+    </div>`;
+  const memberChips = () => chat.members.map((p) => `<span class="mchip">${personImg(p, 'avatar--xs')}<b>${esc(p.displayName)}</b><button type="button" data-member-del="${esc(p.userId)}" aria-label="${esc(t('Entfernen'))}">${icon('fi-rr-cross-small')}</button></span>`).join('');
+  function chatNewGroup() {
+    const gate = chatGate();
+    // Aus einem Privat-Chat: #/chat/neu/gruppe?mit=<id> – die Person ist schon dabei
+    const withId = new URLSearchParams(location.hash.split('?')[1] || '').get('mit');
+    if (withId && !chat.members.some((p) => p.userId === withId)) {
+      const p = (chat.staff || []).find((x) => x.userId === withId) || (typeof chatPlayers[withId] === 'object' ? chatPlayers[withId] : null);
+      if (p) chat.members.push(p); else if (!chatPlayers[withId]) loadPlayer(withId, () => { if (typeof chatPlayers[withId] === 'object') { chat.members.push(chatPlayers[withId]); const box = $('[data-member-chips]'); if (box) box.innerHTML = memberChips(); } });
+    }
+    return `${backTo('#/chat/neu', t('Neu'))}
+      ${gate || `<form class="cform group-form" data-group-new novalidate>
+        <div class="f"><label class="f__label" for="gr-name">${t('Name der Gruppe')}</label><input id="gr-name" name="name" maxlength="60" required placeholder="${esc(t('z. B. Nachtschicht Berlin'))}"></div>
+        <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Worum geht es in der Gruppe? (optional)'))}"></textarea></div>
+        <fieldset class="f"><legend class="f__label">${t('Wer kann die Gruppe sehen?')}</legend>${visPick('private')}</fieldset>
+        <div class="f"><span class="f__label">${t('Leute hinzufügen')}</span>
+          <div class="find-player__row"><input data-member-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--soft" type="button" data-member-add>${icon('fi-rr-plus')}${t('Dazu')}</button></div>
+          <div class="mchips" data-member-chips>${memberChips()}</div>
+        </div>
+        <div class="f"><label class="f__label" for="gr-rules">${t('Regeln')}</label><textarea id="gr-rules" name="rules" rows="3" maxlength="1500" placeholder="${esc(t('z. B. Freundlich bleiben, kein Spam, keine Werbung (optional)'))}"></textarea></div>
+        <details class="gset"><summary>${icon('fi-rr-settings-sliders')}${t('Rechte, Medien und Befehle')}</summary>${groupSettingsFields(GROUP_DEFAULTS)}</details>
+        <div class="f"><label class="f__label" for="gr-text">${t('Erste Nachricht')}</label><textarea id="gr-text" name="text" rows="2" maxlength="2000" placeholder="${esc(t('Hallo zusammen! (optional)'))}"></textarea></div>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-users-alt')}${t('Gruppe erstellen')}</button>
+        <p class="f__note">${icon('fi-rr-shield-check')} ${t('Zur Sicherheit kann die Moderation (ab Supervisor) jede Gruppe einsehen.')}</p>
+      </form>`}`;
+  }
+  // Spieler zu einer ID oder einem Namen (für Direktnachrichten und Gruppen)
   const chatPlayers = {};
-  async function loadPlayer(id) {
+  async function loadPlayer(id, done) {
     if (chatPlayers[id]) return;
     chatPlayers[id] = 'loading';
     try { chatPlayers[id] = await api(`/api/players/find?q=${encodeURIComponent(id)}`); } catch (e) { chatPlayers[id] = 'missing'; }
-    if (state.page === 'chat' && state.chatView === 'direct') renderChat();
+    if (done) done();
+    else if (state.page === 'chat' && state.chatView === 'direct') renderChat();
   }
   function chatDirect(userId) {
     const gate = chatGate();
     if (!chat.staff) loadStaff();
     let p = chat.staff && chat.staff.find((x) => x.userId === String(userId));
-    // Das Team darf jeden Spieler anschreiben
-    if (!p && chat.staff && mayTrain() && chatReady()) {
+    if (!p && chatReady()) {
       if (!chatPlayers[userId]) loadPlayer(userId);
-      if (chatPlayers[userId] && typeof chatPlayers[userId] === 'object') p = chatPlayers[userId];
-      else if (chatPlayers[userId] !== 'missing') return `<a class="back-link" href="#/chat/team">${icon('fi-rr-arrow-left')}${t('Team')}</a><p class="empty">${t('Wird geladen …')}</p>`;
+      if (typeof chatPlayers[userId] === 'object') p = chatPlayers[userId];
+      else if (chatPlayers[userId] !== 'missing') return `${backTo('#/chat/neu/spieler', t('Zurück'))}${loadingHtml()}`;
     }
-    return `<a class="back-link" href="#/chat/team">${icon('fi-rr-arrow-left')}${t('Team')}</a>
-      ${!chat.staff ? `<p class="empty">${t('Team wird geladen …')}</p>` : !p ? `<p class="empty">${t('Spieler können nur dem Team schreiben. Diese Person ist nicht (mehr) im Team.')}</p>` : `
+    return `${backTo('#/chat/neu/spieler', t('Zurück'))}
+      ${!p ? `<p class="empty">${chat.staff ? t('Diesen Spieler gibt es nicht.') : t('Wird geladen …')}</p>` : `
       <div class="dm-card">${personImg(p, 'avatar--lg')}<span><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small>${p.rank ? rankPill(rankOf(p.rank)) : `<span class="pill pill--info">${t('Spieler')}</span>`}</span></div>
       ${gate || `<form class="cform" data-chat-direct="${esc(p.userId)}" novalidate>
         <div class="f"><label class="f__label" for="dm-text">${t('Nachricht an {name}', { name: esc(p.displayName) })}</label><textarea id="dm-text" name="text" rows="5" maxlength="2000"></textarea></div>
         <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Senden')}</button>
-        <p class="f__note">${icon('fi-rr-lock')} ${t('Nur {name} sieht diese Nachricht.', { name: esc(p.displayName) })}</p>
+        <p class="f__note">${icon('fi-rr-lock')} ${t('Nur ihr beide seht die Nachrichten – zur Sicherheit kann die Moderation (ab Supervisor) mitlesen.')}</p>
       </form>`}`}`;
   }
 
   // ---------- Ein Gespräch ----------
+  const SYS_TEXT = {
+    claimed: (m) => t('{name} hat die Anfrage angenommen', { name: esc(m.name) }),
+    closed: (m) => t('{name} hat das Gespräch beendet', { name: esc(m.name) }),
+    created: (m) => t('{name} hat die Gruppe erstellt', { name: esc(m.name) }),
+    joined: (m) => t('{name} ist beigetreten', { name: esc(m.name) }),
+    left: (m) => t('{name} hat die Gruppe verlassen', { name: esc(m.name) }),
+    added: (m) => t('{name} hat {target} hinzugefügt', { name: esc(m.name), target: esc(m.target) }),
+    removed: (m) => t('{name} hat {target} entfernt', { name: esc(m.name), target: esc(m.target) }),
+    mod: (m) => t('{name} ist als Moderation beigetreten', { name: esc(m.name) }),
+    settings: (m) => t('{name} hat die Gruppe bearbeitet', { name: esc(m.name) }),
+    role: (m) => t('{target} ist jetzt {role}', { target: esc(m.target), role: m.role === 'owner' ? t('Inhaber') : m.role === 'admin' ? t('Admin') : t('Mitglied') }),
+  };
+  const ROLE_TAG = { owner: 'Inhaber', admin: 'Admin', mod: 'Moderation' };
+  function peopleOf(c) {
+    const out = {};
+    [c.from, c.to, c.claimedBy].forEach((p) => { if (p) out[p.sub] = p; });
+    (c.members || []).forEach((p) => { out[p.sub] = p; });
+    return out;
+  }
+  const timeOf = (ms) => new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(ms));
+  function filesHtml(m) {
+    const files = m.files || [];
+    const url = (f) => esc(API + f.url);
+    const imgs = files.filter((f) => f.kind === 'image');
+    const vids = files.filter((f) => f.kind === 'video');
+    const docs = files.filter((f) => f.kind === 'file');
+    return `${imgs.length ? `<div class="msg-media msg-media--${Math.min(imgs.length, 3)}">${imgs.map((f) => `<button class="msg-photo" type="button" data-photo="${url(f)}" aria-label="${esc(t('Foto öffnen'))}">
+        <img src="${url(f)}" alt="${esc(f.name)}" loading="lazy"${f.w && f.h && imgs.length === 1 ? ` style="aspect-ratio:${f.w}/${f.h}"` : ''}></button>`).join('')}</div>` : ''}
+      ${vids.map((f) => `<video class="msg-video" src="${url(f)}#t=0.1" controls playsinline preload="metadata"></video>`).join('')}
+      ${docs.map((f) => `<a class="msg-file" href="${url(f)}" target="_blank" rel="noopener">${icon('fi-rr-file')}<span><b>${esc(f.name)}</b><small>${sizeText(f.size)}</small></span>${icon('fi-rr-download')}</a>`).join('')}`;
+  }
   function chatMessages(c) {
-    const me = chat.list ? chat.list.me : null;
-    const people = { [c.from.sub]: c.from };
-    if (c.to) people[c.to.sub] = c.to;
-    if (c.claimedBy) people[c.claimedBy.sub] = c.claimedBy;
+    const me = meSub();
+    const people = peopleOf(c);
+    const many = c.kind === 'group' || (c.members || []).length > 2;
     let lastDay = '';
     let lastBy = '';
     return c.messages.map((m) => {
@@ -3327,13 +3555,25 @@
       lastDay = day;
       if (m.by === 'system') {
         lastBy = '';
-        return `${sep}<li class="msg-sys">${m.text === 'claimed' ? t('{name} hat die Anfrage angenommen', { name: esc(m.name) }) : t('{name} hat das Gespräch beendet', { name: esc(m.name) })}</li>`;
+        return `${sep}<li class="msg-sys">${(SYS_TEXT[m.text] || (() => ''))(m)}</li>`;
+      }
+      const time = timeOf(m.at);
+      // Antwort vom TSG-Bot auf einen Befehl
+      if (m.kind === 'bot') {
+        lastBy = '';
+        return `${sep}<li class="msg-bot${m.only ? ' is-private' : ''}">
+          <span class="msg-bot__ic">${icon('fi-rr-terminal')}</span>
+          <div class="msg-bot__card">
+            <span class="msg-bot__name">TSG-Bot${m.only ? `<small>${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</span>
+            <span class="msg-bot__title">${m.avatar ? `<img src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<b>${esc(m.title || '')}</b></span>
+            ${m.text ? `<p>${esc(m.text)}</p>` : ''}
+            ${(m.rows || []).length ? `<dl class="msg-bot__rows">${m.rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+            <time>${time}</time>
+          </div>
+        </li>`;
       }
       const mine = m.by === me;
-      const p = people[m.by] || { username: '?' };
-      const first = m.by !== lastBy || sep;
-      lastBy = m.by;
-      const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(m.at));
+      const p = people[m.by] || { username: m.name || '?', displayName: m.name || '?' };
       // Ergebnis einer Bewerbung: [✅/❌ PASSED/FAILED] als eigene Karte
       if (m.kind === 'result') {
         lastBy = '';
@@ -3348,78 +3588,133 @@
           <time>${time}</time>
         </li>`;
       }
-      return `${sep}<li class="msg${mine ? ' msg--mine' : ''}${first ? ' is-first' : ''}">
+      const first = m.by !== lastBy || sep;
+      lastBy = m.by;
+      const canDel = !m.deleted && (mine || c.canModerate);
+      const body = m.deleted
+        ? `<p class="msg__deleted">${icon('fi-rr-ban')}${m.deletedBy ? t('Von der Moderation gelöscht') : t('Nachricht gelöscht')}</p>`
+        : `${m.files ? filesHtml(m) : ''}${m.text ? `<p>${esc(m.text)}</p>` : ''}`;
+      return `${sep}<li class="msg${mine ? ' msg--mine' : ''}${first ? ' is-first' : ''}${m.files && !m.text ? ' msg--media' : ''}">
         ${!mine ? (first ? personImg(p, 'avatar--sm') : '<span class="msg__gap"></span>') : ''}
-        <div class="msg__bubble">${!mine && first ? `<b class="msg__name">${esc(p.displayName || p.username)}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}</b>` : ''}<p>${esc(m.text)}</p><time>${time}</time></div>
+        <div class="msg__col"><div class="msg__bubble"${canDel ? ` data-msg="${esc(m.id)}"` : ''}>${!mine && first && (many || p.rank) ? `<b class="msg__name">${esc(nameOfP(p))}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}</b>` : ''}${body}<time>${time}</time></div>
+        ${canDel ? `<div class="msg__acts"><button type="button" data-msg-del="${esc(m.id)}">${icon('fi-rr-trash')}${mine ? t('Löschen') : t('Löschen (Moderation)')}</button></div>` : ''}</div>
       </li>`;
     }).join('');
   }
-  // Kopf eines Gesprächs: zurück, Bild, Name mit Rang und Stand – bleibt beim Scrollen oben
+  function chatBackHref(c) {
+    const me = meSub();
+    if (c.me && c.me.observe) return '#/chat/moderation';
+    if (c.kind === 'ticket' && chat.list && chat.list.areas.includes(c.area) && c.from.sub !== me && !(c.claimedBy && c.claimedBy.sub === me)) return '#/chat/anfragen';
+    if (c.kind === 'group' && c.me && !c.me.role) return '#/chat/gruppen';
+    return '#/chat';
+  }
+  // Kopf eines Gesprächs: zurück, Bild, Name mit Rang und Stand, Info – bleibt beim Scrollen oben
   function chatConvHead(c) {
     const area = c.kind === 'ticket' ? areaOf(c.area) : null;
     const other = chatOther(c);
-    const me = chat.list && chat.list.me;
-    const back = chat.list && chat.list.areas.includes(c.area) && c.from.sub !== me && !(c.claimedBy && c.claimedBy.sub === me) ? '#/chat/anfragen' : '#/chat';
-    const [tone, state] = c.status === 'closed' ? ['done', t('Erledigt')]
-      : c.kind === 'direct' ? ['lock', t('Privat')]
-        : c.status === 'open' ? ['warn', t('Wartet auf Annahme')] : ['ok', t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })];
+    const [tone, stateText] = c.status === 'closed' ? ['done', t('Erledigt')]
+      : c.kind === 'group' ? [c.settings && c.settings.visibility === 'public' ? 'ok' : 'lock', `${c.settings && c.settings.visibility === 'public' ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: (c.members || []).length })}`]
+        : c.kind === 'direct' ? ['lock', t('Privat')]
+          : c.status === 'open' ? ['warn', t('Wartet auf Annahme')] : ['ok', t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })];
     const sub = [
-      other && other.rank ? rankPill(rankOf(other.rank)) : '',
+      other && other.rank && c.kind !== 'group' ? rankPill(rankOf(other.rank)) : '',
       area ? `<span>${esc(t(area.label))}</span>` : '',
-      `<span class="conv-state conv-state--${tone}">${tone === 'lock' ? icon('fi-rr-lock') : '<i></i>'}${state}</span>`,
+      `<span class="conv-state conv-state--${tone}">${tone === 'lock' ? icon('fi-rr-lock') : '<i></i>'}${stateText}</span>`,
     ].filter(Boolean).join('');
     return `<div class="conv-bar">
-        <a class="conv-bar__back" href="${back}" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-rr-arrow-left')}</a>
-        ${other ? personImg(other, 'conv-bar__avatar') : `<span class="conv-bar__ic">${icon(area ? area.icon : 'fi-rr-comments')}</span>`}
-        <div class="conv-bar__text">
-          <h1>${esc(chatTitle(c))}</h1>
-          <p>${sub}</p>
-        </div>
-        ${c.canClose ? `<button class="conv-bar__close" type="button" data-chat-close="${esc(c.id)}">${icon('fi-rr-check')}<span>${t('Beenden')}</span></button>` : ''}
+        <a class="conv-bar__back" href="${chatBackHref(c)}" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-rr-arrow-left')}</a>
+        <a class="conv-bar__who" href="#/chat/${esc(c.id)}/info">
+          ${c.kind === 'group' ? groupBadge(c, 'conv-bar__avatar') : other ? personImg(other, 'conv-bar__avatar') : `<span class="conv-bar__ic">${icon(area ? area.icon : 'fi-rr-comments')}</span>`}
+          <span class="conv-bar__text"><h1>${esc(chatTitle(c))}</h1><p>${sub}</p></span>
+        </a>
+        ${c.canClose && c.kind === 'ticket' ? `<button class="conv-bar__close" type="button" data-chat-close="${esc(c.id)}">${icon('fi-rr-check')}<span>${t('Beenden')}</span></button>` : ''}
+        <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('fi-rr-info')}</a>
       </div>`;
   }
-  // Hinweis am Anfang des Gesprächs: wer sieht es, worum geht es
+  // Hinweis am Anfang: wer sieht das Gespräch, Regeln der Gruppe
   function chatIntro(c) {
-    const me = chat.list && chat.list.me;
+    const me = meSub();
+    const safety = `<small class="msg-intro__safe">${icon('fi-rr-shield-check')}${t('Zur Sicherheit kann die Moderation (ab Supervisor) Gespräche einsehen.')}</small>`;
+    if (c.kind === 'group') {
+      return `<li class="msg-intro msg-intro--group">${groupBadge(c, 'group-badge--lg')}
+        <b class="msg-intro__name">${esc(c.name)}</b>
+        ${c.desc ? `<span class="msg-intro__desc">${esc(c.desc)}</span>` : ''}
+        ${c.rules ? `<span class="msg-rules"><b>${icon('fi-rr-rules')}${t('Regeln')}</b><span>${esc(c.rules)}</span></span>` : ''}
+        ${c.commands && c.commands.length ? `<small class="msg-intro__cmd">${icon('fi-rr-terminal')}${t('Tipp: Schreib / für Befehle, z. B. /GetGroupData')}</small>` : ''}
+        ${safety}</li>`;
+    }
     if (c.kind === 'direct') {
       const other = chatOther(c);
-      return `<li class="msg-intro">${icon('fi-rr-lock')}<span>${t('Privates Gespräch mit {name}. Nur ihr beide seht diese Nachrichten.', { name: `<b>${esc(other ? other.displayName || other.username : '')}</b>` })}</span></li>`;
+      return `<li class="msg-intro">${icon('fi-rr-lock')}<span>${t('Privates Gespräch mit {name}. Nur ihr beide seht diese Nachrichten.', { name: `<b>${esc(nameOfP(other))}</b>` })}${safety}</span></li>`;
     }
     const area = areaOf(c.area);
     return `<li class="msg-intro">${icon(area ? area.icon : 'fi-rr-comments')}<span><b>${esc(t(reasonOf(c.reason).label))}</b>${area ? ` · ${esc(t(area.label))}` : ''}<br>${c.from.sub === me
       ? t('Alle aus dem Team dieses Bereichs sehen deine Anfrage. Wer sie annimmt, antwortet dir hier – du siehst, wer es ist.')
-      : t('Anfrage von {name}', { name: `<b>${esc(c.from.displayName || c.from.username)}</b>` })}</span></li>`;
+      : t('Anfrage von {name}', { name: `<b>${esc(nameOfP(c.from))}</b>` })}
+      ${c.ref && c.from.sub !== me ? `<a class="btn btn--soft btn--sm msg-intro__ref" href="#/chat/${esc(c.ref)}">${icon('fi-rr-eye')}${t('Gemeldetes Gespräch ansehen')}</a>` : ''}</span></li>`;
+  }
+  function trayHtml(id) {
+    return (chat.pending[id] || []).map((p) => `<div class="tray-item" data-tray="${p.key}">
+        ${p.kind === 'image' ? `<img src="${p.preview}" alt="">` : `<span class="tray-item__ic">${icon(p.kind === 'video' ? 'fi-rr-video-camera' : 'fi-rr-file')}</span>`}
+        <span class="tray-item__name">${esc(p.name)}<small>${sizeText(p.size)}</small></span>
+        <i class="tray-item__bar"><span style="width:${Math.round(p.progress * 100)}%"></span></i>
+        ${chat.sending ? '' : `<button type="button" class="tray-item__x" data-tray-del="${p.key}" aria-label="${esc(t('Entfernen'))}">${icon('fi-rr-cross-small')}</button>`}
+      </div>`).join('');
+  }
+  function renderTray(id) {
+    const box = $('[data-chat-tray]');
+    if (box) box.innerHTML = trayHtml(id);
+    const form = $('form[data-chat-send]');
+    if (form) form.classList.toggle('has-files', !!(chat.pending[id] || []).length);
   }
   function chatComposer(c) {
+    if (c.me && c.me.observe) {
+      return `<div class="compose compose--note compose--mod">${icon('fi-rr-eye-crossed')}<span>${t('Du beobachtest dieses Gespräch unsichtbar (Moderation).')}</span>
+        ${c.canJoinMod ? `<button class="btn btn--soft btn--sm" type="button" data-chat-joinmod="${esc(c.id)}">${t('Sichtbar beitreten')}</button>` : ''}</div>`;
+    }
+    if (c.canJoin) {
+      return `<div class="compose compose--claim"><p>${t('Öffentliche Gruppe – du liest gerade mit.')}</p>
+        <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-join="${esc(c.id)}">${icon('fi-rr-user-add')}${t('Gruppe beitreten')}</button></div>`;
+    }
     if (c.canClaim) {
       return `<div class="compose compose--claim"><p>${t('Diese Anfrage wartet auf jemanden aus deinem Bereich.')}</p>
         <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-claim="${esc(c.id)}">${icon('fi-rr-hand-wave')}${t('Anfrage annehmen')}</button></div>`;
     }
     if (c.status === 'closed') return `<p class="compose compose--note">${icon('fi-rr-check-circle')}${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
-    if (!c.canWrite) return `<p class="compose compose--note">${icon('fi-rr-lock')}${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
-    return `<form class="compose" data-chat-send="${esc(c.id)}">
-      <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
-      <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(t('Nachricht schreiben …'))}"></textarea>
-      <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button>
+    if (!c.canWrite) {
+      if (c.kind === 'group' && c.me && c.me.role) return `<p class="compose compose--note">${icon('fi-rr-megaphone')}${t('In dieser Gruppe schreiben nur Inhaber und Admins.')}</p>`;
+      return `<p class="compose compose--note">${icon('fi-rr-lock')}${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
+    }
+    const files = (chat.pending[c.id] || []).length;
+    return `<form class="compose${files ? ' has-files' : ''}" data-chat-send="${esc(c.id)}">
+      <div class="compose__tray" data-chat-tray>${trayHtml(c.id)}</div>
+      <div class="compose__cmds" data-chat-cmds hidden></div>
+      <div class="compose__row">
+        ${c.canMedia ? `<label class="compose__attach" title="${esc(t('Foto, Video oder Datei anhängen'))}"><span class="sr-only">${t('Foto, Video oder Datei anhängen')}</span>${icon('fi-rr-clip')}
+          <input type="file" data-chat-file multiple accept="image/*,video/*,application/pdf"></label>` : ''}
+        <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
+        <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(c.commands && c.commands.length ? t('Nachricht oder / für Befehle …') : t('Nachricht schreiben …'))}"></textarea>
+        <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button>
+      </div>
     </form>`;
   }
   function chatConv(id) {
     const c = chat.conv[id];
     if (!c) {
-      openConv(id);
-      return { head: `<a class="back-link" href="#/chat">${icon('fi-rr-arrow-left')}${t('Alle Gespräche')}</a>`, body: `<p class="empty">${t('Wird geladen …')}</p>` };
+      openConv(id, { observe: true });
+      return { head: backTo('#/chat', t('Alle Gespräche')), body: loadingHtml() };
     }
-    if (c.error) return { head: `<a class="back-link" href="#/chat">${icon('fi-rr-arrow-left')}${t('Alle Gespräche')}</a>`, body: `<p class="empty">${t('Dieses Gespräch gibt es nicht oder du darfst es nicht sehen.')}</p>` };
+    if (c.error) return { head: backTo('#/chat', t('Alle Gespräche')), body: `<p class="empty">${t('Dieses Gespräch gibt es nicht (mehr) oder du darfst es nicht sehen.')}</p>` };
     markSeen(c);
     return {
       head: chatConvHead(c),
       body: `<ol class="msgs" data-chat-msgs>${chatIntro(c)}${chatMessages(c)}</ol><div class="compose-dock" data-chat-compose>${chatComposer(c)}</div>`,
     };
   }
-  async function openConv(id, { since = 0 } = {}) {
+  async function openConv(id, { since = 0, observe = false } = {}) {
     if (!chatReady()) { chat.conv[id] = { error: true }; renderChat(); return; }
     try {
-      const r = await api(`/api/chats/${encodeURIComponent(id)}${since ? `?since=${since}` : ''}`);
+      const r = await api(`/api/chats/${encodeURIComponent(id)}${since ? `?since=${since}` : observe ? '?observe=1' : ''}`);
       if (r.unchanged) {
         const c = chat.conv[id];
         const flags = ['status', 'claimedBy', 'canWrite', 'canClaim', 'canClose'];
@@ -3430,14 +3725,20 @@
     } catch (e) {
       chat.conv[id] = { error: true };
     }
-    updateConv(id);
+    if (state.chatView === 'info' && state.chatArg === id) renderChat();
+    else updateConv(id);
   }
   // Nur Nachrichten und Kopf neu zeichnen – was im Eingabefeld steht, bleibt
   function updateConv(id) {
     if (state.page !== 'chat' || state.chatView !== 'conv' || state.chatArg !== id) return;
     const list = $('[data-chat-msgs]');
     const c = chat.conv[id];
-    if (!list || !c || c.error) { renderChat(); return; }
+    if (!list || !c || c.error) {
+      // Erstes Laden: gleich bei der neuesten Nachricht anfangen
+      renderChat();
+      if (!list && c && !c.error) window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
+      return;
+    }
     const atEnd = window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
     $('[data-chat-head]').innerHTML = chatConvHead(c);
     list.innerHTML = chatIntro(c) + chatMessages(c);
@@ -3454,8 +3755,90 @@
     chat.timer = setInterval(() => {
       if (document.visibilityState !== 'visible' || state.page !== 'chat') return;
       if (state.chatView === 'conv') { const c = chat.conv[state.chatArg]; if (c && !c.error) openConv(state.chatArg, { since: c.updated }); }
-      else loadChats(true);
+      else if (['mine', 'queue'].includes(state.chatView)) loadChats(true);
+      else if (state.chatView === 'mod') loadMod(true);
     }, state.chatView === 'conv' ? 4000 : 15000);
+  }
+
+  // ---------- Info und Einstellungen eines Gesprächs ----------
+  function memberRow(c, p) {
+    const me = meSub();
+    const myRole = c.me && c.me.role;
+    const boss = myRole === 'owner' || myRole === 'mod' || (c.me && c.me.observe && c.canModerate);
+    const acts = [];
+    if (c.kind === 'group' && p.sub !== me) {
+      if (boss && p.role === 'member') acts.push(`<button type="button" data-mem-role="admin" data-mem="${esc(p.sub)}">${icon('fi-rr-crown')}${t('Admin machen')}</button>`);
+      if (boss && p.role === 'admin') acts.push(`<button type="button" data-mem-role="member" data-mem="${esc(p.sub)}">${t('Kein Admin mehr')}</button>`);
+      if (myRole === 'owner' && p.role !== 'mod') acts.push(`<button type="button" data-mem-role="owner" data-mem="${esc(p.sub)}">${t('Zum Inhaber machen')}</button>`);
+      if ((boss && p.role !== 'owner') || c.canModerate && !myRole || (myRole === 'admin' && p.role === 'member')) acts.push(`<button class="is-danger" type="button" data-mem-del="${esc(p.sub)}">${icon('fi-rr-user-slash')}${t('Entfernen')}</button>`);
+    }
+    return `<li class="mem-row">
+      ${personImg(p)}
+      <span class="mem-row__main"><b>${esc(nameOfP(p))}${p.sub === me ? ` <small>(${t('Du')})</small>` : ''}</b><small>@${esc(p.username)}</small></span>
+      <span class="mem-row__tags">${p.rank ? rankPill(rankOf(p.rank)) : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}</span>
+      ${acts.length ? `<span class="mem-row__acts">${acts.join('')}</span>` : ''}
+    </li>`;
+  }
+  function chatInfo(id) {
+    const c = chat.conv[id];
+    if (!c) { openConv(id, { observe: true }); return loadingHtml(); }
+    if (c.error) return `${backTo('#/chat', t('Alle Gespräche'))}<p class="empty">${t('Dieses Gespräch gibt es nicht (mehr) oder du darfst es nicht sehen.')}</p>`;
+    const st = c.settings || GROUP_DEFAULTS;
+    const other = chatOther(c);
+    const role = c.me && c.me.role;
+    const yesNo = (v) => (v ? t('Ja') : t('Nein'));
+    const label = { invite: { owner: t('Nur der Inhaber'), admins: t('Inhaber und Admins'), all: t('Alle Mitglieder') }, write: { all: t('Alle Mitglieder'), admins: t('Nur Inhaber und Admins') }, cmd: { all: t('Für alle'), admins: t('Nur Inhaber und Admins'), off: t('Aus') } };
+    const head = `<div class="info-head">
+        ${c.kind === 'group' ? groupBadge(c, 'group-badge--xl') : other ? personImg(other, 'avatar--xl') : `<span class="chat-row__ic avatar--xl">${icon(areaOf(c.area).icon)}</span>`}
+        <h2>${esc(chatTitle(c))}</h2>
+        ${c.kind === 'group' && c.desc ? `<p>${esc(c.desc)}</p>` : other ? `<p>@${esc(other.username)}</p>` : ''}
+        <div class="info-head__tags">${chatStatus(c)}${other && other.rank && c.kind !== 'group' ? rankPill(rankOf(other.rank)) : ''}</div>
+      </div>`;
+    // Bearbeiten (Inhaber, Admins, Moderation)
+    const edit = c.canAdmin ? `<section class="info-sec"><h3>${icon('fi-rr-settings-sliders')}${t('Gruppe bearbeiten')}</h3>
+        <form class="cform group-form" data-group-edit="${esc(c.id)}" novalidate>
+          <div class="f"><label class="f__label" for="ge-name">${t('Name')}</label><input id="ge-name" name="name" maxlength="60" value="${esc(c.name)}"></div>
+          <div class="f"><label class="f__label" for="ge-desc">${t('Beschreibung')}</label><textarea id="ge-desc" name="desc" rows="2" maxlength="300">${esc(c.desc)}</textarea></div>
+          <fieldset class="f"><legend class="f__label">${t('Farbe')}</legend><div class="swatches">${GROUP_COLORS.map((col) => `<label class="swatch" style="--gc:${col}"><input type="radio" name="color" value="${col}"${c.color === col ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
+          <fieldset class="f"><legend class="f__label">${t('Wer kann die Gruppe sehen?')}</legend>${visPick(st.visibility)}</fieldset>
+          <div class="f"><label class="f__label" for="ge-rules">${t('Regeln')}</label><textarea id="ge-rules" name="rules" rows="4" maxlength="1500">${esc(c.rules)}</textarea></div>
+          ${groupSettingsFields(st)}
+          <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+        </form></section>`
+      : c.kind === 'group' ? `<section class="info-sec"><h3>${icon('fi-rr-rules')}${t('Regeln und Einstellungen')}</h3>
+        ${c.rules ? `<p class="info-rules">${esc(c.rules)}</p>` : `<p class="muted">${t('Diese Gruppe hat keine eigenen Regeln.')}</p>`}
+        <dl class="info-dl">
+          <div><dt>${t('Leute hinzufügen')}</dt><dd>${label.invite[st.invite]}</dd></div>
+          <div><dt>${t('Schreiben')}</dt><dd>${label.write[st.write]}</dd></div>
+          <div><dt>${t('Fotos und Videos')}</dt><dd>${yesNo(st.media)}</dd></div>
+          <div><dt>${t('Langsam-Modus')}</dt><dd>${st.slow ? t('{n} Sekunden', { n: st.slow }) : t('Aus')}</dd></div>
+          <div><dt>${t('Befehle')}</dt><dd>${label.cmd[st.cmd]}</dd></div>
+        </dl></section>` : '';
+    const members = c.members || [];
+    const people = `<section class="info-sec"><h3>${icon('fi-rr-users-alt')}${c.kind === 'group' ? t('{n} Mitglieder', { n: members.length }) : t('Im Gespräch')}</h3>
+        ${c.canInvite ? `<form class="find-player find-player--inline" data-member-invite="${esc(c.id)}"><div class="find-player__row"><input name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--primary" type="submit">${icon('fi-rr-user-add')}${t('Hinzufügen')}</button></div></form>` : ''}
+        <ul class="mem-list">${members.map((p) => memberRow(c, p)).join('')}</ul></section>`;
+    const cmds = c.commands && c.commands.length ? `<section class="info-sec"><h3>${icon('fi-rr-terminal')}${t('Befehle')}</h3>
+        <ul class="cmd-list">${c.commands.map((x) => `<li><code>${esc(x.usage)}</code><span>${esc(t(x.desc))}</span></li>`).join('')}</ul></section>` : '';
+    const mine = role ? `<section class="info-sec"><h3>${icon('fi-rr-bell')}${t('Für dich')}</h3>
+        <label class="toggle"><span class="toggle__text"><b>${t('Stummschalten')}</b><small>${t('Keine Benachrichtigungen aus diesem Gespräch.')}</small></span>
+          <input type="checkbox" role="switch" data-chat-mute="${esc(c.id)}"${c.me.muted ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label></section>` : '';
+    const btn = (attr, ic, text, cls = 'btn--soft') => `<button class="btn ${cls} btn--block" type="button" ${attr}>${icon(ic)}${text}</button>`;
+    const actions = [
+      c.kind === 'direct' && role && other ? `<a class="btn btn--soft btn--block" href="#/chat/neu/gruppe?mit=${esc(other.sub)}">${icon('fi-rr-user-add')}${t('Gruppe mit {name} und weiteren Leuten', { name: esc(nameOfP(other)) })}</a>` : '',
+      c.canJoinMod ? btn(`data-chat-joinmod="${esc(c.id)}"`, 'fi-rr-shield-check', t('Sichtbar als Moderation beitreten')) : '',
+      c.canJoin ? btn(`data-chat-join="${esc(c.id)}"`, 'fi-rr-user-add', t('Gruppe beitreten'), 'btn--primary') : '',
+      c.canReport ? btn(`data-chat-report="${esc(c.id)}"`, 'fi-rr-flag', t('Gespräch melden')) : '',
+      c.canLeave ? btn(`data-chat-leave="${esc(c.id)}"`, 'fi-rr-sign-out-alt', c.kind === 'group' ? t('Gruppe verlassen') : t('Gespräch verlassen')) : '',
+      role ? btn(`data-chat-hide="${esc(c.id)}"`, 'fi-rr-trash', t('Für mich löschen')) : '',
+      c.canDeleteAll ? btn(`data-chat-delete="${esc(c.id)}"`, 'fi-rr-trash-xmark', t('Für alle löschen'), 'btn--danger') : '',
+    ].filter(Boolean);
+    const mod = c.canModerate && (c.reports || c.modlog) ? `<section class="info-sec info-sec--mod"><h3>${icon('fi-rr-shield-check')}${t('Moderation')}</h3>
+        ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('fi-rr-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
+        ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'fi-rr-user-add' : 'fi-rr-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
+      </section>` : '';
+    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${edit}${people}${cmds}${mine}
+      ${actions.length ? `<section class="info-sec"><div class="btn-stack">${actions.join('')}</div></section>` : ''}${mod}`;
   }
 
   function renderChat() {
@@ -3468,77 +3851,198 @@
       body.innerHTML = r.body;
       return;
     }
-    if (v === 'new' || v === 'direct') {
-      head.innerHTML = `<div class="appbar"><div class="appbar__title"><span class="appbar__label">${t('Chat')}</span><h1 class="appbar__value">${v === 'new' ? t('Neue Anfrage') : t('Direktnachricht')}</h1></div></div>`;
-      body.innerHTML = v === 'new' ? chatNew() : chatDirect(state.chatArg);
+    const sub = { new: t('Neu'), 'new-dm': t('Spieler anschreiben'), 'new-group': t('Neue Gruppe'), 'new-ticket': t('Neue Anfrage'), direct: t('Direktnachricht'), info: t('Info') }[v];
+    if (sub) {
+      head.innerHTML = `<div class="appbar"><div class="appbar__title"><span class="appbar__label">${t('Chat')}</span><h1 class="appbar__value">${sub}</h1></div></div>`;
+      body.innerHTML = v === 'new' ? chatNewChoice() : v === 'new-dm' ? chatNewDm() : v === 'new-group' ? chatNewGroup() : v === 'new-ticket' ? chatNewTicket() : v === 'info' ? chatInfo(state.chatArg) : chatDirect(state.chatArg);
       return;
     }
     head.innerHTML = chatHead();
-    body.innerHTML = v === 'team' ? chatTeam() : v === 'queue' ? chatQueue() : chatMine();
+    body.innerHTML = v === 'team' ? chatTeam() : v === 'queue' ? chatQueue() : v === 'public' ? chatPublic() : v === 'mod' ? chatMod() : chatMine();
   }
+
+  // ---------- Aktionen ----------
   async function findPlayer(form) {
-    const name = form.elements.name.value.trim();
+    const name = form.elements.name.value.trim().replace(/^@/, '');
     if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) { toast(t('Bitte gib einen gültigen Roblox-Namen ein.')); return; }
     const btn = $('button', form);
     btn.disabled = true;
     try {
       const p = await api(`/api/players/find?q=${encodeURIComponent(name)}`);
       chatPlayers[p.userId] = p;
-      location.hash = `#/chat/an/${p.userId}`;
+      chat.found = p;
+      renderChat();
     } catch (e) {
       btn.disabled = false;
       toast(e.status === 404 ? t('Diesen Roblox-Namen gibt es nicht.') : errorText(e));
     }
   }
+  async function addGroupMember() {
+    const input = $('[data-member-input]');
+    const name = input ? input.value.trim().replace(/^@/, '') : '';
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) { toast(t('Bitte gib einen gültigen Roblox-Namen ein.')); return; }
+    try {
+      const p = await api(`/api/players/find?q=${encodeURIComponent(name)}`);
+      if (String(p.userId) === meSub()) { toast(t('Du bist sowieso dabei.')); return; }
+      if (!chat.members.some((x) => x.userId === p.userId)) chat.members.push(p);
+      input.value = '';
+      $('[data-member-chips]').innerHTML = memberChips();
+    } catch (e) {
+      toast(e.status === 404 ? t('Diesen Roblox-Namen gibt es nicht.') : errorText(e));
+    }
+  }
   async function sendChat(form) {
     const btn = $('button[type="submit"]', form);
-    const text = form.elements.text.value.trim();
-    if (!text) { form.elements.text.focus(); return; }
     let body;
-    if ('chatNew' in form.dataset) {
-      const reason = (form.querySelector('input[name="reason"]:checked') || {}).value;
-      const area = (form.querySelector('input[name="area"]:checked') || {}).value;
-      if (!reason || !area) { toast(t('Bitte wähle Grund und Bereich.')); return; }
-      body = { kind: 'ticket', reason, area, text };
-    } else body = { kind: 'direct', to: form.dataset.chatDirect, text };
+    if ('groupNew' in form.dataset) {
+      const name = form.elements.name.value.trim();
+      if (name.length < 2) { toast(t('Bitte gib der Gruppe einen Namen.')); form.elements.name.focus(); return; }
+      body = {
+        kind: 'group', name, desc: form.elements.desc.value, rules: form.elements.rules.value, text: form.elements.text.value.trim(),
+        members: chat.members.map((p) => p.userId), settings: readGroupSettings(form),
+      };
+    } else {
+      const text = form.elements.text.value.trim();
+      if (!text) { form.elements.text.focus(); return; }
+      if ('chatNew' in form.dataset) {
+        const reason = (form.querySelector('input[name="reason"]:checked') || {}).value;
+        const area = (form.querySelector('input[name="area"]:checked') || {}).value;
+        if (!reason || !area) { toast(t('Bitte wähle Grund und Bereich.')); return; }
+        body = { kind: 'ticket', reason, area, text };
+      } else body = { kind: 'direct', to: form.dataset.chatDirect, text };
+    }
     btn.disabled = true;
     try {
       const c = await api('/api/chats', { method: 'POST', body });
       chat.conv[c.id] = c;
       chat.at = 0;
+      if (body.kind === 'group') chat.members = [];
       location.hash = `#/chat/${c.id}`;
-      toast(body.kind === 'ticket' ? t('Anfrage gesendet') : t('Nachricht gesendet'));
+      toast(body.kind === 'ticket' ? t('Anfrage gesendet') : body.kind === 'group' ? t('Gruppe erstellt') : t('Nachricht gesendet'));
     } catch (e) {
       btn.disabled = false;
-      toast(e.status === 429 ? t('Du hast heute schon viele Gespräche gestartet. Bitte versuch es morgen wieder.') : errorText(e));
+      toast(chatError(e));
     }
+  }
+  // Dateien anhängen: Fotos werden verkleinert (max. 1920 px), Videos und PDFs bleiben wie sie sind
+  const FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime', 'application/pdf'];
+  const FILE_LIMIT = { image: 15, video: 80, file: 20 };
+  const kindOf = (type) => (type.startsWith('image/') ? 'image' : type.startsWith('video/') ? 'video' : 'file');
+  async function shrinkImage(file) {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale);
+    const h = Math.round(bmp.height * scale);
+    const cv = document.createElement('canvas');
+    cv.width = w;
+    cv.height = h;
+    cv.getContext('2d').drawImage(bmp, 0, 0, w, h);
+    if (bmp.close) bmp.close();
+    const blob = await new Promise((ok, fail) => cv.toBlob((b) => (b ? ok(b) : fail(new Error('blob'))), 'image/jpeg', 0.85));
+    return { blob, w, h };
+  }
+  async function addChatFiles(id, files) {
+    const list = chat.pending[id] || (chat.pending[id] = []);
+    for (const f of [...files]) {
+      if (list.length >= 10) { toast(t('Höchstens 10 Dateien auf einmal.')); break; }
+      let blob = f;
+      let type = (f.type || '').toLowerCase();
+      let w = null;
+      let h = null;
+      const kind = kindOf(type);
+      if (kind === 'image' && type !== 'image/gif') {
+        try { ({ blob, w, h } = await shrinkImage(f)); type = 'image/jpeg'; } catch (e) { /* unverändert senden */ }
+      }
+      if (!FILE_TYPES.includes(type)) { toast(t('„{name}“ kann man nicht senden. Erlaubt sind Fotos, Videos und PDFs.', { name: f.name })); continue; }
+      if (blob.size > FILE_LIMIT[kind] * 1048576) { toast(t('„{name}“ ist zu groß (höchstens {n} MB).', { name: f.name, n: FILE_LIMIT[kind] })); continue; }
+      list.push({ key: Math.random().toString(36).slice(2), name: f.name || 'datei', type, kind, size: blob.size, blob, w, h, preview: kind === 'image' ? URL.createObjectURL(blob) : null, progress: 0 });
+    }
+    renderTray(id);
+  }
+  async function uploadPending(id) {
+    const ids = [];
+    for (const p of chat.pending[id] || []) {
+      if (!p.remoteId) {
+        const s = await api(`/api/chats/${encodeURIComponent(id)}/files`, { method: 'POST', body: { name: p.name, type: p.type, size: p.size, w: p.w, h: p.h } });
+        for (let n = 0; n < s.chunks; n++) {
+          await api(`/api/files/${s.id}/${n}`, { method: 'PUT', raw: p.blob.slice(n * s.chunk, (n + 1) * s.chunk), type: 'application/octet-stream' });
+          p.progress = (n + 1) / s.chunks;
+          const bar = $(`[data-tray="${p.key}"] .tray-item__bar span`);
+          if (bar) bar.style.width = `${Math.round(p.progress * 100)}%`;
+        }
+        p.remoteId = s.id;
+      }
+      ids.push(p.remoteId);
+    }
+    return ids;
   }
   async function sendMessage(form) {
     const id = form.dataset.chatSend;
     const ta = form.elements.text;
     const text = ta.value.trim();
-    if (!text) return;
-    ta.value = '';
-    ta.style.height = '';
+    const pending = chat.pending[id] || [];
+    if ((!text && !pending.length) || chat.sending) return;
+    chat.sending = true;
+    form.classList.add('is-sending');
+    renderTray(id);
+    const btn = $('.compose__send', form);
+    btn.disabled = true;
     try {
-      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text } });
+      const files = pending.length ? await uploadPending(id) : [];
+      ta.value = '';
+      ta.style.height = '';
+      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text, files } });
+      pending.forEach((p) => { if (p.preview) URL.revokeObjectURL(p.preview); });
+      chat.pending[id] = [];
+      chat.sending = false;
+      renderTray(id);
+      hideCommands();
       updateConv(id);
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     } catch (e) {
-      ta.value = text;
-      toast(errorText(e));
+      chat.sending = false;
+      if (!ta.value) ta.value = text;
+      renderTray(id);
+      toast(chatError(e));
+    } finally {
+      chat.sending = false;
+      btn.disabled = false;
+      form.classList.remove('is-sending');
+    }
+  }
+  // Befehle vorschlagen, sobald man „/“ tippt
+  function showCommands(ta) {
+    const box = $('[data-chat-cmds]');
+    const c = chat.conv[state.chatArg];
+    if (!box || !c) return;
+    const v = ta.value;
+    const q = v.startsWith('/') && !/\s/.test(v) ? v.slice(1).toLowerCase() : null;
+    const list = q === null ? [] : (c.commands || []).filter((x) => x.usage.slice(1).toLowerCase().startsWith(q));
+    box.hidden = !list.length;
+    box.innerHTML = list.map((x) => `<button type="button" data-cmd="${esc(x.usage.split(' ')[0])}${x.usage.includes('<') ? ' ' : ''}"><code>${esc(x.usage)}</code><small>${esc(t(x.desc))}</small></button>`).join('');
+  }
+  function hideCommands() {
+    const box = $('[data-chat-cmds]');
+    if (box) { box.hidden = true; box.innerHTML = ''; }
+  }
+  // Aktionen im Gespräch und in der Info (Beitreten, Rollen, Stumm, Löschen, Melden …)
+  async function chatCall(id, path, opts = {}, done = null) {
+    try {
+      const r = await api(`/api/chats/${encodeURIComponent(id)}${path}`, opts);
+      if (r && r.id === id && r.messages) chat.conv[id] = r;
+      chat.at = 0;
+      if (done) done(r);
+      else if (state.page === 'chat') renderChat();
+      return r;
+    } catch (e) {
+      toast(e.status === 409 && path === '/claim' ? t('Jemand anderes war schneller.') : chatError(e));
+      return null;
     }
   }
   async function chatAction(id, action) {
-    try {
-      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
-      chat.at = 0;
-      if (state.page === 'chat' && state.chatView === 'conv') { renderChat(); }
-      toast(action === 'claim' ? t('Du hast die Anfrage angenommen') : t('Gespräch beendet'));
-    } catch (e) {
-      toast(e.status === 409 ? t('Jemand anderes war schneller.') : errorText(e));
-      openConv(id);
-    }
+    const r = await chatCall(id, `/${action}`, { method: 'POST' });
+    if (r) toast(action === 'claim' ? t('Du hast die Anfrage angenommen') : t('Gespräch beendet'));
+    else openConv(id);
   }
 
   // ---------- Echte Zahlen: Gruppe, Spiel, Discord ----------
@@ -3732,6 +4236,11 @@
     station: {
       title: () => t('Abfahrten'),
       render: (name) => stationView(name),
+    },
+    // Foto aus dem Chat in groß
+    photo: {
+      title: () => t('Foto'),
+      render: (src) => `<div class="photo-view"><img src="${esc(src)}" alt=""><a class="btn btn--soft btn--block" href="${esc(src)}" target="_blank" rel="noopener">${icon('fi-rr-download')}${t('Original öffnen')}</a></div>`,
     },
     news: {
       title: () => t('Neuigkeit'),
@@ -4190,11 +4699,20 @@
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
-    const chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', neu: 'new', an: 'direct' }[chatSub] || 'conv';
-    const chatArg = chatView === 'direct' ? (sub2 || '') : chatView === 'conv' ? chatSub : null;
+    const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', anfrage: 'new-ticket' };
+    let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', neu: 'new', an: 'direct' }[chatSub] || 'conv';
+    if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
+    if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
+    const chatArg = chatView === 'direct' ? (sub2 || '') : ['conv', 'info'].includes(chatView) ? chatSub : null;
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg;
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
+    if (chatView === 'public' && state.chatView !== 'public') chat.pubAt = 0;
+    if (chatView === 'mod' && state.chatView !== 'mod') chat.modAt = 0;
+    if (chatView === 'new-dm' && state.chatView !== 'new-dm') chat.found = null;
+    if (chatView === 'new-group' && state.chatView !== 'new-group') chat.members = [];
+    // Info öffnen: Gespräch frisch laden (Mitglieder, Rechte)
+    if (chatView === 'info' && chatArg && chat.conv[chatArg] && !chat.conv[chatArg].error) openConv(chatArg);
     if (reviewId !== state.reviewId) review.answers = 'all';
     // Liste beim Öffnen frisch laden (neue Bewerbungen von anderen Geräten)
     if (jobView === 'review' && !reviewId && state.jobView !== 'review') review.at = 0;
@@ -4525,29 +5043,100 @@
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
     // Chat
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-chat-claim], [data-chat-close]');
+    document.addEventListener('click', async (e) => {
+      const el = e.target.closest('[data-chat-claim], [data-chat-close], [data-chat-join], [data-chat-joinmod], [data-chat-hide], [data-chat-delete], [data-chat-leave], [data-chat-report], [data-chat-edit], [data-mem-role], [data-mem-del], [data-msg-del], [data-msg], [data-photo], [data-tray-del], [data-cmd], [data-mod-kind], [data-member-add], [data-member-del]');
       if (!el) return;
-      el.disabled = true;
-      if (el.dataset.chatClaim) chatAction(el.dataset.chatClaim, 'claim');
-      else if (confirm(t('Gespräch wirklich beenden?'))) chatAction(el.dataset.chatClose, 'close');
-      else el.disabled = false;
+      const ds = el.dataset;
+      const conv = state.chatArg;
+      if (ds.chatClaim) { el.disabled = true; chatAction(ds.chatClaim, 'claim'); }
+      else if (ds.chatClose) { if (confirm(t('Gespräch wirklich beenden?'))) chatAction(ds.chatClose, 'close'); }
+      else if (ds.chatJoin) {
+        el.disabled = true;
+        const r = await chatCall(ds.chatJoin, '/join', { method: 'POST', body: {} }, () => {});
+        if (r) { toast(t('Du bist beigetreten')); chat.pubAt = 0; location.hash = `#/chat/${ds.chatJoin}`; renderChat(); }
+        el.disabled = false;
+      } else if (ds.chatJoinmod) {
+        if (confirm(t('Sichtbar beitreten? Alle im Gespräch sehen dann, dass die Moderation dabei ist.'))) await chatCall(ds.chatJoinmod, '/join', { method: 'POST', body: { mod: true } });
+      } else if (ds.chatHide) {
+        if (!confirm(t('Gespräch für dich löschen? Es verschwindet aus deiner Liste, bis jemand Neues schreibt.'))) return;
+        if (await chatCall(ds.chatHide, '/hide', { method: 'POST' }, () => {})) {
+          if (chat.list) chat.list.chats = chat.list.chats.filter((x) => x.id !== ds.chatHide);
+          toast(t('Gespräch gelöscht'));
+          if (state.chatView === 'mine') renderChat(); else location.hash = '#/chat';
+        }
+      } else if (ds.chatDelete) {
+        if (!confirm(t('Gespräch für alle löschen? Alle Nachrichten, Fotos und Videos sind dann weg.'))) return;
+        if (await chatCall(ds.chatDelete, '', { method: 'DELETE' }, () => {})) { delete chat.conv[ds.chatDelete]; toast(t('Gespräch gelöscht')); location.hash = '#/chat'; }
+      } else if (ds.chatLeave) {
+        if (!confirm(t('Wirklich verlassen?'))) return;
+        if (await chatCall(ds.chatLeave, '/leave', { method: 'POST' }, () => {})) { delete chat.conv[ds.chatLeave]; toast(t('Du hast das Gespräch verlassen')); location.hash = '#/chat'; }
+      } else if (ds.chatReport) {
+        const text = prompt(t('Was ist passiert? Das Team für Meldungen sieht deine Nachricht und das Gespräch.'));
+        if (text === null) return;
+        const r = await chatCall(ds.chatReport, '/report', { method: 'POST', body: { text } }, () => {});
+        if (r) { toast(t('Danke – die Meldung ist beim Team.')); location.hash = `#/chat/${r.ticket}`; }
+      } else if ('chatEdit' in ds) { chat.edit = !chat.edit; renderChat(); }
+      else if (ds.memRole) {
+        const c = chat.conv[conv];
+        if (ds.memRole === 'owner' && !confirm(t('Wirklich zum Inhaber machen? Du bist dann nur noch Admin.'))) return;
+        if (c) await chatCall(c.id, `/members/${ds.mem}`, { method: 'PUT', body: { role: ds.memRole } });
+      } else if (ds.memDel) {
+        const c = chat.conv[conv];
+        if (c && confirm(t('Aus der Gruppe entfernen?'))) await chatCall(c.id, `/members/${ds.memDel}`, { method: 'DELETE' });
+      } else if (ds.msgDel) {
+        if (confirm(t('Nachricht löschen?'))) await chatCall(conv, `/messages/${ds.msgDel}`, { method: 'DELETE' }, () => updateConv(conv));
+      } else if (ds.msg) {
+        if (e.target.closest('a, button, video')) return;
+        const li = el.closest('li');
+        $$('.msg.is-open').forEach((x) => { if (x !== li) x.classList.remove('is-open'); });
+        li.classList.toggle('is-open');
+      } else if (ds.photo) openModal('photo', ds.photo);
+      else if (ds.trayDel) {
+        const list = chat.pending[conv] || [];
+        const p = list.find((x) => x.key === ds.trayDel);
+        if (p && p.preview) URL.revokeObjectURL(p.preview);
+        chat.pending[conv] = list.filter((x) => x.key !== ds.trayDel);
+        renderTray(conv);
+      } else if (ds.cmd) {
+        const ta = $('.compose textarea');
+        if (ta) { ta.value = ds.cmd; ta.focus(); hideCommands(); if (!ds.cmd.endsWith(' ')) ta.form.requestSubmit(); }
+      } else if (ds.modKind !== undefined) { chat.modKind = ds.modKind; chat.mod = null; renderChat(); loadMod(true); }
+      else if ('memberAdd' in ds) addGroupMember();
+      else if (ds.memberDel) { chat.members = chat.members.filter((p) => p.userId !== ds.memberDel); $('[data-member-chips]').innerHTML = memberChips(); }
     });
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('[data-chat-file]')) {
+        addChatFiles(state.chatArg, e.target.files);
+        e.target.value = '';
+      } else if (e.target.matches('[data-chat-mute]')) {
+        chatCall(e.target.dataset.chatMute, '/mute', { method: 'POST', body: { muted: e.target.checked } }, () => toast(e.target.checked ? t('Stummgeschaltet') : t('Benachrichtigungen an')));
+      }
+    });
+    let chatSearchTimer = null;
     document.addEventListener('input', (e) => {
       if (e.target.matches('[data-chat-search]')) {
         chat.query = e.target.value;
         const box = $('[data-chat-team]');
         if (box) box.innerHTML = chatTeamList();
+      } else if (e.target.matches('[data-chat-pubsearch], [data-chat-modsearch]')) {
+        const pub = e.target.matches('[data-chat-pubsearch]');
+        if (pub) chat.pubQuery = e.target.value; else chat.modQuery = e.target.value;
+        clearTimeout(chatSearchTimer);
+        chatSearchTimer = setTimeout(() => (pub ? loadPublic(true) : loadMod(true)), 300);
       } else if (e.target.matches('.compose textarea')) {
         e.target.style.height = 'auto';
         e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+        showCommands(e.target);
       }
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.matches('.compose textarea')) {
         e.preventDefault();
         e.target.form.requestSubmit();
-      }
+      } else if (e.key === 'Enter' && e.target.matches('[data-member-input]')) {
+        e.preventDefault();
+        addGroupMember();
+      } else if (e.key === 'Escape' && e.target.matches('.compose textarea')) hideCommands();
     });
     document.addEventListener('change', (e) => {
       const form = e.target.closest('form[data-chat-new]');
@@ -4636,8 +5225,24 @@
       if (jform) { e.preventDefault(); saveJobForm(jform); return; }
       const fp = e.target.closest('form[data-find-player]');
       if (fp) { e.preventDefault(); findPlayer(fp); return; }
-      const cform = e.target.closest('form[data-chat-new], form[data-chat-direct]');
+      const cform = e.target.closest('form[data-chat-new], form[data-chat-direct], form[data-group-new]');
       if (cform) { e.preventDefault(); sendChat(cform); return; }
+      const gedit = e.target.closest('form[data-group-edit]');
+      if (gedit) {
+        e.preventDefault();
+        const f = gedit.elements;
+        chatCall(gedit.dataset.groupEdit, '', { method: 'PUT', body: { name: f.name.value, desc: f.desc.value, rules: f.rules.value, color: (gedit.querySelector('input[name="color"]:checked') || {}).value, settings: readGroupSettings(gedit) } })
+          .then((r) => { if (r) toast(t('Gespeichert')); });
+        return;
+      }
+      const invite = e.target.closest('form[data-member-invite]');
+      if (invite) {
+        e.preventDefault();
+        const name = invite.elements.name.value.trim().replace(/^@/, '');
+        if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) { toast(t('Bitte gib einen gültigen Roblox-Namen ein.')); return; }
+        chatCall(invite.dataset.memberInvite, '/members', { method: 'POST', body: { users: [name] } }).then((r) => { if (r) toast(t('Hinzugefügt')); });
+        return;
+      }
       const mform = e.target.closest('form[data-chat-send]');
       if (mform) { e.preventDefault(); sendMessage(mform); return; }
       const tform = e.target.closest('form[data-training-new]');

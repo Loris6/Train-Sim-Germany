@@ -1,7 +1,7 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v15';
+const CACHE = 'tsg-v16';
 const SHELL = [
   './',
   'index.html',
@@ -17,6 +17,7 @@ const SHELL = [
   'assets/js/app.js',
   'assets/js/questions/de.js',
   'assets/img/logo.svg',
+  'assets/img/favicon.svg',
   'assets/icons/icon-192.png',
   'assets/icons/badge-96.png',
   'assets/fonts/rubik-latin-wght-normal.woff2',
@@ -60,18 +61,25 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
-  // Chat: Profilbild des Absenders statt Logo (d.icon); neue Nachricht im selben Gespräch meldet sich erneut
-  e.waitUntil(self.registration.showNotification(d.title || 'Train Sim Germany', {
-    body: d.body || '',
-    icon: d.icon || 'assets/icons/icon-192.png',
-    renotify: !!d.tag,
-    timestamp: Date.now(),
-    badge: 'assets/icons/badge-96.png',
-    tag: d.tag || undefined,
-    lang: d.lang || 'de',
-    data: { url: d.url || './', join: d.join || null },
-    actions: d.join ? [{ action: 'join', title: d.joinLabel || 'Beitreten' }] : [],
-  }));
+  e.waitUntil((async () => {
+    // Chat gerade offen und sichtbar? Dann keine Benachrichtigung – die Nachricht ist ja schon zu sehen
+    if (String(d.tag || '').startsWith('chat-')) {
+      const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      if (open.some((c) => c.visibilityState === 'visible' && new URL(c.url).hash.startsWith('#/chat'))) return;
+    }
+    // Chat: Profilbild des Absenders statt Logo (d.icon); neue Nachricht im selben Gespräch meldet sich erneut
+    await self.registration.showNotification(d.title || 'Train Sim Germany', {
+      body: d.body || '',
+      icon: d.icon || 'assets/icons/icon-192.png',
+      renotify: !!d.tag,
+      timestamp: Date.now(),
+      badge: 'assets/icons/badge-96.png',
+      tag: d.tag || undefined,
+      lang: d.lang || 'de',
+      data: { url: d.url || './', join: d.join || null },
+      actions: d.join ? [{ action: 'join', title: d.joinLabel || 'Beitreten' }] : [],
+    });
+  })());
 });
 
 // Tippen auf die Benachrichtigung: App öffnen (bzw. „Beitreten“ startet Roblox im richtigen Server)

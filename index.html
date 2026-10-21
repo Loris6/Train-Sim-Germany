@@ -17,7 +17,7 @@
   <meta name="apple-mobile-web-app-title" content="Train Sim Germany">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -37,7 +37,7 @@
     <div class="container topbar__inner">
       <button class="round-btn topbar__menu" type="button" data-menu-open aria-label="Menü öffnen" aria-controls="menu" aria-expanded="false"><i class="fi fi-rr-menu-burger ic" aria-hidden="true"></i></button>
       <a class="brand" href="#/" aria-label="Train Sim Germany – Startseite">
-        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="36" height="36">
+        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="56" height="28">
         <span class="brand__name">Train Sim Germany</span>
       </a>
       <button class="me" type="button" data-open="profile" aria-label="Profil öffnen">
@@ -55,7 +55,7 @@
         <img class="stage__bg" src="assets/img/hero.svg" alt="" aria-hidden="true">
         <div class="container stage__inner">
           <div class="stage__brand">
-            <img class="stage__logo" src="assets/img/logo.svg" alt="" width="72" height="72">
+            <img class="stage__logo" src="assets/img/logo.svg" alt="" width="112" height="56">
             <h1 class="stage__title">Train Sim Germany</h1>
           </div>
           <p class="stage__lead">Willkommen bei Train Sim Germany, der Bahnsimulation für ganz Deutschland auf Roblox!</p>
@@ -477,7 +477,7 @@
     <div class="container">
       <div class="footer__top">
         <a class="brand footer__brand" href="#/">
-          <img class="brand__logo" src="assets/img/logo.svg" alt="" width="40" height="40">
+          <img class="brand__logo" src="assets/img/logo.svg" alt="" width="56" height="28">
           <span><span class="brand__name">Train Sim Germany</span><small>Das Bahnerlebnis auf Roblox</small></span>
         </a>
         <div class="btn-row">
@@ -504,12 +504,15 @@
   <!-- Tab-Leiste (Handy & Tablet) -->
   <nav class="tabbar" aria-label="App-Navigation">
     <div class="tabbar__inner">
-      <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-house-blank ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-house-blank ic tab-on" aria-hidden="true"></i></a>
-      <a href="#/news" data-nav="news" aria-label="News"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i></a>
-      <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i></a>
-      <a href="#/shop" data-nav="shop" aria-label="Shop"><i class="fi fi-rr-shopping-cart ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-shopping-cart ic tab-on" aria-hidden="true"></i></a>
-      <a href="#/chat" data-nav="chat" aria-label="Chat"><i class="fi fi-rr-comments ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-comments ic tab-on" aria-hidden="true"></i><span class="tabbar__dot" data-chat-dot hidden></span></a>
-      <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="tabbar__avatar" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
+      <a class="tabbar__solo" href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-house-blank ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-house-blank ic tab-on" aria-hidden="true"></i></a>
+      <div class="tabbar__pill">
+        <a href="#/news" data-nav="news" aria-label="News"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i></a>
+        <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i></a>
+        <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="tabbar__avatar" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
+        <a href="#/shop" data-nav="shop" aria-label="Shop"><i class="fi fi-rr-shopping-cart ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-shopping-cart ic tab-on" aria-hidden="true"></i></a>
+        <a href="#/chat" data-nav="chat" aria-label="Chat"><i class="fi fi-rr-comments ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-comments ic tab-on" aria-hidden="true"></i><span class="tabbar__dot" data-chat-dot hidden></span></a>
+      </div>
+      <a class="tabbar__solo" href="#/server" data-nav="server" aria-label="Server"><i class="fi fi-rr-signal-alt-2 ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-signal-alt-2 ic tab-on" aria-hidden="true"></i></a>
     </div>
   </nav>
 
@@ -519,7 +522,7 @@
     <aside class="drawer__panel" role="dialog" aria-modal="true" aria-label="Menü">
       <div class="drawer__head">
         <a class="brand" href="#/">
-          <img class="brand__logo" src="assets/img/logo.svg" alt="" width="36" height="36">
+          <img class="brand__logo" src="assets/img/logo.svg" alt="" width="56" height="28">
           <span class="brand__name">Train Sim Germany</span>
         </a>
         <button class="round-btn" type="button" data-menu-close aria-label="Menü schließen"><i class="fi fi-rr-cross-small ic" aria-hidden="true"></i></button>

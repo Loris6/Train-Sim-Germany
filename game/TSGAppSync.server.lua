@@ -5,6 +5,7 @@
     • meldet der App alle 30 Sekunden (und beim Betreten/Verlassen) Coins, Züge und Strecken der Spieler,
       aber nur, wenn sich etwas geändert hat
     • holt Käufe aus der App ab und verbucht sie im Spiel (Coins abziehen, Zug bzw. Strecke freischalten)
+    • meldet den Server (Spieler, Plätze, Version) – damit funktionieren im App-Chat /GetServers, /GetOnline und /GetUser
 
   Einrichten (einmalig):
     1. Dieses Skript als Script nach ServerScriptService legen.
@@ -117,7 +118,19 @@ local function snapshot(player)
 	return data
 end
 
-local function sync(extra)
+-- Dieser Server, für die Befehle im App-Chat
+local function serverInfo(closing)
+	return {
+		jobId = game.JobId ~= "" and game.JobId or "studio",
+		players = #Players:GetPlayers(),
+		max = Players.MaxPlayers,
+		version = game.PlaceVersion,
+		private = game.PrivateServerId ~= "",
+		closing = closing == true,
+	}
+end
+
+local function sync(extra, closing)
 	local header = authHeader()
 	if not header then
 		return
@@ -146,7 +159,7 @@ local function sync(extra)
 			Url = CONFIG.Backend .. "/api/game/sync",
 			Method = "POST",
 			Headers = { ["Content-Type"] = "application/json", ["Authorization"] = header },
-			Body = HttpService:JSONEncode({ players = players, online = online, done = sending }),
+			Body = HttpService:JSONEncode({ players = players, online = online, done = sending, server = serverInfo(closing) }),
 		})
 	end)
 	if not ok or not res.Success then
@@ -202,7 +215,7 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 game:BindToClose(function()
-	run()
+	sync(nil, true) -- Server meldet sich ab (Käufe werden trotzdem noch gemeldet)
 end)
 
 task.spawn(function()

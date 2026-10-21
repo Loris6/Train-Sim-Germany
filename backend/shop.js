@@ -98,6 +98,7 @@ export async function gameAuthorized(req, env) {
  *   players: [{ userId, coins, trains, routes }]  – nur Spieler, deren Stand sich geändert hat (bzw. beim Betreten/Verlassen)
  *   online:  [userId]                               – für diese Spieler werden offene Käufe zurückgegeben
  *   done:    [{ id, userId, ok }]                   – vom Spiel verbuchte (ok) oder abgelehnte Käufe
+ *   server:  { jobId, players, max, version, private, closing } – dieser Server (für /GetServers und /GetOnline im Chat)
  */
 export async function gameSync(store, body) {
   const t = Date.now();
@@ -136,6 +137,20 @@ export async function gameSync(store, body) {
     w.history = [{ ...hit, ok: !!d.ok, doneAt: t }, ...(w.history || [])].slice(0, 30);
   }
   await Promise.all([...wallets].map(([sub, w]) => store.put(`wallet:${sub}`, w)));
+  // Laufende Server (älter als 10 Minuten = weg)
+  const sv = body.server && typeof body.server === 'object' ? body.server : null;
+  const jobId = sv && clip(sv.jobId, 64);
+  if (jobId) {
+    const servers = Object.fromEntries(Object.entries((await store.get('game:servers')) || {}).filter(([, x]) => t - x.at < 600000));
+    if (sv.closing) delete servers[jobId];
+    else {
+      servers[jobId] = {
+        at: t, players: Math.max(0, Math.round(+sv.players || online.length)), max: Math.max(0, Math.round(+sv.max || 0)),
+        version: Math.round(+sv.version) || null, private: sv.private === true, online,
+      };
+    }
+    await store.put('game:servers', servers);
+  }
   if (pendingChanged) await store.put('shop:pending', all);
   const pending = {};
   online.forEach((sub) => { if (all[sub]) pending[sub] = all[sub]; });

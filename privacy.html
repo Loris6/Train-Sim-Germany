@@ -7,7 +7,7 @@
   <meta name="description" content="Datenschutzerklärung von Train Sim Germany: welche Daten die Web-App verarbeitet, wofür und welche Rechte du hast.">
   <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#131821" media="(prefers-color-scheme: dark)">
-  <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
+  <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/uicons.css">
@@ -22,7 +22,7 @@
   <header class="topbar">
     <div class="container topbar__inner">
       <a class="brand" href="./#/" aria-label="Train Sim Germany – zur App">
-        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="36" height="36">
+        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="56" height="28">
         <span class="brand__name">Train Sim Germany</span>
       </a>
       <a class="btn btn--soft btn--sm legal__app" href="./#/"><i class="fi fi-rr-arrow-left ic" aria-hidden="true"></i>Zur App</a>
@@ -52,7 +52,7 @@
             <li><a href="#sichtbarkeit">Öffentliches Profil und öffentliche Statistik</a></li>
             <li><a href="#benachrichtigungen">Benachrichtigungen</a></li>
             <li><a href="#bewerbungen">Bewerbungen</a></li>
-            <li><a href="#chat">Chat mit dem Team</a></li>
+            <li><a href="#chat">Chat, Gruppen und Moderation</a></li>
             <li><a href="#shop">Shop: Coins, Züge und Strecken</a></li>
             <li><a href="#dritte">Inhalte von Drittanbietern</a></li>
             <li><a href="#kinder">Kinder und Jugendliche</a></li>
@@ -81,7 +81,7 @@
               <li>Wenn du dich mit Roblox anmeldest, erhalten wir nur dein <strong>öffentliches Roblox-Profil</strong> (Nutzer-ID, Name, Anzeigename, Profilbild) – nie dein Passwort.</li>
               <li>Dein Profil und deine Statistik sind <strong>standardmäßig privat</strong>. Öffentlich werden sie nur, wenn du das in den Einstellungen einschaltest.</li>
               <li>Benachrichtigungen bekommst du nur, wenn du sie in den Einstellungen bzw. mit der Glocke einschaltest und erlaubst.</li>
-              <li>Chat-Nachrichten sehen nur die Beteiligten – bei Anfragen zusätzlich das zuständige Team. Sie werden 180 Tage nach der letzten Nachricht gelöscht.</li>
+              <li>Chat-Nachrichten, Fotos und Videos sehen die Beteiligten – bei Anfragen zusätzlich das zuständige Team, bei öffentlichen Gruppen alle, die die Gruppe öffnen. Zur Sicherheit kann die Moderation (ab Supervisor) Gespräche einsehen. Alles wird spätestens 180 Tage nach der letzten Nachricht gelöscht.</li>
               <li>Für den Shop gleicht das Spiel deine Coins, Züge und Strecken mit der App ab. Echtes Geld wird nie verarbeitet.</li>
             </ul>
           </section>
@@ -164,10 +164,12 @@
           </section>
 
           <section id="chat">
-            <h2>10. Chat mit dem Team</h2>
-            <p>Im Chat kannst du dem Team eine Anfrage schicken (mit Grund und Bereich) oder einer Person ab der Rolle Supervisor direkt schreiben. Dafür musst du mit Roblox angemeldet sein. Gespeichert werden im Backend: die Nachrichten mit Zeitpunkt, deine Roblox-Nutzer-ID, dein Name, Anzeigename, Profilbild und Rang, bei Anfragen außerdem Grund, Bereich, Status und wer sie angenommen hat.</p>
-            <p>Eine <strong>Anfrage</strong> sehen du und alle Teammitglieder, die für den gewählten Bereich zuständig sind; sobald jemand sie annimmt, schreiben nur noch ihr beide. Eine <strong>Direktnachricht</strong> sehen nur du und die angeschriebene Person. Spieler können nur dem Team schreiben; das Team (ab Supervisor) kann jeden Spieler anschreiben und sucht ihn dafür über den öffentlichen Roblox-Namen. Die Liste des Teams (Name, Anzeigename, Profilbild, Rolle) stammt aus der öffentlichen Roblox-Gruppe und wird über das Backend bzw. roproxy.com geladen.</p>
-            <p>Zweck ist, dir bei Fragen zu helfen und Meldungen zu bearbeiten. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Gespräche werden 180 Tage nach der letzten Nachricht automatisch gelöscht. Um festzustellen, welche Nachrichten neu für dich sind, merkt sich die App auf deinem Gerät, welche Gespräche du zuletzt geöffnet hast.</p>
+            <h2>10. Chat, Gruppen und Moderation</h2>
+            <p>Im Chat kannst du anderen Spielern schreiben, Gruppen gründen oder ihnen beitreten und dem Team eine Anfrage schicken (mit Grund und Bereich). Dafür musst du mit Roblox angemeldet sein. Gespeichert werden im Backend: die Nachrichten mit Zeitpunkt, Fotos, Videos und Dateien, die du sendest, deine Roblox-Nutzer-ID, dein Name, Anzeigename, Profilbild und Rang; bei Gruppen außerdem Name, Beschreibung, Regeln, Einstellungen, Mitglieder und ihre Rollen, bei Anfragen Grund, Bereich, Status und wer sie angenommen hat. Andere Spieler findest du über ihren öffentlichen Roblox-Namen.</p>
+            <p><strong>Wer sieht was?</strong> Ein privates Gespräch sehen die Beteiligten, eine private Gruppe ihre Mitglieder, eine öffentliche Gruppe alle angemeldeten Nutzer der App. Eine <strong>Anfrage</strong> sehen du und das zuständige Team; sobald jemand sie annimmt, schreiben nur noch ihr beide. Zum Schutz aller – besonders jüngerer Spieler – kann die <strong>Moderation</strong> (Teammitglieder ab dem Rang Supervisor) jedes Gespräch einsehen, auch ohne dass es die Beteiligten bemerken, oder sichtbar beitreten, Nachrichten löschen und Leute entfernen. Ausgenommen sind Gespräche mit Personen höheren Ranges. Jedes Einsehen wird mit Name und Zeitpunkt vermerkt (für die Moderation sichtbar). Meldest du ein Gespräch, sieht das Team für Meldungen deine Nachricht und das Gespräch.</p>
+            <p><strong>Befehle</strong> wie /GetUser holen öffentliche Daten von Roblox (Profil, Rang in der Gruppe) und aus dem Spiel (laufende Server, wer gerade spielt); /Coins zeigt nur dir deinen eigenen Stand.</p>
+            <p><strong>Fotos, Videos und Dateien</strong> sind nur über Links abrufbar, die das Backend für Beteiligte ausstellt; sie gelten höchstens bis Ende des nächsten Tages. Fotos werden vor dem Senden auf deinem Gerät verkleinert. Gelöschte Nachrichten verlieren ihre Dateien sofort.</p>
+            <p>Zweck ist, dass Spieler sich austauschen können, dir bei Fragen zu helfen und Regelverstöße zu bearbeiten (Art. 6 Abs. 1 lit. b DSGVO); die Moderation dient dem Schutz der Nutzer und der Durchsetzung der Regeln (Art. 6 Abs. 1 lit. f DSGVO). Gespräche samt Dateien werden 180 Tage nach der letzten Nachricht automatisch gelöscht; von jedem Gespräch bleiben höchstens die letzten 500 Nachrichten. „Für alle löschen“ (Inhaber einer Gruppe, Moderation) entfernt ein Gespräch sofort. Um festzustellen, welche Nachrichten neu für dich sind, merkt sich die App auf deinem Gerät, welche Gespräche du zuletzt geöffnet hast. Damit du keine Benachrichtigung bekommst, während du den Chat ohnehin offen hast, merkt sich das Backend dafür nur im Arbeitsspeicher und für wenige Sekunden, welches Gespräch du gerade geöffnet hast.</p>
           </section>
 
           <section id="shop">

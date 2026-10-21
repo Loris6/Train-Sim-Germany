@@ -36,27 +36,49 @@
  *   POST   /api/shop/buy                 { kind: train | route, id } – Kauf, wird beim nächsten Abgleich im Spiel verbucht
  *   POST   /api/game/sync                Abgleich mit dem Spiel (Schlüssel GAME_API_KEY): Coins, Besitz, Käufe
  *   GET    /api/staff                    Team ab Supervisor aus der Roblox-Gruppe (für den Chat)
- *   GET    /api/chats                    Eigene Gespräche und – fürs Team – offene Anfragen des Bereichs
- *   POST   /api/chats                    Neue Anfrage { reason, area, text } oder Direktnachricht { kind: direct, to, text }
- *   GET    /api/chats/<id>?since=<ms>    Gespräch lesen
- *   POST   /api/chats/<id>/messages      { text }
+ *   GET    /api/chats?view=1             Eigene Gespräche und – fürs Team – offene Anfragen des Bereichs
+ *   GET    /api/chats/public?q=          Öffentliche Gruppen
+ *   GET    /api/chats/moderation?q=&kind= Alle Gespräche zum Beobachten (ab Supervisor)
+ *   POST   /api/chats                    Anfrage { reason, area, text } · Direktnachricht { kind: direct, to, text }
+ *                                         · Gruppe { kind: group, name, desc, rules, settings, members, text }
+ *   GET    /api/chats/<id>?since=&observe=1  Gespräch lesen (observe = Moderation schaut unsichtbar zu)
+ *   PUT    /api/chats/<id>               Gruppe bearbeiten { name, desc, rules, color, settings }
+ *   DELETE /api/chats/<id>               Für alle löschen (Inhaber der Gruppe, Moderation)
+ *   POST   /api/chats/<id>/messages      { text, files: [id] } – Text mit „/“ = Befehl (siehe commands.js)
+ *   DELETE /api/chats/<id>/messages/<m>  Nachricht löschen (eigene; Admins und Moderation alle)
+ *   POST   /api/chats/<id>/files         Datei anmelden { name, type, size } → in Stücken hochladen (siehe files.js)
+ *   PUT    /api/files/<id>/<n>           Stück n einer Datei
+ *   GET    /api/files/<id>?c=&e=&s=      Datei abrufen (signierter Link)
+ *   POST   /api/chats/<id>/members       Leute hinzufügen { users: [Name oder ID] }
+ *   PUT    /api/chats/<id>/members/<id>  Rolle { role: admin | member | owner }
+ *   DELETE /api/chats/<id>/members/<id>  Aus der Gruppe entfernen
+ *   POST   /api/chats/<id>/join          Öffentlicher Gruppe beitreten ({ mod: true } = sichtbar als Moderation)
+ *   POST   /api/chats/<id>/leave         Gruppe verlassen
+ *   POST   /api/chats/<id>/mute          { muted } – keine Benachrichtigungen für dieses Gespräch
+ *   POST   /api/chats/<id>/hide          Für mich löschen
+ *   POST   /api/chats/<id>/report        Gespräch melden { text }
  *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
  *   POST   /api/chats/<id>/close         Gespräch beenden
- *   GET    /api/players/find?q=<name>    Spieler suchen, um ihn anzuschreiben (ab Supervisor)
+ *   GET    /api/players/find?q=<name>    Spieler suchen, um ihn anzuschreiben
  *   POST   /api/push/subscribe           { subscription, prefs } – Benachrichtigungen auf diesem Gerät (Chat, Bewerbungen, Team)
  *   POST   /api/push/unsubscribe         { endpoint } – Gerät abmelden
  *   POST   /api/push/test                Probe-Benachrichtigung an die eigenen Geräte
  *
  * Einstellungen: siehe .env.example bzw. README.md
  */
-import { enc, b64u, fromB64u, randomKey, now, clip, jsonPart } from './lib.js';
+import { enc, b64u, fromB64u, now, clip, jsonPart } from './lib.js';
+import { hmacKey } from './secret.js';
 import { vapidKeys, saveReminders, sendDue, subscribeUser, unsubscribeUser, notifyUser } from './webpush.js';
 import { matchRank, atLeast } from './ranks.js';
 import { getContent, addTraining, deleteTraining, addNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
 import { submitApplication, listApplications, getApplication, setStatus, announce, ownView } from './applications.js';
 import { liveStats } from './stats.js';
 import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
-import { listChats, createChat, readChat, postMessage, claimChat, closeChat, staffList, findPlayer } from './chat.js';
+import {
+  listChats, publicChats, moderationChats, createChat, readChat, postMessage, deleteMessage, claimChat, closeChat, updateChat, addMembers,
+  joinChat, leaveChat, removeMember, setRole, muteChat, hideChat, deleteChat, reportChat, startChatUpload, staffList, findPlayer,
+} from './chat.js';
+import { putChunk, fileResponse } from './files.js';
 import { mailReady } from './mail.js';
 
 export { sendDue, matchRank };
@@ -78,19 +100,6 @@ const robloxUrl = (env, name) => (env[`ROBLOX_${name.toUpperCase()}_URL`] || ROB
 const groupId = (env) => String(env.ROBLOX_GROUP_ID || DEFAULT_GROUP);
 const loginReady = (env) => !!env.ROBLOX_CLIENT_ID;
 
-// ---------- Geheimer Schlüssel für Sitzungen (wird beim ersten Start erzeugt, außer SESSION_SECRET ist gesetzt) ----------
-const keyCache = new Map();
-async function hmacKey(env, store) {
-  let secret = env.SESSION_SECRET;
-  if (!secret) {
-    secret = await store.get('config:session-secret');
-    if (!secret) { secret = randomKey(32); await store.put('config:session-secret', secret); }
-  }
-  if (!keyCache.has(secret)) {
-    keyCache.set(secret, crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']));
-  }
-  return keyCache.get(secret);
-}
 async function seal(env, store, data) {
   const body = b64u(enc.encode(JSON.stringify(data)));
   const sig = await crypto.subtle.sign('HMAC', await hmacKey(env, store), enc.encode(body));
@@ -269,6 +278,8 @@ export async function handle(req, env, store) {
     }
     if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
     if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
+    const file = path.match(/^\/api\/files\/([\w-]+)$/);
+    if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
     const media = path.match(/^\/media\/([\w-]+)$/);
     if (media && m === 'GET') return await mediaResponse(store, media[1]);
     if (path === '/auth/session' && m === 'POST') return await createSession(req, env, store);
@@ -303,15 +314,34 @@ export async function handle(req, env, store) {
     if (path === '/api/shop/buy' && m === 'POST') return json(req, env, await buy(store, user, await readJson(req, 1000)));
 
     // Chat
-    if (path === '/api/chats' && m === 'GET') return json(req, env, await listChats(store, await freshUser(env, store, user)));
-    if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 10000)), 201);
-    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close))?$/);
-    if (chat && !chat[2] && m === 'GET') return json(req, env, await readChat(store, user, chat[1], +url.searchParams.get('since') || 0));
-    if (chat && chat[2] === 'messages' && m === 'POST') return json(req, env, await postMessage(store, env, user, chat[1], await readJson(req, 10000)), 201);
-    if (chat && chat[2] === 'claim' && m === 'POST') return json(req, env, await claimChat(store, env, await freshUser(env, store, user), chat[1]));
-    // Spieler suchen, um ihn anzuschreiben (nur Team)
+    if (path === '/api/chats' && m === 'GET') return json(req, env, await listChats(store, await freshUser(env, store, user), url.searchParams.get('view') === '1'));
+    if (path === '/api/chats/public' && m === 'GET') return json(req, env, await publicChats(store, user, url.searchParams.get('q') || ''));
+    if (path === '/api/chats/moderation' && m === 'GET') return json(req, env, await moderationChats(store, await freshUser(env, store, user), url.searchParams.get('q') || '', url.searchParams.get('kind') || ''));
+    if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 20000)), 201);
+    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close|files|members|join|leave|mute|hide|report)(?:\/([\w-]+))?)?$/);
+    if (chat) {
+      const [, id, action, sub] = chat;
+      if (!action && m === 'GET') return json(req, env, await readChat(store, env, user, id, { since: +url.searchParams.get('since') || 0, observe: url.searchParams.get('observe') === '1' }));
+      if (!action && m === 'PUT') return json(req, env, await updateChat(store, env, user, id, await readJson(req, 10000)));
+      if (!action && m === 'DELETE') return json(req, env, await deleteChat(store, await freshUser(env, store, user), id));
+      if (action === 'messages' && !sub && m === 'POST') return json(req, env, await postMessage(store, env, user, id, await readJson(req, 10000)), 201);
+      if (action === 'messages' && sub && m === 'DELETE') return json(req, env, await deleteMessage(store, env, user, id, sub));
+      if (action === 'files' && m === 'POST') return json(req, env, await startChatUpload(store, user, id, await readJson(req, 2000)), 201);
+      if (action === 'members' && !sub && m === 'POST') return json(req, env, await addMembers(store, env, user, id, await readJson(req, 5000)));
+      if (action === 'members' && sub && m === 'PUT') return json(req, env, await setRole(store, env, await freshUser(env, store, user), id, sub, (await readJson(req, 1000)).role));
+      if (action === 'members' && sub && m === 'DELETE') return json(req, env, await removeMember(store, env, await freshUser(env, store, user), id, sub));
+      if (action === 'join' && m === 'POST') return json(req, env, await joinChat(store, env, await freshUser(env, store, user), id, { asMod: (await readJson(req, 1000)).mod === true }));
+      if (action === 'leave' && m === 'POST') return json(req, env, await leaveChat(store, env, user, id));
+      if (action === 'mute' && m === 'POST') return json(req, env, await muteChat(store, env, user, id, (await readJson(req, 1000)).muted === true));
+      if (action === 'hide' && m === 'POST') return json(req, env, await hideChat(store, user, id));
+      if (action === 'report' && m === 'POST') return json(req, env, await reportChat(store, env, await freshUser(env, store, user), id, await readJson(req, 5000)), 201);
+      if (action === 'claim' && m === 'POST') return json(req, env, await claimChat(store, env, await freshUser(env, store, user), id));
+      if (action === 'close' && m === 'POST') return json(req, env, await closeChat(store, env, user, id));
+    }
+    const chunk = path.match(/^\/api\/files\/([\w-]+)\/(\d{1,4})$/);
+    if (chunk && m === 'PUT') return json(req, env, await putChunk(store, user, chunk[1], +chunk[2], req));
+    // Spieler suchen, um ihn anzuschreiben
     if (path === '/api/players/find' && m === 'GET') {
-      need(await freshUser(env, store, user), 'Supervisor');
       const p = await findPlayer(env, url.searchParams.get('q'));
       return p ? json(req, env, p) : json(req, env, { error: 'not_found' }, 404);
     }
@@ -325,7 +355,6 @@ export async function handle(req, env, store) {
     if (path === '/api/push/test' && m === 'POST') {
       return json(req, env, { sent: await notifyUser(store, env, user.sub, 'test', { title: 'Train Sim Germany', body: 'Benachrichtigungen funktionieren – auch wenn die App geschlossen ist. 🚆', url: './#/einstellungen', tag: 'test' }) });
     }
-    if (chat && chat[2] === 'close' && m === 'POST') return json(req, env, await closeChat(store, user, chat[1]));
 
     if (path === '/api/me' && m === 'GET') {
       await freshUser(env, store, user);

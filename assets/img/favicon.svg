@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Train Sim Germany – Browser-Tab -->
+  <g transform="translate(6.0 141.0) scale(1.2500)"><defs><clipPath id="tsgf"><path d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z"/></clipPath></defs>
+  <path d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z" fill="#E3001B"/>
+  <g clip-path="url(#tsgf)">
+    <path d="M68 54H262C304 56 340 78 362 110H68C61 110 56 105 56 98V66C56 59 61 54 68 54Z" fill="#1B1F27"/>
+    <path d="M78 64H262C290 65 314 74 333 88H78C74 88 72 86 72 83V69C72 66 74 64 78 64Z" fill="#FFFFFF" fill-opacity=".14"/>
+    <rect x="0" y="126" width="400" height="12" fill="#1B1F27"/>
+    <rect x="0" y="144" width="400" height="12" fill="#FFC400"/>
+  </g>
+  <rect x="34" y="188" width="362" height="11" rx="5.5" fill="#8A909A"/><rect x="2" y="188" width="20" height="11" rx="5.5" fill="#8A909A"/></g>
+</svg>
