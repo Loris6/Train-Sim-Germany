@@ -47,6 +47,29 @@ jobs:
         with:
           node-version: 22
 
+      # Ohne eigene Adresse <name>.workers.dev bricht das Veröffentlichen ab – dann legen wir sie hier an
+      - name: workers.dev-Adresse anlegen (falls noch keine da ist)
+        if: steps.check.outputs.skip != '1'
+        run: |
+          api="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain"
+          auth="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          current=$(curl -s -H "$auth" "$api" | jq -r '.result.subdomain // empty')
+          if [ -n "$current" ]; then
+            echo "Adresse vorhanden: $current.workers.dev"
+            exit 0
+          fi
+          owner=$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9-')
+          for name in trainsimgermany train-sim-germany trainsimgermany-app "tsg-$owner" "trainsimgermany-$RANDOM"; do
+            res=$(curl -s -X PUT -H "$auth" -H "Content-Type: application/json" --data "{\"subdomain\":\"$name\"}" "$api")
+            if [ "$(echo "$res" | jq -r '.success')" = "true" ]; then
+              echo "Adresse angelegt: $name.workers.dev"
+              exit 0
+            fi
+            echo "$name geht nicht: $(echo "$res" | jq -c '.errors')"
+          done
+          echo "::error::Keine workers.dev-Adresse möglich. In Cloudflare unter Workers & Pages → Subdomain einmal von Hand einen Namen wählen und den Ablauf neu starten."
+          exit 1
+
       - name: Veröffentlichen
         id: deploy
         if: steps.check.outputs.skip != '1'
