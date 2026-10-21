@@ -60,7 +60,7 @@ const server = http.createServer(async (req, res) => {
     let size = 0;
     for await (const c of req) {
       size += c.length;
-      if (size > 200000) { res.writeHead(413).end(); return; }
+      if (size > 2000000) { res.writeHead(413).end(); return; }
       chunks.push(c);
     }
     const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();

@@ -12,8 +12,11 @@ APP_URL = "https://loris6.github.io/Train-Sim-Germany/"
 ALLOWED_ORIGINS = "http://localhost:8000"
 # Roblox-Gruppe für den Rang
 ROBLOX_GROUP_ID = "33684346"
+# Spiel und Discord-Einladung für die echten Zahlen
+ROBLOX_PLACE_ID = "140440792597921"
+DISCORD_INVITE = "tvaSwbh3rE"
 
-# Speicher für Profile, Privatsphäre und Erinnerungen: npx wrangler kv namespace create TSG_KV
+# Speicher für Profile, Einstellungen, Trainings, Neuigkeiten, Bewerbungen und Erinnerungen: npx wrangler kv namespace create TSG_KV
 [[kv_namespaces]]
 binding = "TSG_KV"
 id = "HIER-DIE-KV-ID-EINTRAGEN"
@@ -22,5 +25,6 @@ id = "HIER-DIE-KV-ID-EINTRAGEN"
 [triggers]
 crons = ["*/2 * * * *"]
 
-# Geheim (nur falls Bewerbungen an Discord gehen sollen), NICHT hier eintragen:
-#   npx wrangler secret put DISCORD_WEBHOOK_URL
+# Geheim, NICHT hier eintragen:
+#   npx wrangler secret put DISCORD_WEBHOOK_URL           (Webhook 1: neue Bewerbungen)
+#   npx wrangler secret put DISCORD_RESULTS_WEBHOOK_URL   (Webhook 2: Glückwünsche an die Bestandenen)

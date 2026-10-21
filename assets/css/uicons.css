@@ -55,6 +55,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-traffic-light:before{content:"\fddc"}
 .fi-rr-train-side:before{content:"\fddf"}
 .fi-rr-train-station:before{content:"\fde1"}
+.fi-rr-trash:before{content:"\fe17"}
 .fi-rr-triangle-warning:before{content:"\fe33"}
 .fi-rr-trophy:before{content:"\fe39"}
 .fi-rr-user-add:before{content:"\fe7a"}

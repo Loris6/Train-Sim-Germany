@@ -1,48 +1,62 @@
 /*
  * Train Sim Germany – Backend (optional)
  *
- * Die Anmeldung mit Roblox läuft direkt in der Web-App (nur Client-ID, PKCE). Das Backend ergänzt:
- *   - Benachrichtigungen für Trainings per Web-Push, auch wenn die App geschlossen ist
- *   - Bewerbungen an den Discord-Kanal des Teams (der Webhook bleibt geheim)
- *   - Privatsphäre-Einstellungen, die auch andere sehen (öffentliches Profil)
+ * Die Anmeldung mit Roblox läuft direkt in der Web-App (nur Client-ID, PKCE). Das Backend ergänzt alles,
+ * was geteilt oder geheim sein muss. Rechte kommen aus der Rolle in der Roblox-Gruppe:
+ *   ab Supervisor                    Trainings anbieten (und eigene löschen)
+ *   ab Public Relations Department   Neuigkeiten schreiben, Stellen öffnen/schließen, Bewerbungen prüfen
  *
  * Diese Datei nutzt nur Web-Standards (fetch, Request, Response, crypto.subtle) und läuft
  * als Cloudflare Worker (worker.js) und mit Node.js (server.js).
  *
- *   GET  /health                  Was ist eingerichtet?
- *   POST /auth/session            { id_token } aus dem Roblox-Login → Sitzung fürs Backend
- *   POST /auth/logout             Abmelden (alle Sitzungen des Kontos werden ungültig)
- *   GET  /api/me                  Eigenes Profil, Rang aus der Roblox-Gruppe, Privatsphäre
- *   PUT  /api/me/privacy          Privatsphäre speichern: { profile, stats }
- *   GET  /api/players/<id>        Öffentliches Profil eines Spielers (nur wenn freigegeben)
- *   POST /api/applications        Bewerbung an den Discord-Kanal senden (angemeldet)
- *   GET  /api/push/key            Öffentlicher Schlüssel für Web-Push
- *   POST /api/push/reminders      { subscription, reminders } – Erinnerungen für Trainings
+ *   GET    /health                       Was ist eingerichtet?
+ *   GET    /api/content                  Trainings, Neuigkeiten, Stellen (öffentlich)
+ *   GET    /api/stats                    Echte Zahlen: Gruppe, Spiel, Discord (öffentlich)
+ *   GET    /media/<id>                   Hochgeladenes Bild
+ *   POST   /auth/session                 { id_token } aus dem Roblox-Login → Sitzung fürs Backend
+ *   POST   /auth/logout                  Abmelden (alle Sitzungen des Kontos werden ungültig)
+ *   GET    /api/me                       Profil, Rang, Privatsphäre, Einstellungen, eigene Bewerbungen
+ *   PUT    /api/me/privacy               { profile, stats }
+ *   PUT    /api/me/settings              Einstellungen für alle Geräte (Darstellung, Sprache, Glocken …)
+ *   GET    /api/players/<id>             Öffentliches Profil (nur wenn freigegeben)
+ *   POST   /api/trainings                Training anbieten (ab Supervisor)
+ *   DELETE /api/trainings/<id>           Eigenes Training löschen
+ *   POST   /api/news                     Neuigkeit schreiben (ab PRD)
+ *   DELETE /api/news/<id>                Eigene Neuigkeit löschen
+ *   POST   /api/media                    Bild hochladen (ab PRD, höchstens 1,5 MB)
+ *   PUT    /api/jobs/<id>                Stelle öffnen/schließen, Zeitraum (ab PRD)
+ *   POST   /api/applications             Bewerbung senden (angemeldet)
+ *   GET    /api/applications             Alle Bewerbungen (ab PRD)
+ *   GET    /api/applications/<id>        Eine Bewerbung (ab PRD oder eigene)
+ *   PUT    /api/applications/<id>        { status: passed | failed | new } (ab PRD)
+ *   POST   /api/applications/announce    { ids } Bestandene an Discord senden (ab PRD)
+ *   GET    /api/push/key                 Öffentlicher Schlüssel für Web-Push
+ *   POST   /api/push/reminders           { subscription, reminders } – Erinnerungen für Trainings
  *
  * Einstellungen: siehe .env.example bzw. README.md
  */
 import { enc, b64u, fromB64u, randomKey, now, clip, jsonPart } from './lib.js';
 import { vapidKeys, saveReminders, sendDue } from './webpush.js';
+import { matchRank, atLeast } from './ranks.js';
+import { getContent, addTraining, deleteTraining, addNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
+import { submitApplication, listApplications, getApplication, setStatus, announce, ownView } from './applications.js';
+import { liveStats } from './stats.js';
 
-export { sendDue };
+export { sendDue, matchRank };
 
 const ROBLOX = {
   oauth: 'https://apis.roblox.com/oauth',
+  apis: 'https://apis.roblox.com',
   users: 'https://users.roblox.com',
   groups: 'https://groups.roblox.com',
+  games: 'https://games.roblox.com',
   thumbnails: 'https://thumbnails.roblox.com',
 };
-// Ränge der App mit Kürzel. Die Rolle in der Roblox-Gruppe wird über Kürzel oder Name zugeordnet,
-// z. B. „[D] Driver“, „SG | Signaller“ oder „Platform Staff“. Nicht in der Gruppe = Guest.
-const RANKS = [
-  ['Management', 'MG'], ['Dispatcher', 'DS'], ['Supervisor', 'SV'], ['Signaller', 'SG'], ['Conductor', 'CD'],
-  ['Platform Staff', 'PS'], ['Passenger', 'UD'], ['Driver', 'D'], ['Guest', 'G'],
-];
 const SESSION_DAYS = 30;
 const REFRESH_MINUTES = 10;
-const APPS_PER_DAY = 3;
 const DEFAULT_GROUP = '33684346';
 
+const publicBase = (req, env) => (env.BACKEND_URL ? env.BACKEND_URL.replace(/\/+$/, '') : new URL(req.url).origin);
 const robloxUrl = (env, name) => (env[`ROBLOX_${name.toUpperCase()}_URL`] || ROBLOX[name]).replace(/\/+$/, '');
 const groupId = (env) => String(env.ROBLOX_GROUP_ID || DEFAULT_GROUP);
 const loginReady = (env) => !!env.ROBLOX_CLIENT_ID;
@@ -86,7 +100,7 @@ function cors(req, env) {
   if (!origin || !appOrigins(env).includes(origin)) return {};
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
@@ -107,14 +121,6 @@ async function getJson(url, init) {
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(`${url} → ${res.status}`);
   return res.json();
-}
-export function matchRank(role) {
-  if (!role) return 'Guest';
-  const name = String(role.name || '').toLowerCase();
-  const prefix = (name.match(/^\s*\[?\s*([a-z]{1,3})\s*[\]|:\-]/) || [])[1];
-  const hit = (prefix && RANKS.find(([, p]) => p.toLowerCase() === prefix))
-    || RANKS.slice().sort((a, b) => b[0].length - a[0].length).find(([rank]) => name.includes(rank.toLowerCase()));
-  return hit ? hit[0] : 'Passenger';
 }
 // Aktuelle Angaben von Roblox: Name, Anzeigename, Profilbild, Rolle in der Gruppe. Fehler sind egal (alte Werte bleiben).
 async function refreshUser(env, user) {
@@ -190,7 +196,7 @@ async function createSession(req, env, store) {
   await refreshUser(env, user);
   await store.put(`user:${user.sub}`, user);
   const session = await seal(env, store, { sub: user.sub, ver: user.ver, iat: now(), exp: now() + SESSION_DAYS * 86400 });
-  return json(req, env, { session, ...publicUser(user), privacy: user.privacy });
+  return json(req, env, { session, ...publicUser(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
 }
 
 // Angemeldeter Nutzer aus „Authorization: Bearer <sitzung>“
@@ -203,124 +209,153 @@ async function authUser(req, env, store) {
   return user && user.ver === s.ver ? user : null;
 }
 
-// ---------- Bewerbungen → Discord ----------
-async function sendApplication(req, env, store, user) {
-  if (!env.DISCORD_WEBHOOK_URL) return json(req, env, { error: 'not_configured' }, 503);
-  const a = await readJson(req);
-  if (!/^[a-z0-9-]{2,40}$/.test(a.job || '') || !Array.isArray(a.answers) || a.answers.length > 100) return json(req, env, { error: 'bad_request' }, 400);
-  if (!String(a.discord || '').trim()) return json(req, env, { error: 'bad_request' }, 400);
-
-  // Schutz vor Spam: höchstens 3 Bewerbungen pro Tag und eine pro Stelle
-  const rlKey = `apps:${user.sub}`;
-  const recent = ((await store.get(rlKey)) || []).filter((x) => x.at > now() - 86400);
-  if (recent.length >= APPS_PER_DAY || recent.some((x) => x.job === a.job)) return json(req, env, { error: 'rate_limited' }, 429);
-
-  const title = `${clip(a.jobTitle || a.job, 80)}${a.area ? ` – ${clip(a.area, 40)}` : ''}`;
-  const profile = `https://www.roblox.com/users/${encodeURIComponent(user.sub)}/profile`;
-  const score = Number.isFinite(+a.total) && +a.total > 0 ? `${+a.score} von ${+a.total} richtig (${Math.round((+a.score / +a.total) * 100)} %)` : '–';
-  const role = user.groupRole ? `\nGruppe: ${user.groupRole.name}` : '\nNicht in der Gruppe';
-  const field = (name, value, inline = true) => ({ name, value: clip(value || '–', 1024), inline });
-  const embed = {
-    title: clip(`Neue Bewerbung: ${title}`, 256),
-    url: profile,
-    color: 0xEC0016,
-    description: clip(a.experience ? `**Erfahrung:**\n${a.experience}` : '', 3000),
-    thumbnail: user.avatar ? { url: user.avatar } : undefined,
-    fields: [
-      field('Roblox (angemeldet)', `[${user.username}](${profile}) · ${user.displayName}\nID ${user.sub}`),
-      field('Discord', clip(a.discord, 100)),
-      field('E-Mail', clip(a.email, 200)),
-      field('Spielt seit', clip(a.since, 60)),
-      field('Rang', `${clip(a.rank, 40)} (angegeben)${role}`),
-      field('Ergebnis', score),
-      field('Aktivität', a.activity ? `${+a.activity} / 10` : '–'),
-      field('Freie Tage', clip((a.days || []).join(', '), 100)),
-      field('Sprache', clip(a.lang, 10)),
-    ],
-    footer: { text: 'Train Sim Germany · Bewerbung über die Web-App' },
-    timestamp: new Date().toISOString(),
-  };
-  // Alle Fragen und Antworten als Textdatei im Anhang
-  const lines = [
-    `Bewerbung: ${title}`,
-    `Roblox: ${user.username} (${user.displayName}, ID ${user.sub}) – ${profile}`,
-    `Discord: ${clip(a.discord, 100)}`,
-    `E-Mail: ${clip(a.email, 200)}`,
-    `Spielt seit: ${clip(a.since, 60)}`,
-    `Rang (angegeben): ${clip(a.rank, 40)} · ${user.groupRole ? `Rolle in der Gruppe: ${user.groupRole.name}` : 'nicht in der Gruppe'}`,
-    `Ergebnis: ${score}`,
-    `Aktivität: ${a.activity ? `${+a.activity} / 10` : '–'} · Freie Tage: ${clip((a.days || []).join(', '), 100) || '–'}`,
-    `Sprache: ${clip(a.lang, 10)} · Gesendet: ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`,
-    '',
-    'Erfahrung:',
-    clip(a.experience, 5000) || '–',
-    '',
-    'Fragen und Antworten:',
-    ...a.answers.flatMap((x, i) => [
-      '',
-      `${i + 1}. ${x.ok === true ? '[richtig] ' : x.ok === false ? '[falsch] ' : ''}${clip(x.q, 600)}`,
-      `   ${clip(x.a, 3000).replace(/\n/g, '\n   ')}`,
-    ]),
-  ];
-  const file = `bewerbung-${user.username}-${a.job}.txt`;
-  const form = new FormData();
-  form.append('payload_json', JSON.stringify({ username: 'Train Sim Germany', allowed_mentions: { parse: [] }, embeds: [embed], attachments: [{ id: 0, filename: file }] }));
-  form.append('files[0]', new Blob([lines.join('\n')], { type: 'text/plain; charset=utf-8' }), file);
-  const res = await fetch(`${env.DISCORD_WEBHOOK_URL}${env.DISCORD_WEBHOOK_URL.includes('?') ? '&' : '?'}wait=true`, { method: 'POST', body: form });
-  if (!res.ok) {
-    console.error('Discord:', res.status, await res.text().catch(() => ''));
-    return json(req, env, { error: 'discord' }, 502);
+// Rang vor Schreibzugriffen auffrischen (höchstens alle 10 Minuten), damit Rechte aktuell sind
+async function freshUser(env, store, user) {
+  if (!user.refreshed || user.refreshed < now() - REFRESH_MINUTES * 60) {
+    await refreshUser(env, user);
+    await store.put(`user:${user.sub}`, user);
   }
-  recent.push({ job: a.job, at: now() });
-  await store.put(rlKey, recent, { ttl: 86400 });
-  return json(req, env, { ok: true });
+  return user;
+}
+const need = (user, min) => { if (!atLeast(user.rank, min)) throw Object.assign(new Error('forbidden'), { status: 403 }); };
+
+// Einstellungen für alle Geräte
+function cleanSettings(body) {
+  const ids = (v) => (Array.isArray(v) ? v : []).slice(0, 200).map((x) => clip(x, 60));
+  return {
+    theme: ['light', 'dark', 'system'].includes(body.theme) ? body.theme : 'system',
+    lang: /^(auto|[a-z]{2})$/.test(body.lang || '') ? body.lang : 'auto',
+    bell: body.bell === true,
+    remind: ids(body.remind), remindOff: ids(body.remindOff), favs: ids(body.favs),
+    updatedAt: Math.min(Date.now(), Math.round(+body.updatedAt) || Date.now()),
+  };
+}
+async function myApplications(store, user) {
+  const out = [];
+  for (const id of (user.apps || []).slice(-30)) {
+    const a = await getApplication(store, id);
+    if (a) out.push(ownView(a));
+  }
+  return out;
 }
 
 // ---------- Anfragen verteilen ----------
 export async function handle(req, env, store) {
   const url = new URL(req.url);
   const path = url.pathname.replace(/\/+$/, '') || '/';
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req, env) });
+  const m = req.method;
+  if (m === 'OPTIONS') return new Response(null, { status: 204, headers: cors(req, env) });
   try {
+    // ---------- öffentlich ----------
     if (path === '/' || path === '/health') {
-      return json(req, env, { ok: true, login: loginReady(env), applications: !!env.DISCORD_WEBHOOK_URL, push: true, group: groupId(env) });
+      return json(req, env, { ok: true, login: loginReady(env), applications: true, discord: !!env.DISCORD_WEBHOOK_URL, results: !!env.DISCORD_RESULTS_WEBHOOK_URL, push: true, group: groupId(env) });
     }
-    if (path === '/auth/session' && req.method === 'POST') return await createSession(req, env, store);
-    if (path === '/api/push/key' && req.method === 'GET') return json(req, env, { publicKey: (await vapidKeys(store)).publicKey });
-    if (path === '/api/push/reminders' && req.method === 'POST') {
+    if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
+    if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
+    const media = path.match(/^\/media\/([\w-]+)$/);
+    if (media && m === 'GET') return await mediaResponse(store, media[1]);
+    if (path === '/auth/session' && m === 'POST') return await createSession(req, env, store);
+    if (path === '/api/push/key' && m === 'GET') return json(req, env, { publicKey: (await vapidKeys(store)).publicKey });
+    if (path === '/api/push/reminders' && m === 'POST') {
       const body = await readJson(req, 60000);
       return json(req, env, await saveReminders(store, body).then((r) => ({ count: r.count })));
     }
-
     const player = path.match(/^\/api\/players\/(\d{1,20})$/);
-    if (player && req.method === 'GET') {
+    if (player && m === 'GET') {
       const user = await store.get(`user:${player[1]}`);
       if (!user || !user.privacy || !user.privacy.profile) return json(req, env, { error: 'not_found' }, 404);
       return json(req, env, { ...publicUser(user), statsPublic: !!user.privacy.stats, stats: user.privacy.stats ? user.stats || null : null });
     }
 
+    // ---------- angemeldet ----------
     const user = await authUser(req, env, store);
-    if (path === '/auth/logout' && req.method === 'POST') {
+    if (path === '/auth/logout' && m === 'POST') {
       if (user) { user.ver += 1; await store.put(`user:${user.sub}`, user); }
       return json(req, env, { ok: true });
     }
     if (!path.startsWith('/api/')) return json(req, env, { error: 'not_found' }, 404);
     if (!user) return json(req, env, { error: 'unauthorized' }, 401);
 
-    if (path === '/api/me' && req.method === 'GET') {
-      if (!user.refreshed || user.refreshed < now() - REFRESH_MINUTES * 60) {
-        await refreshUser(env, user);
-        await store.put(`user:${user.sub}`, user);
-      }
-      return json(req, env, { ...publicUser(user), privacy: user.privacy });
+    if (path === '/api/me' && m === 'GET') {
+      await freshUser(env, store, user);
+      return json(req, env, { ...publicUser(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
     }
-    if (path === '/api/me/privacy' && req.method === 'PUT') {
+    if (path === '/api/me/privacy' && m === 'PUT') {
       const body = await readJson(req, 1000);
       user.privacy = { profile: body.profile === true, stats: body.stats === true };
       await store.put(`user:${user.sub}`, user);
       return json(req, env, { privacy: user.privacy });
     }
-    if (path === '/api/applications' && req.method === 'POST') return await sendApplication(req, env, store, user);
+    if (path === '/api/me/settings' && m === 'PUT') {
+      const next = cleanSettings(await readJson(req, 20000));
+      // Nur übernehmen, wenn neuer als der gespeicherte Stand (mehrere Geräte)
+      if (!user.settings || next.updatedAt >= (user.settings.updatedAt || 0)) {
+        user.settings = next;
+        await store.put(`user:${user.sub}`, user);
+      }
+      return json(req, env, { settings: user.settings });
+    }
+
+    // Trainings (ab Supervisor)
+    if (path === '/api/trainings' && m === 'POST') {
+      need(await freshUser(env, store, user), 'Supervisor');
+      return json(req, env, await addTraining(store, user, await readJson(req, 5000)), 201);
+    }
+    const training = path.match(/^\/api\/trainings\/([\w-]+)$/);
+    if (training && m === 'DELETE') {
+      await deleteTraining(store, user, training[1]);
+      return json(req, env, { ok: true });
+    }
+
+    // Neuigkeiten, Bilder, Stellen (ab Public Relations Department)
+    if (path === '/api/news' && m === 'POST') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      return json(req, env, await addNews(store, user, await readJson(req, 20000)), 201);
+    }
+    const news = path.match(/^\/api\/news\/([\w-]+)$/);
+    if (news && m === 'DELETE') {
+      await deleteNews(store, user, news[1]);
+      return json(req, env, { ok: true });
+    }
+    if (path === '/api/media' && m === 'POST') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      const id = await saveMedia(store, req);
+      return json(req, env, { id, url: `${publicBase(req, env)}/media/${id}` }, 201);
+    }
+    const job = path.match(/^\/api\/jobs\/([a-z0-9-]+)$/);
+    if (job && m === 'PUT') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      return json(req, env, await setJob(store, user, job[1], await readJson(req, 2000)));
+    }
+
+    // Bewerbungen
+    if (path === '/api/applications' && m === 'POST') {
+      await freshUser(env, store, user);
+      const own = await submitApplication(store, env, user, await readJson(req));
+      user.apps = [...(user.apps || []), own.id].slice(-30);
+      await store.put(`user:${user.sub}`, user);
+      return json(req, env, own, 201);
+    }
+    if (path === '/api/applications' && m === 'GET') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      return json(req, env, { applications: await listApplications(store) });
+    }
+    if (path === '/api/applications/announce' && m === 'POST') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      return json(req, env, await announce(store, env, user, (await readJson(req, 5000)).ids));
+    }
+    const app = path.match(/^\/api\/applications\/([\w-]+)$/);
+    if (app && m === 'GET') {
+      const a = await getApplication(store, app[1]);
+      if (!a) return json(req, env, { error: 'not_found' }, 404);
+      if (a.sub === user.sub && !atLeast((await freshUser(env, store, user)).rank, 'Public Relations Department')) return json(req, env, ownView(a));
+      need(user, 'Public Relations Department');
+      return json(req, env, a);
+    }
+    if (app && m === 'PUT') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      return json(req, env, await setStatus(store, user, app[1], (await readJson(req, 1000)).status));
+    }
     return json(req, env, { error: 'not_found' }, 404);
   } catch (e) {
     if (e.status) return json(req, env, { error: e.message }, e.status);

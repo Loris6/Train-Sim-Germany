@@ -200,13 +200,14 @@
     return `<div class="kpi">
       <span class="kpi__label"><span class="kpi__icon">${icon(ic)}</span>${label}</span>
       <span class="kpi__value">${value}</span>
-      <span class="kpi__foot"><span class="delta ${cls}">${up ? '▲' : '▼'} ${delta}</span>${sparkline(series(seed, 12, up ? 0.04 : -0.04))}</span>
+      <span class="kpi__foot">${delta == null ? `<span class="delta delta--live"><span class="live-dot live-dot--sm"></span>${t('Live')}</span>`
+    : `<span class="delta ${cls}">${up ? '▲' : '▼'} ${delta}</span>`}${sparkline(series(seed, 12, up ? 0.04 : -0.04))}</span>
     </div>`;
   }
   function renderHomeKpis() {
     const s = D.stats;
     $('[data-kpis="home"]').innerHTML = [
-      kpi({ label: t('Spieler online'), value: `<span data-bind="online">${fmt(state.online)}</span>`, delta: `${pct(12)} <small>${t('vs. gestern')}</small>`, ic: 'fi-rr-users-alt', seed: 'on' }),
+      kpi({ label: t('Spieler online'), value: `<span data-bind="online">${fmt(state.online)}</span>`, delta: state.liveOnline ? null : `${pct(12)} <small>${t('vs. gestern')}</small>`, ic: 'fi-rr-users-alt', seed: 'on' }),
       kpi({ label: t('Aktive Server'), value: fmt(s.servers), delta: `3 <small>${t('seit 1 Std.')}</small>`, ic: 'fi-rr-database', seed: 'sv' }),
       kpi({ label: t('Züge unterwegs'), value: fmt(s.trains), delta: `${pct(8)} <small>${t('vs. gestern')}</small>`, ic: 'fi-rr-train-side', seed: 'tr' }),
       kpi({ label: t('Pünktlichkeit'), value: pct(s.punctuality, 1), delta: `${t('{n} Pkt.', { n: nf1.format(0.6) })} <small>${t('vs. gestern')}</small>`, up: false, ic: 'fi-rr-clock-three', seed: 'pu' }),
@@ -214,11 +215,15 @@
   }
   function renderStatsKpis() {
     const s = D.stats;
+    // Echte Zahlen haben keinen Vergleichswert – dort steht „Live“ statt einer Veränderung
+    const L = state.liveStats;
+    const head = $('[data-visits-delta]');
+    if (head && L) { head.className = 'delta delta--live'; head.innerHTML = `<span class="live-dot live-dot--sm"></span>${t('Live')}`; }
     $('[data-kpis="stats"]').innerHTML = [
-      kpi({ label: t('Besuche gesamt'), value: compact(s.visits), delta: pct(3.8, 1), ic: 'fi-rr-gamepad', seed: 'vi' }),
-      kpi({ label: t('Favoriten'), value: compact(s.favorites), delta: pct(1.2, 1), ic: 'fi-rr-star', seed: 'fa' }),
-      kpi({ label: t('Gruppenmitglieder'), value: compact(s.groupMembers), delta: fmt(640), ic: 'fi-rr-users-alt', seed: 'gr' }),
-      kpi({ label: 'Discord', value: compact(s.discordMembers), delta: pct(2.1, 1), ic: 'fi-brands-discord', seed: 'dc' }),
+      kpi({ label: t('Besuche gesamt'), value: compact(s.visits), delta: L ? null : pct(3.8, 1), ic: 'fi-rr-gamepad', seed: 'vi' }),
+      kpi({ label: t('Favoriten'), value: compact(s.favorites), delta: L ? null : pct(1.2, 1), ic: 'fi-rr-star', seed: 'fa' }),
+      kpi({ label: t('Gruppenmitglieder'), value: compact(s.groupMembers), delta: L ? null : fmt(640), ic: 'fi-rr-users-alt', seed: 'gr' }),
+      kpi({ label: 'Discord', value: compact(s.discordMembers), delta: L ? null : pct(2.1, 1), ic: 'fi-brands-discord', seed: 'dc' }),
       kpi({ label: t('Gefahrene km'), value: compact(s.km), delta: pct(4.4, 1), ic: 'fi-rr-route', seed: 'km' }),
       kpi({ label: t('Fahrten heute'), value: fmt(s.tripsToday), delta: pct(6), ic: 'fi-rr-train-side', seed: 'ft' }),
     ].join('');
@@ -387,7 +392,7 @@
   }
 
   function renderNews() {
-    $('[data-news]').innerHTML = D.news.slice(0, 3).map(newsCard).join('');
+    $('[data-news]').innerHTML = newsItems().slice(0, 3).map(newsCard).join('');
   }
 
   // ---------- Server ----------
@@ -400,7 +405,7 @@
   // Jede Linie aus D.lines fährt im Takt in beide Richtungen. Daraus ergeben sich die Züge, die gerade
   // unterwegs sind, und die nächsten Abfahrten an jedem Bahnhof (Demo – später live aus dem Spiel).
   const CATS = [
-    { id: 'ice', name: 'ICE' }, { id: 'ic', name: 'IC' }, { id: 'ire', name: 'IRE' },
+    { id: 'ice', name: 'ICE' }, { id: 'ec', name: 'EC' }, { id: 'ic', name: 'IC' }, { id: 'ire', name: 'IRE' },
     { id: 're', name: 'RE' }, { id: 'rb', name: 'RB' }, { id: 's', name: 'S-Bahn' },
   ];
   const CAT_ORDER = CATS.map((c) => c.id);
@@ -474,7 +479,7 @@
       if (!st.lines.includes(lineId)) st.lines.push(lineId);
     }));
     return Array.from(map.values()).map((st) => {
-      const big = /Hbf|Fernbf/.test(st.name);
+      const big = /Hbf|Fernbf|Główny|Centralna/.test(st.name);
       st.platforms = big ? Math.min(16, 4 + st.lines.length * 2) : Math.max(2, Math.min(6, st.lines.length + 1));
       st.box = big || st.lines.length >= 3;
       st.staff = [];
@@ -487,12 +492,16 @@
   // Spieler: Namen aus D.crew und erzeugte Roblox-Namen, Rollen nach festen Anteilen (Rest = Fahrgäste)
   const NAME_A = ['Lok', 'Bahn', 'Gleis', 'Signal', 'Weichen', 'Takt', 'Zug', 'Schiene', 'Express', 'Regio', 'Rail', 'Tf', 'Strecke', 'Bahnhof', 'Rangier', 'Kelle'];
   const NAME_B = ['Max', 'Lena', 'Tom', 'Mia', 'Ben', 'Emma', 'Paul', 'Lea', 'Finn', 'Noah', 'Jana', 'Luca', 'Nele', 'Timo', 'Ida', 'Ole', 'Fan', 'Profi', 'Held', 'Fuchs'];
-  const ROLE_SHARE = [['Driver', 0.34], ['Conductor', 0.14], ['Platform Staff', 0.12], ['Signaller', 0.08]];
-  const ROLE_ORDER = ['Supervisor', 'Dispatcher', 'Signaller', 'Platform Staff', 'Driver', 'Conductor', 'Passenger'];
+  // Rollen im Spiel: Ränge der Gruppe plus Fahrgäste (kein Rang)
+  const ROLE_SHARE = [['Qualified Driver', 0.24], ['Learning Driver', 0.1], ['Conductor', 0.14], ['Platform Staff', 0.12], ['Signaller', 0.08]];
+  const ROLE_ORDER = ['Supervisor', 'Signaller', 'Platform Staff', 'Qualified Driver', 'Learning Driver', 'Conductor', 'Passenger'];
   const ROLE_LABEL = {
-    Driver: 'Lokführer', Conductor: 'Zugbegleiter', 'Platform Staff': 'Bahnsteigpersonal', Signaller: 'Fahrdienstleiter',
-    Dispatcher: 'Disponent', Supervisor: 'Aufsicht', Passenger: 'Fahrgäste',
+    'Qualified Driver': 'Lokführer', 'Learning Driver': 'Lokführer in Ausbildung', Conductor: 'Zugbegleiter', 'Platform Staff': 'Bahnsteigpersonal',
+    Signaller: 'Fahrdienstleiter', Supervisor: 'Aufsicht', Passenger: 'Fahrgäste',
   };
+  const PASSENGER = { name: 'Passenger', prefix: 'FG', label: 'Fahrgast', color: '#878C96' };
+  const roleRank = (r) => (r === 'Passenger' ? PASSENGER : rankOf(r));
+  const DRIVERS = ['Qualified Driver', 'Learning Driver'];
   const playerCache = {};
   function serverPlayers(s) {
     if (playerCache[s.id]) return playerCache[s.id];
@@ -515,7 +524,7 @@
       const want = Math.max(role === 'Signaller' && n >= 6 ? 1 : 0, Math.round(n * share));
       for (let i = roles.filter((r) => r === role).length; i < want && roles.length < n; i++) roles.push(role);
     });
-    if (n >= 25 && roles.length < n) roles.push('Dispatcher');
+    if (n >= 25 && roles.length < n) roles.push('Supervisor');
     while (roles.length < n) roles.push('Passenger');
     // Gemischte Reihenfolge, die Trainingsleitung behält ihre Rolle
     const rest = names.slice(host ? 1 : 0, n).sort((x, y) => hash(x + s.id) - hash(y + s.id));
@@ -537,21 +546,21 @@
     const memo = seatMemo[s.id] || (seatMemo[s.id] = new Map());
     players.forEach((p) => { const id = memo.get(p.name); if (id && active.has(id)) p.trainId = id; });
     trains.forEach((tr) => { tr.crew = {}; tr.riders = []; });
-    const seat = (role, eligible) => {
-      const pool = players.filter((p) => p.role === role);
-      pool.forEach((p) => { if (p.trainId) active.get(p.trainId).crew[role] = p; });
+    const seat = (roles, key, eligible) => {
+      const pool = players.filter((p) => roles.includes(p.role));
+      pool.forEach((p) => { if (p.trainId) active.get(p.trainId).crew[key] = p; });
       trains.filter(eligible).sort((a, b) => a.start - b.start).forEach((tr) => {
-        if (tr.crew[role]) return;
+        if (tr.crew[key]) return;
         const free = pool.filter((p) => !p.trainId);
         if (!free.length) return;
         const p = free.reduce((best, x) => (hash(x.name + tr.id) > hash(best.name + tr.id) ? x : best));
         p.trainId = tr.id;
-        tr.crew[role] = p;
+        tr.crew[key] = p;
         memo.set(p.name, tr.id);
       });
     };
-    seat('Driver', () => true);
-    seat('Conductor', (tr) => tr.crew.Driver && tr.line.cat !== 's');
+    seat(DRIVERS, 'Driver', () => true);
+    seat(['Conductor'], 'Conductor', (tr) => tr.crew.Driver && tr.line.cat !== 's');
     const hubs = stations.slice(0, Math.min(3, stations.length));
     const boxes = stations.filter((st) => st.box);
     let staffN = 0;
@@ -572,7 +581,7 @@
         p.train = tr;
         tr.riders.push(p);
         memo.set(p.name, tr.id);
-      } else if (p.role !== 'Dispatcher' && p.role !== 'Supervisor') {
+      } else if (p.role !== 'Supervisor') {
         p.station = hubs[hash(p.name) % hubs.length];
         p.waiting = true;
       }
@@ -588,7 +597,7 @@
   function roleCounts(players) {
     const out = ROLE_ORDER.map((role) => [role, players.filter((p) => p.role === role).length]).filter(([, n]) => n);
     // Fahrgäste zuletzt
-    return out.sort((a, b) => (a[0] === 'Passenger') - (b[0] === 'Passenger') || rankIdx(a[0]) - rankIdx(b[0]));
+    return out.sort((a, b) => (a[0] === 'Passenger') - (b[0] === 'Passenger') || rankIdx(b[0]) - rankIdx(a[0]));
   }
 
   function renderServers() {
@@ -631,7 +640,7 @@
           <div class="occ__row"><span class="status status--${level}">${label}</span><b>${s.players}/${s.max}</b></div>
           <div class="bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
         </div>
-        <div class="server__roles"><span class="server__roles-title">${t('Rollen')}</span>${roleCounts(m.players).map(([r, n]) => `<span class="role-count" style="--rc:${rankOf(r).color}"><i></i><span>${esc(r)}</span><b>${n}</b></span>`).join('')}</div>
+        <div class="server__roles"><span class="server__roles-title">${t('Rollen')}</span>${roleCounts(m.players).map(([r, n]) => `<span class="role-count" style="--rc:${roleRank(r).color}"><i></i><span>${esc(r)}</span><b>${n}</b></span>`).join('')}</div>
         <dl class="server__meta">
           <div><dt>${icon('fi-rr-signal-alt-2')}Ping</dt><dd>${s.ping} ms</dd></div>
           <div><dt>${icon('fi-rr-train-side')}${t('Züge')}</dt><dd>${m.trains.length}</dd></div>
@@ -652,7 +661,7 @@
   const riders = (n) => (n === 1 ? t('1 Fahrgast') : t('{n} Fahrgäste', { n }));
   const stationBtn = (name) => `<button class="link-btn" type="button" data-station="${esc(name)}">${esc(name)}</button>`;
   const crewHtml = (p, role) => {
-    const r = rankOf(role);
+    const r = roleRank(p ? p.role : role);
     return `<span class="crew">${p ? avatar(p.name) : `<span class="crew__ai">${icon('fi-rr-gamepad')}</span>`}
       <span class="crew__text"><small>${esc(t(r.label))}</small><b>${p ? esc(p.name) : t('KI')}</b></span></span>`;
   };
@@ -680,7 +689,7 @@
       <div class="train__ends"><span>${esc(tr.from)}<b>${hhmm(tr.stops[0].dep)}</b></span><span>${esc(tr.to)}<b>${hhmm(last.arr)}</b></span></div>
       <p class="train__next">${st.phase === 'wait' ? t('Abfahrt {time}', { time: hhmm(tr.stops[0].dep + tr.delay) }) : t('Nächster Halt: {station}, {time}', { station: esc(next.name), time: hhmm(next.arr + tr.delay) })}</p>
       <div class="train__crew">
-        ${crewHtml(tr.crew.Driver, 'Driver')}
+        ${crewHtml(tr.crew.Driver, 'Qualified Driver')}
         ${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
         ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}
       </div>
@@ -688,8 +697,7 @@
     </article>`;
   }
   function playerWhere(p) {
-    if (p.role === 'Supervisor') return `${icon('fi-rr-calendar')}<span>${t('Leitet das Training')}</span>`;
-    if (p.role === 'Dispatcher') return `${icon('fi-rr-signal-alt-2')}<span>${t('Leitstelle')}</span>`;
+    if (p.role === 'Supervisor') return p.station ? `${icon('fi-rr-signal-alt-2')}<span>${t('Aufsicht im Betrieb')}</span>` : `${icon('fi-rr-calendar')}<span>${t('Leitet das Training')}</span>`;
     if (p.train) {
       return `${icon('fi-rr-train-side')}<button class="link-btn" type="button" data-trip="${esc(p.train.id)}">${lineBadge(p.train.line)}<span>${t('nach {to}', { to: esc(p.train.to) })}</span></button>`;
     }
@@ -699,7 +707,7 @@
     return `${icon('fi-rr-clock-three')}<span>${t('Wartet in')} ${stationBtn(p.station.name)}</span>`;
   }
   function playerRow(p) {
-    const r = rankOf(p.role);
+    const r = roleRank(p.role);
     return `<li class="player">
       ${avatar(p.name)}
       <div class="player__main"><b>${esc(p.name)}</b><span class="player__where">${playerWhere(p)}</span></div>
@@ -806,7 +814,7 @@
           ${roles.map(([r, n]) => `<button class="chip${state.sdRole === r ? ' is-active' : ''}" type="button" data-sd-role="${esc(r)}">${esc(r)} · ${n}</button>`).join('')}
         </div>
         ${groups.map(([r, n]) => `<section class="pgroup">
-          <h2 class="pgroup__title"><i style="--rc:${rankOf(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${n}</small></h2>
+          <h2 class="pgroup__title"><i style="--rc:${roleRank(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${n}</small></h2>
           <ul class="player-list">${m.players.filter((p) => p.role === r).map(playerRow).join('')}</ul>
         </section>`).join('')}`;
     } else {
@@ -848,7 +856,7 @@
     return `<div class="trip">
       <div class="trip__head">${lineBadge(tr.line)}<div class="train__title"><h3>${t('nach {to}', { to: esc(tr.to) })}</h3><small>${esc(tr.no)} · ${esc(tr.line.train)}</small></div>${delayHtml(tr.delay)}</div>
       <p class="train__now">${icon('fi-rr-marker')}<span>${esc(status)}</span></p>
-      ${live ? `<div class="train__crew">${crewHtml(tr.crew.Driver, 'Driver')}${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
+      ${live ? `<div class="train__crew">${crewHtml(tr.crew.Driver, 'Qualified Driver')}${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
         ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}</div>`
         : `<p class="sheet-note">${st.phase === 'done' ? t('Diese Fahrt ist beendet.') : t('Die Besatzung steht kurz vor der Abfahrt fest.')}</p>`}
       <h4 class="sheet-sub">${t('Fahrtverlauf')}</h4>
@@ -885,11 +893,37 @@
 
   // ---------- Trainings ----------
   // Der Wochenplan aus data.js wird für zwei Wochen ausgerollt.
+  // Uhrzeit (ms) → Tag und Minuten in deutscher Zeit
+  function berlinOf(ms) {
+    const p = {};
+    berlinFmt.formatToParts(new Date(ms)).forEach((x) => { p[x.type] = x.value; });
+    const day = Math.floor(Date.UTC(+p.year, +p.month - 1, +p.day) / 864e5);
+    return { day, abs: day * 1440 + (+p.hour % 24) * 60 + +p.minute };
+  }
+  // Datum und Uhrzeit in deutscher Zeit → ms (auch bei Sommer-/Winterzeit)
+  function berlinToEpoch(date, time) {
+    const [y, mo, d] = date.split('-').map(Number);
+    const [h, mi] = time.split(':').map(Number);
+    const want = Math.floor(Date.UTC(y, mo - 1, d) / 864e5) * 1440 + h * 60 + mi;
+    let guess = Date.UTC(y, mo - 1, d, h, mi);
+    for (let i = 0; i < 2; i++) guess -= (berlinOf(guess).abs - want) * 60000;
+    return guess;
+  }
+  function remoteTrainings() {
+    return (remote.trainings || []).map((x) => {
+      const b = berlinOf(x.start);
+      return {
+        id: x.id, type: x.type, title: x.title, host: x.host, hostId: x.hostId, server: x.server, slots: x.slots, taken: 0, dur: x.dur, text: x.text,
+        day: b.day, start: b.abs, end: b.abs + x.dur, time: hhmm(b.abs), req: reqFor(x.type),
+        img: (typeOf(x.type) || {}).img || 'training.svg', color: rankOf(x.type).color, remote: true,
+      };
+    });
+  }
   function trainingsList({ all = false } = {}) {
     const now = berlinNow();
     const types = myTrainingTypes();
-    const out = [];
-    for (let week = 0; week < 2; week++) {
+    const out = apiReady() ? remoteTrainings() : [];
+    for (let week = 0; week < (apiReady() ? 0 : 2); week++) {
       D.trainings.forEach((tn, i) => {
         const [hh, mm] = tn.time.split(':').map(Number);
         const day = now.day + tn.day + week * 7;
@@ -935,6 +969,16 @@
 
   function nextStepHTML(heading) {
     const next = nextRank(state.rank);
+    if (!next && canTrain()) {
+      return `<article class="promo-card">
+        <img class="promo-card__img" src="assets/img/group.svg" alt="" loading="lazy">
+        <div class="promo-card__body">
+          <${heading}>${t('Du bildest jetzt selbst aus')}</${heading}>
+          <p>${t('Als {rank} kannst du Trainings für eine Rolle anbieten – die Spieler werden auf Wunsch rechtzeitig benachrichtigt.', { rank: esc(state.rank) })}</p>
+          <button class="btn btn--primary promo-card__btn" type="button" data-open="training-new">${icon('fi-rr-plus')}${t('Training anbieten')}</button>
+        </div>
+      </article>`;
+    }
     if (!next) {
       return `<article class="promo-card">
         <img class="promo-card__img" src="assets/img/group.svg" alt="" loading="lazy">
@@ -988,7 +1032,7 @@
         </div>
         <div class="tcard__body">
           <h3>${esc(t(tn.title))}</h3>
-          <div class="tcard__row"><span>${t('{time} Uhr', { time: tn.time })}</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : ''}">${icon('fi-sr-user')}${tn.taken}/${tn.slots}</span></div>
+          <div class="tcard__row"><span>${t('{time} Uhr', { time: tn.time })}</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : ''}">${icon('fi-sr-user')}${tn.remote ? t('max. {n}', { n: tn.slots }) : `${tn.taken}/${tn.slots}`}</span></div>
         </div>
       </button>
       ${bellBtn(tn, 'tcard__bell')}
@@ -1000,7 +1044,11 @@
     const list = trainingsList();
     const me = rankOf(state.rank);
 
-    $('[data-rank-name]').textContent = me.name;
+    // Lange Rangnamen (z. B. Public Relations Department) als Kürzel, damit „Training anbieten“ daneben passt
+    const short = me.name.length > 16;
+    $('[data-rank-name]').textContent = short ? `[${me.prefix}]` : me.name;
+    $('[data-rank-name]').title = me.name;
+    $$('[data-can-train]').forEach((b) => { b.hidden = !canTrain(); });
     $('[data-bell]').setAttribute('aria-pressed', String(state.bell));
     const types = myTrainingTypes();
     $('[data-all-title]').textContent = !types ? t('Alle kommenden Trainings') : types.length ? t('Kommende {type}-Trainings', { type: types[0] }) : t('Keine weiteren Trainings');
@@ -1052,27 +1100,79 @@
   }
 
   // ---------- Neuigkeiten ----------
-  const newsDate = (n) => dtf({ day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${n.date}T00:00:00Z`));
-  function newsCard(n, i) {
-    return `<button class="ncard" type="button" data-news-open="${i}">
-      <div class="ncard__img"><img src="assets/img/${n.img}" alt="" loading="lazy">${n.video ? `<span class="ncard__play" aria-label="${esc(t('Mit Video'))}">${icon('fi-sr-play')}</span>` : ''}</div>
+  const newsDate = (n) => dtf({ day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(n.date.length > 10 ? n.date : `${n.date}T00:00:00Z`));
+  function newsCard(n) {
+    return `<button class="ncard" type="button" data-news-open="${esc(n.id)}">
+      <div class="ncard__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="ncard__play" aria-label="${esc(t('Mit Video'))}">${icon('fi-sr-play')}</span>` : ''}</div>
       <div class="ncard__body">
         <h3>${esc(t(n.title))}</h3>
-        <div class="ncard__foot"><span class="cat-tag cat-tag--${n.cat}">${esc(t(n.tag))}</span><span>${newsDate(n)}</span></div>
+        <div class="ncard__foot"><span class="cat-tag cat-tag--${n.cat}">${esc(t(n.tag || n.cat))}</span><span>${newsDate(n)}</span></div>
       </div>
     </button>`;
   }
   function renderNewsPage() {
     $$('[data-news-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.newsCat === state.newsCat)));
-    $('[data-news-feed]').innerHTML = D.news.map((n, i) => ({ n, i }))
-      .filter(({ n }) => state.newsCat === 'all' || n.cat === state.newsCat)
-      .map(({ n, i }) => newsCard(n, i)).join('');
+    $$('[data-can-pr]').forEach((b) => { b.hidden = !canPR(); });
+    const list = newsItems().filter((n) => state.newsCat === 'all' || n.cat === state.newsCat);
+    $('[data-news-feed]').innerHTML = list.length ? list.map(newsCard).join('') : `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`;
   }
 
   // ---------- Karriere ----------
-  const jobStatus = (job) => (job.open
-    ? `<span class="pill pill--ok">${icon('fi-rr-check')}${t('Offen')}</span>`
-    : `<span class="pill pill--bad">${t('Geschlossen')}</span>`);
+  // Stelle offen? Mit Backend legt das Public Relations Department das fest (auch mit Zeitraum), sonst data.js
+  const jobState = (job) => (apiReady() ? remote.jobs[job.id] || null : null);
+  function jobOpen(job, at = Date.now()) {
+    const s = jobState(job);
+    if (!s) return job.open;
+    if (s.from && at < s.from) return false;
+    if (s.to && at > s.to) return false;
+    return s.open !== false || !!(s.closedAt && at < s.closedAt);
+  }
+  const fmtWhen = (ms) => new Intl.DateTimeFormat(locale, { timeZone: 'Europe/Berlin', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(ms);
+  function jobStatus(job) {
+    const s = jobState(job);
+    if (jobOpen(job)) return `<span class="pill pill--ok">${icon('fi-rr-check')}${s && s.to ? t('Offen bis {date}', { date: fmtWhen(s.to) }) : t('Offen')}</span>`;
+    if (s && s.from && Date.now() < s.from && s.open !== false) return `<span class="pill pill--warn">${icon('fi-rr-clock-three')}${t('Öffnet am {date}', { date: fmtWhen(s.from) })}</span>`;
+    return `<span class="pill pill--bad">${t('Geschlossen')}</span>`;
+  }
+  // Wer angefangen hat, als die Stelle offen war, darf noch absenden (12 Stunden lang)
+  const applyStarts = () => store.get('tsg-apply-start', {});
+  const startedRecently = (job) => { const ts = applyStarts()[job.id]; return !!ts && Date.now() - ts < 12 * 3600000 && jobOpen(job, ts); };
+  function markApplyStart(job) {
+    const all = applyStarts();
+    if (!startedRecently(job)) { all[job.id] = Date.now(); store.set('tsg-apply-start', all); }
+  }
+  // Zeit (ms) ↔ Feld „Datum und Uhrzeit“ in deutscher Zeit
+  const toLocalInput = (ms) => { if (!ms) return ''; const b = berlinOf(ms); return `${dateOf(b.day).toISOString().slice(0, 10)}T${hhmm(b.abs)}`; };
+  const fromLocalInput = (v) => (v ? berlinToEpoch(v.slice(0, 10), v.slice(11, 16)) : null);
+  function jobAdmin(job) {
+    if (!canPR()) return '';
+    const s = jobState(job) || {};
+    const open = s.open !== undefined ? s.open !== false : job.open;
+    return `<section class="cbox admin-box">
+      <h3>${icon('fi-rr-settings')}${t('Verwaltung')}<small>Public Relations</small></h3>
+      <form class="cform" data-job-admin="${esc(job.id)}" novalidate>
+        <label class="toggle"><span class="toggle__text"><b>${t('Bewerbungen offen')}</b><small>${t('Aus = sofort geschlossen. Wer gerade schreibt, kann trotzdem noch absenden.')}</small></span>
+          <input type="checkbox" role="switch" name="open"${open ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+        <div class="cform__row">
+          <div class="f"><label class="f__label" for="ja-from">${t('Offen ab (optional)')}</label><input id="ja-from" name="from" type="datetime-local" value="${toLocalInput(s.from)}"></div>
+          <div class="f"><label class="f__label" for="ja-to">${t('Offen bis (optional)')}</label><input id="ja-to" name="to" type="datetime-local" value="${toLocalInput(s.to)}"></div>
+        </div>
+        <p class="f__hint">${t('Deutsche Zeit. Nach dem Ende schließt die Stelle von selbst – wer vorher angefangen hat, kann noch absenden.')}</p>
+        <button class="btn btn--primary" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+        ${s.updatedBy ? `<p class="sheet-note">${t('Zuletzt geändert von {name}', { name: esc(s.updatedBy) })}</p>` : ''}
+      </form>
+    </section>`;
+  }
+  async function saveJobAdmin(form) {
+    const f = new FormData(form);
+    const body = { open: !!f.get('open'), from: fromLocalInput(f.get('from')), to: fromLocalInput(f.get('to')) };
+    if (body.from && body.to && body.to <= body.from) { toast(t('„Offen bis“ muss nach „Offen ab“ liegen.')); return; }
+    try {
+      await api(`/api/jobs/${encodeURIComponent(form.dataset.jobAdmin)}`, { method: 'PUT', body });
+      toast(t('Gespeichert'));
+      await loadContent();
+    } catch (e) { toast(errorText(e)); }
+  }
   const SINCE = ['Weniger als 1 Monat', '1–3 Monate', '3–6 Monate', '6–12 Monate', 'Mehr als 1 Jahr'];
   const SECTORS = [
     { title: 'Über dich', text: 'Damit wir dich im Spiel, auf Discord und per E-Mail erreichen.' },
@@ -1114,9 +1214,10 @@
   function quizGroups(job, area) {
     const Q = qbank();
     if (!job.areas) return [{ key: 'job', items: Q.jobs[job.id] }];
-    const ofArea = (a) => ({ key: a, title: a, color: rankOf(a).color, items: Q.areas[a] });
+    // Fragenkatalog: der Bereich Qualified Driver heißt dort „Driver“
+    const ofArea = (a) => ({ key: a, title: a, color: rankOf(a).color, items: Q.areas[a === 'Qualified Driver' ? 'Driver' : a] });
     return area === 'Signaller'
-      ? [ofArea('Signaller'), ofArea('Driver')]
+      ? [ofArea('Signaller'), ofArea('Qualified Driver')]
       : [ofArea(area), { key: 'basics', title: t('Bahnbetrieb allgemein'), color: 'var(--muted)', items: Q.basics }];
   }
   // Sektor 3 (20): drei feste Fragen, dann Supervisor-Fragen bzw. allgemeine und stellenbezogene Fragen
@@ -1256,25 +1357,30 @@
     </a>`;
   }
   function careerList() {
-    const open = D.jobs.filter((x) => x.open).length;
+    const open = D.jobs.filter((x) => jobOpen(x)).length;
+    const fresh = review.list ? review.list.filter((a) => a.status === 'new').length : 0;
     return `<div class="cbox">
         <h2>${t('Werde Teil <em>unseres Teams</em>')}</h2>
         <p class="lead">${t('Die <strong>Train Sim Germany</strong> Community sucht motivierte Mitglieder, die unser virtuelles Bahnnetz erweitern und verbessern. Entdecke die offenen Stellen und finde die Rolle, die zu dir passt.')}</p>
       </div>
+      ${canPR() ? `<a class="btn-line btn-line--outline review-link" href="#/karriere/pruefen">${icon('fi-rr-document')}${t('Bewerbungen prüfen')}${fresh ? `<span class="count-badge">${t('{n} neu', { n: fresh })}</span>` : ''}</a>` : ''}
       <div class="career-list-head"><h2>${t('Offene Stellen')}</h2><span>${t('{a} von {b} offen', { a: open, b: D.jobs.length })}</span></div>
       <div class="job-list">${D.jobs.map(jobCard).join('')}</div>`;
   }
   function careerDetail(job) {
     const app = state.applications[job.id];
     let action;
+    const st = jobState(job);
     if (app) {
       action = `<div class="note note--ok">${icon('fi-rr-check-circle')}<span>${t('Du hast dich am {date} beworben.', { date: fmtDate(app.at) })}${app.area ? ` (${esc(t('Bereich {area}', { area: app.area }))})` : ''} ${t('Wir melden uns über Discord bei <b>{name}</b>.', { name: esc(app.discord) })}</span></div>
-        <button class="btn-text" type="button" data-apply-reset="${job.id}">${t('Bewerbung zurückziehen')}</button>`;
-    } else if (!job.open) {
-      action = `<div class="note note--bad">${icon('fi-rr-info')}<span>${t('Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.')}</span></div>
+        <a class="btn-line" href="#/karriere/${job.id}/bewerbung">${icon('fi-rr-document')}${t('Deine Bewerbung ansehen')}</a>`;
+    } else if (!jobOpen(job)) {
+      const soon = st && st.from && Date.now() < st.from && st.open !== false;
+      action = `<div class="note note--bad">${icon('fi-rr-info')}<span>${soon ? t('Bewerbungen sind ab {date} möglich.', { date: fmtWhen(st.from) }) : t('Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.')}</span></div>
         <a class="btn-line btn-line--outline" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}${t('Zum Discord')}</a>`;
     } else {
-      action = `<a class="btn-line" href="#/karriere/${job.id}/bewerben">${icon('fi-rr-briefcase')}${t('Jetzt bewerben')}</a>`;
+      action = `<a class="btn-line" href="#/karriere/${job.id}/bewerben">${icon('fi-rr-briefcase')}${t('Jetzt bewerben')}</a>
+        ${st && st.to ? `<p class="f__note">${t('Bewerbungen sind bis {date} möglich.', { date: fmtWhen(st.to) })}</p>` : ''}`;
     }
     const list = (items) => `<ul>${items.map((x) => `<li>${icon('fi-rr-check-circle')}<span>${esc(t(x))}</span></li>`).join('')}</ul>`;
     const areas = job.areas
@@ -1290,7 +1396,8 @@
       ${areas}
       <hr>
       <div class="cbox__action">${action}</div>
-    </article>`;
+    </article>
+    ${jobAdmin(job)}`;
   }
   function quizHtml(job, area) {
     if (job.areas && !area) {
@@ -1304,7 +1411,7 @@
     const any = job.areas.some((a) => mine >= rankIdx(a));
     return `<div class="areas">${job.areas.map((a) => {
       const ok = mine >= rankIdx(a);
-      const covers = a === 'Signaller' ? t('Signaller + alle Driver-Fragen') : t('{area} + Bahnbetrieb allgemein', { area: a });
+      const covers = a === 'Signaller' ? t('Signaller + alle Qualified-Driver-Fragen') : t('{area} + Bahnbetrieb allgemein', { area: a });
       return `<label class="area${ok ? '' : ' is-locked'}" style="--rc:${rankOf(a).color}"${ok ? '' : ` title="${esc(t('Du brauchst mindestens den Rang {rank}.', { rank: a }))}"`}>
           ${ok ? '' : `<span class="area__lock">${icon('fi-rr-info')}${t('Ab Rang {rank}', { rank: esc(a) })}</span>`}
           <input type="radio" name="area" value="${esc(a)}"${ok ? '' : ' disabled'}${ok && a === chosen ? ' checked' : ''}>
@@ -1313,7 +1420,7 @@
     }).join('')}</div>
       <span class="f__hint">${any
         ? t('Du kannst dich für jeden Bereich bis zu deinem Rang bewerben (gerade: <b>{rank}</b>).', { rank: esc(rank) })
-        : t('Für den Supervisor brauchst du mindestens den Rang Driver.')}</span>`;
+        : t('Für den Supervisor brauchst du mindestens den Rang Qualified Driver.')}</span>`;
   }
   function sectorHead(i) {
     const s = SECTORS[i];
@@ -1321,7 +1428,7 @@
       <p class="sector__text">${t(s.text)}</p>`;
   }
   function careerApply(job) {
-    const rankOpts = RANKS.filter((r) => r.name !== 'Management')
+    const rankOpts = RANKS
       .map((r) => `<option value="${esc(r.name)}"${r.name === state.rank ? ' selected' : ''}>${esc(r.name)} · ${esc(t(r.label))}</option>`).join('');
     const areaPicker = job.areas ? `<fieldset class="f" ${dataField('area')}>
         <legend class="f__label">${t('In welchem Bereich möchtest du Trainings leiten?')}</legend>
@@ -1360,25 +1467,39 @@
       </form>`;
   }
   function careerDone(job, app) {
+    const status = app.status === 'passed' ? `<div class="note note--ok">${icon('fi-rr-trophy')}<span>${t('Bestanden – herzlichen Glückwunsch! Alles Weitere erfährst du auf Discord.')}</span></div>`
+      : app.status === 'failed' ? `<div class="note note--bad">${icon('fi-rr-info')}<span>${t('Diesmal leider nicht bestanden. Du kannst dich später noch einmal bewerben.')}</span></div>` : '';
     const rows = [[t('Stelle'), t(job.title)], ...(app.area ? [[t('Bereich'), app.area]] : []), [t('Rang'), app.rank], ['Discord', app.discord],
       ...(app.email ? [[t('E-Mail'), app.email]] : []), [t('Fragen'), t('{n} beantwortet', { n: app.count || QUESTIONS_TOTAL })], [t('Gesendet'), fmtDate(app.at)]];
     return `<div class="cbox done">
       <span class="done__ic">${icon('fi-rr-check')}</span>
       <h2>${t('Bewerbung <em>gesendet</em>')}</h2>
       <p class="lead">${t('Danke, {name}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen über Discord.', { name: esc(app.roblox) })}</p>
+      ${status}
       <dl class="done__list">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-      <a class="btn-line btn-line--outline" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Zurück zu den Jobs')}</a>
+      <a class="btn-line btn-line--outline" href="#/karriere/${job.id}">${icon('fi-rr-arrow-left')}${t('Zurück zur Stelle')}</a>
       ${app.sent ? `<p class="f__note">${t('Die Bewerbung ist beim Team angekommen. Zurückziehen kannst du sie über Discord.')}</p>`
         : `<button class="btn-text" type="button" data-apply-reset="${job.id}">${t('Bewerbung zurückziehen')}</button>`}
     </div>`;
   }
   function renderCareer() {
-    const job = D.jobs.find((x) => x.id === state.jobId);
-    if (job && state.jobApply && !job.open && !state.applications[job.id]) state.jobApply = false;
     const el = $('[data-career]');
+    if (state.jobId === 'pruefen') {
+      el.innerHTML = canPR() ? (state.reviewId ? reviewDetail() : reviewList())
+        : `<div class="cbox"><p class="lead">${t('Bewerbungen prüfen kann das Public Relations Department und höher, wenn es mit Roblox angemeldet ist.')}</p>
+          <a class="btn-line btn-line--outline" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Zurück zu den Jobs')}</a></div>`;
+      ensureReviewData();
+      return;
+    }
+    const job = D.jobs.find((x) => x.id === state.jobId);
+    const app = job && state.applications[job.id];
+    // „Jetzt bewerben“ nach dem Schließen: zurück zur Stelle (wer schon angefangen hat, darf weiterschreiben)
+    if (job && state.jobApply && !app && !jobOpen(job) && !startedRecently(job)) state.jobApply = false;
+    if (canPR() && !review.list) ensureReviewData();
     if (!job) el.innerHTML = careerList();
+    else if (state.jobView === 'mine' && app) el.innerHTML = careerDone(job, app);
     else if (!state.jobApply) el.innerHTML = careerDetail(job);
-    else if (state.applications[job.id]) el.innerHTML = careerDone(job, state.applications[job.id]);
+    else if (app) el.innerHTML = careerDone(job, app);
     else if (!questionsReady()) {
       el.innerHTML = `<div class="cbox"><p class="lead">${t('Die Fragen werden geladen …')}</p></div>`;
       loadQuestions()
@@ -1386,6 +1507,7 @@
         .catch(() => { el.innerHTML = `<div class="cbox"><p class="lead">${t('Die Fragen konnten nicht geladen werden. Prüfe deine Verbindung und lade die Seite neu.')}</p></div>`; });
     } else {
       state.quizAnswers = {};
+      markApplyStart(job);
       el.innerHTML = careerApply(job);
       updateSectors($('form[data-apply]', el));
     }
@@ -1402,7 +1524,7 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(val('email'))) errors.email = t('Bitte gib eine gültige E-Mail-Adresse ein, z. B. name@beispiel.de.');
     if (!val('since')) errors.since = t('Bitte wähle aus, seit wann du spielst.');
     if (job.areas && !form.querySelector('input[name="area"]:checked')) {
-      errors.area = job.areas.some((a) => rankIdx(val('rank')) >= rankIdx(a)) ? t('Bitte wähle einen Bereich.') : t('Für den Supervisor brauchst du mindestens den Rang Driver.');
+      errors.area = job.areas.some((a) => rankIdx(val('rank')) >= rankIdx(a)) ? t('Bitte wähle einen Bereich.') : t('Für den Supervisor brauchst du mindestens den Rang Qualified Driver.');
     }
     $$('[data-q]', form).forEach((q) => {
       const type = q.dataset.q;
@@ -1582,9 +1704,11 @@
           body: {
             job: id, jobTitle: job.title, area: app.area, discord: app.discord, email: app.email, since: app.since, rank: app.rank,
             experience: app.experience, activity: app.activity, days: app.days, score, total, lang, answers: report,
+            count: questions.length, startedAt: applyStarts()[id] || Date.now(),
           },
-        });
+        }).then((own) => Object.assign(app, { id: own.id, status: own.status }));
         app.sent = true;
+        review.at = 0;
       } catch (e) {
         btn.disabled = false;
         btn.innerHTML = label;
@@ -1673,13 +1797,15 @@
 
   // ---------- Einstellungen ----------
   const themeMode = () => document.documentElement.getAttribute('data-theme') || 'system';
-  function setTheme(mode) {
+  function setTheme(mode, { quiet = false } = {}) {
     try {
       if (mode === 'system') localStorage.removeItem('tsg-theme'); else localStorage.setItem('tsg-theme', mode);
     } catch (e) { /* Speicher nicht verfügbar */ }
     if (mode === 'system') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', mode);
-    renderSettings();
+    if (state.page === 'einstellungen') renderSettings();
+    if (quiet) return;
+    settingsChanged();
     toast(mode === 'system' ? t('Darstellung folgt jetzt deinem Gerät') : t('Darstellung: {mode}', { mode: mode === 'dark' ? t('Dunkel') : t('Hell') }));
   }
   // Sprache wählen: 'auto' (Gerätesprache) oder ein Sprachcode
@@ -1690,7 +1816,7 @@
     }
     const ok = code === 'de' || (window.TSG_I18N && window.TSG_I18N[code]);
     if (!ok && !start) { toast(t('Diese Sprache ist gerade nicht erreichbar.')); return; }
-    if (!start) store.set('tsg-lang', setting);
+    if (!start) { store.set('tsg-lang', setting); settingsChanged(); }
     lang = ok ? code : 'de';
     dict = lang === 'de' ? {} : window.TSG_I18N[lang];
     setLocale();
@@ -1954,7 +2080,7 @@
         try {
           const r = await api('/auth/session', { method: 'POST', body: { id_token: tok.id_token } });
           store.set('tsg-session', r.session);
-          if (r.privacy) store.set('tsg-privacy', r.privacy);
+          applyMe(r);
         } catch (e) { /* Backend nicht erreichbar: Login gilt trotzdem in der App */ }
       }
       return 'ok';
@@ -1964,15 +2090,15 @@
   }
 
   // ---------- Rang aus der Roblox-Gruppe ----------
-  // Rolle → Rang über das Kürzel („[D] Driver“, „SG | Signaller“) oder den Namen („Platform Staff“).
-  // Nicht in der Gruppe = Guest [G]. Unbekannte Rolle in der Gruppe = Passenger.
+  // Rolle → Rang über das Kürzel („[QD] Qualified Driver“, „[J-SV] Junior Supervisor“) oder den Namen.
+  // Nicht in der Gruppe = Guest [G]. Unbekannte Rolle in der Gruppe = Learning Driver.
   function rankFromRole(role) {
     if (!role) return 'Guest';
     const name = String(role.name || '').toLowerCase();
-    const prefix = (name.match(/^\s*\[?\s*([a-z]{1,3})\s*[\]|:\-]/) || [])[1];
+    const prefix = ((name.match(/^\s*\[\s*([^\]]+?)\s*\]/) || name.match(/^\s*([a-z-]{1,5})\s*[|:]/) || [])[1] || '').replace(/\s+/g, '');
     const byPrefix = prefix && RANKS.find((r) => r.prefix.toLowerCase() === prefix);
     const byName = RANKS.slice().sort((x, y) => y.name.length - x.name.length).find((r) => name.includes(r.name.toLowerCase()));
-    return (byPrefix || byName || rankOf('Passenger')).name;
+    return (byPrefix || byName || rankOf('Learning Driver')).name;
   }
   // Rolle öffentlich bei Roblox abfragen (über den Proxy aus data.js, Roblox selbst erlaubt das nicht aus dem Browser)
   async function syncGroupRank({ force = false } = {}) {
@@ -2006,12 +2132,13 @@
   const API = String(CFG.api || '').trim().replace(/\/+$/, '');
   const apiReady = () => !!API;
   const sessionToken = () => store.get('tsg-session', null);
-  async function api(path, { method = 'GET', body } = {}) {
+  async function api(path, { method = 'GET', body, raw, type } = {}) {
     const headers = {};
     const token = sessionToken();
     if (token) headers.Authorization = `Bearer ${token}`;
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const res = await fetch(API + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+    if (raw) headers['Content-Type'] = type;
+    const res = await fetch(API + path, { method, headers, body: raw || (body === undefined ? undefined : JSON.stringify(body)) });
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 && token) store.set('tsg-session', null);
     if (!res.ok) throw Object.assign(new Error(data.error || 'api'), { status: res.status });
@@ -2020,9 +2147,26 @@
   async function loadMe() {
     if (!apiReady() || !sessionToken()) return;
     try {
-      const me = await api('/api/me');
-      if (me.privacy) store.set('tsg-privacy', me.privacy);
+      applyMe(await api('/api/me'));
+      safeRender();
     } catch (e) { /* offline */ }
+  }
+  function applyMe(me) {
+    if (me.privacy) store.set('tsg-privacy', me.privacy);
+    // Rang aus der Gruppe, vom Backend geprüft
+    if (me.rank && state.profile && state.profile.oauth) {
+      store.set('tsg-group', { userId: state.profile.userId, role: me.groupRole || null, rank: me.rank, at: Date.now() });
+      applyGroupRank();
+    }
+    // Eigene Bewerbungen (auch von anderen Geräten)
+    (me.applications || []).forEach((a) => {
+      const old = state.applications[a.job];
+      if (!old || old.at <= a.at) state.applications[a.job] = { ...(old || {}), ...a, sent: true };
+    });
+    store.set('tsg-applications', state.applications);
+    // Einstellungen: neuerer Stand gewinnt
+    if (me.settings && (me.settings.updatedAt || 0) > settingsAt()) applySettings(me.settings);
+    else if (!me.settings || settingsAt() > (me.settings.updatedAt || 0)) pushSettings();
   }
   function signedOut(msg) {
     store.set('tsg-session', null);
@@ -2034,6 +2178,415 @@
     RENDER[state.page]();
     refreshModal();
     if (msg) toast(msg);
+  }
+
+  // Neu zeichnen, ohne offene Formulare (Bewerbung, Training, Neuigkeit) zu stören
+  function safeRender() {
+    renderMe();
+    if (!(state.page === 'karriere' && state.jobApply)) RENDER[state.page]();
+    if (modalView && !['training-new', 'news-new'].includes(modalView.name)) refreshModal();
+    bind();
+  }
+  const errorText = (e) => (e.status === 403 ? t('Dafür fehlt dir der Rang.')
+    : e.status === 401 ? t('Bitte melde dich erneut mit Roblox an.')
+      : e.status === 413 ? t('Die Datei ist zu groß.')
+        : e.status === 409 ? t('Diese Stelle ist inzwischen geschlossen.')
+          : t('Das hat nicht geklappt. Bitte versuch es noch einmal.'));
+
+  // ---------- Rechte (aus der Rolle in der Roblox-Gruppe, das Backend prüft sie noch einmal) ----------
+  const isMine = (id) => !!(state.profile && state.profile.oauth && String(state.profile.userId) === String(id));
+  const canBackend = () => apiReady() && !!sessionToken() && state.rankFromGroup;
+  const canTrain = () => canBackend() && rankIdx(state.rank) >= rankIdx('Supervisor');
+  const canPR = () => canBackend() && rankIdx(state.rank) >= rankIdx('Public Relations Department');
+
+  // ---------- Inhalte aus dem Backend: Trainings, Neuigkeiten, Stellen ----------
+  const remote = { trainings: null, news: null, jobs: {} };
+  if (apiReady()) {
+    const c = store.get('tsg-content', null);
+    if (c) Object.assign(remote, { trainings: c.trainings || [], news: c.news || [], jobs: c.jobs || {} });
+  }
+  async function loadContent({ render = true } = {}) {
+    if (!apiReady()) return;
+    try {
+      const c = await api('/api/content');
+      Object.assign(remote, { trainings: c.trainings || [], news: c.news || [], jobs: c.jobs || {} });
+      store.set('tsg-content', c);
+      if (render) safeRender();
+    } catch (e) { /* offline: letzter Stand bleibt */ }
+  }
+
+  // ---------- Trainings anbieten (ab Supervisor) ----------
+  const TRAINING_TYPES = D.trainingTypes.map((x) => x.name);
+  function trainingForm() {
+    if (!canTrain()) return `<p class="muted">${t('Trainings anbieten können Supervisor und höher, wenn sie mit Roblox angemeldet sind.')}</p>`;
+    const today = dateOf(berlinNow().day).toISOString().slice(0, 10);
+    return `<form class="cform" data-training-new novalidate>
+      <fieldset class="f"><legend class="f__label">${t('Für welche Rolle? (genau eine)')}</legend>
+        <div class="role-pick">${TRAINING_TYPES.map((r, i) => `<label class="role-pick__opt" style="--rc:${rankOf(r).color}">
+          <input type="radio" name="type" value="${esc(r)}"${i ? '' : ' checked'}><span><i></i>[${esc(rankOf(r).prefix)}] ${esc(r)}</span></label>`).join('')}</div>
+      </fieldset>
+      <div class="f"><label class="f__label" for="tn-title">${t('Titel')}</label><input id="tn-title" name="title" maxlength="80" placeholder="${esc(t('z. B. Stellwerk Magdeburg Hbf'))}"></div>
+      <div class="cform__row">
+        <div class="f"><label class="f__label" for="tn-date">${t('Datum')}</label><input id="tn-date" name="date" type="date" min="${today}" value="${today}"></div>
+        <div class="f"><label class="f__label" for="tn-time">${t('Uhrzeit (deutsche Zeit)')}</label><input id="tn-time" name="time" type="time" value="18:00"></div>
+      </div>
+      <div class="cform__row">
+        <div class="f"><label class="f__label" for="tn-dur">${t('Dauer')}</label><div class="select"><select id="tn-dur" name="dur">${[30, 45, 60, 90, 120].map((m) => `<option value="${m}"${m === 60 ? ' selected' : ''}>${t('{m} Min.', { m })}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
+        <div class="f"><label class="f__label" for="tn-slots">${t('Plätze')}</label><input id="tn-slots" name="slots" type="number" inputmode="numeric" min="1" max="50" value="12"></div>
+      </div>
+      <div class="f"><label class="f__label" for="tn-server">${t('Server')}</label><div class="select"><select id="tn-server" name="server">${D.servers.map((x) => `<option${x.type === 'training' ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
+      <div class="f"><label class="f__label" for="tn-text">${t('Beschreibung (optional)')}</label><textarea id="tn-text" name="text" maxlength="500" rows="3" placeholder="${esc(t('Was lernen die Teilnehmer?'))}"></textarea></div>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-plus')}${t('Training anbieten')}</button>
+      <p class="sheet-note">${t('Löschen kannst du nur deine eigenen Trainings.')}</p>
+    </form>`;
+  }
+  async function submitTraining(form) {
+    const f = new FormData(form);
+    if (!f.get('date') || !f.get('time')) { toast(t('Bitte Datum und Uhrzeit angeben.')); return; }
+    const start = berlinToEpoch(f.get('date'), f.get('time'));
+    if (start < Date.now()) { toast(t('Der Termin liegt in der Vergangenheit.')); return; }
+    const btn = $('button[type="submit"]', form);
+    btn.disabled = true;
+    try {
+      await api('/api/trainings', { method: 'POST', body: {
+        type: f.get('type'), title: f.get('title').trim(), start, dur: +f.get('dur'), slots: +f.get('slots'), server: f.get('server'), text: f.get('text').trim(),
+      } });
+      closeModal();
+      toast(t('Training angeboten'));
+      await loadContent();
+    } catch (e) {
+      btn.disabled = false;
+      toast(errorText(e));
+    }
+  }
+  async function deleteTraining(id) {
+    if (!window.confirm(t('Dieses Training wirklich löschen?'))) return;
+    try {
+      await api(`/api/trainings/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      closeModal();
+      toast(t('Training gelöscht'));
+      await loadContent();
+    } catch (e) { toast(errorText(e)); }
+  }
+
+  // ---------- Neuigkeiten erstellen (ab Public Relations Department) ----------
+  const NEWS_BUTTONS = {
+    discord: { name: 'Discord', icon: 'fi-brands-discord', label: 'Auf Discord diskutieren', url: () => D.links.discord },
+    youtube: { name: 'YouTube', icon: 'fi-brands-youtube', label: 'Auf YouTube ansehen', url: () => '' },
+    roblox: { name: 'Roblox', icon: 'fi-sr-play', label: 'Jetzt spielen', url: () => D.links.play },
+    link: { name: 'Weiterleitung (Link)', icon: 'fi-rr-arrow-up-right-from-square', label: 'Mehr erfahren', url: () => '' },
+  };
+  const newsBtnRow = () => `<div class="nbtn-row" data-nbtn>
+      <div class="select"><select name="btype" aria-label="${esc(t('Art des Buttons'))}">${Object.entries(NEWS_BUTTONS).map(([k, b]) => `<option value="${k}">${esc(t(b.name))}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div>
+      <input name="blabel" maxlength="40" placeholder="${esc(t('Text, z. B. {label}', { label: t(NEWS_BUTTONS.discord.label) }))}" value="${esc(t(NEWS_BUTTONS.discord.label))}">
+      <input name="burl" type="url" inputmode="url" placeholder="https://…" value="${esc(D.links.discord)}">
+      <button class="round-btn" type="button" data-nbtn-del aria-label="${esc(t('Button entfernen'))}">${icon('fi-rr-cross-small')}</button>
+    </div>`;
+  function newsForm() {
+    if (!canPR()) return `<p class="muted">${t('Neuigkeiten schreiben kann das Public Relations Department und höher, wenn es mit Roblox angemeldet ist.')}</p>`;
+    return `<form class="cform" data-news-new novalidate>
+      <div class="f"><label class="f__label" for="nw-title">${t('Titel')}</label><input id="nw-title" name="title" maxlength="120"></div>
+      <div class="f"><label class="f__label" for="nw-text">${t('Text')}</label><textarea id="nw-text" name="text" maxlength="4000" rows="5"></textarea></div>
+      <div class="cform__row">
+        <fieldset class="f"><legend class="f__label">${t('Kategorie')}</legend><div class="seg">${[['update', t('Update')], ['event', t('Event')], ['community', t('Community')]]
+          .map(([v, l], i) => `<label><input type="radio" name="cat" value="${v}"${i ? '' : ' checked'}><span>${l}</span></label>`).join('')}</div></fieldset>
+        <div class="f"><label class="f__label" for="nw-tag">${t('Tag')}</label><input id="nw-tag" name="tag" maxlength="30" placeholder="${esc(t('z. B. Update 2.6'))}"></div>
+      </div>
+      <fieldset class="f"><legend class="f__label">${t('Foto oder Video? (Pflicht)')}</legend>
+        <div class="seg seg--big">
+          <label><input type="radio" name="media" value="image"><span>${icon('fi-rr-picture')}${t('Foto')}</span></label>
+          <label><input type="radio" name="media" value="video"><span>${icon('fi-sr-play')}${t('Video')}</span></label>
+        </div>
+        <div class="media-in" data-media-in="image" hidden>
+          <label class="upload"><input type="file" name="file" accept="image/*"><span data-upload-label>${icon('fi-rr-picture')}${t('Foto auswählen')}</span></label>
+          <img class="upload__preview" data-upload-preview alt="" hidden>
+          <input name="imageUrl" type="url" inputmode="url" placeholder="${esc(t('oder Link zu einem Bild (https://…)'))}">
+        </div>
+        <div class="media-in" data-media-in="video" hidden>
+          <input name="videoUrl" type="url" inputmode="url" placeholder="${esc(t('YouTube-Link oder Link zu einer .mp4-Datei'))}">
+        </div>
+      </fieldset>
+      <fieldset class="f"><legend class="f__label">${t('Buttons (höchstens 2)')}</legend>
+        <div class="nbtns" data-nbtns></div>
+        <button class="btn-text" type="button" data-nbtn-add>${icon('fi-rr-plus')}${t('Button hinzufügen')}</button>
+      </fieldset>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Veröffentlichen')}</button>
+      <p class="sheet-note">${t('Löschen kannst du nur deine eigenen Neuigkeiten.')}</p>
+    </form>`;
+  }
+  // Foto verkleinern (höchstens 1600 px, JPEG), damit es schnell lädt
+  async function shrinkImage(file, max = 1600) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = url; });
+      const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      return await new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.82));
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+  async function submitNews(form) {
+    const f = new FormData(form);
+    const title = f.get('title').trim();
+    const text = f.get('text').trim();
+    const kind = f.get('media');
+    if (!title || !text) { toast(t('Bitte Titel und Text ausfüllen.')); return; }
+    if (!kind) { toast(t('Bitte angeben, ob es ein Foto oder ein Video ist.')); return; }
+    const buttons = $$('[data-nbtn]', form).map((row) => ({
+      type: $('[name="btype"]', row).value, label: $('[name="blabel"]', row).value.trim(), url: $('[name="burl"]', row).value.trim(),
+    }));
+    if (buttons.some((b) => !/^https?:\/\//.test(b.url))) { toast(t('Jeder Button braucht einen Link (https://…).')); return; }
+    const btn = $('button[type="submit"]', form);
+    btn.disabled = true;
+    try {
+      const media = { type: kind };
+      if (kind === 'image') {
+        const file = f.get('file');
+        if (file && file.size) {
+          btn.textContent = t('Foto wird hochgeladen …');
+          const up = await api('/api/media', { method: 'POST', raw: await shrinkImage(file), type: 'image/jpeg' });
+          Object.assign(media, { url: up.url, mediaId: up.id });
+        } else media.url = f.get('imageUrl').trim();
+      } else media.url = f.get('videoUrl').trim();
+      if (!media.url) throw Object.assign(new Error('media'), { status: 400, msg: kind === 'image' ? t('Bitte ein Foto auswählen oder einen Bild-Link angeben.') : t('Bitte einen Video-Link angeben.') });
+      await api('/api/news', { method: 'POST', body: { title, text, cat: f.get('cat'), tag: f.get('tag').trim(), media, buttons } });
+      closeModal();
+      toast(t('Neuigkeit veröffentlicht'));
+      await loadContent();
+    } catch (e) {
+      btn.disabled = false;
+      btn.innerHTML = `${icon('fi-rr-paper-plane')}${t('Veröffentlichen')}`;
+      toast(e.msg || (e.message === 'video_url' ? t('Das ist kein YouTube- oder Video-Link.') : errorText(e)));
+    }
+  }
+  async function deleteNews(id) {
+    if (!window.confirm(t('Diese Neuigkeit wirklich löschen?'))) return;
+    try {
+      await api(`/api/news/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      closeModal();
+      toast(t('Neuigkeit gelöscht'));
+      await loadContent();
+    } catch (e) { toast(errorText(e)); }
+  }
+  // Neuigkeiten: mit Backend die echten, sonst die Beispiele aus data.js
+  function newsItems() {
+    if (!apiReady() || !remote.news) return D.news;
+    return remote.news.map((x) => ({
+      ...x, remote: true,
+      image: x.media && x.media.type === 'image' ? x.media.url : null,
+      video: x.media && x.media.type === 'video' ? x.media.url : null,
+      poster: x.media && x.media.poster,
+    }));
+  }
+  const newsImage = (n) => {
+    if (n.image) return n.image;
+    if (n.img) return `assets/img/${n.img}`;
+    const yt = youtubeId(n.video);
+    return yt ? `https://i.ytimg.com/vi/${yt}/hqdefault.jpg` : n.poster || 'assets/img/play.svg';
+  };
+  function newsButtons(n) {
+    const list = n.buttons && n.buttons.length ? n.buttons : [{ type: 'discord', url: D.links.discord }];
+    return list.map((b) => {
+      const k = NEWS_BUTTONS[b.type] || NEWS_BUTTONS.link;
+      const cls = b.type === 'discord' ? 'btn--discord' : b.type === 'roblox' ? 'btn--primary' : 'btn--outline';
+      return `<a class="btn ${cls} btn--block btn--lg" href="${esc(b.url)}" target="_blank" rel="noopener">${icon(k.icon)}${esc(b.label || t(k.label))}</a>`;
+    }).join('');
+  }
+
+  // ---------- Bewerbungen prüfen (ab Public Relations Department) ----------
+  const review = { list: null, at: 0, apps: {}, filter: 'new', job: 'all', busy: false };
+  async function ensureReviewData() {
+    if (!canPR() || review.busy) return;
+    const id = state.reviewId;
+    const needList = !review.list || Date.now() - review.at > 30000;
+    const needApp = id && !review.apps[id];
+    if (!needList && !needApp) return;
+    review.busy = true;
+    try {
+      if (needList) { review.list = (await api('/api/applications')).applications || []; review.at = Date.now(); }
+      if (needApp) review.apps[id] = await api(`/api/applications/${encodeURIComponent(id)}`).catch(() => ({ error: true }));
+    } catch (e) {
+      review.list = review.list || [];
+      review.at = Date.now();
+    } finally {
+      review.busy = false;
+    }
+    if (state.page === 'karriere' && !state.jobApply) renderCareer();
+  }
+  const statusPill = (a) => (a.status === 'passed' ? `<span class="pill pill--ok">${icon('fi-rr-check')}${t('Bestanden')}</span>`
+    : a.status === 'failed' ? `<span class="pill pill--bad">${t('Nicht bestanden')}</span>` : `<span class="pill pill--warn">${t('Neu')}</span>`);
+  const scorePct = (a) => (a.total ? Math.round((a.score / a.total) * 100) : null);
+  const jobTitleOf = (a) => { const j = D.jobs.find((x) => x.id === a.job); return t(j ? j.title : a.jobTitle || a.job); };
+  const personImg = (a, cls = '') => (a.avatar ? `<span class="avatar ${cls}"><img src="${esc(a.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(a.username, cls));
+  function reviewList() {
+    const back = `<a class="back-link" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Karriere')}</a>`;
+    if (!review.list) return `${back}<div class="cbox"><p class="lead">${t('Bewerbungen werden geladen …')}</p></div>`;
+    const all = review.list;
+    const count = (st) => all.filter((a) => a.status === st).length;
+    const jobs = [...new Set(all.map((a) => a.job))];
+    const shown = all.filter((a) => (review.filter === 'all' || a.status === review.filter) && (review.job === 'all' || a.job === review.job));
+    const ready = all.filter((a) => a.status === 'passed' && !a.sentAt);
+    const chip = (attr, val, cur, label) => `<button class="chip${cur === val ? ' is-active' : ''}" type="button" ${attr}="${esc(val)}">${label}</button>`;
+    return `${back}
+      <div class="cbox">
+        <h2>${t('Bewerbungen <em>prüfen</em>')}</h2>
+        <p class="lead">${t('Öffne eine Bewerbung, sieh dir alle Antworten an und entscheide: bestanden oder nicht. Die Bestandenen schickst du unten gesammelt an Discord.')}</p>
+        <div class="chips chips--scroll">${chip('data-rv-filter', 'new', review.filter, `${t('Neu')} · ${count('new')}`)}${chip('data-rv-filter', 'passed', review.filter, `${t('Bestanden')} · ${count('passed')}`)}${chip('data-rv-filter', 'failed', review.filter, `${t('Nicht bestanden')} · ${count('failed')}`)}${chip('data-rv-filter', 'all', review.filter, `${t('Alle')} · ${all.length}`)}</div>
+        ${jobs.length > 1 ? `<div class="chips chips--scroll rv-jobs">${chip('data-rv-job', 'all', review.job, t('Alle Stellen'))}${jobs.map((j) => chip('data-rv-job', j, review.job, esc(jobTitleOf({ job: j })))).join('')}</div>` : ''}
+      </div>
+      <div class="rv-list">${shown.length ? shown.map((a) => `<a class="rv-row" href="#/karriere/pruefen/${esc(a.id)}">
+          ${personImg(a)}
+          <span class="rv-row__main"><b>${esc(a.displayName || a.username)}</b><small>@${esc(a.username)} · ${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''} · ${fmtDate(a.at)}</small></span>
+          <span class="rv-row__side">${scorePct(a) !== null ? `<b class="rv-score">${scorePct(a)} %</b>` : ''}${statusPill(a)}${a.sentAt ? `<small>${icon('fi-brands-discord')}${t('gesendet')}</small>` : ''}</span>
+        </a>`).join('') : `<p class="empty">${t('Keine Bewerbungen in dieser Ansicht.')}</p>`}</div>
+      <section class="cbox rv-send">
+        <h3>${icon('fi-brands-discord')}${t('Bestandene an Discord senden')}</h3>
+        ${ready.length ? `<p>${t('Diese Spieler haben bestanden und wurden noch nicht verkündet. Entferne den Haken bei allen, die du (noch) nicht senden willst.')}</p>
+          <ul class="rv-pick">${ready.map((a) => `<li><label><input type="checkbox" name="announce" value="${esc(a.id)}" checked>${personImg(a, 'avatar--sm')}<span><b>${esc(a.displayName || a.username)}</b><small>${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''}</small></span></label></li>`).join('')}</ul>
+          <button class="btn-line" type="button" data-announce>${icon('fi-rr-paper-plane')}${t('Ausgewählte an Discord senden')}</button>`
+          : `<p class="muted">${t('Gerade gibt es keine bestandenen Bewerbungen, die noch nicht gesendet wurden.')}</p>`}
+      </section>`;
+  }
+  function reviewDetail() {
+    const back = `<a class="back-link" href="#/karriere/pruefen">${icon('fi-rr-arrow-left')}${t('Alle Bewerbungen')}</a>`;
+    const a = review.apps[state.reviewId];
+    if (!a) return `${back}<div class="cbox"><p class="lead">${t('Bewerbung wird geladen …')}</p></div>`;
+    if (a.error) return `${back}<div class="cbox"><p class="lead">${t('Diese Bewerbung gibt es nicht (mehr).')}</p></div>`;
+    const pctv = scorePct(a);
+    const facts = [
+      [t('Stelle'), `${jobTitleOf(a)}${a.area ? ` – ${a.area}` : ''}`], ['Discord', a.discord], [t('E-Mail'), a.email || '–'], [t('Spielt seit'), t(a.since || '–')],
+      [t('Rang (angegeben)'), a.rank || '–'], [t('Rolle in der Gruppe'), a.groupRole ? a.groupRole.name : t('nicht in der Gruppe')],
+      [t('Aktivität'), a.activity ? `${a.activity} / 10` : '–'], [t('Freie Tage'), (a.days || []).join(', ') || '–'], [t('Gesendet'), fmtDate(a.at)],
+    ];
+    return `${back}
+      <article class="cbox rv-detail">
+        <header class="rv-head">${personImg(a, 'avatar--lg')}
+          <div><h2>${esc(a.displayName || a.username)}</h2><p>@${esc(a.username)} · <a href="https://www.roblox.com/users/${encodeURIComponent(a.sub)}/profile" target="_blank" rel="noopener">${t('Roblox-Profil')}${icon('fi-rr-arrow-up-right-from-square')}</a></p></div>
+          ${statusPill(a)}</header>
+        ${pctv !== null ? `<div class="rv-result"><b>${pctv} %</b><span>${t('{a} von {b} bewerteten Fragen richtig', { a: a.score, b: a.total })}</span><i><span style="width:${pctv}%"></span></i></div>` : ''}
+        <dl class="done__list">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+        <h3 class="rv-sub">${t('Erfahrung')}</h3>
+        <p class="rv-text">${esc(a.experience || '–')}</p>
+        <h3 class="rv-sub">${t('Fragen und Antworten')}</h3>
+        <ol class="rv-answers">${(a.answers || []).map((x) => `<li class="${x.ok === true ? 'is-ok' : x.ok === false ? 'is-bad' : ''}">
+          <span class="rv-mark" aria-label="${x.ok === true ? esc(t('richtig')) : x.ok === false ? esc(t('falsch')) : esc(t('nicht bewertet'))}">${x.ok === true ? icon('fi-rr-check') : x.ok === false ? icon('fi-rr-cross-small') : '–'}</span>
+          <div><b>${esc(x.q)}</b><p>${esc(x.a)}</p></div></li>`).join('')}</ol>
+        <div class="rv-actions">
+          <button class="btn btn--ok btn--lg" type="button" data-review="passed" aria-pressed="${a.status === 'passed'}">${icon('fi-rr-check')}${t('Bestanden')}</button>
+          <button class="btn btn--danger btn--lg" type="button" data-review="failed" aria-pressed="${a.status === 'failed'}">${icon('fi-rr-cross-small')}${t('Nicht bestanden')}</button>
+        </div>
+        ${a.sentAt ? `<p class="f__note">${icon('fi-brands-discord')}${t('Am {date} an Discord gesendet.', { date: fmtDate(a.sentAt) })}</p>` : ''}
+      </article>`;
+  }
+  async function setReview(status) {
+    const id = state.reviewId;
+    try {
+      const sum = await api(`/api/applications/${encodeURIComponent(id)}`, { method: 'PUT', body: { status } });
+      if (review.apps[id]) review.apps[id].status = sum.status;
+      if (review.list) review.list = review.list.map((x) => (x.id === id ? sum : x));
+      toast(status === 'passed' ? t('Als bestanden markiert') : t('Als nicht bestanden markiert'));
+      // Weiter zur nächsten neuen Bewerbung
+      const next = review.list && review.list.find((x) => x.status === 'new');
+      if (next) location.hash = `#/karriere/pruefen/${next.id}`;
+      else location.hash = '#/karriere/pruefen';
+    } catch (e) { toast(errorText(e)); }
+  }
+  async function announceSelected() {
+    const ids = $$('input[name="announce"]:checked').map((x) => x.value);
+    if (!ids.length) { toast(t('Bitte mindestens einen Spieler auswählen.')); return; }
+    try {
+      const r = await api('/api/applications/announce', { method: 'POST', body: { ids } });
+      toast(t('{n} Spieler auf Discord beglückwünscht', { n: r.sent }));
+      review.list = null;
+      ensureReviewData();
+    } catch (e) {
+      toast(e.status === 503 ? t('Im Backend fehlt noch der zweite Discord-Webhook (DISCORD_RESULTS_WEBHOOK_URL).') : errorText(e));
+    }
+  }
+
+  // ---------- Echte Zahlen: Gruppe, Spiel, Discord ----------
+  const inviteCode = (String(D.links.discord).match(/discord\.(?:gg|com\/invite)\/([\w-]+)/) || [])[1];
+  function applyStats(s) {
+    const st = D.stats;
+    ['groupMembers', 'visits', 'favorites', 'discordMembers', 'discordOnline'].forEach((k) => { if (Number.isFinite(s[k])) st[k] = s[k]; });
+    if (Number.isFinite(s.playing)) { st.online = s.playing; state.online = s.playing; state.liveOnline = true; }
+    if (Array.isArray(s.roles)) {
+      const counts = {};
+      s.roles.forEach((r) => {
+        if (!r.rank || /^[-–\s]+$/.test(r.name)) return; // Gast-Rolle und Trennlinien
+        const k = rankFromRole(r);
+        counts[k] = (counts[k] || 0) + (r.memberCount || 0);
+      });
+      RANKS.forEach((r) => { if (!r.guest && counts[r.name] != null) r.members = counts[r.name]; });
+    }
+    state.liveStats = true;
+  }
+  async function browserStats() {
+    const R = D.roblox;
+    const out = {};
+    const j = (u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+    await Promise.allSettled([
+      RBX.groupId && j(`${R.groupsApi}/v1/groups/${RBX.groupId}`).then((g) => { out.groupMembers = g.memberCount; }),
+      RBX.groupId && j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles`).then((r) => { out.roles = r.roles; }),
+      placeId && j(`${R.apisApi}/universes/v1/places/${placeId}/universe`).then((u) => j(`${R.gamesApi}/v1/games?universeIds=${u.universeId}`))
+        .then((g) => { const x = (g.data || [])[0]; if (x) Object.assign(out, { playing: x.playing, visits: x.visits, favorites: x.favoritedCount }); }),
+      inviteCode && j(`${R.discordApi}/invites/${inviteCode}?with_counts=true`)
+        .then((x) => Object.assign(out, { discordMembers: x.approximate_member_count, discordOnline: x.approximate_presence_count })),
+    ]);
+    return out;
+  }
+  async function loadStats() {
+    let s = {};
+    if (apiReady()) { try { s = await api('/api/stats'); } catch (e) { /* weiter ohne Backend */ } }
+    if (s.groupMembers == null || s.discordMembers == null) {
+      const b = await browserStats();
+      Object.keys(b).forEach((k) => { if (s[k] == null) s[k] = b[k]; });
+    }
+    if (Object.keys(s).some((k) => k !== 'at' && s[k] != null)) {
+      store.set('tsg-live', { ...s, at: Date.now() });
+      applyStats(s);
+      safeRender();
+    }
+  }
+  { const cached = store.get('tsg-live', null); if (cached) applyStats(cached); }
+
+  // ---------- Einstellungen auf allen Geräten (mit Backend und Roblox-Login) ----------
+  const settingsAt = () => store.get('tsg-settings-at', 0);
+  const currentSettings = () => ({
+    theme: themeMode(), lang: langSetting(), bell: state.bell, remind: [...remind.ids], remindOff: [...remind.off], favs: [...state.favs], updatedAt: settingsAt(),
+  });
+  let settingsTimer = null;
+  let applyingSettings = false;
+  function settingsChanged() {
+    if (applyingSettings) return;
+    store.set('tsg-settings-at', Date.now());
+    clearTimeout(settingsTimer);
+    settingsTimer = setTimeout(pushSettings, 600);
+  }
+  async function pushSettings() {
+    if (!apiReady() || !sessionToken()) return;
+    try { await api('/api/me/settings', { method: 'PUT', body: currentSettings() }); } catch (e) { /* später nochmal */ }
+  }
+  async function applySettings(s) {
+    applyingSettings = true;
+    try {
+      store.set('tsg-settings-at', s.updatedAt || Date.now());
+      if (s.theme && s.theme !== themeMode()) setTheme(s.theme, { quiet: true });
+      state.bell = !!s.bell;
+      store.set('tsg-bell', state.bell);
+      remind.ids = new Set(s.remind || []);
+      remind.off = new Set(s.remindOff || []);
+      saveRemind();
+      state.favs = new Set(s.favs || []);
+      store.set('tsg-favs', [...state.favs]);
+      if (s.lang && s.lang !== langSetting()) await setLanguage(s.lang);
+    } finally {
+      applyingSettings = false;
+    }
   }
 
   // ---------- Auswahl-Sheets ----------
@@ -2119,7 +2672,7 @@
     },
     rank: {
       title: () => t('Dein Rang'),
-      render: () => `<div class="opt-list" role="radiogroup" aria-label="${esc(t('Rang wählen'))}">${RANKS.filter((r) => r.name !== 'Management').map((r) => `
+      render: () => `<div class="opt-list" role="radiogroup" aria-label="${esc(t('Rang wählen'))}">${RANKS.map((r) => `
         <button class="opt" type="button" role="radio" aria-checked="${r.name === state.rank}" data-rank="${r.name}"${state.rankFromGroup ? ' disabled' : ''}>
           ${rankPill(r)}<span><b>${esc(r.name)}</b><small>${esc(t(r.label))} · ${esc(t(r.desc))}</small></span>
           ${r.name === state.rank ? icon('fi-rr-check') : ''}
@@ -2150,14 +2703,16 @@
     news: {
       title: () => t('Neuigkeit'),
       hero: true,
-      render: (i) => {
-        const n = D.news[+i];
+      render: (id) => {
+        const n = newsItems().find((x) => String(x.id) === String(id));
+        if (!n) return `<p class="muted">${t('Diese Neuigkeit gibt es nicht mehr.')}</p>`;
         return `<div class="detail">
           ${mediaHtml(n)}
-          <div class="detail__top"><span class="cat-tag cat-tag--${n.cat}">${esc(t(n.tag))}</span><span class="tag">${newsDate(n)}</span></div>
+          <div class="detail__top"><span class="cat-tag cat-tag--${n.cat}">${esc(t(n.tag || n.cat))}</span><span class="tag">${newsDate(n)}</span>${n.author ? `<span class="tag">${icon('fi-rr-pencil')}${esc(n.author)}</span>` : ''}</div>
           <h3>${esc(t(n.title))}</h3>
-          <p>${esc(t(n.text))}</p>
-          <div class="btn-stack"><a class="btn btn--discord btn--block btn--lg" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}${t('Auf Discord diskutieren')}</a></div>
+          <p class="detail__text">${esc(t(n.text))}</p>
+          <div class="btn-stack">${newsButtons(n)}
+            ${n.remote && isMine(n.authorId) ? `<button class="btn btn--danger btn--block btn--lg" type="button" data-news-del="${esc(n.id)}">${icon('fi-rr-trash')}${t('Neuigkeit löschen')}</button>` : ''}</div>
         </div>`;
       },
     },
@@ -2180,23 +2735,33 @@
           <div class="detail__media"><img src="assets/img/${tn.img}" alt=""></div>
           <div class="detail__top">${roleBadge(tn.type)}${serverPill(tn)}<span class="tag">${relTime(tn.start)}</span></div>
           <h3>${esc(t(tn.title))}</h3>
-          <p>${esc(type ? t(type.text) : '')}</p>
+          <p>${esc(tn.text || (type ? t(type.text) : ''))}</p>
           <dl>
             <div><dt>${icon('fi-rr-calendar')}${t('Datum')}</dt><dd>${dayName(tn.day, { long: true })}</dd></div>
             <div><dt>${icon('fi-rr-clock-three')}${t('Uhrzeit')}</dt><dd>${t('{time} Uhr', { time: `${tn.time} – ${hhmm(tn.end)}` })}</dd></div>
-            <div><dt>${icon('fi-rr-database')}${t('Server')}</dt><dd>${esc(t(tn.server))}</dd></div>
+            <div><dt>${icon('fi-rr-database')}${t('Server')}</dt><dd>${esc(t(tn.server || '–'))}</dd></div>
             <div><dt>${icon('fi-rr-users-alt')}${t('Leitung')}</dt><dd>${esc(tn.host)}</dd></div>
+            ${tn.remote ? `<div><dt>${icon('fi-sr-user')}${t('Plätze')}</dt><dd>${t('max. {n}', { n: tn.slots })}</dd></div>` : ''}
           </dl>
-          <div class="occ">
+          ${tn.remote ? '' : `<div class="occ">
             <div class="occ__row"><span class="status status--${st.level}">${st.text}</span><b>${t('{a}/{b} Plätze', { a: tn.taken, b: tn.slots })}</b></div>
             <div class="bar bar--${st.level}"><span style="width:${(tn.taken / tn.slots) * 100}%"></span></div>
-          </div>
+          </div>`}
           ${locked ? `<div class="lock">${icon('fi-rr-lock')}<span>${t('Für dieses Training brauchst du mindestens den Rang {rank}. Dein Rang: {mine}.', { rank: esc(tn.req), mine: esc(state.rank) })}</span></div>` : ''}
           ${action}
           <button class="btn btn--remind btn--lg btn--block" type="button" data-remind="${tn.id}" aria-pressed="${isReminded(tn)}">${icon(isReminded(tn) ? 'fi-sr-bell-ring' : 'fi-rr-bell')}${isReminded(tn) ? t('Benachrichtigung an') : t('Benachrichtigen, wenn der Server öffnet')}</button>
           ${hint ? `<p class="sheet-note join-hint">${hint}</p>` : ''}
+          ${tn.remote && isMine(tn.hostId) ? `<button class="btn btn--danger btn--lg btn--block" type="button" data-training-del="${esc(tn.id)}">${icon('fi-rr-trash')}${t('Training löschen')}</button>` : ''}
         </div>`;
       },
+    },
+    'training-new': {
+      title: () => t('Training anbieten'),
+      render: () => trainingForm(),
+    },
+    'news-new': {
+      title: () => t('Neuigkeit erstellen'),
+      render: () => newsForm(),
     },
   };
   // Bild oder Video oben in der Detailansicht. video: YouTube-Link oder eigene Datei (assets/video/…)
@@ -2205,14 +2770,14 @@
     return m ? m[1] : null;
   };
   function mediaHtml(n) {
-    if (!n.video) return `<div class="detail__media"><img src="assets/img/${n.img}" alt=""></div>`;
+    if (!n.video) return `<div class="detail__media"><img src="${esc(newsImage(n))}" alt="" referrerpolicy="no-referrer"></div>`;
     const yt = youtubeId(n.video);
     if (yt) {
       // Erst nach dem Antippen laden (Datenschutz): Vorschaubild mit Play-Knopf
       return `<div class="detail__media detail__media--video"><button class="video-start" type="button" data-youtube="${yt}" aria-label="${esc(t('Video abspielen'))}">
           <img src="https://i.ytimg.com/vi/${yt}/hqdefault.jpg" alt="" referrerpolicy="no-referrer"><span class="video-start__btn">${icon('fi-sr-play')}</span></button></div>`;
     }
-    return `<div class="detail__media detail__media--video"><video src="${esc(n.video)}" poster="${esc(n.poster || `assets/img/${n.img}`)}" controls playsinline preload="metadata"></video></div>`;
+    return `<div class="detail__media detail__media--video"><video src="${esc(n.video)}" poster="${esc(n.poster || (n.img ? `assets/img/${n.img}` : ''))}" controls playsinline preload="metadata"></video></div>`;
   }
   // Wechsel zwischen Zug und Bahnhof im offenen Dialog: vorige Ansicht merken (Zurück-Knopf)
   let modalStack = [];
@@ -2320,6 +2885,7 @@
     if (on && !(await allowNotifications())) return;
     if (on) { remind.ids.add(id); remind.off.delete(id); } else { remind.ids.delete(id); if (state.bell) remind.off.add(id); }
     saveRemind();
+    settingsChanged();
     renderReminders();
     if (on) {
       // Sofort eine echte Benachrichtigung als Bestätigung
@@ -2337,6 +2903,7 @@
     store.set('tsg-bell', state.bell);
     if (state.bell) remind.off.clear();
     saveRemind();
+    settingsChanged();
     renderReminders();
     const next = nextRank(state.rank);
     if (state.bell) {
@@ -2476,12 +3043,19 @@
     const page = PAGES.includes(first) ? first : 'home';
     const jobId = page === 'karriere' ? (sub || null) : null;
     const jobApply = !!jobId && sub2 === 'bewerben';
+    const jobView = !jobId ? null : jobId === 'pruefen' ? 'review' : sub2 === 'bewerbung' ? 'mine' : jobApply ? 'apply' : 'detail';
+    const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
-    const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId;
+    const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
+      || jobView !== state.jobView || reviewId !== state.reviewId;
+    // Liste beim Öffnen frisch laden (neue Bewerbungen von anderen Geräten)
+    if (jobView === 'review' && !reviewId && state.jobView !== 'review') review.at = 0;
     if (serverId !== state.serverId) Object.assign(state, { sdTab: 'trains', sdCat: 'all', sdRole: 'all' });
     state.page = page;
     state.jobId = jobId;
     state.jobApply = jobApply;
+    state.jobView = jobView;
+    state.reviewId = reviewId;
     state.serverId = serverId;
     document.body.dataset.page = page;
     const view = serverId ? 'server-detail' : page;
@@ -2571,6 +3145,7 @@
         const name = ds.fav;
         if (state.favs.has(name)) state.favs.delete(name); else state.favs.add(name);
         store.set('tsg-favs', Array.from(state.favs));
+        settingsChanged();
         el.setAttribute('aria-pressed', String(state.favs.has(name)));
         toast(state.favs.has(name) ? t('{name} gemerkt', { name: t(name) }) : t('{name} entfernt', { name: t(name) }));
       }
@@ -2786,7 +3361,61 @@
     });
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
+    // Bewerbungen prüfen
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-rv-filter], [data-rv-job], [data-review], [data-announce]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.rvFilter) { review.filter = ds.rvFilter; renderCareer(); }
+      else if (ds.rvJob) { review.job = ds.rvJob; renderCareer(); }
+      else if (ds.review) setReview(ds.review);
+      else if ('announce' in ds) announceSelected();
+    });
+
+    // Trainings und Neuigkeiten erstellen/löschen
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-training-del], [data-news-del], [data-nbtn-add], [data-nbtn-del]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.trainingDel) deleteTraining(ds.trainingDel);
+      else if (ds.newsDel) deleteNews(ds.newsDel);
+      else if ('nbtnAdd' in ds) {
+        const box = $('[data-nbtns]', el.closest('form'));
+        if ($$('[data-nbtn]', box).length < 2) box.insertAdjacentHTML('beforeend', newsBtnRow());
+        el.hidden = $$('[data-nbtn]', box).length >= 2;
+      } else if ('nbtnDel' in ds) {
+        const form = el.closest('form');
+        el.closest('[data-nbtn]').remove();
+        $('[data-nbtn-add]', form).hidden = false;
+      }
+    });
+    document.addEventListener('change', (e) => {
+      const form = e.target.closest('form[data-news-new]');
+      if (!form) return;
+      if (e.target.name === 'media') $$('[data-media-in]', form).forEach((x) => { x.hidden = x.dataset.mediaIn !== e.target.value; });
+      if (e.target.name === 'btype') {
+        // Text und Link passend zur Art vorschlagen, solange sie nicht selbst geändert wurden
+        const row = e.target.closest('[data-nbtn]');
+        const k = NEWS_BUTTONS[e.target.value];
+        const label = $('[name="blabel"]', row);
+        const url = $('[name="burl"]', row);
+        if (!label.value || Object.values(NEWS_BUTTONS).some((b) => t(b.label) === label.value)) label.value = t(k.label);
+        if (!url.value || Object.values(NEWS_BUTTONS).some((b) => b.url() && b.url() === url.value)) url.value = k.url();
+      }
+      if (e.target.name === 'file') {
+        const file = e.target.files && e.target.files[0];
+        const prev = $('[data-upload-preview]', form);
+        if (file) { prev.src = URL.createObjectURL(file); prev.hidden = false; $('[data-upload-label]', form).textContent = file.name; }
+      }
+    });
+
     document.addEventListener('submit', (e) => {
+      const jform = e.target.closest('form[data-job-admin]');
+      if (jform) { e.preventDefault(); saveJobAdmin(jform); return; }
+      const tform = e.target.closest('form[data-training-new]');
+      if (tform) { e.preventDefault(); submitTraining(tform); return; }
+      const nform = e.target.closest('form[data-news-new]');
+      if (nform) { e.preventDefault(); submitNews(nform); return; }
       const connect = e.target.closest('form[data-connect]');
       if (connect) { e.preventDefault(); connectRoblox(connect); return; }
       const form = e.target.closest('form[data-apply]');
@@ -2852,7 +3481,8 @@
     const minuteChanged = now.abs !== lastMinute;
     lastMinute = now.abs;
     state.updatedAt = Date.now();
-    state.online = Math.max(900, state.online + Math.round((Math.random() - 0.48) * 14));
+    // Ohne echte Zahl von Roblox schwankt die Demo-Zahl leicht
+    if (!state.liveOnline) state.online = Math.max(900, state.online + Math.round((Math.random() - 0.48) * 14));
     bind();
     if (!minuteChanged) return;
     remindersTick();
@@ -2877,7 +3507,6 @@
   setLanguage(langSetting(), { start: true }).then(async () => {
     loginNote = await oauthCallback();
     if (loginNote === null) syncGroupRank().then(() => { renderMe(); if (state.page === 'trainings') renderTrainings(); });
-    loadMe();
   }).then(() => {
     events();
     renderMe();
@@ -2888,6 +3517,16 @@
         : t('Angemeldet als {name}', { name: state.profile.displayName }));
     } else if (loginNote) toast(loginNote);
     remindersTick();
+    // Echte Daten: Inhalte und Einstellungen vom Backend, Zahlen von Roblox und Discord
+    loadContent();
+    loadMe();
+    loadStats();
+    let lastSync = Date.now();
+    const sync = () => { lastSync = Date.now(); loadContent(); loadMe(); };
+    setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 120000);
+    setInterval(loadStats, 600000);
+    // Zurück in die App (z. B. auf einem anderen Gerät etwas geändert): gleich abgleichen
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastSync > 15000) sync(); });
     tick();
     lastMinute = berlinNow().abs;
     setInterval(tick, 1000);
