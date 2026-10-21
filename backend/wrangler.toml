@@ -16,10 +16,15 @@ ROBLOX_GROUP_ID = "33684346"
 ROBLOX_PLACE_ID = "140440792597921"
 DISCORD_INVITE = "tvaSwbh3rE"
 
-# Speicher für Profile, Einstellungen, Trainings, Neuigkeiten, Bewerbungen und Erinnerungen: npx wrangler kv namespace create TSG_KV
-[[kv_namespaces]]
-binding = "TSG_KV"
-id = "HIER-DIE-KV-ID-EINTRAGEN"
+# Speicher für alles (Profile, Einstellungen, Trainings, Neuigkeiten, Bewerbungen, Chat, Shop, Erinnerungen):
+# ein Durable Object mit SQLite – im kostenlosen Tarif enthalten, nichts weiter anzulegen
+[[durable_objects.bindings]]
+name = "TSG_STORE"
+class_name = "TSGStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TSGStore"]
 
 # Alle 2 Minuten fällige Benachrichtigungen für Trainings verschicken
 [triggers]
@@ -28,3 +33,5 @@ crons = ["*/2 * * * *"]
 # Geheim, NICHT hier eintragen:
 #   npx wrangler secret put DISCORD_WEBHOOK_URL           (Webhook 1: neue Bewerbungen)
 #   npx wrangler secret put DISCORD_RESULTS_WEBHOOK_URL   (Webhook 2: Glückwünsche an die Bestandenen)
+#   npx wrangler secret put GAME_API_KEY                  (Schlüssel für den Abgleich mit dem Spiel: Coins, Züge, Strecken)
+# Oder alles automatisch über GitHub Actions („Backend veröffentlichen“, siehe README.md).

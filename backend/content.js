@@ -12,7 +12,7 @@ import { TRAINING_RANKS } from './ranks.js';
 const bad = (msg = 'bad_request') => Object.assign(new Error(msg), { status: 400 });
 const forbidden = () => Object.assign(new Error('forbidden'), { status: 403 });
 const notFound = () => Object.assign(new Error('not_found'), { status: 404 });
-const MAX_IMAGE = 1500000;
+const MAX_IMAGE = 1000000; // als Base64 unter 2 MB (Grenze pro Eintrag im Durable Object)
 
 export async function getContent(store) {
   const [trainings, news, jobs] = await Promise.all([store.get('content:trainings'), store.get('content:news'), store.get('content:jobs')]);

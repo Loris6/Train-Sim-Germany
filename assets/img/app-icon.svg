@@ -1,25 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- App-Icon und Roblox-Spielbild: Logo auf weißer Fläche (randlos, die Ecken rundet das System) -->
+  <!-- App-Icon und Roblox-Spielbild: randlose rote Fläche (die Ecken rundet das System), Zug im sicheren Bereich. -->
   <defs>
-    <linearGradient id="tsg" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#B80011"/>
-      <stop offset="1" stop-color="#FF3A4D"/>
-    </linearGradient>
-    <mask id="cut">
-      <rect width="512" height="512" fill="#fff"/>
-      <path d="M298 202H326C350 202 370 220 382 248L386 258H298C292 258 288 254 288 248V212C288 206 292 202 298 202Z" fill="#000"/>
-      <rect x="204" y="290" width="206" height="14" rx="7" fill="#000"/>
-    </mask>
+    <linearGradient id="tsg-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF3549"/><stop offset=".52" stop-color="#E3001B"/><stop offset="1" stop-color="#9B000F"/></linearGradient>
+    <linearGradient id="tsg-gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".6" stop-color="#fff" stop-opacity="0"/></linearGradient>
   </defs>
-  <rect width="512" height="512" fill="#FFFFFF"/>
-  <g transform="translate(256 256) scale(.68) translate(-237 -256)">
-  <path d="M64 146V186C64 116 116 64 186 64H326C396 64 448 116 448 186V326C448 396 396 448 326 448H186C116 448 64 396 64 326V380" fill="none" stroke="url(#tsg)" stroke-width="36" stroke-linecap="round"/>
-  <g fill="url(#tsg)">
-    <path mask="url(#cut)" d="M222 176H262C340 176 392 226 414 300C419 318 420 336 420 352H222C211 352 202 343 202 332V196C202 185 211 176 222 176Z"/>
-    <rect x="40" y="184" width="140" height="36" rx="18"/>
-    <rect x="16" y="246" width="164" height="36" rx="18"/>
-    <rect x="64" y="308" width="116" height="36" rx="18"/>
-    <rect x="150" y="384" width="256" height="16" rx="8"/>
+  <rect width="512" height="512" fill="url(#tsg-bg)"/>
+  <rect width="512" height="512" fill="url(#tsg-gloss)"/>
+  <g transform="translate(256 256) scale(.86) translate(-256 -256)">
+  <g transform="translate(14 -34)">
+    <path d="M150 196H296C364 196 418 238 441 306C444 316 437 326 427 326H150C139 326 130 317 130 306V216C130 205 139 196 150 196Z" fill="#FFFFFF"/>
+    <path d="M309 218C344 220 373 240 392 270H309C302 270 297 265 297 258V230C297 223 302 218 309 218Z" fill="#C4001C"/>
+    <rect x="62" y="214" width="50" height="16" rx="8" fill="#FFFFFF" fill-opacity=".55"/>
+    <rect x="40" y="252" width="72" height="16" rx="8" fill="#FFFFFF" fill-opacity=".85"/>
+    <rect x="72" y="290" width="40" height="16" rx="8" fill="#FFFFFF" fill-opacity=".55"/>
+    <rect x="96" y="366" width="322" height="16" rx="8" fill="#FFFFFF"/>
   </g>
-</g>
+  </g>
 </svg>

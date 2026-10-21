@@ -23,7 +23,7 @@
  *   DELETE /api/trainings/<id>           Eigenes Training löschen
  *   POST   /api/news                     Neuigkeit schreiben (ab PRD)
  *   DELETE /api/news/<id>                Eigene Neuigkeit löschen
- *   POST   /api/media                    Bild hochladen (ab PRD, höchstens 1,5 MB)
+ *   POST   /api/media                    Bild hochladen (ab PRD, höchstens 1 MB)
  *   PUT    /api/jobs/<id>                Stelle öffnen/schließen, Zeitraum (ab PRD)
  *   POST   /api/applications             Bewerbung senden (angemeldet)
  *   GET    /api/applications             Alle Bewerbungen (ab PRD)
@@ -32,6 +32,16 @@
  *   POST   /api/applications/announce    { ids } Bestandene an Discord senden (ab PRD)
  *   GET    /api/push/key                 Öffentlicher Schlüssel für Web-Push
  *   POST   /api/push/reminders           { subscription, reminders } – Erinnerungen für Trainings
+ *   GET    /api/shop                     Züge, Strecken, Preise; angemeldet auch eigene Coins und Besitz
+ *   POST   /api/shop/buy                 { kind: train | route, id } – Kauf, wird beim nächsten Abgleich im Spiel verbucht
+ *   POST   /api/game/sync                Abgleich mit dem Spiel (Schlüssel GAME_API_KEY): Coins, Besitz, Käufe
+ *   GET    /api/staff                    Team ab Supervisor aus der Roblox-Gruppe (für den Chat)
+ *   GET    /api/chats                    Eigene Gespräche und – fürs Team – offene Anfragen des Bereichs
+ *   POST   /api/chats                    Neue Anfrage { reason, area, text } oder Direktnachricht { kind: direct, to, text }
+ *   GET    /api/chats/<id>?since=<ms>    Gespräch lesen
+ *   POST   /api/chats/<id>/messages      { text }
+ *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
+ *   POST   /api/chats/<id>/close         Gespräch beenden
  *
  * Einstellungen: siehe .env.example bzw. README.md
  */
@@ -41,6 +51,8 @@ import { matchRank, atLeast } from './ranks.js';
 import { getContent, addTraining, deleteTraining, addNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
 import { submitApplication, listApplications, getApplication, setStatus, announce, ownView } from './applications.js';
 import { liveStats } from './stats.js';
+import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
+import { listChats, createChat, readChat, postMessage, claimChat, closeChat, staffList } from './chat.js';
 
 export { sendDue, matchRank };
 
@@ -248,7 +260,7 @@ export async function handle(req, env, store) {
   try {
     // ---------- öffentlich ----------
     if (path === '/' || path === '/health') {
-      return json(req, env, { ok: true, login: loginReady(env), applications: true, discord: !!env.DISCORD_WEBHOOK_URL, results: !!env.DISCORD_RESULTS_WEBHOOK_URL, push: true, group: groupId(env) });
+      return json(req, env, { ok: true, login: loginReady(env), applications: true, discord: !!env.DISCORD_WEBHOOK_URL, results: !!env.DISCORD_RESULTS_WEBHOOK_URL, push: true, chat: true, game: !!env.GAME_API_KEY, group: groupId(env) });
     }
     if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
     if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
@@ -259,6 +271,11 @@ export async function handle(req, env, store) {
     if (path === '/api/push/reminders' && m === 'POST') {
       const body = await readJson(req, 60000);
       return json(req, env, await saveReminders(store, body).then((r) => ({ count: r.count })));
+    }
+    if (path === '/api/staff' && m === 'GET') return json(req, env, { staff: await staffList(store, env) });
+    if (path === '/api/game/sync' && m === 'POST') {
+      if (!await gameAuthorized(req, env)) return json(req, env, { error: 'unauthorized' }, 401);
+      return json(req, env, await gameSync(store, await readJson(req, 500000)));
     }
     const player = path.match(/^\/api\/players\/(\d{1,20})$/);
     if (player && m === 'GET') {
@@ -274,7 +291,20 @@ export async function handle(req, env, store) {
       return json(req, env, { ok: true });
     }
     if (!path.startsWith('/api/')) return json(req, env, { error: 'not_found' }, 404);
+    if (path === '/api/shop' && m === 'GET') return json(req, env, await shopState(store, user));
     if (!user) return json(req, env, { error: 'unauthorized' }, 401);
+
+    // Shop
+    if (path === '/api/shop/buy' && m === 'POST') return json(req, env, await buy(store, user, await readJson(req, 1000)));
+
+    // Chat
+    if (path === '/api/chats' && m === 'GET') return json(req, env, await listChats(store, await freshUser(env, store, user)));
+    if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 10000)), 201);
+    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close))?$/);
+    if (chat && !chat[2] && m === 'GET') return json(req, env, await readChat(store, user, chat[1], +url.searchParams.get('since') || 0));
+    if (chat && chat[2] === 'messages' && m === 'POST') return json(req, env, await postMessage(store, user, chat[1], await readJson(req, 10000)), 201);
+    if (chat && chat[2] === 'claim' && m === 'POST') return json(req, env, await claimChat(store, await freshUser(env, store, user), chat[1]));
+    if (chat && chat[2] === 'close' && m === 'POST') return json(req, env, await closeChat(store, user, chat[1]));
 
     if (path === '/api/me' && m === 'GET') {
       await freshUser(env, store, user);

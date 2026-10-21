@@ -1,0 +1,91 @@
+# Train Sim Germany – Backend automatisch bei Cloudflare veröffentlichen
+#
+# Einmal einrichten (Anleitung: backend/README.md):
+#   1. Kostenloses Konto auf cloudflare.com, dort einmal „Workers & Pages“ öffnen (legt die workers.dev-Adresse an)
+#   2. API-Token mit der Vorlage „Edit Cloudflare Workers“ erstellen
+#   3. Im Repository unter Settings → Secrets and variables → Actions eintragen:
+#        CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID                     (Pflicht)
+#        DISCORD_WEBHOOK_URL, DISCORD_RESULTS_WEBHOOK_URL, GAME_API_KEY  (optional)
+#   4. Actions → „Backend veröffentlichen“ → Run workflow
+# Danach läuft es bei jeder Änderung im Ordner backend/ von selbst. Die Adresse des Backends
+# wird automatisch in assets/js/config.js (api) eingetragen.
+name: Backend veröffentlichen
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['backend/**', '.github/workflows/backend.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Cloudflare eingerichtet?
+        id: check
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID fehlen unter Settings → Secrets → Actions. Anleitung: backend/README.md"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.skip != '1'
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != '1'
+        with:
+          node-version: 22
+
+      - name: Veröffentlichen
+        id: deploy
+        if: steps.check.outputs.skip != '1'
+        working-directory: backend
+        run: |
+          set -o pipefail
+          npx --yes wrangler@4 deploy 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Geheime Werte setzen
+        if: steps.check.outputs.skip != '1'
+        working-directory: backend
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_RESULTS_WEBHOOK_URL: ${{ secrets.DISCORD_RESULTS_WEBHOOK_URL }}
+          GAME_API_KEY: ${{ secrets.GAME_API_KEY }}
+        run: |
+          for name in DISCORD_WEBHOOK_URL DISCORD_RESULTS_WEBHOOK_URL GAME_API_KEY; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              printf '%s' "$value" | npx --yes wrangler@4 secret put "$name" > /dev/null && echo "$name gesetzt"
+            else
+              echo "$name nicht gesetzt (optional)"
+            fi
+          done
+
+      - name: Adresse in config.js eintragen
+        if: steps.check.outputs.skip != '1' && steps.deploy.outputs.url != ''
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          if grep -q "api: '$URL'" assets/js/config.js; then
+            echo "config.js ist schon aktuell"
+          else
+            sed -i "s#^  api: '[^']*',#  api: '$URL',#" assets/js/config.js
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "Backend-Adresse in config.js eintragen"
+            git push
+          fi
+          echo "### Backend läuft: $URL" >> "$GITHUB_STEP_SUMMARY"

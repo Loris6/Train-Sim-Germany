@@ -673,11 +673,22 @@
     if (st.phase === 'stop') return t('Hält in {station} auf Gleis {n}', { station: stop.name, n: gleis });
     return t('Zwischen {a} und {b}', { a: stop.name, b: tr.stops[st.i + 1].name });
   }
+  // Zeit an einem Halt: bei Verspätung die Fahrplanzeit durchgestrichen, abgesetzt dahinter die neue Zeit
+  const stopTime = (sched, delay) => (delay
+    ? `<span class="st-time is-delayed"><s>${hhmm(sched)}</s><i class="st-time__sep" aria-hidden="true"></i><b class="${delay > 5 ? 'is-bad' : 'is-warn'}">${hhmm(sched + delay)}</b></span>`
+    : `<span class="st-time"><b>${hhmm(sched)}</b></span>`);
+  // Stand eines Halts in der Fahrt: passed (vorbei) | here (Zug steht hier) | next (nächster Halt) | future
+  function stopPhase(tr, i) {
+    const st = tr.st;
+    if (st.phase === 'done') return 'passed';
+    if (st.phase === 'wait') return i === 0 ? 'here' : 'future';
+    if (st.phase === 'stop') return i < st.i ? 'passed' : i === st.i ? 'here' : 'future';
+    return i <= st.i ? 'passed' : i === st.i + 1 ? 'next' : 'future';
+  }
   function trainCard(m, tr) {
     const st = tr.st;
-    const next = tr.stops[st.phase === 'run' ? st.i + 1 : Math.min(st.i + 1, tr.stops.length - 1)];
     const pctDone = Math.max(0, Math.min(100, st.progress * 100));
-    const last = tr.stops[tr.stops.length - 1];
+    const lastI = tr.stops.length - 1;
     return `<article class="train">
       <div class="train__head">
         ${lineBadge(tr.line)}
@@ -686,8 +697,10 @@
       </div>
       <p class="train__now">${icon(st.phase === 'run' ? 'fi-rr-train-side' : 'fi-rr-marker')}<span>${esc(trainWhere(m, tr))}</span></p>
       <div class="train__track" aria-hidden="true"><span style="width:${pctDone}%"></span><i style="left:${pctDone}%"></i></div>
-      <div class="train__ends"><span>${esc(tr.from)}<b>${hhmm(tr.stops[0].dep)}</b></span><span>${esc(tr.to)}<b>${hhmm(last.arr)}</b></span></div>
-      <p class="train__next">${st.phase === 'wait' ? t('Abfahrt {time}', { time: hhmm(tr.stops[0].dep + tr.delay) }) : t('Nächster Halt: {station}, {time}', { station: esc(next.name), time: hhmm(next.arr + tr.delay) })}</p>
+      <ol class="stoplist" aria-label="${esc(t('Fahrtverlauf'))}">${tr.stops.map((stop, i) => `<li class="stoplist__row is-${stopPhase(tr, i)}">
+          <i aria-hidden="true"></i><span class="stoplist__name">${esc(stop.name)}</span>
+          ${i === lastI ? `<small class="stoplist__an">${t('an')}</small>` : ''}${stopTime(i === lastI ? stop.arr : stop.dep, tr.delay)}
+        </li>`).join('')}</ol>
       <div class="train__crew">
         ${crewHtml(tr.crew.Driver, 'Qualified Driver')}
         ${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
@@ -763,7 +776,6 @@
       body.innerHTML = `<p class="empty">${t('Diesen Server gibt es nicht mehr. Vielleicht wurde er gerade geschlossen.')}</p>`;
       return;
     }
-    document.title = `${t(s.name)} · ${t(TITLES.server)}`;
     const m = serverModel(s);
     const full = s.players >= s.max;
     const typeName = { public: t('Öffentlich'), event: t('Event'), training: t('Training'), vip: 'VIP' }[s.type];
@@ -823,6 +835,37 @@
     body.innerHTML = stats + content;
   }
 
+  // Fahrzeug: Nummer (Baureihe-Ordnungsnummer-Prüfziffer), Stromsystem und Geschwindigkeit
+  const POLAND = /Rzepin|Poznań|Konin|Kutno|Warszawa/;
+  function checkDigit(digits) {
+    let sum = 0;
+    [...digits].reverse().forEach((d, i) => { const v = +d * (i % 2 ? 1 : 2); sum += v > 9 ? v - 9 : v; });
+    return (10 - (sum % 10)) % 10;
+  }
+  function vehicleOf(tr) {
+    const T = D.trainTypes[tr.line.train] || { series: '000', vmax: 120, power: 'ac' };
+    const serial = String(1 + (hash(tr.id) % 99)).padStart(3, '0');
+    return { ...T, id: `${T.series}-${serial}-${checkDigit(T.series + serial)}` };
+  }
+  function powerText(tr, veh) {
+    if (veh.power === 'diesel') return t('Diesel');
+    if (veh.power === 'dc750') return `${fmt(750)} V DC`;
+    if (veh.power === 'multi') {
+      // Mehrsystemlok: in Polen 3.000 V Gleichstrom, Systemwechsel hinter Frankfurt (Oder)
+      const st = tr.st;
+      const a = POLAND.test(tr.stops[st.i].name);
+      const b = POLAND.test(tr.stops[Math.min(st.i + 1, tr.stops.length - 1)].name);
+      if (st.phase === 'run' ? (a && b) || (a !== b && (b ? st.seg > 0.4 : st.seg < 0.6)) : a) return `${fmt(3000)} V DC`;
+    }
+    return `${fmt(15000)} V AC`;
+  }
+  function speedOf(tr, veh) {
+    const st = tr.st;
+    if (!st || st.phase !== 'run') return 0;
+    const cruise = veh.vmax * (0.72 + (hash(`${tr.id}#${st.i}`) % 25) / 100);
+    return Math.max(4, Math.round(cruise * Math.min(1, Math.sin(Math.PI * st.seg) * 1.8)));
+  }
+
   // Dialoge: Fahrtverlauf eines Zuges und kommende Züge an einem Bahnhof
   function tripView(id) {
     const s = serverById(state.serverId);
@@ -832,35 +875,62 @@
     const live = m.trains.find((x) => x.id === id);
     const tr = live || Object.assign(base, { st: tripState(base, m.now), crew: {}, riders: [] });
     const st = tr.st;
-    const items = [];
-    tr.stops.forEach((stop, i) => {
-      const station = m.stationMap.get(stop.name);
-      const passed = st.phase === 'done' || (st.phase !== 'wait' && (i < st.i || (i === st.i && st.phase === 'run')));
-      const here = (st.phase === 'stop' || st.phase === 'wait') && i === st.i;
-      const time = i === 0 ? stop.dep : stop.arr;
-      const staff = station ? station.staff.map((p) => esc(p.name)).join(', ') : '';
-      items.push(`<li class="journey__stop${passed ? ' is-passed' : ''}${here ? ' is-here' : ''}">
-        <span class="journey__time">${timeHtml(time, tr.delay)}</span>
-        <span class="journey__dot" aria-hidden="true"></span>
-        <span class="journey__body">${stationBtn(stop.name)}
-          <small>${t('Gleis {n}', { n: platformOf(station, tr.lineId, tr.dir) })}${here ? ` · <b>${t('Zug steht hier')}</b>` : ''}${staff ? ` · Platform Staff: ${staff}` : ''}</small></span>
-      </li>`);
-      if (st.phase === 'run' && i === st.i) {
-        const left = Math.max(1, Math.ceil(tr.stops[i + 1].arr - st.at));
-        items.push(`<li class="journey__train"><span class="journey__time"></span><span class="journey__dot" aria-hidden="true">${icon('fi-rr-train-side')}</span>
-          <span class="journey__body"><b>${t('Zug fährt gerade')}</b><small>${t('Noch {n} Min. bis {station}', { n: left, station: esc(tr.stops[i + 1].name) })}</small></span></li>`);
-      }
-    });
+    const veh = vehicleOf(tr);
+    const lastI = tr.stops.length - 1;
+
+    // Oben: wer fährt den Zug (ohne Hintergrund)
+    const driver = tr.crew.Driver;
+    const dr = driver && roleRank(driver.role);
+    const head = driver
+      ? `<header class="tv-user">
+          <span class="avatar-ring tv-user__ring" style="--rc:${dr.color}">${avatar(driver.name)}</span>
+          <span class="tv-user__text"><h3>${esc(driver.name)}</h3><span class="tv-badge" style="--rc:${dr.color}">${esc(t(dr.label))}</span></span>
+        </header>`
+      : `<header class="tv-user">
+          <span class="avatar-ring tv-user__ring" style="--rc:var(--line-2)"><span class="tv-user__ai">${icon('fi-rr-robot')}</span></span>
+          <span class="tv-user__text"><h3>${live ? t('KI') : t('Noch offen')}</h3><span class="tv-badge tv-badge--muted">${esc(live ? t(rankOf('Qualified Driver').label) : st.phase === 'done' ? t('Diese Fahrt ist beendet.') : t('Die Besatzung steht kurz vor der Abfahrt fest.'))}</span></span>
+        </header>`;
+
     const status = st.phase === 'done' ? t('Angekommen') : st.phase === 'wait'
       ? t('Abfahrt in {n} Min.', { n: Math.max(0, Math.ceil(tr.stops[0].dep - st.at)) }) : trainWhere(m, tr);
-    return `<div class="trip">
-      <div class="trip__head">${lineBadge(tr.line)}<div class="train__title"><h3>${t('nach {to}', { to: esc(tr.to) })}</h3><small>${esc(tr.no)} · ${esc(tr.line.train)}</small></div>${delayHtml(tr.delay)}</div>
-      <p class="train__now">${icon('fi-rr-marker')}<span>${esc(status)}</span></p>
-      ${live ? `<div class="train__crew">${crewHtml(tr.crew.Driver, 'Qualified Driver')}${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
-        ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}</div>`
-        : `<p class="sheet-note">${st.phase === 'done' ? t('Diese Fahrt ist beendet.') : t('Die Besatzung steht kurz vor der Abfahrt fest.')}</p>`}
-      <h4 class="sheet-sub">${t('Fahrtverlauf')}</h4>
-      <ol class="journey">${items.join('')}</ol>
+    const unit = `<section class="tv-card tv-unit">
+        <div class="tv-unit__row">
+          <div class="tv-unit__main"><span class="tv-label">${t('Einheit')}</span>${lineBadge(tr.line)}
+            <b class="tv-unit__dest">${t('nach {to}', { to: esc(tr.to) })}</b><small>${esc(tr.no)} · ${esc(tr.line.train)}</small></div>
+          <div class="tv-unit__id"><span class="tv-label">ID</span><code>${veh.id}</code></div>
+        </div>
+        <div class="tv-unit__facts">
+          <span>${icon('fi-rr-bolt', 'tv-ic tv-ic--power')}<b>${powerText(tr, veh)}</b></span>
+          <span>${icon('fi-rr-dashboard', 'tv-ic tv-ic--speed')}<b>${t('{n} km/h', { n: speedOf(tr, veh) })}</b></span>
+        </div>
+        <p class="tv-unit__status">${icon(st.phase === 'run' ? 'fi-rr-train-side' : 'fi-rr-marker')}<span>${esc(status)}</span>${delayHtml(tr.delay)}</p>
+        ${tr.crew.Conductor || tr.riders.length ? `<div class="train__crew">${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
+          ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rr-users-alt')}${riders(tr.riders.length)}</span>` : ''}</div>` : ''}
+      </section>`;
+
+    // Fahrtverlauf: Linie schwarz bis zur aktuellen Position, Gleis am Start und Ziel hervorgehoben
+    const fillOf = (i) => (st.phase === 'done' || i < st.i ? 1 : i === st.i && st.phase === 'run' ? st.seg : 0);
+    const rows = tr.stops.map((stop, i) => {
+      const station = m.stationMap.get(stop.name);
+      const ph = stopPhase(tr, i);
+      const time = i === lastI ? stop.arr : stop.dep;
+      const fill = fillOf(i);
+      const people = station ? [...station.signallers.map((p) => [p, 'Signaller']), ...station.staff.map((p) => [p, 'Platform Staff'])] : [];
+      return `<li class="tl__row is-${ph}">
+        <span class="tl__time"><b${tr.delay ? ' class="is-struck"' : ''}>${hhmm(time)}</b><small class="${tr.delay ? 'is-late' : 'is-ok'}">${hhmm(time + tr.delay)}</small></span>
+        <span class="tl__rail" style="--fill:${fill.toFixed(3)}">${i === lastI ? icon(st.phase === 'done' ? 'fi-sr-marker' : 'fi-rr-marker', 'tl__pin') : '<i class="tl__dot"></i>'}${fill > 0 && fill < 1
+          ? `<span class="tl__train" style="top:calc(12px + ${(fill * 100).toFixed(1)}%)">${icon('fi-rr-train-side')}</span>` : ''}</span>
+        <span class="tl__body">
+          <span class="tl__head">${stationBtn(stop.name)}<span class="tl__gl${i === 0 || i === lastI ? ' is-end' : ''}">${t('Gl. {n}', { n: platformOf(station, tr.lineId, tr.dir) })}</span></span>
+          ${ph === 'here' ? `<small class="tl__note">${t('Zug steht hier')}</small>` : ''}
+          ${people.length ? `<span class="tl__chips">${people.map(([p, role]) => `<span class="tl-chip" style="--rc:${rankOf(role).color}">${avatar(p.name)}<span>${role}: <b>${esc(p.name)}</b></span></span>`).join('')}</span>` : ''}
+        </span>
+      </li>`;
+    });
+    return `<div class="tv">
+      ${head}
+      ${unit}
+      <section class="tv-card tv-line"><ol class="tl">${rows.join('')}</ol></section>
       <p class="sheet-note">${t('Oben die Zeit laut Fahrplan, darunter die erwartete Zeit. Tippe auf einen Bahnhof für die kommenden Züge.')}</p>
     </div>`;
   }
@@ -969,7 +1039,7 @@
 
   function nextStepHTML(heading) {
     const next = nextRank(state.rank);
-    if (!next && canTrain()) {
+    if (!next && mayTrain()) {
       return `<article class="promo-card">
         <img class="promo-card__img" src="assets/img/group.svg" alt="" loading="lazy">
         <div class="promo-card__body">
@@ -1044,11 +1114,12 @@
     const list = trainingsList();
     const me = rankOf(state.rank);
 
-    // Lange Rangnamen (z. B. Public Relations Department) als Kürzel, damit „Training anbieten“ daneben passt
-    const short = me.name.length > 16;
-    $('[data-rank-name]').textContent = short ? `[${me.prefix}]` : me.name;
-    $('[data-rank-name]').title = me.name;
-    $$('[data-can-train]').forEach((b) => { b.hidden = !canTrain(); });
+    // Passt der Rangname nicht in die Zeile (z. B. Public Relations Department), steht dort das Kürzel
+    const rankName = $('[data-rank-name]');
+    rankName.textContent = me.name;
+    rankName.title = me.name;
+    if (rankName.scrollWidth > rankName.clientWidth + 1) rankName.textContent = `[${me.prefix}]`;
+    $$('[data-can-train]').forEach((b) => { b.hidden = !mayTrain(); });
     $('[data-bell]').setAttribute('aria-pressed', String(state.bell));
     const types = myTrainingTypes();
     $('[data-all-title]').textContent = !types ? t('Alle kommenden Trainings') : types.length ? t('Kommende {type}-Trainings', { type: types[0] }) : t('Keine weiteren Trainings');
@@ -1112,7 +1183,7 @@
   }
   function renderNewsPage() {
     $$('[data-news-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.newsCat === state.newsCat)));
-    $$('[data-can-pr]').forEach((b) => { b.hidden = !canPR(); });
+    $$('[data-can-pr]').forEach((b) => { b.hidden = !mayPR(); });
     const list = newsItems().filter((n) => state.newsCat === 'all' || n.cat === state.newsCat);
     $('[data-news-feed]').innerHTML = list.length ? list.map(newsCard).join('') : `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`;
   }
@@ -1145,6 +1216,11 @@
   const toLocalInput = (ms) => { if (!ms) return ''; const b = berlinOf(ms); return `${dateOf(b.day).toISOString().slice(0, 10)}T${hhmm(b.abs)}`; };
   const fromLocalInput = (v) => (v ? berlinToEpoch(v.slice(0, 10), v.slice(11, 16)) : null);
   function jobAdmin(job) {
+    if (mayPR() && !canBackend()) {
+      return `<section class="cbox admin-box"><h3>${icon('fi-rr-settings')}${t('Verwaltung')}<small>Public Relations</small></h3>
+        <p class="muted">${t('Stellen öffnen, schließen und Zeiträume setzen geht, sobald der App-Server verbunden ist.')}</p>
+        <button class="btn btn--soft btn--block" type="button" data-open="backend-setup">${icon('fi-rr-info')}${t('So richtest du ihn ein')}</button></section>`;
+    }
     if (!canPR()) return '';
     const s = jobState(job) || {};
     const open = s.open !== undefined ? s.open !== false : job.open;
@@ -1363,7 +1439,7 @@
         <h2>${t('Werde Teil <em>unseres Teams</em>')}</h2>
         <p class="lead">${t('Die <strong>Train Sim Germany</strong> Community sucht motivierte Mitglieder, die unser virtuelles Bahnnetz erweitern und verbessern. Entdecke die offenen Stellen und finde die Rolle, die zu dir passt.')}</p>
       </div>
-      ${canPR() ? `<a class="btn-line btn-line--outline review-link" href="#/karriere/pruefen">${icon('fi-rr-document')}${t('Bewerbungen prüfen')}${fresh ? `<span class="count-badge">${t('{n} neu', { n: fresh })}</span>` : ''}</a>` : ''}
+      ${mayPR() ? `<a class="btn-line btn-line--outline review-link" href="#/karriere/pruefen">${icon('fi-rr-document')}${t('Bewerbungen prüfen')}${fresh ? `<span class="count-badge">${t('{n} neu', { n: fresh })}</span>` : ''}</a>` : ''}
       <div class="career-list-head"><h2>${t('Offene Stellen')}</h2><span>${t('{a} von {b} offen', { a: open, b: D.jobs.length })}</span></div>
       <div class="job-list">${D.jobs.map(jobCard).join('')}</div>`;
   }
@@ -1485,7 +1561,8 @@
   function renderCareer() {
     const el = $('[data-career]');
     if (state.jobId === 'pruefen') {
-      el.innerHTML = canPR() ? (state.reviewId ? reviewDetail() : reviewList())
+      el.innerHTML = mayPR() && !canBackend() ? `<a class="back-link" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Karriere')}</a><div class="cbox">${backendSetupHtml()}</div>`
+        : canPR() ? (state.reviewId ? reviewDetail() : reviewList())
         : `<div class="cbox"><p class="lead">${t('Bewerbungen prüfen kann das Public Relations Department und höher, wenn es mit Roblox angemeldet ist.')}</p>
           <a class="btn-line btn-line--outline" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Zurück zu den Jobs')}</a></div>`;
       ensureReviewData();
@@ -1828,7 +1905,7 @@
     renderMe();
     RENDER[state.page]();
     bind();
-    if (!state.serverId) document.title = t(TITLES[state.page]);
+    document.title = TITLES[state.page] || 'Train Sim Germany';
     refreshModal();
   }
   // Fester Text aus index.html: beim ersten Aufruf merken, danach immer vom deutschen Original übersetzen
@@ -2198,6 +2275,27 @@
   const canBackend = () => apiReady() && !!sessionToken() && state.rankFromGroup;
   const canTrain = () => canBackend() && rankIdx(state.rank) >= rankIdx('Supervisor');
   const canPR = () => canBackend() && rankIdx(state.rank) >= rankIdx('Public Relations Department');
+  // Darf es laut Rang? Dann sind die Knöpfe sichtbar – auch wenn das Backend noch fehlt (dann kommt die Anleitung).
+  const isTeam = (min) => state.rankFromGroup && rankIdx(state.rank) >= rankIdx(min);
+  const mayTrain = () => isTeam('Supervisor');
+  const mayPR = () => isTeam('Public Relations Department');
+  const BACKEND_GUIDE = 'https://github.com/Loris6/Train-Sim-Germany/blob/main/backend/README.md';
+  function backendSetupHtml() {
+    const r = rankOf(state.rank);
+    const reLogin = apiReady() && !sessionToken();
+    return `<div class="setup">
+      <span class="setup__ic">${icon('fi-rr-database')}</span>
+      <h3>${reLogin ? t('Bitte neu anmelden') : t('Der App-Server fehlt noch')}</h3>
+      <p>${reLogin ? t('Melde dich einmal ab und wieder mit Roblox an, damit der Server dich erkennt.')
+        : t('Als {rank} darfst du das. Damit Trainings, Neuigkeiten, Bewerbungen und der Chat bei allen ankommen, braucht die App ihren Server (Backend). Er ist noch nicht verbunden.', { rank: `<b>[${esc(r.prefix)}] ${esc(r.name)}</b>` })}</p>
+      ${reLogin ? '' : `<ol class="setup__steps">
+        <li>${t('Bei Cloudflare ein kostenloses Konto anlegen und einen API-Token erstellen.')}</li>
+        <li>${t('Auf GitHub unter Settings → Secrets die Werte CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID eintragen.')}</li>
+        <li>${t('Unter Actions „Backend veröffentlichen“ starten – die Adresse wird automatisch eingetragen.')}</li>
+      </ol>
+      <a class="btn btn--primary btn--lg btn--block" href="${BACKEND_GUIDE}" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}${t('Anleitung öffnen')}</a>`}
+    </div>`;
+  }
 
   // ---------- Inhalte aus dem Backend: Trainings, Neuigkeiten, Stellen ----------
   const remote = { trainings: null, news: null, jobs: {} };
@@ -2218,6 +2316,7 @@
   // ---------- Trainings anbieten (ab Supervisor) ----------
   const TRAINING_TYPES = D.trainingTypes.map((x) => x.name);
   function trainingForm() {
+    if (mayTrain() && !canBackend()) return backendSetupHtml();
     if (!canTrain()) return `<p class="muted">${t('Trainings anbieten können Supervisor und höher, wenn sie mit Roblox angemeldet sind.')}</p>`;
     const today = dateOf(berlinNow().day).toISOString().slice(0, 10);
     return `<form class="cform" data-training-new novalidate>
@@ -2283,6 +2382,7 @@
       <button class="round-btn" type="button" data-nbtn-del aria-label="${esc(t('Button entfernen'))}">${icon('fi-rr-cross-small')}</button>
     </div>`;
   function newsForm() {
+    if (mayPR() && !canBackend()) return backendSetupHtml();
     if (!canPR()) return `<p class="muted">${t('Neuigkeiten schreiben kann das Public Relations Department und höher, wenn es mit Roblox angemeldet ist.')}</p>`;
     return `<form class="cform" data-news-new novalidate>
       <div class="f"><label class="f__label" for="nw-title">${t('Titel')}</label><input id="nw-title" name="title" maxlength="120"></div>
@@ -2505,6 +2605,575 @@
       ensureReviewData();
     } catch (e) {
       toast(e.status === 503 ? t('Im Backend fehlt noch der zweite Discord-Webhook (DISCORD_RESULTS_WEBHOOK_URL).') : errorText(e));
+    }
+  }
+
+  // ---------- Shop: Coins, Züge und Strecken ----------
+  // Mit Backend kommen Katalog, Coins und Besitz vom Server (Stand aus dem Spiel); ohne Backend ist es eine Demo.
+  const shop = { data: null, at: 0, tab: 'trains', filter: 'all', loading: false };
+  const ART = Object.fromEntries(D.shop.trains.map((x) => [x.id, x.art]));
+  let artN = 0;
+  const coins = (n) => `<span class="coins">${icon('fi-sr-coins')}${fmt(n)}</span>`;
+  // Seitenansicht eines Zuges als SVG
+  function trainArt(id) {
+    const a = ART[id] || { nose: 'round', body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B' };
+    const clip = `ta-${id}-${(artN += 1)}`;
+    const deck = a.deck === 2;
+    const x0 = 14;
+    const x1 = a.short ? 236 : a.long ? 314 : 290;
+    const bottom = 92;
+    const top = deck ? 30 : 44;
+    const noseLen = a.nose === 'ice' ? 54 : a.nose === 'round' ? 26 : 12;
+    const n = x1 - noseLen;
+    const body = a.nose === 'ice'
+      ? `M${x0},${top + 6} Q${x0},${top} ${x0 + 6},${top} H${n} C${n + 30},${top} ${x1 - 6},${bottom - 26} ${x1},${bottom - 8} Q${x1 + 1},${bottom} ${x1 - 8},${bottom} H${x0} Z`
+      : a.nose === 'round'
+        ? `M${x0},${top + 6} Q${x0},${top} ${x0 + 6},${top} H${n} Q${x1 - 2},${top} ${x1},${top + 18} L${x1},${bottom - 6} Q${x1},${bottom} ${x1 - 6},${bottom} H${x0} Z`
+        : `M${x0},${top + 6} Q${x0},${top} ${x0 + 6},${top} H${x1 - 8} Q${x1},${top} ${x1},${top + 8} L${x1},${bottom - 4} Q${x1},${bottom} ${x1 - 4},${bottom} H${x0} Z`;
+    const winEnd = n - (a.nose === 'ice' ? 4 : 10);
+    const band = (y) => `<rect x="${x0 + 12}" y="${y}" width="${winEnd - x0 - 12}" height="11" rx="4" fill="${a.window}"/>`;
+    const cab = a.nose === 'ice'
+      ? `<path d="M${n + 2},${top + 8} C${n + 22},${top + 8} ${x1 - 16},${top + 24} ${x1 - 10},${top + 34} H${n + 2} Z" fill="${a.window}"/>`
+      : `<rect x="${x1 - 16}" y="${top + 9}" width="12" height="${deck ? 18 : 14}" rx="3" fill="${a.window}"/>`;
+    const doors = [];
+    for (let x = x0 + 44; x < winEnd - 20; x += a.short ? 90 : 78) doors.push(`<rect x="${x}" y="${deck ? top + 33 : top + 7}" width="13" height="${bottom - (deck ? top + 33 : top + 7) - 5}" rx="2" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="1.2"/>`);
+    const bogie = (x) => `<g><rect x="${x - 20}" y="${bottom - 2}" width="40" height="7" rx="3" fill="#3A3F48"/><circle cx="${x - 10}" cy="${bottom + 7}" r="6" fill="#2A2E35"/><circle cx="${x + 10}" cy="${bottom + 7}" r="6" fill="#2A2E35"/></g>`;
+    return `<svg class="train-art" viewBox="0 0 330 112" role="img" aria-hidden="true">
+      <ellipse cx="${(x0 + x1) / 2}" cy="106" rx="${(x1 - x0) / 2}" ry="4" fill="rgba(0,0,0,.12)"/>
+      <rect x="0" y="103" width="330" height="3" rx="1.5" fill="rgba(0,0,0,.18)"/>
+      ${bogie(x0 + 40)}${bogie(x1 - 44)}
+      <path d="${body}" fill="${a.body}" stroke="rgba(0,0,0,.14)" stroke-width="1"/>
+      ${a.top ? `<clipPath id="${clip}"><path d="${body}"/></clipPath><rect x="0" y="${top}" width="330" height="24" fill="${a.top}" clip-path="url(#${clip})"/>` : ''}
+      ${a.lower ? `<rect x="${x0 + 1}" y="${bottom - 12}" width="${n - x0}" height="11" fill="${a.lower}"/>` : ''}
+      ${deck ? band(top + 8) + band(top + 34) : band(top + 10)}
+      ${cab}
+      <rect x="${x0 + 1}" y="${bottom - (a.lower ? 18 : 14)}" width="${n - x0 + (a.nose === 'flat' ? noseLen - 2 : 0)}" height="5" fill="${a.stripe}"/>
+      ${doors.join('')}
+    </svg>`;
+  }
+  const demoWallet = () => {
+    const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
+    return { coins: w.coins, available: w.coins, trains: w.trains, routes: w.routes, pending: [], syncedAt: null, demo: true };
+  };
+  async function loadShop(force = false) {
+    if (shop.loading || (!force && shop.data && Date.now() - shop.at < 20000)) return;
+    shop.loading = true;
+    try {
+      shop.data = apiReady() ? await api('/api/shop') : { catalog: { trains: D.shop.trains, routes: D.shop.routes }, wallet: demoWallet(), demo: true };
+    } catch (e) {
+      shop.data = shop.data || { catalog: { trains: D.shop.trains, routes: D.shop.routes }, wallet: null, error: true };
+    } finally {
+      shop.loading = false;
+      shop.at = Date.now();
+    }
+    if (state.page === 'shop') renderShop();
+    if (modalView && modalView.name === 'buy') refreshModal();
+  }
+  const routeByNo = (no) => D.routes.find((r) => r.no === no);
+  function shopItems(kind) {
+    const c = shop.data ? shop.data.catalog : { trains: D.shop.trains, routes: D.shop.routes };
+    return kind === 'routes' ? c.routes.map((x) => ({ ...x, route: routeByNo(x.id) })).filter((x) => x.route) : c.trains;
+  }
+  function itemStatus(kind, item) {
+    const w = shop.data && shop.data.wallet;
+    if (!w) return item.starter ? 'owned' : 'locked';
+    const owned = (kind === 'routes' ? w.routes : w.trains) || [];
+    if (owned.includes(item.id) || item.starter) return 'owned';
+    if ((w.pending || []).some((p) => p.item === item.id)) return 'pending';
+    return w.available >= item.price ? 'buy' : 'short';
+  }
+  function shopNote() {
+    const d = shop.data;
+    if (!d) return `<p class="shop-note">${t('Wird geladen …')}</p>`;
+    if (d.demo) return `<p class="shop-note">${icon('fi-rr-info')}<span>${t('Demo: Coins und Käufe gelten nur auf diesem Gerät. Mit dem App-Server kommen sie direkt aus dem Spiel.')}</span></p>`;
+    if (!d.wallet) {
+      return `<div class="shop-note shop-note--cta">${icon('fi-rr-sign-in-alt')}<span>${t('Melde dich mit Roblox an, um deine Coins und Züge aus dem Spiel zu sehen und hier einzukaufen.')}</span>
+        <button class="btn btn--primary btn--sm" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
+    }
+    if (!d.wallet.syncedAt) return `<p class="shop-note">${icon('fi-rr-gamepad')}<span>${t('Noch keine Daten aus dem Spiel. Starte Train Sim Germany einmal – danach stehen hier deine Coins.')}</span></p>`;
+    const min = Math.max(0, Math.round((Date.now() - d.wallet.syncedAt) / 60000));
+    return `<p class="shop-note">${icon('fi-rr-check-circle')}<span>${min < 1 ? t('Stand aus dem Spiel: gerade eben') : t('Stand aus dem Spiel: vor {n} Min.', { n: min })}</span></p>`;
+  }
+  function shopCard(kind, item) {
+    const st = itemStatus(kind, item);
+    const w = shop.data && shop.data.wallet;
+    const action = st === 'owned' ? `<span class="shop-own">${icon('fi-rr-check')}${t('Im Besitz')}</span>`
+      : st === 'pending' ? `<span class="shop-own shop-own--wait">${icon('fi-rr-time-fast')}${t('Wird im Spiel freigeschaltet')}</span>`
+        : st === 'locked' ? `<span class="shop-price">${coins(item.price)}</span>`
+          : `<button class="btn ${st === 'buy' ? 'btn--primary' : 'btn--soft'} shop-buy" type="button" data-buy="${kind}:${esc(item.id)}"${w && w.syncedAt === null && !w.demo ? ' disabled' : ''}>${coins(item.price)}</button>`;
+    if (kind === 'routes') {
+      const r = item.route;
+      return `<article class="shop-card shop-card--route is-${st}">
+        <div class="shop-card__media"><img src="assets/img/${r.img}" alt="" loading="lazy"><span class="line line--${r.cat}">${esc(r.line)}</span></div>
+        <div class="shop-card__body">
+          <span class="shop-card__kicker">${esc(r.no)}</span>
+          <h3>${esc(t(r.title))}</h3>
+          <p class="shop-card__meta">${esc(r.from)} → ${esc(r.to)}</p>
+          <p class="shop-card__meta">${fmt(r.km)} km · ${t('{n} Halte', { n: r.stops })}</p>
+          <div class="shop-card__foot">${action}</div>
+        </div>
+      </article>`;
+    }
+    return `<article class="shop-card is-${st}">
+      <div class="shop-card__media shop-card__media--${item.cat}">${trainArt(item.id)}<span class="line line--${item.cat}">${esc((CATS.find((c) => c.id === item.cat) || { name: item.cat.toUpperCase() }).name)}</span></div>
+      <div class="shop-card__body">
+        <span class="shop-card__kicker">${esc(item.series)}</span>
+        <h3>${esc(item.name)}</h3>
+        <p class="shop-card__meta">${icon('fi-rr-dashboard')}${t('{n} km/h', { n: item.vmax })}</p>
+        <div class="shop-card__foot">${action}</div>
+      </div>
+    </article>`;
+  }
+  function renderShop() {
+    if (!shop.data) loadShop();
+    const w = shop.data && shop.data.wallet;
+    $('[data-shop-coins]').innerHTML = w ? coins(w.coins) : coins(0);
+    $('[data-shop-sub]').textContent = w && w.pending && w.pending.length
+      ? t('{n} Coins reserviert für offene Käufe', { n: fmt(w.coins - w.available) }) : t('Deine Coins');
+    $$('[data-shop-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.shopTab === shop.tab)));
+    const kind = shop.tab;
+    const all = shopItems(kind);
+    const list = all.filter((x) => {
+      const st = itemStatus(kind, x);
+      return shop.filter === 'all' || (shop.filter === 'owned' ? st === 'owned' || st === 'pending' : st === 'buy' || st === 'short');
+    });
+    const n = (f) => all.filter((x) => { const st = itemStatus(kind, x); return f === 'owned' ? st === 'owned' || st === 'pending' : st === 'buy' || st === 'short' || st === 'locked'; }).length;
+    const chip = (id, label) => `<button class="chip${shop.filter === id ? ' is-active' : ''}" type="button" data-shop-filter="${id}">${label}</button>`;
+    $('[data-shop]').innerHTML = `${shopNote()}
+      <div class="chips chips--scroll chips--block">${chip('all', `${t('Alle')} · ${all.length}`)}${chip('owned', `${t('Im Besitz')} · ${n('owned')}`)}${chip('buy', `${t('Kaufbar')} · ${n('buy')}`)}</div>
+      <div class="shop-grid">${list.length ? list.map((x) => shopCard(kind, x)).join('') : `<p class="empty">${t('Hier ist gerade nichts.')}</p>`}</div>`;
+  }
+  function buyView(arg) {
+    const [kind, id] = String(arg).split(':');
+    const item = shopItems(kind).find((x) => x.id === id);
+    if (!item) return `<p class="muted">${t('Diesen Artikel gibt es nicht mehr.')}</p>`;
+    const w = shop.data && shop.data.wallet;
+    const st = itemStatus(kind, item);
+    const name = kind === 'routes' ? `${item.route.no} ${t(item.route.title)}` : item.name;
+    if (st === 'owned' || st === 'pending') return `<p class="muted">${t('{name} gehört dir schon.', { name: esc(name) })}</p>`;
+    const after = w ? w.available - item.price : 0;
+    return `<div class="buy">
+      <div class="buy__media">${kind === 'routes' ? `<img src="assets/img/${item.route.img}" alt="">` : trainArt(item.id)}</div>
+      <h3>${esc(name)}</h3>
+      <dl class="buy__sum">
+        <div><dt>${t('Preis')}</dt><dd>${coins(item.price)}</dd></div>
+        <div><dt>${t('Deine Coins')}</dt><dd>${coins(w ? w.available : 0)}</dd></div>
+        <div class="buy__after${after < 0 ? ' is-short' : ''}"><dt>${t('Danach')}</dt><dd>${coins(after)}</dd></div>
+      </dl>
+      ${after < 0 ? `<p class="f__note">${t('Dir fehlen noch {n} Coins. Coins verdienst du im Spiel mit pünktlichen Fahrten.', { n: fmt(-after) })}</p>`
+        : `<button class="btn btn--primary btn--lg btn--block" type="button" data-buy-confirm="${esc(arg)}">${icon('fi-rr-shopping-cart')}${t('Jetzt kaufen')}</button>
+          <p class="f__note">${shop.data.demo ? t('Demo: Der Kauf gilt nur auf diesem Gerät.') : t('Die Coins werden reserviert. Im Spiel wird der Kauf beim nächsten Abgleich verbucht – meist innerhalb einer Minute, sonst beim nächsten Spielstart.')}</p>`}
+    </div>`;
+  }
+  async function confirmBuy(arg) {
+    const [kind, id] = String(arg).split(':');
+    const item = shopItems(kind).find((x) => x.id === id);
+    if (!item) return;
+    if (shop.data.demo) {
+      const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
+      if (w.coins < item.price) return;
+      w.coins -= item.price;
+      w[kind === 'routes' ? 'routes' : 'trains'] = [...w[kind === 'routes' ? 'routes' : 'trains'], id];
+      store.set('tsg-wallet', w);
+      shop.data.wallet = demoWallet();
+    } else {
+      try {
+        shop.data.wallet = await api('/api/shop/buy', { method: 'POST', body: { kind: kind === 'routes' ? 'route' : 'train', id } });
+      } catch (e) {
+        toast(e.status === 402 ? t('Dafür reichen deine Coins nicht.') : e.status === 409 && e.message === 'not_synced'
+          ? t('Starte zuerst einmal das Spiel, damit deine Coins hier ankommen.') : e.status === 409 ? t('Das gehört dir schon.') : errorText(e));
+        return;
+      }
+    }
+    closeModal();
+    renderShop();
+    toast(t('Gekauft: {name}', { name: kind === 'routes' ? t(item.route.title) : item.name }));
+  }
+
+  // ---------- Chat: Anfragen ans Team und Direktnachrichten ----------
+  // Spieler wählen Grund und Bereich; alle aus dem Team des Bereichs können die Anfrage annehmen.
+  // Direkt anschreiben kann man jeden ab Supervisor (Liste aus der Roblox-Gruppe mit Suche).
+  const CHAT = D.chat;
+  const chat = { list: null, at: 0, staff: null, staffAt: 0, query: '', conv: {}, busy: false, timer: null };
+  const reasonOf = (id) => CHAT.reasons.find((r) => r.id === id) || CHAT.reasons[CHAT.reasons.length - 1];
+  const areaOf = (id) => CHAT.areas.find((a) => a.id === id) || CHAT.areas[CHAT.areas.length - 1];
+  const chatReady = () => apiReady() && !!sessionToken();
+  const seenChats = () => store.get('tsg-chat-seen', {});
+  const markSeen = (c) => { const s = seenChats(); s[c.id] = c.updated; store.set('tsg-chat-seen', s); };
+  const isUnread = (c) => !!(chat.list && c.last && c.last.by !== chat.list.me && c.last.by !== 'system' && c.updated > (seenChats()[c.id] || 0));
+  const chatAgo = (ms) => {
+    const min = Math.round((Date.now() - ms) / 60000);
+    if (min < 1) return t('gerade eben');
+    if (min < 60) return t('vor {n} Min.', { n: min });
+    if (min < 1440) return t('vor {n} Std.', { n: Math.round(min / 60) });
+    return fmtDate(ms);
+  };
+  // Mit wem spreche ich? (für Titel und Bild)
+  function chatOther(c) {
+    const me = chat.list && chat.list.me;
+    if (c.kind === 'direct') return c.from.sub === me ? c.to : c.from;
+    if (c.from.sub === me) return c.claimedBy || null;
+    return c.from;
+  }
+  function chatTitle(c) {
+    const other = chatOther(c);
+    if (c.kind === 'direct') return other ? other.displayName || other.username : t('Direktnachricht');
+    return t(reasonOf(c.reason).label);
+  }
+  function chatStatus(c) {
+    if (c.status === 'closed') return `<span class="pill">${t('Erledigt')}</span>`;
+    if (c.kind === 'direct') return `<span class="pill pill--info">${icon('fi-rr-lock')}${t('Privat')}</span>`;
+    if (c.status === 'open') return `<span class="pill pill--warn">${t('Wartet auf Annahme')}</span>`;
+    return `<span class="pill pill--ok">${t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</span>`;
+  }
+
+  async function loadChats(force = false) {
+    if (!chatReady() || chat.busy || (!force && chat.list && Date.now() - chat.at < 10000)) return;
+    chat.busy = true;
+    try {
+      chat.list = await api('/api/chats');
+    } catch (e) { /* später nochmal */ } finally {
+      chat.busy = false;
+      chat.at = Date.now();
+    }
+    chatDot();
+    if (state.page === 'chat' && ['mine', 'queue'].includes(state.chatView)) renderChat();
+  }
+  function chatDot() {
+    const l = chat.list;
+    const n = l ? l.chats.filter(isUnread).length + l.queue.filter((x) => x.status === 'open').length : 0;
+    $$('[data-chat-dot]').forEach((el) => { el.hidden = !n; });
+  }
+  // Team ab Supervisor: vom Backend oder direkt aus der Roblox-Gruppe (über den Proxy)
+  async function loadStaff() {
+    if (chat.staff && Date.now() - chat.staffAt < 30 * 60000) return;
+    const cached = store.get('tsg-staff', null);
+    if (!chat.staff && cached && Date.now() - cached.at < 30 * 60000) { chat.staff = cached.list; chat.staffAt = cached.at; return; }
+    try {
+      let list;
+      if (apiReady()) list = (await api('/api/staff')).staff;
+      else {
+        const R = D.roblox;
+        const j = (u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+        const roles = ((await j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles`)).roles || [])
+          .map((r) => ({ ...r, rankName: rankFromRole(r) })).filter((r) => r.rank > 0 && rankIdx(r.rankName) >= rankIdx('Supervisor'));
+        list = [];
+        for (const r of roles) {
+          const res = await j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles/${r.id}/users?limit=100&sortOrder=Asc`);
+          (res.data || []).forEach((u) => list.push({ userId: String(u.userId), username: u.username, displayName: u.displayName || u.username, rank: r.rankName, role: r.name }));
+        }
+        for (let i = 0; i < list.length; i += 100) {
+          const part = list.slice(i, i + 100);
+          const r = await j(`${R.thumbnailsApi}/v1/users/avatar-headshot?userIds=${part.map((x) => x.userId).join(',')}&size=150x150&format=Png&isCircular=false`).catch(() => ({ data: [] }));
+          (r.data || []).forEach((img) => { const p = part.find((x) => x.userId === String(img.targetId)); if (p && img.state === 'Completed') p.avatar = img.imageUrl; });
+        }
+      }
+      chat.staff = list;
+      chat.staffAt = Date.now();
+      store.set('tsg-staff', { at: chat.staffAt, list });
+    } catch (e) {
+      chat.staff = chat.staff || (cached && cached.list) || [];
+      chat.staffAt = Date.now() - 25 * 60000;
+    }
+    if (state.page === 'chat' && ['team', 'direct'].includes(state.chatView)) renderChat();
+  }
+
+  function chatHead() {
+    const v = state.chatView;
+    const staffAreas = chat.list ? chat.list.areas : [];
+    const tab = (id, href, label, n) => `<a role="tab" href="${href}" aria-selected="${v === id}">${label}${n ? `<span class="head-tabs__n">${n}</span>` : ''}</a>`;
+    const open = chat.list ? chat.list.queue.filter((x) => x.status === 'open').length : 0;
+    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
+    return `<div class="appbar">
+        <div class="appbar__title"><span class="appbar__label">${t('Hilfe & Team')}</span><h1 class="appbar__value">${t('Chat')}</h1></div>
+        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neue Anfrage')}</a></div>
+      </div>
+      <div class="head-tabs" role="tablist" aria-label="${esc(t('Chat'))}">
+        ${tab('mine', '#/chat', t('Gespräche'), unread)}
+        ${staffAreas.length || mayTrain() ? tab('queue', '#/chat/anfragen', t('Anfragen'), open) : ''}
+        ${tab('team', '#/chat/team', t('Team'))}
+      </div>`;
+  }
+  function chatGate() {
+    if (!apiReady()) {
+      return mayTrain() ? `<div class="cbox">${backendSetupHtml()}</div>`
+        : `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Der Chat startet bald')}</h2><p>${t('Sobald der App-Server läuft, kannst du hier dem Team schreiben. Wer im Team ist, siehst du schon unter „Team“.')}</p>
+          <a class="btn btn--soft" href="#/chat/team">${icon('fi-rr-users-alt')}${t('Team ansehen')}</a></div>`;
+    }
+    if (!sessionToken()) {
+      return `<div class="chat-empty">${icon('fi-rr-sign-in-alt')}<h2>${t('Mit Roblox anmelden')}</h2><p>${t('Damit das Team weiß, wer schreibt, meldest du dich einmal mit Roblox an.')}</p>
+        <button class="btn btn--primary" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
+    }
+    return '';
+  }
+  function chatRow(c, { queue = false } = {}) {
+    const other = chatOther(c);
+    const area = areaOf(c.area);
+    const img = other ? personImg(other) : `<span class="chat-row__ic">${icon(c.kind === 'ticket' ? area.icon : 'fi-rr-comments')}</span>`;
+    const preview = c.last ? (c.last.by === 'system' ? '' : `${c.last.by === (chat.list && chat.list.me) ? `${t('Du')}: ` : ''}${esc(c.last.text)}`) : '';
+    return `<a class="chat-row${isUnread(c) ? ' is-unread' : ''}${c.status === 'open' && c.kind === 'ticket' ? ' is-waiting' : ''}" href="#/chat/${esc(c.id)}">
+      ${img}
+      <span class="chat-row__main">
+        <span class="chat-row__top"><b>${queue ? esc(c.from.displayName || c.from.username) : esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>
+        <span class="chat-row__sub">${queue ? `${esc(t(reasonOf(c.reason).label))} · ` : ''}${c.kind === 'ticket' ? esc(t(area.label)) : t('Direktnachricht')}</span>
+        ${preview ? `<span class="chat-row__text">${preview}</span>` : ''}
+        <span class="chat-row__status">${chatStatus(c)}</span>
+      </span>
+    </a>`;
+  }
+  function chatMine() {
+    const gate = chatGate();
+    if (gate) return gate;
+    if (!chat.list) { loadChats(); return `<p class="empty">${t('Wird geladen …')}</p>`; }
+    const list = chat.list.chats.slice().sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || b.updated - a.updated);
+    if (!list.length) {
+      return `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Stell dem Team eine Frage oder schreib jemandem direkt.')}</p>
+        <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neue Anfrage')}</a><a class="btn btn--soft" href="#/chat/team">${icon('fi-rr-users-alt')}${t('Team')}</a></div></div>`;
+    }
+    return `<div class="chat-list">${list.map((c) => chatRow(c)).join('')}</div>`;
+  }
+  function chatQueue() {
+    const gate = chatGate();
+    if (gate) return gate;
+    if (!chat.list) { loadChats(); return `<p class="empty">${t('Wird geladen …')}</p>`; }
+    if (!chat.list.areas.length) return `<p class="empty">${t('Anfragen annehmen kann das Team ab Supervisor.')}</p>`;
+    const q = chat.list.queue;
+    // Nicht angenommene zuerst – wer am längsten wartet, steht oben
+    const open = q.filter((x) => x.status === 'open').sort((a, b) => a.created - b.created);
+    const taken = q.filter((x) => x.status === 'claimed').sort((a, b) => b.updated - a.updated);
+    const areas = chat.list.areas.map((id) => esc(t(areaOf(id).label))).join(', ');
+    return `<p class="chat-hint">${icon('fi-rr-info')}<span>${t('Du siehst Anfragen aus: {areas}', { areas })}</span></p>
+      <h2 class="chat-sec">${t('Wartet auf Annahme')}<span>${open.length}</span></h2>
+      ${open.length ? `<div class="chat-list">${open.map((c) => chatRow(c, { queue: true })).join('')}</div>` : `<p class="empty">${t('Alles erledigt – keine offenen Anfragen.')}</p>`}
+      ${taken.length ? `<h2 class="chat-sec">${t('Angenommen')}<span>${taken.length}</span></h2><div class="chat-list">${taken.map((c) => chatRow(c, { queue: true })).join('')}</div>` : ''}`;
+  }
+  function chatTeam() {
+    if (!chat.staff) { loadStaff(); return `<p class="empty">${t('Team wird geladen …')}</p>`; }
+    return `<label class="field chat-search">${icon('fi-rr-search')}<span class="field__input"><span class="sr-only">${t('Team durchsuchen')}</span><input type="search" data-chat-search value="${esc(chat.query)}" placeholder="${esc(t('Name oder Rang suchen …'))}" autocomplete="off"></span></label>
+      <p class="chat-hint">${icon('fi-rr-lock')}<span>${t('Direktnachrichten sieht nur die Person, der du schreibst.')}</span></p>
+      <div data-chat-team>${chatTeamList()}</div>`;
+  }
+  function chatTeamList() {
+    const me = chat.list ? chat.list.me : state.profile && String(state.profile.userId);
+    const q = norm(chat.query.trim());
+    const list = chat.staff.filter((p) => p.userId !== me && (!q || norm(`${p.displayName} ${p.username} ${p.rank} ${rankOf(p.rank).prefix}`).includes(q)));
+    const groups = RANKS.slice().reverse().filter((r) => rankIdx(r.name) >= rankIdx('Supervisor')).map((r) => [r, list.filter((p) => p.rank === r.name)]).filter(([, l]) => l.length);
+    return groups.length ? groups.map(([r, l]) => `<section class="team-group">
+          <h2 class="pgroup__title"><i style="--rc:${r.color}"></i>${esc(r.name)}<small>${esc(t(r.label))} · ${l.length}</small></h2>
+          <ul class="team-list">${l.map((p) => `<li class="team-row">
+            ${personImg(p)}
+            <span class="team-row__main"><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small></span>
+            ${rankPill(rankOf(p.rank))}
+            <a class="btn btn--soft btn--sm" href="#/chat/an/${esc(p.userId)}" aria-label="${esc(t('{name} schreiben', { name: p.displayName }))}">${icon('fi-rr-paper-plane')}<span>${t('Schreiben')}</span></a>
+          </li>`).join('')}</ul>
+        </section>`).join('') : `<p class="empty">${q ? t('Niemanden gefunden.') : t('Gerade ist niemand im Team eingetragen.')}</p>`;
+  }
+  function chatNew() {
+    const gate = chatGate();
+    const next = nextRank(state.rank);
+    const nextArea = next && CHAT.areas.find((a) => a.rank === next.name);
+    return `<a class="back-link" href="#/chat">${icon('fi-rr-arrow-left')}${t('Chat')}</a>
+      ${gate || `<form class="cform chat-form" data-chat-new novalidate>
+        <fieldset class="f"><legend class="f__label">${t('Worum geht es?')}</legend>
+          <div class="pick-grid">${CHAT.reasons.map((r) => `<label class="pick"><input type="radio" name="reason" value="${r.id}" data-area-hint="${esc(r.area || (nextArea ? nextArea.id : 'driver'))}"><span>${icon(r.icon)}${esc(t(r.label))}</span></label>`).join('')}</div>
+        </fieldset>
+        <fieldset class="f"><legend class="f__label">${t('Welcher Bereich?')}</legend>
+          <div class="area-grid">${CHAT.areas.map((a) => `<label class="area"><input type="radio" name="area" value="${a.id}"><span class="area__ic">${icon(a.icon)}</span><span class="area__text"><b>${esc(t(a.label))}</b><small>${esc(t(a.desc))}</small></span></label>`).join('')}</div>
+        </fieldset>
+        <div class="f"><label class="f__label" for="ch-text">${t('Deine Nachricht')}</label><textarea id="ch-text" name="text" rows="5" maxlength="2000" placeholder="${esc(t('Beschreib kurz, worum es geht …'))}"></textarea></div>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Anfrage senden')}</button>
+        <p class="f__note">${t('Alle aus dem Team dieses Bereichs sehen deine Anfrage. Wer sie annimmt, antwortet dir hier – du siehst, wer es ist.')}</p>
+        <a class="chat-alt" href="#/chat/team">${icon('fi-rr-users-alt')}<span>${t('Lieber jemand Bestimmtem schreiben?')}<small>${t('Alle ab Supervisor im Team')}</small></span>${icon('fi-rr-angle-small-right')}</a>
+      </form>`}`;
+  }
+  function chatDirect(userId) {
+    const gate = chatGate();
+    const p = chat.staff && chat.staff.find((x) => x.userId === String(userId));
+    if (!chat.staff) loadStaff();
+    return `<a class="back-link" href="#/chat/team">${icon('fi-rr-arrow-left')}${t('Team')}</a>
+      ${!chat.staff ? `<p class="empty">${t('Team wird geladen …')}</p>` : !p ? `<p class="empty">${t('Diese Person ist nicht (mehr) im Team.')}</p>` : `
+      <div class="dm-card">${personImg(p, 'avatar--lg')}<span><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small>${rankPill(rankOf(p.rank))}</span></div>
+      ${gate || `<form class="cform" data-chat-direct="${esc(p.userId)}" novalidate>
+        <div class="f"><label class="f__label" for="dm-text">${t('Nachricht an {name}', { name: esc(p.displayName) })}</label><textarea id="dm-text" name="text" rows="5" maxlength="2000"></textarea></div>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Senden')}</button>
+        <p class="f__note">${icon('fi-rr-lock')} ${t('Nur {name} sieht diese Nachricht.', { name: esc(p.displayName) })}</p>
+      </form>`}`}`;
+  }
+
+  // ---------- Ein Gespräch ----------
+  function chatMessages(c) {
+    const me = chat.list ? chat.list.me : null;
+    const people = { [c.from.sub]: c.from };
+    if (c.to) people[c.to.sub] = c.to;
+    if (c.claimedBy) people[c.claimedBy.sub] = c.claimedBy;
+    let lastDay = '';
+    let lastBy = '';
+    return c.messages.map((m) => {
+      const day = fmtDate(m.at);
+      const sep = day !== lastDay ? `<li class="msg-day"><span>${day}</span></li>` : '';
+      lastDay = day;
+      if (m.by === 'system') {
+        lastBy = '';
+        return `${sep}<li class="msg-sys">${m.text === 'claimed' ? t('{name} hat die Anfrage angenommen', { name: esc(m.name) }) : t('{name} hat das Gespräch beendet', { name: esc(m.name) })}</li>`;
+      }
+      const mine = m.by === me;
+      const p = people[m.by] || { username: '?' };
+      const first = m.by !== lastBy || sep;
+      lastBy = m.by;
+      const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(m.at));
+      return `${sep}<li class="msg${mine ? ' msg--mine' : ''}${first ? ' is-first' : ''}">
+        ${!mine ? (first ? personImg(p, 'avatar--sm') : '<span class="msg__gap"></span>') : ''}
+        <div class="msg__bubble">${!mine && first ? `<b class="msg__name">${esc(p.displayName || p.username)}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}</b>` : ''}<p>${esc(m.text)}</p><time>${time}</time></div>
+      </li>`;
+    }).join('');
+  }
+  function chatConvHead(c) {
+    const area = c.kind === 'ticket' ? areaOf(c.area) : null;
+    const other = chatOther(c);
+    return `<a class="back-link" href="${chat.list && chat.list.areas.includes(c.area) && c.from.sub !== chat.list.me && !(c.claimedBy && c.claimedBy.sub === chat.list.me) ? '#/chat/anfragen' : '#/chat'}">${icon('fi-rr-arrow-left')}${t('Alle Gespräche')}</a>
+      <div class="conv-head">
+        ${other ? personImg(other, 'avatar--lg') : `<span class="chat-row__ic chat-row__ic--lg">${icon(area ? area.icon : 'fi-rr-comments')}</span>`}
+        <div class="conv-head__text">
+          <h1>${esc(chatTitle(c))}</h1>
+          <p>${area ? `${esc(t(area.label))} · ` : ''}${c.kind === 'ticket' && other && c.from.sub !== (chat.list && chat.list.me) ? `${esc(t(reasonOf(c.reason).label))} · ` : ''}${chatStatus(c)}</p>
+        </div>
+        ${c.canClose ? `<button class="btn btn--soft btn--sm" type="button" data-chat-close="${esc(c.id)}">${icon('fi-rr-check')}${t('Beenden')}</button>` : ''}
+      </div>`;
+  }
+  function chatComposer(c) {
+    if (c.canClaim) {
+      return `<div class="compose compose--claim"><p>${t('Diese Anfrage wartet auf jemanden aus deinem Bereich.')}</p>
+        <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-claim="${esc(c.id)}">${icon('fi-rr-hand-wave')}${t('Anfrage annehmen')}</button></div>`;
+    }
+    if (c.status === 'closed') return `<p class="compose compose--note">${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
+    if (!c.canWrite) return `<p class="compose compose--note">${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
+    return `<form class="compose" data-chat-send="${esc(c.id)}">
+      <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
+      <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(t('Nachricht schreiben …'))}"></textarea>
+      <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button>
+    </form>`;
+  }
+  function chatConv(id) {
+    const c = chat.conv[id];
+    if (!c) {
+      openConv(id);
+      return { head: `<a class="back-link" href="#/chat">${icon('fi-rr-arrow-left')}${t('Alle Gespräche')}</a>`, body: `<p class="empty">${t('Wird geladen …')}</p>` };
+    }
+    if (c.error) return { head: `<a class="back-link" href="#/chat">${icon('fi-rr-arrow-left')}${t('Alle Gespräche')}</a>`, body: `<p class="empty">${t('Dieses Gespräch gibt es nicht oder du darfst es nicht sehen.')}</p>` };
+    markSeen(c);
+    return {
+      head: chatConvHead(c),
+      body: `<ol class="msgs" data-chat-msgs>${chatMessages(c)}</ol><div data-chat-compose>${chatComposer(c)}</div>`,
+    };
+  }
+  async function openConv(id, { since = 0 } = {}) {
+    if (!chatReady()) { chat.conv[id] = { error: true }; renderChat(); return; }
+    try {
+      const r = await api(`/api/chats/${encodeURIComponent(id)}${since ? `?since=${since}` : ''}`);
+      if (r.unchanged) {
+        const c = chat.conv[id];
+        const flags = ['status', 'claimedBy', 'canWrite', 'canClaim', 'canClose'];
+        if (c && flags.some((k) => JSON.stringify(c[k]) !== JSON.stringify(r[k]))) { flags.forEach((k) => { c[k] = r[k]; }); updateConv(id); }
+        return;
+      }
+      chat.conv[id] = r;
+    } catch (e) {
+      chat.conv[id] = { error: true };
+    }
+    updateConv(id);
+  }
+  // Nur Nachrichten und Kopf neu zeichnen – was im Eingabefeld steht, bleibt
+  function updateConv(id) {
+    if (state.page !== 'chat' || state.chatView !== 'conv' || state.chatArg !== id) return;
+    const list = $('[data-chat-msgs]');
+    const c = chat.conv[id];
+    if (!list || !c || c.error) { renderChat(); return; }
+    const atEnd = window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
+    $('[data-chat-head]').innerHTML = chatConvHead(c);
+    list.innerHTML = chatMessages(c);
+    const box = $('[data-chat-compose]');
+    const wasForm = !!$('form', box);
+    if (!wasForm || !c.canWrite) box.innerHTML = chatComposer(c);
+    markSeen(c);
+    if (atEnd) window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' });
+  }
+  function chatPoll() {
+    clearInterval(chat.timer);
+    chat.timer = null;
+    if (state.page !== 'chat' || !chatReady()) return;
+    chat.timer = setInterval(() => {
+      if (document.visibilityState !== 'visible' || state.page !== 'chat') return;
+      if (state.chatView === 'conv') { const c = chat.conv[state.chatArg]; if (c && !c.error) openConv(state.chatArg, { since: c.updated }); }
+      else loadChats(true);
+    }, state.chatView === 'conv' ? 4000 : 15000);
+  }
+
+  function renderChat() {
+    const v = state.chatView;
+    const head = $('[data-chat-head]');
+    const body = $('[data-chat]');
+    if (v === 'conv') {
+      const r = chatConv(state.chatArg);
+      head.innerHTML = r.head;
+      body.innerHTML = r.body;
+      return;
+    }
+    if (v === 'new' || v === 'direct') {
+      head.innerHTML = `<div class="appbar"><div class="appbar__title"><span class="appbar__label">${t('Chat')}</span><h1 class="appbar__value">${v === 'new' ? t('Neue Anfrage') : t('Direktnachricht')}</h1></div></div>`;
+      body.innerHTML = v === 'new' ? chatNew() : chatDirect(state.chatArg);
+      return;
+    }
+    head.innerHTML = chatHead();
+    body.innerHTML = v === 'team' ? chatTeam() : v === 'queue' ? chatQueue() : chatMine();
+  }
+  async function sendChat(form) {
+    const btn = $('button[type="submit"]', form);
+    const text = form.elements.text.value.trim();
+    if (!text) { form.elements.text.focus(); return; }
+    let body;
+    if ('chatNew' in form.dataset) {
+      const reason = (form.querySelector('input[name="reason"]:checked') || {}).value;
+      const area = (form.querySelector('input[name="area"]:checked') || {}).value;
+      if (!reason || !area) { toast(t('Bitte wähle Grund und Bereich.')); return; }
+      body = { kind: 'ticket', reason, area, text };
+    } else body = { kind: 'direct', to: form.dataset.chatDirect, text };
+    btn.disabled = true;
+    try {
+      const c = await api('/api/chats', { method: 'POST', body });
+      chat.conv[c.id] = c;
+      chat.at = 0;
+      location.hash = `#/chat/${c.id}`;
+      toast(body.kind === 'ticket' ? t('Anfrage gesendet') : t('Nachricht gesendet'));
+    } catch (e) {
+      btn.disabled = false;
+      toast(e.status === 429 ? t('Du hast heute schon viele Gespräche gestartet. Bitte versuch es morgen wieder.') : errorText(e));
+    }
+  }
+  async function sendMessage(form) {
+    const id = form.dataset.chatSend;
+    const ta = form.elements.text;
+    const text = ta.value.trim();
+    if (!text) return;
+    ta.value = '';
+    ta.style.height = '';
+    try {
+      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text } });
+      updateConv(id);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    } catch (e) {
+      ta.value = text;
+      toast(errorText(e));
+    }
+  }
+  async function chatAction(id, action) {
+    try {
+      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+      chat.at = 0;
+      if (state.page === 'chat' && state.chatView === 'conv') { renderChat(); }
+      toast(action === 'claim' ? t('Du hast die Anfrage angenommen') : t('Gespräch beendet'));
+    } catch (e) {
+      toast(e.status === 409 ? t('Jemand anderes war schneller.') : errorText(e));
+      openConv(id);
     }
   }
 
@@ -2763,6 +3432,14 @@
       title: () => t('Neuigkeit erstellen'),
       render: () => newsForm(),
     },
+    buy: {
+      title: () => t('Kaufen'),
+      render: (arg) => buyView(arg),
+    },
+    'backend-setup': {
+      title: () => t('App-Server'),
+      render: () => backendSetupHtml(),
+    },
   };
   // Bild oder Video oben in der Detailansicht. video: YouTube-Link oder eigene Datei (assets/video/…)
   const youtubeId = (url) => {
@@ -3009,22 +3686,17 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'karriere', 'statistiken', 'einstellungen'];
-  const TITLES = {
-    home: 'Train Sim Germany – Das Bahnerlebnis auf Roblox',
-    news: 'Neuigkeiten · Train Sim Germany',
-    karriere: 'Karriere · Train Sim Germany',
-    trainings: 'Trainings · Train Sim Germany',
-    server: 'Server · Train Sim Germany',
-    statistiken: 'Statistiken · Train Sim Germany',
-    einstellungen: 'Einstellungen · Train Sim Germany',
-  };
+  const PAGES = ['home', 'trainings', 'news', 'server', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen'];
+  // Die App heißt überall nur „Train Sim Germany“
+  const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
     home() {
       renderRoles(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews();
       $('[data-open-jobs]').textContent = D.jobs.filter((x) => x.open).length;
     },
     news() { renderNewsPage(); },
+    shop() { renderShop(); loadShop(); },
+    chat() { renderChat(); },
     karriere() { renderCareer(); },
     trainings() { renderTrainings(); },
     server() {
@@ -3046,8 +3718,12 @@
     const jobView = !jobId ? null : jobId === 'pruefen' ? 'review' : sub2 === 'bewerbung' ? 'mine' : jobApply ? 'apply' : 'detail';
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
+    const chatSub = page === 'chat' ? (sub || '') : null;
+    const chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', neu: 'new', an: 'direct' }[chatSub] || 'conv';
+    const chatArg = chatView === 'direct' ? (sub2 || '') : chatView === 'conv' ? chatSub : null;
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
-      || jobView !== state.jobView || reviewId !== state.reviewId;
+      || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg;
+    if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
     // Liste beim Öffnen frisch laden (neue Bewerbungen von anderen Geräten)
     if (jobView === 'review' && !reviewId && state.jobView !== 'review') review.at = 0;
     if (serverId !== state.serverId) Object.assign(state, { sdTab: 'trains', sdCat: 'all', sdRole: 'all' });
@@ -3057,19 +3733,24 @@
     state.jobView = jobView;
     state.reviewId = reviewId;
     state.serverId = serverId;
+    state.chatView = chatView;
+    state.chatArg = chatArg;
     document.body.dataset.page = page;
+    document.body.dataset.chatView = chatView || '';
     const view = serverId ? 'server-detail' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
     $$('[data-nav]').forEach((a) => {
       if (a.dataset.nav === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
-    document.title = t(TITLES[page]);
+    document.title = TITLES[page];
     closeMenu();
     closeModal();
     RENDER[page]();
     bind();
-    if (changed) window.scrollTo({ top: 0, behavior: 'instant' });
+    if (changed) window.scrollTo({ top: chatView === 'conv' ? document.body.scrollHeight : 0, behavior: 'instant' });
+    chatPoll();
+    if (chatView === 'mine' || chatView === 'queue') loadChats();
     // Aus einer Benachrichtigung: #/trainings?t=<id> öffnet das Training
     const openId = new URLSearchParams(query || '').get('t');
     if (page === 'trainings' && openId) {
@@ -3361,6 +4042,50 @@
     });
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
+    // Chat
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-chat-claim], [data-chat-close]');
+      if (!el) return;
+      el.disabled = true;
+      if (el.dataset.chatClaim) chatAction(el.dataset.chatClaim, 'claim');
+      else if (confirm(t('Gespräch wirklich beenden?'))) chatAction(el.dataset.chatClose, 'close');
+      else el.disabled = false;
+    });
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('[data-chat-search]')) {
+        chat.query = e.target.value;
+        const box = $('[data-chat-team]');
+        if (box) box.innerHTML = chatTeamList();
+      } else if (e.target.matches('.compose textarea')) {
+        e.target.style.height = 'auto';
+        e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.matches('.compose textarea')) {
+        e.preventDefault();
+        e.target.form.requestSubmit();
+      }
+    });
+    document.addEventListener('change', (e) => {
+      const form = e.target.closest('form[data-chat-new]');
+      if (!form) return;
+      if (e.target.name === 'area') form.dataset.areaTouched = '1';
+      if (e.target.name === 'reason' && !form.dataset.areaTouched) {
+        const area = form.querySelector(`input[name="area"][value="${e.target.dataset.areaHint}"]`);
+        if (area) area.checked = true;
+      }
+    });
+    // Shop
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-buy], [data-buy-confirm]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.shopTab) { shop.tab = ds.shopTab; shop.filter = 'all'; renderShop(); }
+      else if (ds.shopFilter) { shop.filter = ds.shopFilter; renderShop(); }
+      else if (ds.buy) openModal('buy', ds.buy);
+      else if (ds.buyConfirm) { el.disabled = true; confirmBuy(ds.buyConfirm); }
+    });
     // Bewerbungen prüfen
     document.addEventListener('click', (e) => {
       const el = e.target.closest('[data-rv-filter], [data-rv-job], [data-review], [data-announce]');
@@ -3412,6 +4137,10 @@
     document.addEventListener('submit', (e) => {
       const jform = e.target.closest('form[data-job-admin]');
       if (jform) { e.preventDefault(); saveJobAdmin(jform); return; }
+      const cform = e.target.closest('form[data-chat-new], form[data-chat-direct]');
+      if (cform) { e.preventDefault(); sendChat(cform); return; }
+      const mform = e.target.closest('form[data-chat-send]');
+      if (mform) { e.preventDefault(); sendMessage(mform); return; }
       const tform = e.target.closest('form[data-training-new]');
       if (tform) { e.preventDefault(); submitTraining(tform); return; }
       const nform = e.target.closest('form[data-news-new]');
@@ -3521,9 +4250,12 @@
     loadContent();
     loadMe();
     loadStats();
+    loadChats();
     let lastSync = Date.now();
-    const sync = () => { lastSync = Date.now(); loadContent(); loadMe(); };
+    const sync = () => { lastSync = Date.now(); loadContent(); loadMe(); loadChats(true); };
     setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 120000);
+    // Neue Nachrichten im Chat (roter Punkt unten)
+    setInterval(() => { if (document.visibilityState === 'visible' && state.page !== 'chat') loadChats(true); }, 45000);
     setInterval(loadStats, 600000);
     // Zurück in die App (z. B. auf einem anderen Gerät etwas geändert): gleich abgleichen
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastSync > 15000) sync(); });

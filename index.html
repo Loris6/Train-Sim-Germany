@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-  <title>Train Sim Germany – Das Bahnerlebnis auf Roblox</title>
+  <title>Train Sim Germany</title>
   <meta name="description" content="Train Sim Germany: Fahre ICE, RE und S-Bahn durch Deutschland auf Roblox. Trainings, Server, News, Statistiken und Karriere.">
   <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#131821" media="(prefers-color-scheme: dark)">
@@ -14,7 +14,7 @@
   <meta name="application-name" content="Train Sim Germany">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="TSG">
+  <meta name="apple-mobile-web-app-title" content="Train Sim Germany">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
@@ -357,6 +357,37 @@
       </div>
     </section>
 
+    <!-- ===================== SHOP ===================== -->
+    <section class="page" data-page="shop" aria-label="Shop" hidden>
+      <div class="page-head">
+        <div class="container">
+          <div class="appbar">
+            <div class="appbar__title">
+              <span class="appbar__label" data-shop-sub>Deine Coins</span>
+              <h1 class="appbar__value" data-shop-coins>–</h1>
+            </div>
+          </div>
+          <div class="head-tabs head-tabs--fill" role="tablist" aria-label="Shop">
+            <button type="button" role="tab" aria-selected="true" data-shop-tab="trains"><i class="fi fi-rr-train-side ic" aria-hidden="true"></i>Züge</button>
+            <button type="button" role="tab" aria-selected="false" data-shop-tab="routes"><i class="fi fi-rr-route ic" aria-hidden="true"></i>Strecken</button>
+          </div>
+        </div>
+      </div>
+      <div class="sheet">
+        <div class="container" data-shop></div>
+      </div>
+    </section>
+
+    <!-- ===================== CHAT ===================== -->
+    <section class="page" data-page="chat" aria-label="Chat" hidden>
+      <div class="page-head">
+        <div class="container container--narrow" data-chat-head></div>
+      </div>
+      <div class="sheet">
+        <div class="container container--narrow" data-chat></div>
+      </div>
+    </section>
+
     <!-- ===================== KARRIERE ===================== -->
     <section class="page" data-page="karriere" aria-labelledby="h-career" hidden>
       <h1 class="sr-only" id="h-career">Karriere bei Train Sim Germany</h1>
@@ -454,6 +485,8 @@
         <a href="#/trainings">Trainings</a>
         <a href="#/server">Server</a>
         <a href="#/news">Neuigkeiten</a>
+        <a href="#/shop">Shop</a>
+        <a href="#/chat">Chat</a>
         <a href="#/karriere">Karriere</a>
         <a href="#/statistiken">Statistiken</a>
         <a href="#/einstellungen">Einstellungen</a>
@@ -468,6 +501,8 @@
       <a href="#/" data-nav="home" aria-label="Start"><i class="fi fi-rr-house-blank ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-house-blank ic tab-on" aria-hidden="true"></i></a>
       <a href="#/news" data-nav="news" aria-label="News"><i class="fi fi-rr-newspaper ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-newspaper ic tab-on" aria-hidden="true"></i></a>
       <a href="#/trainings" data-nav="trainings" aria-label="Trainings"><i class="fi fi-rr-calendar ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-calendar ic tab-on" aria-hidden="true"></i></a>
+      <a href="#/shop" data-nav="shop" aria-label="Shop"><i class="fi fi-rr-shopping-cart ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-shopping-cart ic tab-on" aria-hidden="true"></i></a>
+      <a href="#/chat" data-nav="chat" aria-label="Chat"><i class="fi fi-rr-comments ic tab-off" aria-hidden="true"></i><i class="fi fi-sr-comments ic tab-on" aria-hidden="true"></i><span class="tabbar__dot" data-chat-dot hidden></span></a>
       <button class="tabbar__me" type="button" data-open="profile" aria-label="Profil"><span class="tabbar__avatar" data-me-ring><span class="avatar-img" data-me-avatar></span></span></button>
     </div>
   </nav>
@@ -489,6 +524,8 @@
         <a href="#/trainings" data-nav="trainings"><span class="menu__ic"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></span>Trainings</a>
         <a href="#/news" data-nav="news"><span class="menu__ic"><i class="fi fi-rr-newspaper ic" aria-hidden="true"></i></span>Neuigkeiten</a>
         <a href="#/server" data-nav="server"><span class="menu__ic"><i class="fi fi-rr-database ic" aria-hidden="true"></i></span>Server</a>
+        <a href="#/shop" data-nav="shop"><span class="menu__ic"><i class="fi fi-rr-shopping-cart ic" aria-hidden="true"></i></span>Shop</a>
+        <a href="#/chat" data-nav="chat"><span class="menu__ic"><i class="fi fi-rr-comments ic" aria-hidden="true"></i></span>Chat</a>
         <a href="#/karriere" data-nav="karriere"><span class="menu__ic"><i class="fi fi-rr-briefcase ic" aria-hidden="true"></i></span>Karriere</a>
         <a href="#/statistiken" data-nav="statistiken"><span class="menu__ic"><i class="fi fi-rr-chart-line-up ic" aria-hidden="true"></i></span>Statistiken</a>
         <a href="#/einstellungen" data-nav="einstellungen"><span class="menu__ic"><i class="fi fi-rr-settings ic" aria-hidden="true"></i></span>Einstellungen</a>

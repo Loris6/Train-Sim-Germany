@@ -69,6 +69,74 @@ window.TSG = {
     's-1d': { name: 'S 1', cat: 's', train: 'Doppelstock', every: 30, offset: 9, no: 33100, stops: [['Meißen Triebischtal', 0], ['Coswig (b Dresden)', 16], ['Radebeul Ost', 26], ['Dresden-Neustadt', 36], ['Dresden Hbf', 43]] },
   },
 
+  // Fahrzeuge der Linien (train): Baureihe für die Fahrzeugnummer, Höchstgeschwindigkeit und Stromsystem
+  // power: ac = 15.000 V AC, dc750 = 750 V DC (Stromschiene), diesel, multi = Mehrsystem (in Polen 3.000 V DC)
+  trainTypes: {
+    'ICE 4': { series: '412', vmax: 250, power: 'ac' },
+    'ICE T': { series: '411', vmax: 230, power: 'ac' },
+    'EC (Berlin-Warszawa-Express)': { series: '370', vmax: 160, power: 'multi' },
+    'IC 2': { series: '146', vmax: 160, power: 'ac' },
+    'IC 1': { series: '101', vmax: 200, power: 'ac' },
+    'Desiro HC': { series: '462', vmax: 160, power: 'ac' },
+    'Doppelstock': { series: '146', vmax: 160, power: 'ac' },
+    'Talent 2': { series: '442', vmax: 160, power: 'ac' },
+    'KISS': { series: '445', vmax: 160, power: 'ac' },
+    'LINT 41': { series: '648', vmax: 120, power: 'diesel' },
+    'FLIRT 3': { series: '1428', vmax: 140, power: 'ac' },
+    'BR 481': { series: '481', vmax: 100, power: 'dc750' },
+  },
+
+  // Shop: Züge und Strecken für Coins. Mit Backend kommen Preise und Besitz vom Server (backend/shop.js,
+  // gleiche IDs wie im Spiel). Diese Liste gilt nur für die Demo ohne Backend.
+  // art = Zeichnung: nose (ice | round | flat), deck (1 | 2), body/top/stripe/window = Farben
+  shop: {
+    trains: [
+      { id: 'talent2', name: 'Talent 2', series: 'BR 442', cat: 're', vmax: 160, price: 0, starter: true, art: { nose: 'round', body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B' } },
+      { id: 'br481', name: 'BR 481', series: 'S-Bahn Berlin', cat: 's', vmax: 100, price: 2500, art: { nose: 'round', body: '#8F1D21', top: '#F2B705', stripe: '#8F1D21', window: '#2B313B' } },
+      { id: 'flirt3', name: 'FLIRT 3', series: 'BR 1428', cat: 's', vmax: 140, price: 3500, art: { nose: 'round', body: '#F4F6F8', stripe: '#1E5AA8', window: '#26303C' } },
+      { id: 'lint41', name: 'LINT 41', series: 'BR 648', cat: 'rb', vmax: 120, price: 4000, art: { nose: 'flat', body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B', short: true } },
+      { id: 'kiss', name: 'KISS', series: 'BR 445', cat: 're', vmax: 160, price: 6500, art: { nose: 'round', deck: 2, body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B' } },
+      { id: 'desirohc', name: 'Desiro HC', series: 'BR 462', cat: 're', vmax: 160, price: 7500, art: { nose: 'ice', body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B' } },
+      { id: 'dosto', name: 'Doppelstock', series: 'BR 146 + Dosto', cat: 're', vmax: 160, price: 9000, art: { nose: 'flat', deck: 2, body: '#F4F6F8', stripe: '#EC0016', lower: '#B2B8C0', window: '#2B313B' } },
+      { id: 'ic2', name: 'IC 2', series: 'BR 146.5 + Twindexx', cat: 'ic', vmax: 160, price: 15000, art: { nose: 'round', deck: 2, body: '#F4F6F8', stripe: '#EC0016', lower: '#8E949E', window: '#2B313B' } },
+      { id: 'ic1', name: 'IC 1', series: 'BR 101', cat: 'ic', vmax: 200, price: 20000, art: { nose: 'flat', body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B' } },
+      { id: 'ice-t', name: 'ICE T', series: 'BR 411', cat: 'ice', vmax: 230, price: 32000, art: { nose: 'ice', body: '#F4F6F8', stripe: '#EC0016', window: '#1F252D' } },
+      { id: 'eu44', name: 'Berlin-Warszawa-Express', series: 'EU44 Husarz', cat: 'ec', vmax: 160, price: 45000, art: { nose: 'flat', body: '#1C3F7A', stripe: '#F4F6F8', window: '#0F1C33' } },
+      { id: 'ice4', name: 'ICE 4', series: 'BR 412', cat: 'ice', vmax: 250, price: 60000, art: { nose: 'ice', body: '#F4F6F8', stripe: '#EC0016', window: '#1F252D', long: true } },
+    ],
+    // Strecken aus routes (gleiche Nummern)
+    routes: [
+      { id: 'R001', price: 0, starter: true }, { id: 'R002', price: 3000 }, { id: 'R003', price: 3000 }, { id: 'R004', price: 5000 },
+      { id: 'R005', price: 6000 }, { id: 'R006', price: 8000 }, { id: 'R007', price: 10000 }, { id: 'R008', price: 12000 },
+      { id: 'R009', price: 15000 }, { id: 'R010', price: 40000 },
+    ],
+    // Demo-Stand ohne Backend
+    demo: { coins: 24500, trains: ['talent2', 'br481'], routes: ['R001', 'R002'] },
+  },
+
+  // Chat: Grund und Bereich einer Anfrage. Wer annehmen darf, legt backend/chat.js fest (AREAS).
+  chat: {
+    reasons: [
+      { id: 'training', label: 'Frage zu einem Training', icon: 'fi-rr-calendar' },
+      { id: 'rank', label: 'Rang oder Beförderung', icon: 'fi-rr-badge-check', area: 'other' },
+      { id: 'bug', label: 'Fehler im Spiel', icon: 'fi-rr-bug', area: 'tech' },
+      { id: 'report', label: 'Spieler melden', icon: 'fi-rr-flag', area: 'report' },
+      { id: 'application', label: 'Bewerbung', icon: 'fi-rr-briefcase', area: 'career' },
+      { id: 'shop', label: 'Coins, Züge, Strecken', icon: 'fi-rr-coins', area: 'tech' },
+      { id: 'other', label: 'Etwas anderes', icon: 'fi-rr-interrogation', area: 'other' },
+    ],
+    areas: [
+      { id: 'driver', label: 'Qualified Driver', desc: 'Fahren, Signale, Fahrplan', icon: 'fi-rr-train-side', rank: 'Qualified Driver' },
+      { id: 'platform', label: 'Platform Staff', desc: 'Abfertigung am Bahnsteig', icon: 'fi-rr-whistle', rank: 'Platform Staff' },
+      { id: 'conductor', label: 'Conductor', desc: 'Türen, Fahrgäste, Tickets', icon: 'fi-rr-ticket', rank: 'Conductor' },
+      { id: 'signaller', label: 'Signaller', desc: 'Stellwerk und Fahrstraßen', icon: 'fi-rr-traffic-light', rank: 'Signaller' },
+      { id: 'career', label: 'Karriere & Bewerbungen', desc: 'Stellen und Bewerbungen', icon: 'fi-rr-briefcase' },
+      { id: 'tech', label: 'Technik & Fehler', desc: 'Bugs, App, Coins und Käufe', icon: 'fi-rr-bug' },
+      { id: 'report', label: 'Meldungen', desc: 'Regelverstöße und Spieler melden', icon: 'fi-rr-flag' },
+      { id: 'other', label: 'Allgemein', desc: 'Alles andere', icon: 'fi-rr-interrogation' },
+    ],
+  },
+
   // Ränge = Rollen der Roblox-Gruppe, von unten nach oben. Ausbildungsweg mit Trainings:
   // Learning Driver → Qualified Driver → Platform Staff → Conductor → Signaller.
   // staff = Teamrang ohne Training. Ab Supervisor können Trainings angeboten werden,
@@ -94,7 +162,7 @@ window.TSG = {
     { name: 'Project Engineer', prefix: 'PJE', label: 'Projekt-Ingenieur', desc: 'Entwickelt Strecken und Funktionen', color: '#E479AE', members: 5, staff: true },
     { name: 'Operation Manager', prefix: 'OM', label: 'Betriebsleitung', desc: 'Leitet den Spielbetrieb', color: '#8A5CD0', members: 2, staff: true },
     { name: 'Community Director', prefix: 'CDR', label: 'Community-Leitung', desc: 'Leitet die Community', color: '#3CB98C', members: 1, staff: true },
-    { name: 'Chief Engineer', prefix: 'CEN', label: 'Chefentwickler', desc: 'Leitung von Train Sim Germany', color: '#131821', members: 1, staff: true },
+    { name: 'Chief Engineer', prefix: 'CEN', label: 'Chefentwickler', desc: 'Leitung von Train Sim Germany', color: '#D12FC8', members: 1, staff: true },
   ],
 
   // Öffentliche Roblox-Daten (Name, Profilbild, Rolle in der Gruppe) über einen Proxy mit CORS laden.

@@ -9,8 +9,10 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 | Seite | Inhalt |
 |---|---|
 | **Start** | Titelbereich mit Logo und Begrüßung, Rollen-Karten (Learning Driver, Qualified Driver, Platform Staff, Conductor, Signaller) mit der echten Zahl der Gruppenmitglieder je Rolle, nächstes Training, Strecken im Osten mit Nummer (R001 Magdeburg – Berlin, R002 Magdeburg – Leipzig, … bis Berlin – Warschau), Kennzahlen, Karriere, News |
-| **Server** | Serverliste (Ostnetz #1–#6, Trainings-, Event- und VIP-Server) mit Auslastung, Linien (ICE, EC, IC, RE, RB, S-Bahn), Rollen (Qualified Driver, Learning Driver, Conductor, Platform Staff, Signaller, auf großen Servern Supervisor als Aufsicht, Fahrgäste), Ping, Laufzeit und **Details**-Button. Die Detailseite (`#/server/<id>`) zeigt live alle **Züge** als Karten (Position, Verspätung, Lokführer bzw. KI, Zugbegleiter, Fahrgäste) mit Details-Button für den **Fahrtverlauf**, alle **Spieler** nach Rolle (wer wo Platform Staff ist, wer im Stellwerk sitzt, wer welchen Zug fährt) und alle **Stationen**. Ein Klick auf eine Station zeigt die kommenden Züge mit Gleis, Platform Staff und Stellwerk. Die Adresse ist die Server-ID aus dem Spiel (`#/server/b1cb1816-…`), sie steht auch auf der Detailseite (antippen = kopieren). „Beitreten“ startet Roblox direkt in genau diesem Server |
+| **Server** | Serverliste (Ostnetz #1–#6, Trainings-, Event- und VIP-Server) mit Auslastung, Linien (ICE, EC, IC, RE, RB, S-Bahn), Rollen (Qualified Driver, Learning Driver, Conductor, Platform Staff, Signaller, auf großen Servern Supervisor als Aufsicht, Fahrgäste), Ping, Laufzeit und **Details**-Button. Die Detailseite (`#/server/<id>`) zeigt live alle **Züge** als Karten (Position, Verspätung, alle Halte mit Abfahrt bzw. Ankunft – bei Verspätung die Fahrplanzeit durchgestrichen und abgesetzt dahinter die neue Zeit –, Lokführer bzw. KI, Zugbegleiter, Fahrgäste). **Details** öffnet die Zugansicht: oben der Lokführer mit Profilbild im Ring und Rang (ohne Hintergrund), darunter die Karte **Einheit** mit Linie (farbig, abgerundet), Fahrzeugnummer (z. B. `412-016-8`), Stromsystem (15.000 V AC, in Polen 3.000 V DC, S-Bahn Berlin 750 V DC, Diesel) und Geschwindigkeit, dann der **Fahrtverlauf** mit Zeit laut Fahrplan und erwarteter Zeit, Linie schwarz bis zur aktuellen Position, Gleis (Start und Ziel hervorgehoben) und wer am Bahnhof Signaller bzw. Platform Staff ist. Außerdem alle **Spieler** nach Rolle (wer wo Platform Staff ist, wer im Stellwerk sitzt, wer welchen Zug fährt) und alle **Stationen**. Ein Klick auf eine Station zeigt die kommenden Züge mit Gleis, Platform Staff und Stellwerk. Die Adresse ist die Server-ID aus dem Spiel (`#/server/b1cb1816-…`), sie steht auch auf der Detailseite (antippen = kopieren). „Beitreten“ startet Roblox direkt in genau diesem Server |
 | **News** | Neuigkeiten mit Kategorien (Updates, Events, Community), Beiträge mit Video (Play-Symbol auf der Karte). In der Detailansicht beginnt Bild bzw. Video ganz oben in der Rundung, Griff und Schließen liegen darauf. **Ab Public Relations Department** (mit Backend) gibt es oben „Neuigkeit“: Titel, Text, Kategorie, Tag, Pflichtangabe **Foto oder Video** (Foto hochladen oder Link, Video als YouTube-Link oder .mp4) und **bis zu 2 Buttons** – für jeden wählbar: Discord, YouTube, Roblox oder ein beliebiger Link, mit eigener Beschriftung. Eigene Neuigkeiten lassen sich wieder löschen |
+| **Shop** | Deine **Coins** aus dem Spiel und alle **Züge** und **Strecken**: Im Besitz oder kaufbar, mit Preis. Kaufen in der App reserviert die Coins, das Spiel verbucht den Kauf beim nächsten Abgleich („Wird im Spiel freigeschaltet“ → „Im Besitz“). Ohne App-Server ist der Shop eine Demo auf dem Gerät |
+| **Chat** | **Neue Anfrage:** Grund (z. B. Frage zu einem Training, Spieler melden, Bewerbung) und Bereich (Qualified Driver, Platform Staff, Conductor, Signaller, Karriere, Technik, Meldungen, Allgemein) wählen. Alle aus dem Team dieses Bereichs sehen sie unter **Anfragen** und können sie annehmen; nicht angenommene stehen oben, und man sieht, wer angenommen hat. **Team:** alle ab Supervisor nach Rolle sortiert, mit Suche oben – direkt anschreiben, dann sieht nur diese Person das Gespräch. Neue Nachrichten zeigt ein roter Punkt unten in der Leiste |
 | **Karriere** | Offene Stellen mit Status, Detailseite mit Verantwortlichkeiten und Anforderungen, eigene Bewerbungsseite je Stelle mit 60 Fragen in drei Sektoren: 1. Über dich (Roblox, Discord, E-Mail, Spielzeit, Rang), 2. Grundwissen (40 Fragen; beim Supervisor im gewählten Bereich Driver, Platform Staff, Conductor oder Signaller), 3. Erfahrung & Zeit (20 Fragen, u. a. Aktivität und freie Tage per Schieberegler, bei Game Developer, Map Builder und Social Media Links mit Art). Oben zählt „x von 60 Fragen beantwortet“ mit. Nach dem Absenden steht dort, wo „Jetzt bewerben“ war, **„Deine Bewerbung ansehen“** – er öffnet die Seite „Bewerbung gesendet“ mit den eigenen Angaben. **Ab Public Relations Department:** jede Stelle öffnen/schließen und einen Zeitraum „von – bis“ setzen; danach schließt sie von selbst (wer schon schreibt, darf noch absenden – erst ein neues „Jetzt bewerben“ nach Ablauf geht nicht mehr). Unter **„Bewerbungen prüfen“** jede Bewerbung im Detail ansehen (alle Antworten, richtig/falsch), als bestanden oder nicht bestanden markieren und unten die ausgewählten Bestandenen mit einem Klick per **Webhook 2** an Discord senden, wo ihnen gratuliert wird |
 | **Statistiken** | **Echte Zahlen** (mit „Live“ gekennzeichnet): Besuche, Favoriten, Spieler online, Mitglieder der Roblox-Gruppe und des Discord-Servers – über das Backend oder direkt über roproxy.com und die Discord-Einladung. Dazu Spieler-online-Diagramm (24 Std. / 7 Tage / 30 Tage), Zuggattungen, Pünktlichkeit je Netz (Magdeburg, Halle/Leipzig, Berlin, Berlin – Warschau), meistbefahrene Strecken (mit Streckennummer) |
 | **Trainings** | Dein Rang und dein nächster Ausbildungsschritt (z. B. Conductor → Signaller), Tagesleiste über 14 Tage (roter Punkt = Trainings). Angezeigt werden nur die Trainings für den nächsten Rang – ein Conductor sieht also nur Signaller-Trainings; Supervisor und Management sehen alle. Trainingskarten mit Serverstatus (offen, öffnet in … Min., geschlossen), alle kommenden Termine. In der Detailansicht ist „Join Now“ grau, bis der Server offen ist, dann hellblau. Der Server öffnet 15 Minuten vor Beginn. **Benachrichtigungen:** Oben links auf jeder Trainingskarte (gegenüber der Server-Anzeige) und im Detail sitzt eine Glocke. Eingeschaltet leuchtet sie rot, und das Gerät bekommt eine echte Benachrichtigung (wie bei YouTube oder Gmail), sobald der Server öffnet – mit Training, Uhrzeit, Server, Leitung und Knopf „Beitreten“. Die Glocke oben schaltet das für alle Trainings des nächsten Rangs ein. **Ab Supervisor** (mit Backend) gibt es oben „Training anbieten“ (auf schmalen Handys als roter Plus-Knopf): Rolle – **genau eine** von Qualified Driver, Platform Staff, Conductor, Signaller –, Titel, Datum und Uhrzeit (deutsche Zeit), Dauer, Plätze, Server, Beschreibung. Das Training erscheint bei allen, die diese Rolle als Nächstes lernen; löschen kann es nur, wer es angeboten hat |
@@ -36,9 +38,9 @@ Die Seite ist reines HTML, CSS und JavaScript. Es gibt keinen Build-Schritt, sie
 
 Die Seite ist eine installierbare Web-App (PWA): Auf dem Handy über „Zum Startbildschirm hinzufügen“ bzw. „App installieren“ im Menü, am PC über das Installieren-Symbol in der Adressleiste. Danach startet sie wie eine eigene App mit Icon und funktioniert auch offline.
 
-**Logo:** `assets/img/logo.svg` ist das Zeichen ohne Hintergrund (Schnellzug mit Fahrtlinien, der aus einem offenen Rahmen fährt), `assets/img/logo-white.svg` die weiße Variante für dunkle Hintergründe. Als PNG in 1024 × 1024 mit transparentem Hintergrund: `assets/icons/logo-1024.png` und `logo-white-1024.png`.
+**Logo:** `assets/img/logo.svg` ist das Zeichen: ein schlanker Schnellzug mit Fahrtlinien auf der Schiene in einer roten, weich abgerundeten Kachel (funktioniert auf hellem und dunklem Hintergrund). `assets/img/logo-white.svg` ist die helle Variante (weiße Kachel, roter Zug). Die App heißt überall nur **„Train Sim Germany“** (Titel, Startbildschirm, Manifest). Als PNG in 1024 × 1024 mit transparentem Hintergrund: `assets/icons/logo-1024.png` und `logo-white-1024.png`.
 
-Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/app-icon.svg` (Logo auf weißer Fläche, der Hintergrund lässt sich frei austauschen), daraus sind alle Größen erzeugt:
+Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/app-icon.svg` (randlose rote Fläche mit dem Zug), daraus sind alle Größen erzeugt:
 
 | Datei | Wofür |
 |---|---|
@@ -55,7 +57,7 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 
 - Oben links öffnet das Menü-Symbol ein Menü, das sich von links hereinschiebt – kompakt, sodass alles ohne Scrollen auf eine Seite passt: alle Seiten in zwei Spalten, darunter Datenschutz und Nutzungsbedingungen als gleiche Buttons, Spielen/Gruppe/Discord und unten die Uhrzeit in Deutschland als Karte (Uhr, Zeit und Zeitzone auf einer Linie).
 - Oben rechts stehen das Rang-Kürzel des Spielers in der Rangfarbe (z. B. `[CD]` für Conductor) und sein Profilbild im Ring. Die Kürzel stehen in `ranks` (`prefix`).
-- Unten liegt eine dunkle Leiste über die ganze Breite (`width: 100vw`), fest am unteren Rand, nur mit Icons: Start, News, Trainings und rechts ein kleines Profilbild (Ring in der Rangfarbe). Icons und Profil liegen senkrecht genau in der Mitte – auf iPhones mit Home-Balken über die ganze Höhe der Leiste. Die Leiste ist fast schwarz und hebt sich so klar vom Inhalt ab.
+- Unten liegt eine dunkle Leiste über die ganze Breite (`width: 100vw`), fest am unteren Rand, nur mit Icons: Start, News, Trainings, Shop, Chat und rechts ein kleines Profilbild (Ring in der Rangfarbe). Icons und Profil liegen senkrecht genau in der Mitte – auf iPhones mit Home-Balken über die ganze Höhe der Leiste. Die Leiste ist fast schwarz und hebt sich so klar vom Inhalt ab.
 - Die Fußzeile (Logo, Buttons, Seiten, Hinweise) ist mittig untereinander angeordnet.
 - **Mit Roblox anmelden:** Ist in `assets/js/config.js` die Client-ID eingetragen, zeigt der Profil-Dialog „Mit Roblox anmelden“ (siehe „Roblox-Login“). Ohne Client-ID gilt die Demo:
 - **Mit Roblox verbinden (Demo):** Ein Klick auf das Profil öffnet den Dialog. Nach Eingabe des Roblox-Namens lädt die App den Anzeigenamen und das Profilbild und zeigt sie oben, unten und im Menü. Roblox erlaubt solche Abfragen nicht direkt aus dem Browser, deshalb läuft das über einen Proxy (`roblox` in `data.js`, Standard: roproxy.com). Ist er nicht erreichbar, verbindet die App trotzdem und zeigt die Initialen. Nach dem Verbinden zeigt der Profil-Dialog den Button **Meine Statistik** mit den eigenen Werten: Kacheln (Level, Kilometer, Fahrten, Pünktlichkeit, Trainings, Spielzeit, Bestenliste, Dabei seit, Lieblingsstrecke), Streifendiagramme der meistgefahrenen Züge im Fernverkehr, Regio und S-Bahn, alle Strecken als Rangliste (R001, R002, …) und die Spielzeit dieser Woche (Demo-Werte). Das ist noch kein echter Login – dafür die Client-ID eintragen (siehe „Roblox-Login“). Im Profil- und Statistik-Dialog steht, ob Profil bzw. Statistik öffentlich sind, mit Link zu den Einstellungen.
@@ -99,9 +101,13 @@ Für alles, was ein Server braucht, liegt im Ordner [`backend/`](backend/README.
 | **Einstellungen** | Darstellung, Sprache, gemerkte Trainings und Glocken für alle Geräte des Kontos |
 | **Echte Zahlen** | Gruppenmitglieder (auch je Rolle), Spieler online, Besuche, Favoriten, Discord-Mitglieder – alle 10 Minuten neu |
 | **Privatsphäre** | Speichert „Profil öffentlich“ und „Statistik öffentlich“; `GET /api/players/<id>` liefert ein Profil nur, wenn es öffentlich ist |
+| **Chat** | Anfragen nach Bereich mit Annehmen, Direktnachrichten an alle ab Supervisor, Teamliste aus der Roblox-Gruppe; Gespräche werden 180 Tage nach der letzten Nachricht gelöscht |
+| **Shop** | Coins, Züge und Strecken aus dem Spiel; Käufe werden reserviert und vom Spiel verbucht (`game/TSGAppSync.server.lua`, Schlüssel `GAME_API_KEY`) |
 | **Sitzung** | Nach dem Login schickt die App das von Roblox signierte ID-Token; das Backend prüft Signatur, Client-ID und Ablauf und gibt eine eigene Sitzung (30 Tage, Abmelden beendet alle) |
 
-Einrichten: Schritt-für-Schritt in [`backend/README.md`](backend/README.md), danach die Adresse in `config.js` bei `api` eintragen. Ohne Backend läuft alles andere wie gewohnt mit Beispieldaten (Bewerbungen bleiben dann auf dem Gerät, Trainings und News lassen sich nicht anlegen). **Geheime Werte** (Discord-Webhooks) gehören nur in `backend/.env` oder als Cloudflare-Secret – nie in eine Datei im Repository.
+**Einrichten in 5 Minuten:** Cloudflare-Konto anlegen, API-Token erstellen und auf GitHub unter *Settings → Secrets → Actions* `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID` eintragen, dann unter *Actions* „Backend veröffentlichen“ starten – die Adresse landet automatisch in `config.js`. Schritt für Schritt in [`backend/README.md`](backend/README.md). Gespeichert wird in einem Durable Object (im kostenlosen Tarif enthalten, nichts weiter anzulegen).
+
+Solange das Backend fehlt, läuft alles andere mit Beispieldaten. Teammitglieder sehen „Training anbieten“, „Neuigkeit“ und „Bewerbungen prüfen“ trotzdem (je nach Rang) und bekommen beim Antippen die Anleitung. **Geheime Werte** (Discord-Webhooks, `GAME_API_KEY`) gehören nur in GitHub-Secrets, `backend/.env` oder Cloudflare-Secrets – nie in eine Datei im Repository.
 
 ## Datenschutz & Nutzungsbedingungen
 
@@ -209,7 +215,7 @@ assets/js/config.js   Roblox-Client-ID, Gruppe, Adresse des Backends und Angaben
 assets/js/nozoom.js   Sperrt das Hineinzoomen auf allen Seiten
 assets/js/data.js     Inhalte & Beispieldaten (Server, Linien, Trainings, News …)
 assets/js/legal.js    Setzt die Angaben aus config.js in privacy.html und terms.html ein
-assets/js/app.js      Routing, Sprache, Trainings, Server & Fahrplan, Diagramme, Bewerbungen, Profil, Login, Einstellungen
+assets/js/app.js      Routing, Sprache, Trainings, Server & Fahrplan, Zugansicht, Shop, Chat, Diagramme, Bewerbungen, Profil, Login, Einstellungen
 assets/js/i18n/       Übersetzungen der Oberfläche und Inhalte (en, fr, es, it, nl, pl, tr)
 assets/js/questions/  Fragen für die Bewerbungen je Sprache (de.js ist das Original)
 assets/css/uicons.css Flaticon UIcons (erzeugt)
@@ -219,13 +225,21 @@ assets/icons/         App-Icons, Favicon, Roblox-Spiel-Icon und Vorschaubild (PN
 assets/fonts/         Rubik und UIcons (woff2)
 tools/build_icons.py  Baut die UIcons-Teilmenge
 tools/render_videos.mjs Erzeugt die News-Clips aus den Illustrationen
-backend/              Optionales Backend: Web-Push, Bewerbungen → Discord, Privatsphäre
-  app.js              Logik (Web-Standards, läuft überall)
+backend/              App-Server: Trainings, News, Bewerbungen, Chat, Shop, Einstellungen, Web-Push
+  app.js              Wege und Anmeldung (Web-Standards, läuft überall)
+  content.js          Trainings, Neuigkeiten, Bilder, Stellen
+  applications.js     Bewerbungen, Prüfen, Glückwünsche an Discord
+  chat.js             Anfragen, Direktnachrichten, Teamliste
+  shop.js             Katalog, Coins, Käufe, Abgleich mit dem Spiel
+  stats.js            Echte Zahlen (Gruppe, Spiel, Discord)
+  ranks.js            Ränge der Gruppe
   webpush.js          Web-Push (VAPID, Verschlüsselung nach RFC 8291, Zeitplan)
   lib.js              Kleine Hilfen
-  worker.js           Start als Cloudflare Worker (wrangler.toml)
+  worker.js           Start als Cloudflare Worker mit Durable Object (wrangler.toml)
   server.js           Start mit Node.js (.env)
   .env.example        Alle Einstellungen mit Erklärung
+game/TSGAppSync.server.lua  Roblox-Skript: Coins, Züge und Strecken mit der App abgleichen, Käufe verbuchen
+.github/workflows/backend.yml  Veröffentlicht das Backend automatisch bei Cloudflare
 ```
 
 ---
