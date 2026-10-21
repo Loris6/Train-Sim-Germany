@@ -18,7 +18,7 @@
  * Gespräche werden 180 Tage nach der letzten Nachricht automatisch gelöscht.
  */
 import { randomKey, clip } from './lib.js';
-import { level, atLeast, matchRank } from './ranks.js';
+import { level, atLeast, matchRank, rankLabel } from './ranks.js';
 import { notifyUser, notifyStaff } from './webpush.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
@@ -68,6 +68,8 @@ async function saveQueue(store, c) {
 }
 const preview = (text) => (text.length > 140 ? `${text.slice(0, 139)}…` : text);
 const nameOf = (p) => p.displayName || p.username;
+// Benachrichtigung wie bei Messengern: Profilbild des Absenders, Name als Titel, Text beginnt mit „[SV] Supervisor: …“
+const fromPerson = (p, text, title = nameOf(p)) => ({ title, body: `${rankLabel(p.rank)}: ${preview(text)}`, ...(p.avatar ? { icon: p.avatar } : {}) });
 // Benachrichtigung an alle Beteiligten außer dem Absender
 async function notifyOthers(store, env, c, author, message) {
   const ids = [c.from.sub, c.to && c.to.sub, c.claimedBy && c.claimedBy.sub].filter((x) => x && x !== author);
@@ -168,11 +170,11 @@ export async function createChat(store, env, user, body) {
   await store.put(rl, recent, { ttl: 86400 });
   if (kind === 'ticket') {
     await notifyStaff(store, env, (rank) => canHandle(rank, c.area), 'team', {
-      title: `Neue Anfrage: ${REASON_LABEL[c.reason]}`, body: `${nameOf(c.from)} · ${AREA_LABEL[c.area]}\n${preview(text)}`,
+      ...fromPerson(c.from, text, `${nameOf(c.from)} · ${REASON_LABEL[c.reason]} (${AREA_LABEL[c.area]})`),
       url: `./#/chat/${c.id}`, tag: `chat-${c.id}`,
     }, user.sub);
   } else {
-    await notifyOthers(store, env, c, user.sub, { title: `Neue Nachricht von ${nameOf(c.from)}`, body: preview(text) });
+    await notifyOthers(store, env, c, user.sub, fromPerson(c.from, text));
   }
   return view(c, user);
 }
@@ -193,7 +195,7 @@ export async function postMessage(store, env, user, id, body) {
   c.messages.push({ id: randomKey(6), by: user.sub, text, at: t });
   c.updated = t;
   await store.put(`chat:${c.id}`, c, { ttl: KEEP });
-  await notifyOthers(store, env, c, user.sub, { title: nameOf(person(user)), body: preview(text) });
+  await notifyOthers(store, env, c, user.sub, fromPerson(person(user), text));
   return view(c, user);
 }
 
@@ -211,7 +213,7 @@ export async function claimChat(store, env, user, id) {
   await addTo(store, user.sub, c.id);
   await saveQueue(store, c);
   await notifyUser(store, env, c.from.sub, 'chat', {
-    title: 'Anfrage angenommen', body: `${nameOf(c.claimedBy)} kümmert sich jetzt um deine Anfrage „${REASON_LABEL[c.reason]}“.`,
+    ...fromPerson(c.claimedBy, `Ich kümmere mich jetzt um deine Anfrage „${REASON_LABEL[c.reason]}“.`, `${nameOf(c.claimedBy)} hat deine Anfrage angenommen`),
     url: `./#/chat/${c.id}`, tag: `chat-${c.id}`,
   });
   return view(c, user);
@@ -298,7 +300,8 @@ export async function postResult(store, env, reviewer, a) {
   await addTo(store, a.sub, c.id);
   if (c.claimedBy) await addTo(store, c.claimedBy.sub, c.id);
   await notifyUser(store, env, a.sub, 'applications', {
-    title: `[${label}] ${job}`, body: `Ausgewertet von ${reviewer.username}. Tippe hier für die Nachricht.`, url: `./#/chat/${c.id}`, tag: `app-${a.id}`,
+    ...fromPerson(person(reviewer), `[${label}] Deine Bewerbung als ${job} ist ausgewertet.`, `[${label}] ${job}`),
+    url: `./#/chat/${c.id}`, tag: `app-${a.id}`,
   });
   return c.id;
 }

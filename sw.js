@@ -1,7 +1,7 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v13';
+const CACHE = 'tsg-v14';
 const SHELL = [
   './',
   'index.html',
@@ -60,9 +60,12 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
+  // Chat: Profilbild des Absenders statt Logo (d.icon); neue Nachricht im selben Gespräch meldet sich erneut
   e.waitUntil(self.registration.showNotification(d.title || 'Train Sim Germany', {
     body: d.body || '',
-    icon: 'assets/icons/icon-192.png',
+    icon: d.icon || 'assets/icons/icon-192.png',
+    renotify: !!d.tag,
+    timestamp: Date.now(),
     badge: 'assets/icons/badge-96.png',
     tag: d.tag || undefined,
     lang: d.lang || 'de',

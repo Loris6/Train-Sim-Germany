@@ -92,6 +92,8 @@ In der App unter *Einstellungen → Benachrichtigungen* einschalten. Das Gerät 
 - **Team** (ab Supervisor) – neue Anfragen im eigenen Bereich, ab PRD auch neue Bewerbungen
 - **Trainings** – wie bisher über die Glocke
 
+Chat-Benachrichtigungen sehen aus wie bei einem Messenger: Titel ist der Name, als Bild erscheint das **Roblox-Profilbild des Absenders** statt des Logos, und der Text beginnt mit dem ausgeschriebenen Rang – z. B. „**[SV] Supervisor:** Morgen um 19:30!“. (iPhone und iPad zeigen dabei immer das App-Icon, das Profilbild erscheint auf Android, Windows und macOS.)
+
 Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safari → Teilen → „Zum Home-Bildschirm“). Beim Abmelden wird das Gerät vom Konto getrennt.
 
 ## Chat

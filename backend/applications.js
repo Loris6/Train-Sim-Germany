@@ -12,7 +12,7 @@
  */
 import { randomKey, clip, now } from './lib.js';
 import { jobOpenAt } from './content.js';
-import { atLeast } from './ranks.js';
+import { atLeast, matchRank, rankLabel } from './ranks.js';
 import { notifyStaff } from './webpush.js';
 import { postResult } from './chat.js';
 import { sendMail, applicationMail, resultMail } from './mail.js';
@@ -108,8 +108,9 @@ export async function submitApplication(store, env, user, body) {
   a.mailed = await sendMail(env, { to: a.email, toName: a.displayName, ...mail });
   if (a.mailed) await store.put(`app:${a.id}`, a);
   await notifyStaff(store, env, (rank) => atLeast(rank, 'Public Relations Department'), 'team', {
-    title: `Neue Bewerbung: ${a.jobTitle}${a.area ? ` – ${a.area}` : ''}`,
-    body: `${a.displayName} (@${a.username})${a.total ? ` · ${Math.round((a.score / a.total) * 100)} %` : ''}`,
+    title: `${a.displayName} · Neue Bewerbung`,
+    body: `${rankLabel(matchRank(a.groupRole))}: Bewerbung als ${a.jobTitle}${a.area ? ` – ${a.area}` : ''}${a.total ? ` · ${Math.round((a.score / a.total) * 100)} %` : ''}`,
+    ...(a.avatar ? { icon: a.avatar } : {}),
     url: `./#/karriere/pruefen/${a.id}`, tag: `app-${a.id}`,
   }, a.sub);
 

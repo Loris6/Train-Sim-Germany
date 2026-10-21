@@ -19,6 +19,11 @@ export const level = (name) => {
   return i < 0 ? -1 : RANKS.length - 1 - i;
 };
 export const atLeast = (name, min) => level(name) >= level(min);
+// „[SV] Supervisor“ – Kürzel und ausgeschriebener Rang (für Benachrichtigungen)
+export const rankLabel = (name) => {
+  const hit = RANKS.find(([n]) => n === name) || RANKS[RANKS.length - 1];
+  return `[${hit[1]}] ${hit[0]}`;
+};
 
 // Testkonten (Bots, z. B. „[AT] Alpha Test Accounts“) zählen nicht als Rang
 const IGNORED = /alpha\s*test|^\s*\[\s*at\s*\]/i;
