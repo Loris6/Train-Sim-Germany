@@ -42,17 +42,22 @@
  *   POST   /api/chats/<id>/messages      { text }
  *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
  *   POST   /api/chats/<id>/close         Gespräch beenden
+ *   GET    /api/players/find?q=<name>    Spieler suchen, um ihn anzuschreiben (ab Supervisor)
+ *   POST   /api/push/subscribe           { subscription, prefs } – Benachrichtigungen auf diesem Gerät (Chat, Bewerbungen, Team)
+ *   POST   /api/push/unsubscribe         { endpoint } – Gerät abmelden
+ *   POST   /api/push/test                Probe-Benachrichtigung an die eigenen Geräte
  *
  * Einstellungen: siehe .env.example bzw. README.md
  */
 import { enc, b64u, fromB64u, randomKey, now, clip, jsonPart } from './lib.js';
-import { vapidKeys, saveReminders, sendDue } from './webpush.js';
+import { vapidKeys, saveReminders, sendDue, subscribeUser, unsubscribeUser, notifyUser } from './webpush.js';
 import { matchRank, atLeast } from './ranks.js';
 import { getContent, addTraining, deleteTraining, addNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
 import { submitApplication, listApplications, getApplication, setStatus, announce, ownView } from './applications.js';
 import { liveStats } from './stats.js';
 import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
-import { listChats, createChat, readChat, postMessage, claimChat, closeChat, staffList } from './chat.js';
+import { listChats, createChat, readChat, postMessage, claimChat, closeChat, staffList, findPlayer } from './chat.js';
+import { mailReady } from './mail.js';
 
 export { sendDue, matchRank };
 
@@ -260,7 +265,7 @@ export async function handle(req, env, store) {
   try {
     // ---------- öffentlich ----------
     if (path === '/' || path === '/health') {
-      return json(req, env, { ok: true, login: loginReady(env), applications: true, discord: !!env.DISCORD_WEBHOOK_URL, results: !!env.DISCORD_RESULTS_WEBHOOK_URL, push: true, chat: true, game: !!env.GAME_API_KEY, group: groupId(env) });
+      return json(req, env, { ok: true, login: loginReady(env), applications: true, discord: !!env.DISCORD_WEBHOOK_URL, results: !!env.DISCORD_RESULTS_WEBHOOK_URL, push: true, chat: true, mail: mailReady(env), game: !!env.GAME_API_KEY, group: groupId(env) });
     }
     if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
     if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
@@ -302,8 +307,24 @@ export async function handle(req, env, store) {
     if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 10000)), 201);
     const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close))?$/);
     if (chat && !chat[2] && m === 'GET') return json(req, env, await readChat(store, user, chat[1], +url.searchParams.get('since') || 0));
-    if (chat && chat[2] === 'messages' && m === 'POST') return json(req, env, await postMessage(store, user, chat[1], await readJson(req, 10000)), 201);
-    if (chat && chat[2] === 'claim' && m === 'POST') return json(req, env, await claimChat(store, await freshUser(env, store, user), chat[1]));
+    if (chat && chat[2] === 'messages' && m === 'POST') return json(req, env, await postMessage(store, env, user, chat[1], await readJson(req, 10000)), 201);
+    if (chat && chat[2] === 'claim' && m === 'POST') return json(req, env, await claimChat(store, env, await freshUser(env, store, user), chat[1]));
+    // Spieler suchen, um ihn anzuschreiben (nur Team)
+    if (path === '/api/players/find' && m === 'GET') {
+      need(await freshUser(env, store, user), 'Supervisor');
+      const p = await findPlayer(env, url.searchParams.get('q'));
+      return p ? json(req, env, p) : json(req, env, { error: 'not_found' }, 404);
+    }
+
+    // Benachrichtigungen auf diesem Gerät (auch bei geschlossener App)
+    if (path === '/api/push/subscribe' && m === 'POST') {
+      await freshUser(env, store, user);
+      return json(req, env, await subscribeUser(store, user, await readJson(req, 10000), atLeast(user.rank, 'Supervisor')));
+    }
+    if (path === '/api/push/unsubscribe' && m === 'POST') return json(req, env, await unsubscribeUser(store, user, (await readJson(req, 5000)).endpoint));
+    if (path === '/api/push/test' && m === 'POST') {
+      return json(req, env, { sent: await notifyUser(store, env, user.sub, 'test', { title: 'Train Sim Germany', body: 'Benachrichtigungen funktionieren – auch wenn die App geschlossen ist. 🚆', url: './#/einstellungen', tag: 'test' }) });
+    }
     if (chat && chat[2] === 'close' && m === 'POST') return json(req, env, await closeChat(store, user, chat[1]));
 
     if (path === '/api/me' && m === 'GET') {
@@ -384,7 +405,7 @@ export async function handle(req, env, store) {
     }
     if (app && m === 'PUT') {
       need(await freshUser(env, store, user), 'Public Relations Department');
-      return json(req, env, await setStatus(store, user, app[1], (await readJson(req, 1000)).status));
+      return json(req, env, await setStatus(store, env, user, app[1], (await readJson(req, 1000)).status));
     }
     return json(req, env, { error: 'not_found' }, 404);
   } catch (e) {

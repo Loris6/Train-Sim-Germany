@@ -4,7 +4,11 @@
  * Zwei Arten von Gesprächen:
  *   ticket  – Anfrage mit Grund und Bereich. Alle Teammitglieder dieses Bereichs sehen sie und können sie annehmen.
  *             Nicht angenommene Anfragen stehen oben. Danach schreiben nur noch Spieler und wer angenommen hat.
- *   direct  – Nachricht an eine bestimmte Person ab Supervisor. Nur die beiden sehen das Gespräch.
+ *   direct  – Spieler schreiben einer bestimmten Person ab Supervisor; das Team (ab Supervisor) kann jeden Spieler
+ *             anschreiben. Spieler untereinander können sich nicht schreiben. Nur die beiden sehen das Gespräch.
+ *
+ * Bei jeder neuen Nachricht bekommt die andere Seite eine Benachrichtigung (auch bei geschlossener App).
+ * Neue Anfragen gehen an das zuständige Team, Ergebnisse von Bewerbungen kommen als Nachricht vom Prüfer.
  *
  *   chat:<id>       → ganzes Gespräch mit Nachrichten
  *   chats:of:<id>   → Gespräche eines Nutzers (IDs)
@@ -15,6 +19,7 @@
  */
 import { randomKey, clip } from './lib.js';
 import { level, atLeast, matchRank } from './ranks.js';
+import { notifyUser, notifyStaff } from './webpush.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 const MAX_MESSAGES = 300;
@@ -22,6 +27,8 @@ const NEW_PER_DAY = 6;
 const KEEP = 180 * 86400; // Gespräche werden 180 Tage nach der letzten Nachricht gelöscht
 
 export const REASONS = ['training', 'rank', 'bug', 'report', 'application', 'shop', 'other'];
+const REASON_LABEL = { training: 'Frage zu einem Training', rank: 'Rang oder Beförderung', bug: 'Fehler im Spiel', report: 'Spieler melden', application: 'Bewerbung', shop: 'Coins, Züge, Strecken', other: 'Etwas anderes' };
+const AREA_LABEL = { driver: 'Qualified Driver', platform: 'Platform Staff', conductor: 'Conductor', signaller: 'Signaller', career: 'Karriere & Bewerbungen', tech: 'Technik & Fehler', report: 'Meldungen', other: 'Allgemein' };
 // Wer eine Anfrage annehmen darf: ab Supervisor, je nach Bereich. Leitung (OM, CDR, CEN) darf alles.
 const LEADERSHIP = ['Operation Manager', 'Community Director', 'Chief Engineer'];
 export const AREAS = {
@@ -30,7 +37,7 @@ export const AREAS = {
   conductor: ['Supervisor', 'Conductor Manager'],
   signaller: ['Supervisor', 'Signaller Manager'],
   career: ['Public Relations Department'],
-  tech: ['Project Engineer', 'Alpha Test Account(s)'],
+  tech: ['Project Engineer'],
   report: '*',
   other: ['Supervisor', 'Public Relations Department'],
 };
@@ -59,6 +66,38 @@ async function saveQueue(store, c) {
   list.unshift(summary(c));
   await store.put('chats:queue', list.filter((x) => x.status !== 'closed' || x.updated > keepFrom).slice(0, 300));
 }
+const preview = (text) => (text.length > 140 ? `${text.slice(0, 139)}…` : text);
+const nameOf = (p) => p.displayName || p.username;
+// Benachrichtigung an alle Beteiligten außer dem Absender
+async function notifyOthers(store, env, c, author, message) {
+  const ids = [c.from.sub, c.to && c.to.sub, c.claimedBy && c.claimedBy.sub].filter((x) => x && x !== author);
+  await Promise.all([...new Set(ids)].map((id) => notifyUser(store, env, id, 'chat', { url: `./#/chat/${c.id}`, tag: `chat-${c.id}`, ...message })));
+}
+// Öffentliches Roblox-Profil (Name, Anzeigename, Profilbild) für Nachrichten des Teams an Spieler
+async function robloxUser(env, id) {
+  const users = (env.ROBLOX_USERS_URL || 'https://users.roblox.com').replace(/\/+$/, '');
+  const thumbs = (env.ROBLOX_THUMBNAILS_URL || 'https://thumbnails.roblox.com').replace(/\/+$/, '');
+  const res = await fetch(`${users}/v1/users/${encodeURIComponent(id)}`, { headers: { Accept: 'application/json' } });
+  if (!res.ok) return null;
+  const u = await res.json();
+  let avatar = null;
+  try {
+    const img = ((await (await fetch(`${thumbs}/v1/users/avatar-headshot?userIds=${encodeURIComponent(id)}&size=150x150&format=Png&isCircular=false`)).json()).data || [])[0];
+    if (img && img.state === 'Completed') avatar = img.imageUrl;
+  } catch (e) { /* ohne Bild */ }
+  return { userId: String(u.id), username: u.name, displayName: u.displayName || u.name, avatar };
+}
+// Spieler suchen (nur Team): per Roblox-Name oder Nutzer-ID
+export async function findPlayer(env, query) {
+  const q = String(query || '').trim();
+  if (/^\d{1,20}$/.test(q)) return robloxUser(env, q);
+  if (!/^[A-Za-z0-9_]{3,20}$/.test(q)) throw bad('bad_name');
+  const users = (env.ROBLOX_USERS_URL || 'https://users.roblox.com').replace(/\/+$/, '');
+  const res = await fetch(`${users}/v1/usernames/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usernames: [q], excludeBannedUsers: true }) });
+  const hit = res.ok ? ((await res.json()).data || [])[0] : null;
+  return hit ? robloxUser(env, hit.id) : null;
+}
+
 function cleanText(v) {
   const text = clip(v, 2000).replace(/\r/g, '').trim();
   if (!text) throw bad('empty');
@@ -99,7 +138,8 @@ export async function createChat(store, env, user, body) {
   const text = cleanText(body.text);
   const rl = `chats:new:${user.sub}`;
   const recent = ((await store.get(rl)) || []).filter((x) => x > Date.now() - 86400000);
-  if (recent.length >= NEW_PER_DAY) throw bad('rate_limited', 429);
+  const team = atLeast(user.rank, 'Supervisor');
+  if (recent.length >= (team ? 60 : NEW_PER_DAY)) throw bad('rate_limited', 429);
   const t = Date.now();
   const c = {
     id: randomKey(9), kind, status: 'open', from: person(user), created: t, updated: t,
@@ -113,10 +153,11 @@ export async function createChat(store, env, user, body) {
   } else {
     const to = String(body.to || '');
     if (!/^\d{1,20}$/.test(to) || to === user.sub) throw bad('bad_target');
+    // Spieler schreiben nur dem Team; das Team darf jeden anschreiben
     const staff = await staffList(store, env);
-    const target = staff.find((x) => String(x.userId) === to);
-    if (!target) throw bad('not_staff', 404);
-    c.to = { sub: to, username: target.username, displayName: target.displayName, avatar: target.avatar || null, rank: target.rank };
+    const target = staff.find((x) => String(x.userId) === to) || (team ? await robloxUser(env, to) : null);
+    if (!target) throw bad(team ? 'not_found' : 'not_staff', 404);
+    c.to = { sub: to, username: target.username, displayName: target.displayName, avatar: target.avatar || null, rank: target.rank || null };
     c.reason = REASONS.includes(body.reason) ? body.reason : 'other';
   }
   await store.put(`chat:${c.id}`, c, { ttl: KEEP });
@@ -125,6 +166,14 @@ export async function createChat(store, env, user, body) {
   if (kind === 'ticket') await saveQueue(store, c);
   recent.push(t);
   await store.put(rl, recent, { ttl: 86400 });
+  if (kind === 'ticket') {
+    await notifyStaff(store, env, (rank) => canHandle(rank, c.area), 'team', {
+      title: `Neue Anfrage: ${REASON_LABEL[c.reason]}`, body: `${nameOf(c.from)} · ${AREA_LABEL[c.area]}\n${preview(text)}`,
+      url: `./#/chat/${c.id}`, tag: `chat-${c.id}`,
+    }, user.sub);
+  } else {
+    await notifyOthers(store, env, c, user.sub, { title: `Neue Nachricht von ${nameOf(c.from)}`, body: preview(text) });
+  }
   return view(c, user);
 }
 
@@ -135,18 +184,20 @@ export async function readChat(store, user, id, since = 0) {
   return v;
 }
 
-export async function postMessage(store, user, id, body) {
+export async function postMessage(store, env, user, id, body) {
   const c = await getChat(store, user, id);
   if (!access(c, user).write) throw bad('forbidden', 403);
   if (c.messages.length >= MAX_MESSAGES) throw bad('full', 409);
   const t = Date.now();
-  c.messages.push({ id: randomKey(6), by: user.sub, text: cleanText(body.text), at: t });
+  const text = cleanText(body.text);
+  c.messages.push({ id: randomKey(6), by: user.sub, text, at: t });
   c.updated = t;
   await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+  await notifyOthers(store, env, c, user.sub, { title: nameOf(person(user)), body: preview(text) });
   return view(c, user);
 }
 
-export async function claimChat(store, user, id) {
+export async function claimChat(store, env, user, id) {
   const c = await getChat(store, user, id);
   if (c.kind !== 'ticket' || c.from.sub === user.sub || !canHandle(user.rank, c.area)) throw bad('forbidden', 403);
   if (c.status !== 'open') throw bad('taken', 409);
@@ -159,6 +210,10 @@ export async function claimChat(store, user, id) {
   await store.put(`chat:${c.id}`, c, { ttl: KEEP });
   await addTo(store, user.sub, c.id);
   await saveQueue(store, c);
+  await notifyUser(store, env, c.from.sub, 'chat', {
+    title: 'Anfrage angenommen', body: `${nameOf(c.claimedBy)} kümmert sich jetzt um deine Anfrage „${REASON_LABEL[c.reason]}“.`,
+    url: `./#/chat/${c.id}`, tag: `chat-${c.id}`,
+  });
   return view(c, user);
 }
 
@@ -212,4 +267,38 @@ export async function staffList(store, env) {
     if (cached) return cached.list;
     throw bad('staff_unavailable', 502);
   }
+}
+
+// ---------- Ergebnis einer Bewerbung: Nachricht vom Prüfer an den Bewerber ----------
+// Ein Gespräch je Bewerbung; ändert sich das Ergebnis, kommt eine neue Nachricht dazu.
+export async function postResult(store, env, reviewer, a) {
+  const passed = a.status === 'passed';
+  const t = Date.now();
+  const job = `${a.jobTitle}${a.area ? ` – ${a.area}` : ''}`;
+  let c = a.chatId && await store.get(`chat:${a.chatId}`);
+  if (!c) {
+    c = {
+      id: randomKey(9), kind: 'direct', status: 'open', reason: 'application', app: a.id, created: t, updated: t, messages: [],
+      from: person(reviewer), to: { sub: a.sub, username: a.username, displayName: a.displayName || a.username, avatar: a.avatar || null, rank: matchRank(a.groupRole) },
+    };
+  }
+  // Ein anderer Prüfer ändert das Ergebnis: er wird Teil des Gesprächs
+  if (c.from.sub !== reviewer.sub && !(c.claimedBy && c.claimedBy.sub === reviewer.sub)) c.claimedBy = person(reviewer);
+  if (c.status === 'closed') c.status = 'open';
+  const label = passed ? '✅ PASSED' : '❌ FAILED';
+  const corrected = c.messages.some((m) => m.kind === 'result');
+  c.messages.push({
+    id: randomKey(6), by: reviewer.sub, at: t, kind: 'result', status: a.status, job, score: a.score, total: a.total, reviewer: reviewer.username, corrected,
+    text: `[${label}] ${corrected ? 'Korrektur: ' : ''}Bewerbung als ${job}\nAusgewertet von ${reviewer.username}\n${passed
+      ? 'Herzlichen Glückwunsch! Wir melden uns hier mit allem Weiteren.' : 'Danke für deine Bewerbung. Du kannst dich später gern noch einmal bewerben.'}`,
+  });
+  c.updated = t;
+  await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+  await addTo(store, c.from.sub, c.id);
+  await addTo(store, a.sub, c.id);
+  if (c.claimedBy) await addTo(store, c.claimedBy.sub, c.id);
+  await notifyUser(store, env, a.sub, 'applications', {
+    title: `[${label}] ${job}`, body: `Ausgewertet von ${reviewer.username}. Tippe hier für die Nachricht.`, url: `./#/chat/${c.id}`, tag: `app-${a.id}`,
+  });
+  return c.id;
 }

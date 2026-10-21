@@ -1,9 +1,9 @@
 /*
  * Train Sim Germany – Inhalte aus der App: Trainings, Neuigkeiten, Bilder, Stellen (offen/geschlossen)
  *
- *   content:trainings  → [{ id, type, title, start, dur, server, slots, text, host, hostId }]
+ *   content:trainings  → [{ id, type, title, start, dur, server, slots, text, host, hostName, hostAvatar, hostId }]
  *   content:news       → [{ id, date, cat, tag, title, text, media, buttons, author, authorId }]
- *   content:jobs       → { <stelle>: { open, from, to, closedAt, updatedBy } }
+ *   content:jobs       → { <stelle>: { open, from, to, limit, received, note, urgent, closedAt, openedAt, updatedBy, log } }
  *   media:<id>         → { type, data }   (Bilder für Neuigkeiten, als Base64)
  */
 import { b64u, fromB64u, randomKey, clip } from './lib.js';
@@ -49,7 +49,7 @@ export async function addTraining(store, user, body) {
   const training = {
     id: randomKey(9), type, title: clip(body.title, 80).trim() || `${type}-Training`, start, dur, slots,
     server: clip(body.server, 60).trim(), text: clip(body.text, 500).trim(),
-    host: user.username, hostId: user.sub, created: now,
+    host: user.username, hostName: user.displayName || user.username, hostAvatar: user.avatar || null, hostId: user.sub, created: now,
   };
   const list = ((await store.get('content:trainings')) || []).filter((x) => x.start + x.dur * 60000 > now - 86400000);
   if (list.length >= 200) throw bad('too_many');
@@ -133,11 +133,26 @@ export async function setJob(store, user, id, body) {
   const from = body.from ? +body.from : null;
   const to = body.to ? +body.to : null;
   if ((from && !Number.isFinite(from)) || (to && !Number.isFinite(to)) || (from && to && to <= from)) throw bad('bad_time');
+  const limit = Math.max(0, Math.min(500, Math.round(+body.limit || 0)));
+  const note = clip(body.note, 200).trim();
+  const urgent = body.urgent === true;
+  const received = body.resetCount === true ? 0 : (old.received || 0);
+  // Was hat sich geändert? (Verlauf in der Verwaltung)
+  const changes = [];
+  if ((old.open !== false) !== open) changes.push(open ? 'geöffnet' : 'geschlossen');
+  if ((old.from || null) !== from || (old.to || null) !== to) changes.push(from || to ? 'Zeitraum geändert' : 'Zeitraum entfernt');
+  if ((old.limit || 0) !== limit) changes.push(limit ? `Höchstens ${limit} Bewerbungen` : 'Keine Höchstzahl');
+  if ((old.note || '') !== note) changes.push(note ? 'Hinweis geändert' : 'Hinweis entfernt');
+  if (!!old.urgent !== urgent) changes.push(urgent ? 'als dringend markiert' : 'nicht mehr dringend');
+  if (body.resetCount === true) changes.push('Zähler zurückgesetzt');
+  const now = Date.now();
   jobs[id] = {
-    open, from, to,
+    open, from, to, limit, note, urgent, received,
     // Wer vor dem Schließen angefangen hat, darf noch absenden
-    closedAt: !open ? (old.open === false ? old.closedAt : Date.now()) : null,
-    updatedBy: user.username, updated: Date.now(),
+    closedAt: !open ? (old.open === false ? old.closedAt : now) : null,
+    openedAt: open && old.open === false ? now : (old.openedAt || null),
+    updatedBy: user.username, updated: now,
+    log: [...(changes.length ? [{ at: now, by: user.username, text: changes.join(' · ') }] : []), ...(old.log || [])].slice(0, 8),
   };
   await store.put('content:jobs', jobs);
   return jobs[id];

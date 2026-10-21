@@ -50,7 +50,7 @@
             <li><a href="#roblox-login">Anmeldung mit Roblox (OAuth 2.0)</a></li>
             <li><a href="#roblox-name">Verbinden über den Roblox-Namen</a></li>
             <li><a href="#sichtbarkeit">Öffentliches Profil und öffentliche Statistik</a></li>
-            <li><a href="#benachrichtigungen">Benachrichtigungen für Trainings</a></li>
+            <li><a href="#benachrichtigungen">Benachrichtigungen</a></li>
             <li><a href="#bewerbungen">Bewerbungen</a></li>
             <li><a href="#chat">Chat mit dem Team</a></li>
             <li><a href="#shop">Shop: Coins, Züge und Strecken</a></li>
@@ -80,7 +80,7 @@
               <li>Einstellungen wie Darstellung, Sprache oder gemerkte Trainings werden auf deinem Gerät gespeichert. Bist du mit Roblox angemeldet, speichert sie zusätzlich das Backend, damit sie auf all deinen Geräten gleich sind.</li>
               <li>Wenn du dich mit Roblox anmeldest, erhalten wir nur dein <strong>öffentliches Roblox-Profil</strong> (Nutzer-ID, Name, Anzeigename, Profilbild) – nie dein Passwort.</li>
               <li>Dein Profil und deine Statistik sind <strong>standardmäßig privat</strong>. Öffentlich werden sie nur, wenn du das in den Einstellungen einschaltest.</li>
-              <li>Benachrichtigungen für Trainings bekommst du nur, wenn du sie mit der Glocke einschaltest und erlaubst.</li>
+              <li>Benachrichtigungen bekommst du nur, wenn du sie in den Einstellungen bzw. mit der Glocke einschaltest und erlaubst.</li>
               <li>Chat-Nachrichten sehen nur die Beteiligten – bei Anfragen zusätzlich das zuständige Team. Sie werden 180 Tage nach der letzten Nachricht gelöscht.</li>
               <li>Für den Shop gleicht das Spiel deine Coins, Züge und Strecken mit der App ab. Echtes Geld wird nie verarbeitet.</li>
             </ul>
@@ -104,6 +104,7 @@
               <li>das verbundene Roblox-Profil (Nutzer-ID, Name, Anzeigename, Adresse des Profilbilds)</li>
               <li>mit Backend: ein Sitzungsschlüssel, mit dem dich das Backend erkennt (gültig 30 Tage oder bis zum Abmelden)</li>
               <li>Bewerbungen bzw. ihre Kurzfassung, damit du siehst, dass du dich beworben hast (siehe Abschnitt 9)</li>
+              <li>ob du Benachrichtigungen auf diesem Gerät eingeschaltet hast und für welche Themen</li>
               <li>welche Chat-Gespräche du zuletzt geöffnet hast, die Teamliste für den Chat (30 Minuten zwischengespeichert) und ohne Backend der Demo-Stand des Shops</li>
             </ul>
             <p>Bist du mit Roblox angemeldet und das Backend eingerichtet, speichert das Backend Darstellung, Sprache, gemerkte Trainings und deine Erinnerungen zu deinem Konto. So erscheint eine Änderung auf dem Handy auch auf deinen anderen Geräten. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (von dir gewünschte Funktion). Die übrigen Angaben verlassen dein Gerät nicht.</p>
@@ -145,16 +146,19 @@
           </section>
 
           <section id="benachrichtigungen">
-            <h2>8. Benachrichtigungen für Trainings</h2>
+            <h2>8. Benachrichtigungen</h2>
             <p>Mit der Glocke kannst du dich an Trainings erinnern lassen. Beim ersten Mal fragt dein Browser bzw. dein Gerät, ob die App Benachrichtigungen senden darf. Die Benachrichtigung kommt, sobald der Trainingsserver öffnet (15 Minuten vor Beginn).</p>
             <p>Ist die App geöffnet oder im Hintergrund, zeigt sie die Benachrichtigung selbst an; welche Trainings du gewählt hast, bleibt dann nur auf deinem Gerät. Ist das Backend eingerichtet, kommen die Benachrichtigungen auch bei geschlossener App („Web-Push“). Dafür speichert das Backend die Push-Adresse deines Browsers mit den zugehörigen Schlüsseln und die gewählten Trainings mit Uhrzeit und Text der Benachrichtigung – höchstens bis zum Training, danach werden sie gelöscht. Zugestellt werden die Nachrichten über den Push-Dienst deines Browsers (z. B. Google bei Chrome und Android, Apple bei Safari und iPhone, Mozilla bei Firefox); der Inhalt ist dabei verschlüsselt.</p>
-            <p>Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Du kannst sie jederzeit widerrufen, indem du die Glocke ausschaltest oder Benachrichtigungen für die Seite in deinem Browser bzw. Gerät abschaltest.</p>
+            <p><strong>Chat, Bewerbungen und Team:</strong> Schaltest du unter „Einstellungen → Benachrichtigungen“ die Benachrichtigungen ein und bist mit Roblox angemeldet, speichert das Backend die Push-Adresse dieses Geräts (mit den zugehörigen Schlüsseln) zu deinem Konto, dazu deine Auswahl (Chat-Nachrichten, Bewerbungen, für das Team neue Anfragen und Bewerbungen) und die Sprache – für bis zu 6 Geräte. Damit bekommst du auch bei geschlossener App Bescheid, wenn dir jemand im Chat schreibt, deine Anfrage angenommen wird oder das Ergebnis deiner Bewerbung da ist. Die Benachrichtigung enthält den Namen des Absenders und den Anfang der Nachricht. Beim Ausschalten oder Abmelden wird das Gerät wieder entfernt; Adressen, die der Push-Dienst nicht mehr kennt, löschen wir automatisch.</p>
+            <p>Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO, § 25 Abs. 1 TDDDG). Du kannst sie jederzeit widerrufen, indem du die Benachrichtigungen in den Einstellungen bzw. die Glocke ausschaltest oder Benachrichtigungen für die Seite in deinem Browser bzw. Gerät abschaltest.</p>
           </section>
 
           <section id="bewerbungen">
             <h2>9. Bewerbungen</h2>
             <p>Über „Karriere“ kannst du dich für das Team bewerben. Dabei gibst du deinen Discord-Namen, deine E-Mail-Adresse, deine Spielzeit, deinen Rang und deine Antworten auf die Fragen an, bei manchen Stellen auch Links zu deinen Arbeiten. Ist das Backend eingerichtet, kommt dein angemeldetes Roblox-Konto dazu (Nutzer-ID, Name, Profilbild, Rolle in der Gruppe), damit das Team sieht, wer sich bewirbt.</p>
             <p>Das Backend speichert deine Bewerbung mit allen Angaben und Antworten. Prüfen können sie nur Mitglieder ab der Rolle Public Relations Department in der App; sie markieren sie als „bestanden“ oder „nicht bestanden“. Du selbst siehst deine gesendeten Angaben jederzeit wieder unter der Stelle („Deine Bewerbung ansehen“). Zusätzlich geht ein Hinweis mit deinen Angaben an einen nicht öffentlichen Discord-Kanal des Teams (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA; <a href="https://discord.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Discord</a>). Als Schutz vor Spam merkt sich das Backend 24 Stunden lang, wann du dich auf welche Stelle beworben hast.</p>
+            <p><strong>E-Mails:</strong> Nach dem Absenden schicken wir dir die ganze Bewerbung an die angegebene E-Mail-Adresse, nach der Auswertung das Ergebnis. Dafür nutzen wir einen E-Mail-Dienst als Auftragsverarbeiter: Brevo (Sendinblue SAS, 106 boulevard Haussmann, 75008 Paris, Frankreich; <a href="https://www.brevo.com/de/legal/privacypolicy/" target="_blank" rel="noopener">Datenschutzerklärung von Brevo</a>) oder – falls eingerichtet – Resend (Plus Five Five, Inc., USA, EU-US Data Privacy Framework bzw. Standardvertragsklauseln). Übermittelt werden deine E-Mail-Adresse, dein Name und der Inhalt der Bewerbung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.</p>
+            <p><strong>Ergebnis:</strong> Die Person aus dem Public Relations Department, die deine Bewerbung auswertet, schickt dir das Ergebnis („PASSED“ oder „FAILED“) als Nachricht im Chat der App; ihr Name steht dabei. Du kannst dort direkt antworten (siehe Abschnitt 10).</p>
             <p>Hast du bestanden, gratuliert dir das Team in einem Discord-Kanal der Community. Dort stehen dann dein Discord-Name, dein Roblox-Name mit Link zum Profil und die Stelle. Wenn du das nicht möchtest, schreib uns vorher (siehe Abschnitt 14); Rechtsgrundlage dafür ist unser berechtigtes Interesse, neue Teammitglieder vorzustellen (Art. 6 Abs. 1 lit. f DSGVO), dem du widersprechen kannst.</p>
             <p>Wir nutzen die Angaben nur, um deine Bewerbung zu prüfen und dich zu kontaktieren. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Das Backend löscht Bewerbungen automatisch nach 180 Tagen; die Nachricht im Team-Kanal löschen wir spätestens sechs Monate nach der Entscheidung, außer du wirst ins Team aufgenommen. Solange das Backend nicht eingerichtet ist, werden Bewerbungen nur auf deinem Gerät gespeichert und nicht verschickt.</p>
           </section>
@@ -162,7 +166,7 @@
           <section id="chat">
             <h2>10. Chat mit dem Team</h2>
             <p>Im Chat kannst du dem Team eine Anfrage schicken (mit Grund und Bereich) oder einer Person ab der Rolle Supervisor direkt schreiben. Dafür musst du mit Roblox angemeldet sein. Gespeichert werden im Backend: die Nachrichten mit Zeitpunkt, deine Roblox-Nutzer-ID, dein Name, Anzeigename, Profilbild und Rang, bei Anfragen außerdem Grund, Bereich, Status und wer sie angenommen hat.</p>
-            <p>Eine <strong>Anfrage</strong> sehen du und alle Teammitglieder, die für den gewählten Bereich zuständig sind; sobald jemand sie annimmt, schreiben nur noch ihr beide. Eine <strong>Direktnachricht</strong> sehen nur du und die angeschriebene Person. Die Liste des Teams (Name, Anzeigename, Profilbild, Rolle) stammt aus der öffentlichen Roblox-Gruppe und wird über das Backend bzw. roproxy.com geladen.</p>
+            <p>Eine <strong>Anfrage</strong> sehen du und alle Teammitglieder, die für den gewählten Bereich zuständig sind; sobald jemand sie annimmt, schreiben nur noch ihr beide. Eine <strong>Direktnachricht</strong> sehen nur du und die angeschriebene Person. Spieler können nur dem Team schreiben; das Team (ab Supervisor) kann jeden Spieler anschreiben und sucht ihn dafür über den öffentlichen Roblox-Namen. Die Liste des Teams (Name, Anzeigename, Profilbild, Rolle) stammt aus der öffentlichen Roblox-Gruppe und wird über das Backend bzw. roproxy.com geladen.</p>
             <p>Zweck ist, dir bei Fragen zu helfen und Meldungen zu bearbeiten. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO. Gespräche werden 180 Tage nach der letzten Nachricht automatisch gelöscht. Um festzustellen, welche Nachrichten neu für dich sind, merkt sich die App auf deinem Gerät, welche Gespräche du zuletzt geöffnet hast.</p>
           </section>
 

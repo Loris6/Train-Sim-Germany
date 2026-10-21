@@ -4,12 +4,18 @@
  *   app:<id>       → ganze Bewerbung (Angaben, Antworten, Ergebnis, Status)
  *   content:apps   → Übersicht [{ id, job, jobTitle, area, sub, username, displayName, at, score, total, status, sentAt }]
  *
- * Status: new (neu) → passed (bestanden) | failed (nicht bestanden). Das Public Relations Department
- * schickt die Bestandenen gesammelt an Discord (DISCORD_RESULTS_WEBHOOK_URL) und gratuliert ihnen.
+ * Status: new (neu) → passed (bestanden) | failed (nicht bestanden). Nach der Auswertung bekommt der Bewerber
+ * eine Nachricht vom Prüfer im Chat ([✅ PASSED] / [❌ FAILED]), eine Benachrichtigung und eine E-Mail.
+ * Das Public Relations Department schickt die Bestandenen außerdem gesammelt an Discord (DISCORD_RESULTS_WEBHOOK_URL).
+ * Nach dem Absenden bekommt der Bewerber die ganze Bewerbung per E-Mail (siehe mail.js).
  * Bewerbungen werden nach 180 Tagen gelöscht.
  */
 import { randomKey, clip, now } from './lib.js';
 import { jobOpenAt } from './content.js';
+import { atLeast } from './ranks.js';
+import { notifyStaff } from './webpush.js';
+import { postResult } from './chat.js';
+import { sendMail, applicationMail, resultMail } from './mail.js';
 
 const APPS_PER_DAY = 3;
 const KEEP_DAYS = 180;
@@ -18,11 +24,12 @@ const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg),
 const summary = (a) => ({
   id: a.id, job: a.job, jobTitle: a.jobTitle, area: a.area, sub: a.sub, username: a.username, displayName: a.displayName,
   avatar: a.avatar, at: a.at, score: a.score, total: a.total, status: a.status, sentAt: a.sentAt || null,
+  notified: a.notifiedStatus || null, chatId: a.chatId || null, reviewedBy: a.reviewedBy || null,
 });
 // Was der Bewerber selbst wieder sehen kann
 export const ownView = (a) => ({
   id: a.id, job: a.job, area: a.area, roblox: a.username, discord: a.discord, email: a.email, since: a.since, rank: a.rank,
-  count: a.count, at: a.at, status: a.sentAt ? a.status : 'new',
+  count: a.count, at: a.at, status: a.notifiedStatus || (a.sentAt ? a.status : 'new'), mailed: !!a.mailed, chatId: a.chatId || null,
 });
 
 async function saveIndex(store, list) {
@@ -60,12 +67,15 @@ const scoreText = (a) => (a.total > 0 ? `${a.score} von ${a.total} richtig (${Ma
 export async function submitApplication(store, env, user, body) {
   if (!/^[a-z0-9-]{2,40}$/.test(body.job || '') || !Array.isArray(body.answers) || body.answers.length > 100) throw bad();
   if (!String(body.discord || '').trim()) throw bad();
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]{2,}$/.test(String(body.email || '').trim())) throw bad('email');
   // Stelle offen? Wer vor dem Schließen bzw. vor Ende des Zeitraums angefangen hat, darf noch absenden.
   const jobs = (await store.get('content:jobs')) || {};
   const state = jobs[body.job];
   const t = Date.now();
   const started = Number.isFinite(+body.startedAt) ? Math.min(+body.startedAt, t) : t;
   if (!jobOpenAt(state, t) && !(jobOpenAt(state, started) && t - started < 12 * 3600000)) throw bad('closed', 409);
+  // Höchstzahl an Bewerbungen erreicht?
+  if (state && state.limit && (state.received || 0) >= state.limit) throw bad('full', 409);
 
   // Schutz vor Spam: höchstens 3 Bewerbungen pro Tag und eine pro Stelle
   const rlKey = `apps:${user.sub}`;
@@ -89,6 +99,19 @@ export async function submitApplication(store, env, user, body) {
   await saveIndex(store, list);
   recent.push({ job: a.job, at: now() });
   await store.put(rlKey, recent, { ttl: 86400 });
+  // Zähler der Stelle (für „Noch x Plätze“ und die Höchstzahl)
+  jobs[a.job] = { ...(jobs[a.job] || {}), received: ((jobs[a.job] || {}).received || 0) + 1 };
+  await store.put('content:jobs', jobs);
+
+  // Die ganze Bewerbung per E-Mail an den Bewerber, Benachrichtigung ans Public Relations Department
+  const mail = applicationMail(env, a);
+  a.mailed = await sendMail(env, { to: a.email, toName: a.displayName, ...mail });
+  if (a.mailed) await store.put(`app:${a.id}`, a);
+  await notifyStaff(store, env, (rank) => atLeast(rank, 'Public Relations Department'), 'team', {
+    title: `Neue Bewerbung: ${a.jobTitle}${a.area ? ` – ${a.area}` : ''}`,
+    body: `${a.displayName} (@${a.username})${a.total ? ` · ${Math.round((a.score / a.total) * 100)} %` : ''}`,
+    url: `./#/karriere/pruefen/${a.id}`, tag: `app-${a.id}`,
+  }, a.sub);
 
   // Hinweis an den Team-Kanal (optional, Fehler sind nicht schlimm – die Bewerbung ist gespeichert)
   if (env.DISCORD_WEBHOOK_URL) {
@@ -117,13 +140,19 @@ export async function getApplication(store, id) {
   if (!/^[\w-]{6,30}$/.test(id)) return null;
   return store.get(`app:${id}`);
 }
-export async function setStatus(store, user, id, status) {
+export async function setStatus(store, env, user, id, status) {
   if (!['new', 'passed', 'failed'].includes(status)) throw bad();
   const a = await getApplication(store, id);
   if (!a) throw bad('not_found', 404);
   a.status = status;
   a.reviewedBy = user.username;
   a.reviewedAt = Date.now();
+  // Ergebnis an den Bewerber: Nachricht im Chat, Benachrichtigung und E-Mail (nur wenn es sich geändert hat)
+  if (status !== 'new' && a.notifiedStatus !== status) {
+    a.chatId = await postResult(store, env, user, a);
+    a.notifiedStatus = status;
+    await sendMail(env, { to: a.email, toName: a.displayName, ...resultMail(env, a, user, a.chatId) });
+  }
   await store.put(`app:${a.id}`, a);
   const list = await listApplications(store);
   const i = list.findIndex((x) => x.id === id);

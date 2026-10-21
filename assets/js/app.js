@@ -983,7 +983,7 @@
     return (remote.trainings || []).map((x) => {
       const b = berlinOf(x.start);
       return {
-        id: x.id, type: x.type, title: x.title, host: x.host, hostId: x.hostId, server: x.server, slots: x.slots, taken: 0, dur: x.dur, text: x.text,
+        id: x.id, type: x.type, title: x.title, host: x.host, hostName: x.hostName, hostAvatar: x.hostAvatar, hostId: x.hostId, server: x.server, slots: x.slots, taken: 0, dur: x.dur, text: x.text,
         day: b.day, start: b.abs, end: b.abs + x.dur, time: hhmm(b.abs), req: reqFor(x.type),
         img: (typeOf(x.type) || {}).img || 'training.svg', color: rankOf(x.type).color, remote: true,
       };
@@ -1091,6 +1091,9 @@
     const on = isReminded(tn);
     return `<button class="${cls}" type="button" data-remind="${tn.id}" aria-pressed="${on}" aria-label="${esc(on ? t('Benachrichtigung aus') : t('Benachrichtigen, wenn der Server öffnet'))}">${icon(on ? 'fi-sr-bell-ring' : 'fi-rr-bell')}</button>`;
   };
+  // Leitung des Trainings: Profilbild und daneben der Name
+  const hostHtml = (tn, cls = '') => `<span class="host ${cls}">${tn.hostAvatar
+    ? `<span class="avatar"><img src="${esc(tn.hostAvatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(tn.host)}<span class="host__name"><b>${esc(tn.hostName || tn.host)}</b>${tn.hostName && tn.hostName !== tn.host ? `<small>@${esc(tn.host)}</small>` : ''}</span></span>`;
   function tcard(tn) {
     const st = trainingState(tn);
     return `<article class="tcard">
@@ -1102,6 +1105,7 @@
         </div>
         <div class="tcard__body">
           <h3>${esc(t(tn.title))}</h3>
+          ${hostHtml(tn)}
           <div class="tcard__row"><span>${t('{time} Uhr', { time: tn.time })}</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : ''}">${icon('fi-sr-user')}${tn.remote ? t('max. {n}', { n: tn.slots }) : `${tn.taken}/${tn.slots}`}</span></div>
         </div>
       </button>
@@ -1194,6 +1198,7 @@
   function jobOpen(job, at = Date.now()) {
     const s = jobState(job);
     if (!s) return job.open;
+    if (s.limit && (s.received || 0) >= s.limit) return false;
     if (s.from && at < s.from) return false;
     if (s.to && at > s.to) return false;
     return s.open !== false || !!(s.closedAt && at < s.closedAt);
@@ -1201,6 +1206,7 @@
   const fmtWhen = (ms) => new Intl.DateTimeFormat(locale, { timeZone: 'Europe/Berlin', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(ms);
   function jobStatus(job) {
     const s = jobState(job);
+    if (s && s.limit && (s.received || 0) >= s.limit) return `<span class="pill pill--bad">${t('Voll')}</span>`;
     if (jobOpen(job)) return `<span class="pill pill--ok">${icon('fi-rr-check')}${s && s.to ? t('Offen bis {date}', { date: fmtWhen(s.to) }) : t('Offen')}</span>`;
     if (s && s.from && Date.now() < s.from && s.open !== false) return `<span class="pill pill--warn">${icon('fi-rr-clock-three')}${t('Öffnet am {date}', { date: fmtWhen(s.from) })}</span>`;
     return `<span class="pill pill--bad">${t('Geschlossen')}</span>`;
@@ -1215,40 +1221,161 @@
   // Zeit (ms) ↔ Feld „Datum und Uhrzeit“ in deutscher Zeit
   const toLocalInput = (ms) => { if (!ms) return ''; const b = berlinOf(ms); return `${dateOf(b.day).toISOString().slice(0, 10)}T${hhmm(b.abs)}`; };
   const fromLocalInput = (v) => (v ? berlinToEpoch(v.slice(0, 10), v.slice(11, 16)) : null);
+  // Auf der Seite einer Stelle: kurze Verwaltung mit „Bearbeiten“
   function jobAdmin(job) {
     if (mayPR() && !canBackend()) {
-      return `<section class="cbox admin-box"><h3>${icon('fi-rr-settings')}${t('Verwaltung')}<small>Public Relations</small></h3>
-        <p class="muted">${t('Stellen öffnen, schließen und Zeiträume setzen geht, sobald der App-Server verbunden ist.')}</p>
-        <button class="btn btn--soft btn--block" type="button" data-open="backend-setup">${icon('fi-rr-info')}${t('So richtest du ihn ein')}</button></section>`;
+      return `<section class="cbox admin-strip"><span class="admin-strip__ic">${icon('fi-rr-settings')}</span><div><b>${t('Verwaltung')}</b><small>${t('Geht, sobald der App-Server verbunden ist.')}</small></div>
+        <button class="btn btn--soft btn--sm" type="button" data-open="backend-setup">${t('Einrichten')}</button></section>`;
     }
     if (!canPR()) return '';
+    const st = jobStats(job);
+    return `<section class="cbox admin-strip"><span class="admin-strip__ic">${icon('fi-rr-settings')}</span>
+      <div><b>${t('Verwaltung')}</b><small>${esc(jobLine(job))} · ${t('{n} Bewerbungen', { n: st.total })}</small></div>
+      <button class="btn btn--primary btn--sm" type="button" data-job-edit="${esc(job.id)}">${icon('fi-rr-pencil')}${t('Bearbeiten')}</button></section>`;
+  }
+  // ---------- Stellen verwalten (ab Public Relations Department) ----------
+  // Je Stelle: offen/geschlossen, Zeitraum (mit Vorlagen), Höchstzahl an Bewerbungen, „Dringend gesucht“,
+  // Hinweis für Bewerber, Zahlen zu den Bewerbungen und ein Verlauf, wer was geändert hat.
+  const untilText = (ms) => {
+    const min = Math.round((ms - Date.now()) / 60000);
+    if (min < 60) return t('noch {n} Min.', { n: Math.max(1, min) });
+    if (min < 2880) return t('noch {n} Std.', { n: Math.round(min / 60) });
+    return t('noch {n} Tage', { n: Math.round(min / 1440) });
+  };
+  const jobFull = (s) => !!(s && s.limit && (s.received || 0) >= s.limit);
+  function jobStats(job) {
+    const apps = (review.list || []).filter((a) => a.job === job.id);
+    const scored = apps.filter((a) => a.total);
+    return {
+      total: apps.length, fresh: apps.filter((a) => a.status === 'new').length,
+      passed: apps.filter((a) => a.status === 'passed').length, failed: apps.filter((a) => a.status === 'failed').length,
+      avg: scored.length ? Math.round((scored.reduce((sum, a) => sum + a.score / a.total, 0) / scored.length) * 100) : null,
+    };
+  }
+  function jobLine(job) {
     const s = jobState(job) || {};
-    const open = s.open !== undefined ? s.open !== false : job.open;
-    return `<section class="cbox admin-box">
-      <h3>${icon('fi-rr-settings')}${t('Verwaltung')}<small>Public Relations</small></h3>
-      <form class="cform" data-job-admin="${esc(job.id)}" novalidate>
-        <label class="toggle"><span class="toggle__text"><b>${t('Bewerbungen offen')}</b><small>${t('Aus = sofort geschlossen. Wer gerade schreibt, kann trotzdem noch absenden.')}</small></span>
-          <input type="checkbox" role="switch" name="open"${open ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
-        <div class="cform__row">
-          <div class="f"><label class="f__label" for="ja-from">${t('Offen ab (optional)')}</label><input id="ja-from" name="from" type="datetime-local" value="${toLocalInput(s.from)}"></div>
-          <div class="f"><label class="f__label" for="ja-to">${t('Offen bis (optional)')}</label><input id="ja-to" name="to" type="datetime-local" value="${toLocalInput(s.to)}"></div>
+    if (jobFull(s)) return t('Voll – {n} Bewerbungen erreicht', { n: s.limit });
+    if (jobOpen(job)) return s.to ? t('Offen bis {date} · {left}', { date: fmtWhen(s.to), left: untilText(s.to) }) : t('Offen ohne Enddatum');
+    if (s.from && Date.now() < s.from && s.open !== false) return t('Öffnet am {date} · {left}', { date: fmtWhen(s.from), left: untilText(s.from) });
+    return s.closedAt ? t('Geschlossen seit {date}', { date: fmtWhen(s.closedAt) }) : t('Geschlossen');
+  }
+  function jobLineShort(job) {
+    const s = jobState(job) || {};
+    if (jobFull(s)) return t('Höchstzahl erreicht');
+    if (jobOpen(job)) return s.to ? untilText(s.to) : t('ohne Enddatum');
+    if (s.from && Date.now() < s.from && s.open !== false) return untilText(s.from);
+    return s.closedAt ? t('seit {date}', { date: fmtWhen(s.closedAt) }) : '';
+  }
+  function manageCard(job) {
+    const s = jobState(job) || {};
+    const st = jobStats(job);
+    const isOpen = s.open !== undefined ? s.open !== false : job.open;
+    const stat = (n, label, cls = '') => `<div class="jm-stat ${cls}"><b>${n}</b><span>${label}</span></div>`;
+    return `<article class="jm-card${jobOpen(job) ? ' is-open' : ''}">
+      <header class="jm-card__head">
+        <div class="jm-card__title"><h3>${esc(t(job.title))}</h3><span>${icon('fi-rr-users-alt')}${t('Team {name}', { name: t(job.team) })}</span></div>
+        <label class="switch" title="${esc(t('Bewerbungen offen'))}"><input type="checkbox" role="switch" data-job-toggle="${esc(job.id)}"${isOpen ? ' checked' : ''} aria-label="${esc(t('Bewerbungen offen'))}"><span class="toggle__ui" aria-hidden="true"></span></label>
+      </header>
+      <p class="jm-card__line">${jobStatus(job)}<span>${esc(jobLineShort(job))}</span></p>
+      ${s.urgent || s.note ? `<div class="jm-card__tags">${s.urgent ? `<span class="pill pill--bad">${icon('fi-rr-bolt')}${t('Dringend gesucht')}</span>` : ''}${s.note ? `<span class="pill pill--info">${icon('fi-rr-info')}${t('Hinweis aktiv')}</span>` : ''}</div>` : ''}
+      <div class="jm-stats">${stat(st.total, t('gesamt'))}${stat(st.fresh, t('neu'), st.fresh ? 'is-new' : '')}${stat(st.passed, t('bestanden'), 'is-ok')}${stat(st.avg === null ? '–' : `${st.avg} %`, t('Ø Ergebnis'))}</div>
+      ${s.limit ? `<div class="jm-limit"><div class="jm-limit__row"><span>${t('Plätze')}</span><b>${t('{a} von {b}', { a: s.received || 0, b: s.limit })}</b></div><i><span style="width:${Math.min(100, ((s.received || 0) / s.limit) * 100)}%"></span></i></div>` : ''}
+      <div class="jm-card__actions">
+        <button class="btn btn--primary btn--sm" type="button" data-job-edit="${esc(job.id)}">${icon('fi-rr-pencil')}${t('Bearbeiten')}</button>
+        <button class="btn btn--soft btn--sm" type="button" data-job-apps="${esc(job.id)}">${icon('fi-rr-document')}${t('Bewerbungen')}${st.fresh ? `<span class="count-badge">${st.fresh}</span>` : ''}</button>
+        <a class="btn btn--soft btn--sm" href="#/karriere/${esc(job.id)}">${icon('fi-rr-eye')}${t('Ansehen')}</a>
+      </div>
+      ${s.updatedBy ? `<p class="jm-card__by">${t('Zuletzt geändert von {name} · {date}', { name: esc(s.updatedBy), date: fmtWhen(s.updated) })}</p>` : ''}
+    </article>`;
+  }
+  function careerManage() {
+    const back = `<a class="back-link" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Karriere')}</a>`;
+    if (!canPR()) return `${back}<div class="cbox">${mayPR() ? backendSetupHtml() : `<p class="lead">${t('Stellen verwalten kann das Public Relations Department und höher.')}</p>`}</div>`;
+    const open = D.jobs.filter((x) => jobOpen(x)).length;
+    const fresh = review.list ? review.list.filter((a) => a.status === 'new').length : 0;
+    return `${back}
+      <section class="cbox jm-intro">
+        <h2>${t('Stellen <em>verwalten</em>')}</h2>
+        <p class="lead">${t('Öffnen und schließen, Zeiträume und Plätze festlegen, dringende Stellen hervorheben – alles auf einen Blick.')}</p>
+        <div class="jm-summary">
+          <div><b>${open}</b><span>${t('offen')}</span></div>
+          <div><b>${D.jobs.length - open}</b><span>${t('geschlossen')}</span></div>
+          <a href="#/karriere/pruefen"><b>${fresh}</b><span>${t('neue Bewerbungen')}</span></a>
         </div>
-        <p class="f__hint">${t('Deutsche Zeit. Nach dem Ende schließt die Stelle von selbst – wer vorher angefangen hat, kann noch absenden.')}</p>
-        <button class="btn btn--primary" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
-        ${s.updatedBy ? `<p class="sheet-note">${t('Zuletzt geändert von {name}', { name: esc(s.updatedBy) })}</p>` : ''}
-      </form>
-    </section>`;
+      </section>
+      <div class="jm-list">${D.jobs.map(manageCard).join('')}</div>`;
   }
-  async function saveJobAdmin(form) {
-    const f = new FormData(form);
-    const body = { open: !!f.get('open'), from: fromLocalInput(f.get('from')), to: fromLocalInput(f.get('to')) };
-    if (body.from && body.to && body.to <= body.from) { toast(t('„Offen bis“ muss nach „Offen ab“ liegen.')); return; }
+  // Dialog „Stelle bearbeiten“
+  function jobEditView(id) {
+    const job = D.jobs.find((x) => x.id === id);
+    if (!job || !canPR()) return `<p class="muted">${t('Diese Stelle gibt es nicht.')}</p>`;
+    const s = jobState(job) || {};
+    const isOpen = s.open !== undefined ? s.open !== false : job.open;
+    const preset = s.from || s.to ? 'custom' : 'none';
+    const chip = (val, label) => `<label class="pick"><input type="radio" name="preset" value="${val}"${preset === val ? ' checked' : ''}><span>${label}</span></label>`;
+    return `<form class="cform job-edit" data-job-form="${esc(job.id)}" novalidate>
+      <div class="job-edit__title"><b>${esc(t(job.title))}</b><span>${esc(jobLine(job))}</span></div>
+      <label class="toggle"><span class="toggle__text"><b>${t('Bewerbungen offen')}</b><small>${t('Aus = sofort geschlossen. Wer gerade schreibt, darf trotzdem noch absenden.')}</small></span>
+        <input type="checkbox" role="switch" name="open"${isOpen ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+      <fieldset class="f"><legend class="f__label">${t('Zeitraum')}</legend>
+        <div class="pick-grid">${chip('none', t('Ohne Ende'))}${chip('7', t('7 Tage'))}${chip('14', t('14 Tage'))}${chip('30', t('30 Tage'))}${chip('custom', t('Eigene Zeit'))}</div>
+        <div class="job-edit__custom">
+          <div class="f"><label class="f__label" for="je-from">${t('Offen ab (optional)')}</label><input id="je-from" name="from" type="datetime-local" value="${toLocalInput(s.from)}"></div>
+          <div class="f"><label class="f__label" for="je-to">${t('Offen bis')}</label><input id="je-to" name="to" type="datetime-local" value="${toLocalInput(s.to)}"></div>
+        </div>
+        <small class="f__hint">${t('Deutsche Zeit. Danach schließt die Stelle von selbst – wer vorher angefangen hat, kann noch absenden.')}</small>
+      </fieldset>
+      <div class="f"><label class="f__label" for="je-limit">${t('Höchstzahl an Bewerbungen')}</label>
+        <input id="je-limit" name="limit" type="number" inputmode="numeric" min="0" max="500" value="${s.limit || 0}">
+        <small class="f__hint">${t('0 = unbegrenzt. Ist sie erreicht, schließt die Stelle automatisch. Bisher eingegangen: {n}.', { n: s.received || 0 })}</small>
+        ${s.received ? `<label class="check"><input type="checkbox" name="resetCount"><span>${t('Zähler auf 0 zurücksetzen')}</span></label>` : ''}
+      </div>
+      <label class="toggle"><span class="toggle__text"><b>${t('Dringend gesucht')}</b><small>${t('Die Stelle bekommt ein auffälliges Abzeichen und steht oben.')}</small></span>
+        <input type="checkbox" role="switch" name="urgent"${s.urgent ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+      <div class="f"><label class="f__label" for="je-note">${t('Hinweis für Bewerber (optional)')}</label>
+        <textarea id="je-note" name="note" maxlength="200" rows="2" placeholder="${esc(t('z. B. Wir suchen vor allem Builder für die Strecke nach Warschau.'))}">${esc(s.note || '')}</textarea></div>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+      ${(s.log || []).length ? `<div class="job-edit__log"><h4>${t('Verlauf')}</h4><ul>${s.log.map((l) => `<li><b>${esc(l.text)}</b><small>${esc(l.by)} · ${fmtWhen(l.at)}</small></li>`).join('')}</ul></div>` : ''}
+    </form>`;
+  }
+  function jobBody(job, patch = {}) {
+    const s = jobState(job) || {};
+    return { open: s.open !== undefined ? s.open !== false : job.open, from: s.from || null, to: s.to || null, limit: s.limit || 0, note: s.note || '', urgent: !!s.urgent, ...patch };
+  }
+  async function putJob(id, body, msg) {
     try {
-      await api(`/api/jobs/${encodeURIComponent(form.dataset.jobAdmin)}`, { method: 'PUT', body });
-      toast(t('Gespeichert'));
+      await api(`/api/jobs/${encodeURIComponent(id)}`, { method: 'PUT', body });
       await loadContent();
-    } catch (e) { toast(errorText(e)); }
+      if (state.page === 'karriere') renderCareer();
+      if (msg) toast(msg);
+      return true;
+    } catch (e) {
+      toast(errorText(e));
+      if (state.page === 'karriere') renderCareer();
+      return false;
+    }
   }
+  async function saveJobForm(form) {
+    const id = form.dataset.jobForm;
+    const f = new FormData(form);
+    const preset = f.get('preset');
+    let from = null;
+    let to = null;
+    if (preset === 'custom') {
+      from = fromLocalInput(f.get('from'));
+      to = fromLocalInput(f.get('to'));
+      if (from && to && to <= from) { toast(t('„Offen bis“ muss nach „Offen ab“ liegen.')); return; }
+    } else if (preset && preset !== 'none') to = Date.now() + +preset * 86400000;
+    const body = {
+      open: !!f.get('open'), from, to, limit: Math.max(0, Math.min(500, Math.round(+f.get('limit') || 0))),
+      urgent: !!f.get('urgent'), note: String(f.get('note') || '').trim(), resetCount: !!f.get('resetCount'),
+    };
+    const btn = $('button[type="submit"]', form);
+    btn.disabled = true;
+    if (await putJob(id, body, t('Gespeichert'))) closeModal();
+    else btn.disabled = false;
+  }
+
   const SINCE = ['Weniger als 1 Monat', '1–3 Monate', '3–6 Monate', '6–12 Monate', 'Mehr als 1 Jahr'];
   const SECTORS = [
     { title: 'Über dich', text: 'Damit wir dich im Spiel, auf Discord und per E-Mail erreichen.' },
@@ -1425,8 +1552,16 @@
   }
 
   function jobCard(job) {
-    return `<a class="job" href="#/karriere/${job.id}">
+    const s = jobState(job) || {};
+    const open = jobOpen(job);
+    const extras = [
+      s.urgent && open ? `<span class="job-flag job-flag--hot">${icon('fi-rr-bolt')}${t('Dringend gesucht')}</span>` : '',
+      open && s.limit ? `<span class="job-flag">${icon('fi-sr-user')}${t('Noch {n} Plätze', { n: Math.max(0, s.limit - (s.received || 0)) })}</span>` : '',
+      open && s.to ? `<span class="job-flag">${icon('fi-rr-clock-three')}${untilText(s.to).replace(/^./, (c) => c.toUpperCase())}</span>` : '',
+    ].join('');
+    return `<a class="job${s.urgent && open ? ' job--hot' : ''}" href="#/karriere/${job.id}">
       <div class="job__top"><h3>${esc(t(job.title))}</h3>${jobStatus(job)}</div>
+      ${extras ? `<div class="job__flags">${extras}</div>` : ''}
       <span class="job__team">${icon('fi-rr-users-alt')}${t('Team {name}', { name: t(job.team) })}</span>
       <p>${esc(t(job.text))}</p>
       <span class="job__more">${t('Details')} ${icon('fi-rr-arrow-small-right')}</span>
@@ -1435,13 +1570,18 @@
   function careerList() {
     const open = D.jobs.filter((x) => jobOpen(x)).length;
     const fresh = review.list ? review.list.filter((a) => a.status === 'new').length : 0;
+    // Dringende und offene Stellen zuerst
+    const jobs = D.jobs.slice().sort((a, b) => (jobOpen(b) - jobOpen(a)) || (!!(jobState(b) || {}).urgent - !!(jobState(a) || {}).urgent));
     return `<div class="cbox">
         <h2>${t('Werde Teil <em>unseres Teams</em>')}</h2>
         <p class="lead">${t('Die <strong>Train Sim Germany</strong> Community sucht motivierte Mitglieder, die unser virtuelles Bahnnetz erweitern und verbessern. Entdecke die offenen Stellen und finde die Rolle, die zu dir passt.')}</p>
       </div>
-      ${mayPR() ? `<a class="btn-line btn-line--outline review-link" href="#/karriere/pruefen">${icon('fi-rr-document')}${t('Bewerbungen prüfen')}${fresh ? `<span class="count-badge">${t('{n} neu', { n: fresh })}</span>` : ''}</a>` : ''}
+      ${mayPR() ? `<div class="admin-tiles">
+        <a class="admin-tile review-link" href="#/karriere/pruefen"><span class="admin-tile__ic">${icon('fi-rr-document')}</span><span><b>${t('Bewerbungen prüfen')}</b><small>${fresh ? t('{n} neu', { n: fresh }) : t('Alles geprüft')}</small></span>${fresh ? `<span class="count-badge">${fresh}</span>` : ''}</a>
+        <a class="admin-tile" href="#/karriere/verwalten"><span class="admin-tile__ic">${icon('fi-rr-settings')}</span><span><b>${t('Stellen verwalten')}</b><small>${t('{a} von {b} offen', { a: open, b: D.jobs.length })}</small></span></a>
+      </div>` : ''}
       <div class="career-list-head"><h2>${t('Offene Stellen')}</h2><span>${t('{a} von {b} offen', { a: open, b: D.jobs.length })}</span></div>
-      <div class="job-list">${D.jobs.map(jobCard).join('')}</div>`;
+      <div class="job-list">${jobs.map(jobCard).join('')}</div>`;
   }
   function careerDetail(job) {
     const app = state.applications[job.id];
@@ -1452,12 +1592,15 @@
         <a class="btn-line" href="#/karriere/${job.id}/bewerbung">${icon('fi-rr-document')}${t('Deine Bewerbung ansehen')}</a>`;
     } else if (!jobOpen(job)) {
       const soon = st && st.from && Date.now() < st.from && st.open !== false;
-      action = `<div class="note note--bad">${icon('fi-rr-info')}<span>${soon ? t('Bewerbungen sind ab {date} möglich.', { date: fmtWhen(st.from) }) : t('Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.')}</span></div>
+      action = `<div class="note note--bad">${icon('fi-rr-info')}<span>${jobFull(st) ? t('Alle Plätze sind vergeben – es sind genug Bewerbungen eingegangen.') : soon ? t('Bewerbungen sind ab {date} möglich.', { date: fmtWhen(st.from) }) : t('Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.')}</span></div>
         <a class="btn-line btn-line--outline" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}${t('Zum Discord')}</a>`;
     } else {
       action = `<a class="btn-line" href="#/karriere/${job.id}/bewerben">${icon('fi-rr-briefcase')}${t('Jetzt bewerben')}</a>
-        ${st && st.to ? `<p class="f__note">${t('Bewerbungen sind bis {date} möglich.', { date: fmtWhen(st.to) })}</p>` : ''}`;
+        ${st && st.to ? `<p class="f__note">${t('Bewerbungen sind bis {date} möglich ({left}).', { date: fmtWhen(st.to), left: untilText(st.to) })}</p>` : ''}
+        ${st && st.limit ? `<p class="f__note">${t('Noch {n} Plätze frei.', { n: Math.max(0, st.limit - (st.received || 0)) })}</p>` : ''}`;
     }
+    if (st && st.note) action = `<div class="note note--info">${icon('fi-rr-info')}<span><b>${t('Hinweis vom Team')}:</b> ${esc(st.note)}</span></div>${action}`;
+    if (st && st.urgent && jobOpen(job)) action = `<span class="job-flag job-flag--hot job-flag--lg">${icon('fi-rr-bolt')}${t('Dringend gesucht')}</span>${action}`;
     const list = (items) => `<ul>${items.map((x) => `<li>${icon('fi-rr-check-circle')}<span>${esc(t(x))}</span></li>`).join('')}</ul>`;
     const areas = job.areas
       ? `<section class="checks"><h3>${icon('fi-sr-check')}${t('Bereiche')}</h3><div class="area-tags">${job.areas.map((a) => `<span style="--rc:${rankOf(a).color}"><i></i>${esc(a)}</span>`).join('')}</div></section>`
@@ -1543,15 +1686,19 @@
       </form>`;
   }
   function careerDone(job, app) {
-    const status = app.status === 'passed' ? `<div class="note note--ok">${icon('fi-rr-trophy')}<span>${t('Bestanden – herzlichen Glückwunsch! Alles Weitere erfährst du auf Discord.')}</span></div>`
-      : app.status === 'failed' ? `<div class="note note--bad">${icon('fi-rr-info')}<span>${t('Diesmal leider nicht bestanden. Du kannst dich später noch einmal bewerben.')}</span></div>` : '';
+    const chatLink = app.chatId ? `<a class="note__link" href="#/chat/${esc(app.chatId)}">${t('Zur Nachricht im Chat')} ${icon('fi-rr-arrow-small-right')}</a>` : '';
+    const status = app.status === 'passed' ? `<div class="note note--ok">${icon('fi-rr-trophy')}<span><b>✅ PASSED</b> – ${t('Bestanden – herzlichen Glückwunsch!')}${chatLink}</span></div>`
+      : app.status === 'failed' ? `<div class="note note--bad">${icon('fi-rr-info')}<span><b>❌ FAILED</b> – ${t('Diesmal leider nicht bestanden. Du kannst dich später noch einmal bewerben.')}${chatLink}</span></div>`
+        : `<div class="note">${icon('fi-rr-time-fast')}<span>${t('Wird geprüft. Das Ergebnis bekommst du im Chat, per E-Mail und als Benachrichtigung.')}</span></div>`;
+    const mailNote = app.mailed && app.email ? `<p class="done__mail">${icon('fi-rr-envelope')}<span>${t('Eine Kopie mit allen Angaben ging an {email}.', { email: `<b>${esc(app.email)}</b>` })}</span></p>` : '';
     const rows = [[t('Stelle'), t(job.title)], ...(app.area ? [[t('Bereich'), app.area]] : []), [t('Rang'), app.rank], ['Discord', app.discord],
       ...(app.email ? [[t('E-Mail'), app.email]] : []), [t('Fragen'), t('{n} beantwortet', { n: app.count || QUESTIONS_TOTAL })], [t('Gesendet'), fmtDate(app.at)]];
     return `<div class="cbox done">
       <span class="done__ic">${icon('fi-rr-check')}</span>
       <h2>${t('Bewerbung <em>gesendet</em>')}</h2>
-      <p class="lead">${t('Danke, {name}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen über Discord.', { name: esc(app.roblox) })}</p>
+      <p class="lead">${t('Danke, {name}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen.', { name: esc(app.roblox) })}</p>
       ${status}
+      ${mailNote}
       <dl class="done__list">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
       <a class="btn-line btn-line--outline" href="#/karriere/${job.id}">${icon('fi-rr-arrow-left')}${t('Zurück zur Stelle')}</a>
       ${app.sent ? `<p class="f__note">${t('Die Bewerbung ist beim Team angekommen. Zurückziehen kannst du sie über Discord.')}</p>`
@@ -1560,6 +1707,11 @@
   }
   function renderCareer() {
     const el = $('[data-career]');
+    if (state.jobId === 'verwalten') {
+      el.innerHTML = careerManage();
+      ensureReviewData();
+      return;
+    }
     if (state.jobId === 'pruefen') {
       el.innerHTML = mayPR() && !canBackend() ? `<a class="back-link" href="#/karriere">${icon('fi-rr-arrow-left')}${t('Karriere')}</a><div class="cbox">${backendSetupHtml()}</div>`
         : canPR() ? (state.reviewId ? reviewDetail() : reviewList())
@@ -1783,7 +1935,7 @@
             experience: app.experience, activity: app.activity, days: app.days, score, total, lang, answers: report,
             count: questions.length, startedAt: applyStarts()[id] || Date.now(),
           },
-        }).then((own) => Object.assign(app, { id: own.id, status: own.status }));
+        }).then((own) => Object.assign(app, { id: own.id, status: own.status, mailed: own.mailed }));
         app.sent = true;
         review.at = 0;
       } catch (e) {
@@ -2007,6 +2159,7 @@
   function renderSettings() {
     renderLangPicker();
     renderPrivacy();
+    renderNotify();
     $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === themeMode())));
     const p = state.profile;
     const r = rankOf(state.rank);
@@ -2170,7 +2323,8 @@
   // Rolle → Rang über das Kürzel („[QD] Qualified Driver“, „[J-SV] Junior Supervisor“) oder den Namen.
   // Nicht in der Gruppe = Guest [G]. Unbekannte Rolle in der Gruppe = Learning Driver.
   function rankFromRole(role) {
-    if (!role) return 'Guest';
+    // Testkonten (Bots, z. B. „[AT] Alpha Test Accounts“) zählen nicht als Rang
+    if (!role || /alpha\s*test|^\s*\[\s*at\s*\]/i.test(String(role.name || ''))) return 'Guest';
     const name = String(role.name || '').toLowerCase();
     const prefix = ((name.match(/^\s*\[\s*([^\]]+?)\s*\]/) || name.match(/^\s*([a-z-]{1,5})\s*[|:]/) || [])[1] || '').replace(/\s+/g, '');
     const byPrefix = prefix && RANKS.find((r) => r.prefix.toLowerCase() === prefix);
@@ -2226,6 +2380,9 @@
     try {
       applyMe(await api('/api/me'));
       safeRender();
+      // Benachrichtigungen an, aber dieses Gerät noch nicht mit dem Konto verbunden (z. B. nach dem Login)
+      const ns = notifyState();
+      if (ns.on && state.profile && ns.linked !== state.profile.userId) linkPush();
     } catch (e) { /* offline */ }
   }
   function applyMe(me) {
@@ -2311,6 +2468,17 @@
       store.set('tsg-content', c);
       if (render) safeRender();
     } catch (e) { /* offline: letzter Stand bleibt */ }
+  }
+
+  // Beim Öffnen einer Seite frische Inhalte holen (höchstens alle 20 Sekunden), ohne offene Formulare zu stören
+  let freshAt = 0;
+  function refreshOnEnter(page) {
+    if (!apiReady() || Date.now() - freshAt < 20000) return;
+    freshAt = Date.now();
+    Promise.all([loadContent({ render: false }), page === 'karriere' ? loadMe() : null]).then(() => {
+      if (state.page !== page || !modal.hidden || (page === 'karriere' && state.jobApply)) return;
+      RENDER[page]();
+    });
   }
 
   // ---------- Trainings anbieten (ab Supervisor) ----------
@@ -2498,7 +2666,7 @@
   }
 
   // ---------- Bewerbungen prüfen (ab Public Relations Department) ----------
-  const review = { list: null, at: 0, apps: {}, filter: 'new', job: 'all', busy: false };
+  const review = { list: null, at: 0, apps: {}, filter: 'new', job: 'all', answers: 'all', busy: false };
   async function ensureReviewData() {
     if (!canPR() || review.busy) return;
     const id = state.reviewId;
@@ -2551,31 +2719,63 @@
           : `<p class="muted">${t('Gerade gibt es keine bestandenen Bewerbungen, die noch nicht gesendet wurden.')}</p>`}
       </section>`;
   }
+  // Ergebnis als Ring (Prozent der bewerteten Fragen)
+  function scoreRing(pctv) {
+    const r = 34;
+    const c = 2 * Math.PI * r;
+    const color = pctv >= 70 ? 'var(--ok)' : pctv >= 50 ? 'var(--warn)' : 'var(--bad)';
+    return `<svg class="rv-ring" viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="${r}" fill="none" stroke="var(--line)" stroke-width="8"/>
+      <circle cx="40" cy="40" r="${r}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${(c * pctv) / 100} ${c}" transform="rotate(-90 40 40)"/>
+      <text x="40" y="45" text-anchor="middle" font-size="17" font-weight="800" fill="currentColor">${pctv}%</text></svg>`;
+  }
   function reviewDetail() {
     const back = `<a class="back-link" href="#/karriere/pruefen">${icon('fi-rr-arrow-left')}${t('Alle Bewerbungen')}</a>`;
     const a = review.apps[state.reviewId];
     if (!a) return `${back}<div class="cbox"><p class="lead">${t('Bewerbung wird geladen …')}</p></div>`;
     if (a.error) return `${back}<div class="cbox"><p class="lead">${t('Diese Bewerbung gibt es nicht (mehr).')}</p></div>`;
     const pctv = scorePct(a);
-    const facts = [
-      [t('Stelle'), `${jobTitleOf(a)}${a.area ? ` – ${a.area}` : ''}`], ['Discord', a.discord], [t('E-Mail'), a.email || '–'], [t('Spielt seit'), t(a.since || '–')],
-      [t('Rang (angegeben)'), a.rank || '–'], [t('Rolle in der Gruppe'), a.groupRole ? a.groupRole.name : t('nicht in der Gruppe')],
-      [t('Aktivität'), a.activity ? `${a.activity} / 10` : '–'], [t('Freie Tage'), (a.days || []).join(', ') || '–'], [t('Gesendet'), fmtDate(a.at)],
-    ];
+    const answers = a.answers || [];
+    const nOk = answers.filter((x) => x.ok === true).length;
+    const nBad = answers.filter((x) => x.ok === false).length;
+    const nOpen = answers.length - nOk - nBad;
+    const shown = answers.map((x, i) => [x, i]).filter(([x]) => review.answers === 'all' || (review.answers === 'bad' ? x.ok === false : review.answers === 'ok' ? x.ok === true : x.ok == null));
+    const fact = (ic, k, v) => `<div class="rv-fact"><span class="rv-fact__ic">${icon(ic)}</span><span><small>${k}</small><b>${v}</b></span></div>`;
+    const chip = (val, label) => `<button class="chip${review.answers === val ? ' is-active' : ''}" type="button" data-rv-answers="${val}">${label}</button>`;
+    const sent = a.notifiedStatus ? `<p class="rv-sent">${icon('fi-rr-paper-plane')}<span>${t('Ergebnis gesendet: {status}', { status: a.notifiedStatus === 'passed' ? '✅ PASSED' : '❌ FAILED' })}${a.reviewedBy ? ` · ${t('von {name}', { name: esc(a.reviewedBy) })}` : ''}</span>${a.chatId ? `<a href="#/chat/${esc(a.chatId)}">${t('Zum Chat')}</a>` : ''}</p>` : '';
     return `${back}
-      <article class="cbox rv-detail">
-        <header class="rv-head">${personImg(a, 'avatar--lg')}
-          <div><h2>${esc(a.displayName || a.username)}</h2><p>@${esc(a.username)} · <a href="https://www.roblox.com/users/${encodeURIComponent(a.sub)}/profile" target="_blank" rel="noopener">${t('Roblox-Profil')}${icon('fi-rr-arrow-up-right-from-square')}</a></p></div>
-          ${statusPill(a)}</header>
-        ${pctv !== null ? `<div class="rv-result"><b>${pctv} %</b><span>${t('{a} von {b} bewerteten Fragen richtig', { a: a.score, b: a.total })}</span><i><span style="width:${pctv}%"></span></i></div>` : ''}
-        <dl class="done__list">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-        <h3 class="rv-sub">${t('Erfahrung')}</h3>
-        <p class="rv-text">${esc(a.experience || '–')}</p>
-        <h3 class="rv-sub">${t('Fragen und Antworten')}</h3>
-        <ol class="rv-answers">${(a.answers || []).map((x) => `<li class="${x.ok === true ? 'is-ok' : x.ok === false ? 'is-bad' : ''}">
-          <span class="rv-mark" aria-label="${x.ok === true ? esc(t('richtig')) : x.ok === false ? esc(t('falsch')) : esc(t('nicht bewertet'))}">${x.ok === true ? icon('fi-rr-check') : x.ok === false ? icon('fi-rr-cross-small') : '–'}</span>
-          <div><b>${esc(x.q)}</b><p>${esc(x.a)}</p></div></li>`).join('')}</ol>
+      <article class="rv-detail">
+        <section class="cbox rv-hero">
+          <div class="rv-hero__top">${personImg(a, 'avatar--lg')}
+            <div class="rv-hero__who"><h2>${esc(a.displayName || a.username)}</h2><p>@${esc(a.username)}</p></div>
+            ${statusPill(a)}</div>
+          <div class="rv-hero__job">${icon('fi-rr-briefcase')}<span>${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''}</span><small>${fmtDate(a.at)}</small></div>
+          ${pctv !== null ? `<div class="rv-score-box">${scoreRing(pctv)}<div><b>${t('{a} von {b} richtig', { a: a.score, b: a.total })}</b>
+            <span class="rv-legend"><span><i class="is-ok"></i>${nOk} ${t('richtig')}</span><span><i class="is-bad"></i>${nBad} ${t('falsch')}</span><span><i></i>${nOpen} ${t('offen')}</span></span></div></div>` : ''}
+          <div class="rv-hero__actions">
+            <a class="btn btn--soft btn--sm" href="#/chat/an/${esc(a.sub)}">${icon('fi-rr-comments')}${t('Nachricht')}</a>
+            <a class="btn btn--soft btn--sm" href="https://www.roblox.com/users/${encodeURIComponent(a.sub)}/profile" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}${t('Roblox-Profil')}</a>
+          </div>
+        </section>
+        <section class="cbox rv-facts">
+          ${fact('fi-brands-discord', 'Discord', esc(a.discord || '–'))}
+          ${fact('fi-rr-envelope', t('E-Mail'), esc(a.email || '–'))}
+          ${fact('fi-rr-clock-three', t('Spielt seit'), esc(t(a.since || '–')))}
+          ${fact('fi-rr-badge-check', t('Rang (angegeben)'), esc(a.rank || '–'))}
+          ${fact('fi-rr-users-alt', t('Rolle in der Gruppe'), esc(a.groupRole ? a.groupRole.name : t('nicht in der Gruppe')))}
+          ${fact('fi-rr-calendar', t('Freie Tage'), esc((a.days || []).join(', ') || '–'))}
+          ${a.activity ? `<div class="rv-fact rv-fact--wide"><span class="rv-fact__ic">${icon('fi-rr-chart-line-up')}</span><span><small>${t('Aktivität')}</small><b>${a.activity} / 10</b><i class="rv-bar"><span style="width:${a.activity * 10}%"></span></i></span></div>` : ''}
+        </section>
+        ${a.experience ? `<section class="cbox"><h3 class="rv-sub">${t('Erfahrung')}</h3><p class="rv-text">${esc(a.experience)}</p></section>` : ''}
+        <section class="cbox">
+          <h3 class="rv-sub">${t('Fragen und Antworten')}<span>${answers.length}</span></h3>
+          <div class="chips">${chip('all', `${t('Alle')} · ${answers.length}`)}${nBad ? chip('bad', `${t('Falsch')} · ${nBad}`) : ''}${chip('ok', `${t('Richtig')} · ${nOk}`)}${nOpen ? chip('open', `${t('Offen')} · ${nOpen}`) : ''}</div>
+          <ol class="rv-answers">${shown.map(([x, i]) => `<li class="${x.ok === true ? 'is-ok' : x.ok === false ? 'is-bad' : ''}">
+            <span class="rv-mark" aria-label="${x.ok === true ? esc(t('richtig')) : x.ok === false ? esc(t('falsch')) : esc(t('nicht bewertet'))}">${x.ok === true ? icon('fi-rr-check') : x.ok === false ? icon('fi-rr-cross-small') : '–'}</span>
+            <div><small>${t('Frage {n}', { n: i + 1 })}</small><b>${esc(x.q)}</b><p>${esc(x.a || '–')}</p></div></li>`).join('') || `<li class="rv-empty">${t('Keine Fragen in dieser Ansicht.')}</li>`}</ol>
+        </section>
+        ${sent}
         <div class="rv-actions">
+          <p>${t('Ergebnis an {name} senden', { name: `<b>${esc(a.username)}</b>` })}</p>
           <button class="btn btn--ok btn--lg" type="button" data-review="passed" aria-pressed="${a.status === 'passed'}">${icon('fi-rr-check')}${t('Bestanden')}</button>
           <button class="btn btn--danger btn--lg" type="button" data-review="failed" aria-pressed="${a.status === 'failed'}">${icon('fi-rr-cross-small')}${t('Nicht bestanden')}</button>
         </div>
@@ -2584,11 +2784,16 @@
   }
   async function setReview(status) {
     const id = state.reviewId;
+    const app = review.apps[id];
+    // Das Ergebnis geht sofort an den Bewerber (Chat, Benachrichtigung, E-Mail)
+    if (app && app.notifiedStatus !== status && !confirm(status === 'passed'
+      ? t('{name} als BESTANDEN werten? Das Ergebnis wird sofort per Chat, Benachrichtigung und E-Mail gesendet.', { name: app.username })
+      : t('{name} als NICHT BESTANDEN werten? Das Ergebnis wird sofort per Chat, Benachrichtigung und E-Mail gesendet.', { name: app.username }))) return;
     try {
       const sum = await api(`/api/applications/${encodeURIComponent(id)}`, { method: 'PUT', body: { status } });
-      if (review.apps[id]) review.apps[id].status = sum.status;
+      if (review.apps[id]) Object.assign(review.apps[id], { status: sum.status, notifiedStatus: sum.notified, chatId: sum.chatId, reviewedBy: sum.reviewedBy });
       if (review.list) review.list = review.list.map((x) => (x.id === id ? sum : x));
-      toast(status === 'passed' ? t('Als bestanden markiert') : t('Als nicht bestanden markiert'));
+      toast(status === 'passed' ? t('✅ Bestanden – Ergebnis gesendet') : t('❌ Nicht bestanden – Ergebnis gesendet'));
       // Weiter zur nächsten neuen Bewerbung
       const next = review.list && review.list.find((x) => x.status === 'new');
       if (next) location.hash = `#/karriere/pruefen/${next.id}`;
@@ -2949,7 +3154,14 @@
   }
   function chatTeam() {
     if (!chat.staff) { loadStaff(); return `<p class="empty">${t('Team wird geladen …')}</p>`; }
-    return `<label class="field chat-search">${icon('fi-rr-search')}<span class="field__input"><span class="sr-only">${t('Team durchsuchen')}</span><input type="search" data-chat-search value="${esc(chat.query)}" placeholder="${esc(t('Name oder Rang suchen …'))}" autocomplete="off"></span></label>
+    // Team: jeden Spieler per Roblox-Name anschreiben
+    const write = mayTrain() && chatReady() ? `<form class="find-player" data-find-player>
+        <label class="f__label" for="fp-name">${icon('fi-rr-paper-plane')}${t('Spieler anschreiben')}</label>
+        <div class="find-player__row"><input id="fp-name" name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name, z. B. Lokfuehrer_Max'))}">
+        <button class="btn btn--primary" type="submit">${t('Suchen')}</button></div>
+        <small>${t('Als Team kannst du jeden Spieler anschreiben. Spieler selbst können nur dem Team schreiben.')}</small>
+      </form>` : '';
+    return `${write}<label class="field chat-search">${icon('fi-rr-search')}<span class="field__input"><span class="sr-only">${t('Team durchsuchen')}</span><input type="search" data-chat-search value="${esc(chat.query)}" placeholder="${esc(t('Name oder Rang suchen …'))}" autocomplete="off"></span></label>
       <p class="chat-hint">${icon('fi-rr-lock')}<span>${t('Direktnachrichten sieht nur die Person, der du schreibst.')}</span></p>
       <div data-chat-team>${chatTeamList()}</div>`;
   }
@@ -2978,7 +3190,7 @@
           <div class="pick-grid">${CHAT.reasons.map((r) => `<label class="pick"><input type="radio" name="reason" value="${r.id}" data-area-hint="${esc(r.area || (nextArea ? nextArea.id : 'driver'))}"><span>${icon(r.icon)}${esc(t(r.label))}</span></label>`).join('')}</div>
         </fieldset>
         <fieldset class="f"><legend class="f__label">${t('Welcher Bereich?')}</legend>
-          <div class="area-grid">${CHAT.areas.map((a) => `<label class="area"><input type="radio" name="area" value="${a.id}"><span class="area__ic">${icon(a.icon)}</span><span class="area__text"><b>${esc(t(a.label))}</b><small>${esc(t(a.desc))}</small></span></label>`).join('')}</div>
+          <div class="ch-area-grid">${CHAT.areas.map((a) => `<label class="ch-area"><input type="radio" name="area" value="${a.id}"><span class="ch-area__ic">${icon(a.icon)}</span><span class="ch-area__text"><b>${esc(t(a.label))}</b><small>${esc(t(a.desc))}</small></span></label>`).join('')}</div>
         </fieldset>
         <div class="f"><label class="f__label" for="ch-text">${t('Deine Nachricht')}</label><textarea id="ch-text" name="text" rows="5" maxlength="2000" placeholder="${esc(t('Beschreib kurz, worum es geht …'))}"></textarea></div>
         <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Anfrage senden')}</button>
@@ -2986,13 +3198,27 @@
         <a class="chat-alt" href="#/chat/team">${icon('fi-rr-users-alt')}<span>${t('Lieber jemand Bestimmtem schreiben?')}<small>${t('Alle ab Supervisor im Team')}</small></span>${icon('fi-rr-angle-small-right')}</a>
       </form>`}`;
   }
+  // Spieler, die das Team anschreibt (nicht in der Teamliste)
+  const chatPlayers = {};
+  async function loadPlayer(id) {
+    if (chatPlayers[id]) return;
+    chatPlayers[id] = 'loading';
+    try { chatPlayers[id] = await api(`/api/players/find?q=${encodeURIComponent(id)}`); } catch (e) { chatPlayers[id] = 'missing'; }
+    if (state.page === 'chat' && state.chatView === 'direct') renderChat();
+  }
   function chatDirect(userId) {
     const gate = chatGate();
-    const p = chat.staff && chat.staff.find((x) => x.userId === String(userId));
     if (!chat.staff) loadStaff();
+    let p = chat.staff && chat.staff.find((x) => x.userId === String(userId));
+    // Das Team darf jeden Spieler anschreiben
+    if (!p && chat.staff && mayTrain() && chatReady()) {
+      if (!chatPlayers[userId]) loadPlayer(userId);
+      if (chatPlayers[userId] && typeof chatPlayers[userId] === 'object') p = chatPlayers[userId];
+      else if (chatPlayers[userId] !== 'missing') return `<a class="back-link" href="#/chat/team">${icon('fi-rr-arrow-left')}${t('Team')}</a><p class="empty">${t('Wird geladen …')}</p>`;
+    }
     return `<a class="back-link" href="#/chat/team">${icon('fi-rr-arrow-left')}${t('Team')}</a>
-      ${!chat.staff ? `<p class="empty">${t('Team wird geladen …')}</p>` : !p ? `<p class="empty">${t('Diese Person ist nicht (mehr) im Team.')}</p>` : `
-      <div class="dm-card">${personImg(p, 'avatar--lg')}<span><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small>${rankPill(rankOf(p.rank))}</span></div>
+      ${!chat.staff ? `<p class="empty">${t('Team wird geladen …')}</p>` : !p ? `<p class="empty">${t('Spieler können nur dem Team schreiben. Diese Person ist nicht (mehr) im Team.')}</p>` : `
+      <div class="dm-card">${personImg(p, 'avatar--lg')}<span><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small>${p.rank ? rankPill(rankOf(p.rank)) : `<span class="pill pill--info">${t('Spieler')}</span>`}</span></div>
       ${gate || `<form class="cform" data-chat-direct="${esc(p.userId)}" novalidate>
         <div class="f"><label class="f__label" for="dm-text">${t('Nachricht an {name}', { name: esc(p.displayName) })}</label><textarea id="dm-text" name="text" rows="5" maxlength="2000"></textarea></div>
         <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Senden')}</button>
@@ -3021,6 +3247,20 @@
       const first = m.by !== lastBy || sep;
       lastBy = m.by;
       const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(m.at));
+      // Ergebnis einer Bewerbung: [✅/❌ PASSED/FAILED] als eigene Karte
+      if (m.kind === 'result') {
+        lastBy = '';
+        const ok = m.status === 'passed';
+        const pctv = m.total ? Math.round((m.score / m.total) * 100) : null;
+        return `${sep}<li class="msg-result msg-result--${ok ? 'ok' : 'bad'}">
+          <span class="msg-result__tag">${ok ? '✅ PASSED' : '❌ FAILED'}${m.corrected ? ` · ${t('Korrektur')}` : ''}</span>
+          <b class="msg-result__title">${t('Bewerbung als {job}', { job: esc(m.job) })}</b>
+          <span class="msg-result__by">${personImg(p, 'avatar--sm')}${t('Ausgewertet von {name}', { name: `<b>${esc(m.reviewer || p.username)}</b>` })}</span>
+          ${pctv !== null ? `<span class="msg-result__score">${t('Wissensfragen: {a} von {b} richtig ({p} %)', { a: m.score, b: m.total, p: pctv })}</span>` : ''}
+          <p>${ok ? t('Herzlichen Glückwunsch! Wir melden uns hier mit allem Weiteren.') : t('Danke für deine Bewerbung. Du kannst dich später gern noch einmal bewerben.')}</p>
+          <time>${time}</time>
+        </li>`;
+      }
       return `${sep}<li class="msg${mine ? ' msg--mine' : ''}${first ? ' is-first' : ''}">
         ${!mine ? (first ? personImg(p, 'avatar--sm') : '<span class="msg__gap"></span>') : ''}
         <div class="msg__bubble">${!mine && first ? `<b class="msg__name">${esc(p.displayName || p.username)}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}</b>` : ''}<p>${esc(m.text)}</p><time>${time}</time></div>
@@ -3125,6 +3365,20 @@
     }
     head.innerHTML = chatHead();
     body.innerHTML = v === 'team' ? chatTeam() : v === 'queue' ? chatQueue() : chatMine();
+  }
+  async function findPlayer(form) {
+    const name = form.elements.name.value.trim();
+    if (!/^[A-Za-z0-9_]{3,20}$/.test(name)) { toast(t('Bitte gib einen gültigen Roblox-Namen ein.')); return; }
+    const btn = $('button', form);
+    btn.disabled = true;
+    try {
+      const p = await api(`/api/players/find?q=${encodeURIComponent(name)}`);
+      chatPlayers[p.userId] = p;
+      location.hash = `#/chat/an/${p.userId}`;
+    } catch (e) {
+      btn.disabled = false;
+      toast(e.status === 404 ? t('Diesen Roblox-Namen gibt es nicht.') : errorText(e));
+    }
   }
   async function sendChat(form) {
     const btn = $('button[type="submit"]', form);
@@ -3409,7 +3663,7 @@
             <div><dt>${icon('fi-rr-calendar')}${t('Datum')}</dt><dd>${dayName(tn.day, { long: true })}</dd></div>
             <div><dt>${icon('fi-rr-clock-three')}${t('Uhrzeit')}</dt><dd>${t('{time} Uhr', { time: `${tn.time} – ${hhmm(tn.end)}` })}</dd></div>
             <div><dt>${icon('fi-rr-database')}${t('Server')}</dt><dd>${esc(t(tn.server || '–'))}</dd></div>
-            <div><dt>${icon('fi-rr-users-alt')}${t('Leitung')}</dt><dd>${esc(tn.host)}</dd></div>
+            <div><dt>${icon('fi-rr-users-alt')}${t('Leitung')}</dt><dd>${hostHtml(tn, 'host--sm')}</dd></div>
             ${tn.remote ? `<div><dt>${icon('fi-sr-user')}${t('Plätze')}</dt><dd>${t('max. {n}', { n: tn.slots })}</dd></div>` : ''}
           </dl>
           ${tn.remote ? '' : `<div class="occ">
@@ -3435,6 +3689,10 @@
     buy: {
       title: () => t('Kaufen'),
       render: (arg) => buyView(arg),
+    },
+    'job-edit': {
+      title: () => t('Stelle bearbeiten'),
+      render: (id) => jobEditView(id),
     },
     'backend-setup': {
       title: () => t('App-Server'),
@@ -3591,6 +3849,7 @@
     }
     toast(state.bell ? (next ? t('Benachrichtigungen an – wir melden uns vor {type}-Trainings', { type: next.name }) : t('Benachrichtigungen an')) : t('Benachrichtigungen aus'));
     syncPush();
+    renderNotify();
   }
   function renderReminders() {
     $$('[data-bell]').forEach((b) => b.setAttribute('aria-pressed', String(state.bell)));
@@ -3637,6 +3896,108 @@
     } finally {
       pushBusy = false;
     }
+  }
+
+  // ---------- Benachrichtigungen (Einstellungen): auch bei geschlossener App ----------
+  // Das Gerät meldet sich beim Backend an; Chat-Nachrichten, Ergebnisse von Bewerbungen und (fürs Team)
+  // neue Anfragen kommen dann als echte Benachrichtigung des Systems. Gilt pro Gerät.
+  const NOTIFY_KINDS = [
+    ['chat', 'Chat-Nachrichten', 'Wenn dir jemand im Chat schreibt oder deine Anfrage annimmt.'],
+    ['applications', 'Bewerbungen', 'Ergebnis deiner Bewerbung (bestanden oder nicht).'],
+    ['team', 'Team: neue Anfragen und Bewerbungen', 'Neue Anfragen in deinem Bereich, ab PRD auch neue Bewerbungen.'],
+  ];
+  const notifyState = () => store.get('tsg-notify', { on: false, prefs: { chat: true, applications: true, team: true } });
+  const pushSupported = () => notesSupported() && 'PushManager' in window;
+  const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  async function pushSubscription(create = true) {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub && create) {
+      const { publicKey } = await api('/api/push/key');
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64url(publicKey) });
+    }
+    return sub;
+  }
+  // Gerät mit dem angemeldeten Konto verbinden (nach dem Einschalten, nach dem Login, wenn sich etwas ändert)
+  async function linkPush() {
+    const ns = notifyState();
+    if (!ns.on || !apiReady() || !sessionToken() || !pushSupported() || Notification.permission !== 'granted') return false;
+    try {
+      const sub = await pushSubscription();
+      await api('/api/push/subscribe', { method: 'POST', body: { subscription: sub.toJSON(), prefs: ns.prefs, lang } });
+      store.set('tsg-notify', { ...ns, endpoint: sub.endpoint, linked: state.profile && state.profile.userId });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  async function unlinkPush() {
+    const ns = notifyState();
+    if (ns.endpoint && apiReady() && sessionToken()) await api('/api/push/unsubscribe', { method: 'POST', body: { endpoint: ns.endpoint } }).catch(() => {});
+  }
+  async function setNotify(on) {
+    const ns = notifyState();
+    if (on) {
+      if (!pushSupported()) {
+        toast(isIOS() && !standalone() ? t('Auf dem iPhone: In Safari auf „Teilen“ → „Zum Home-Bildschirm“ tippen und die App von dort öffnen. Dann klappen Benachrichtigungen.') : t('Dein Browser unterstützt keine Benachrichtigungen.'));
+        renderNotify();
+        return;
+      }
+      if (!await allowNotifications()) { renderNotify(); return; }
+      store.set('tsg-notify', { ...ns, on: true });
+      const linked = await linkPush();
+      store.set('tsg-push-sig', '');
+      syncPush();
+      toast(linked ? t('Benachrichtigungen sind an – auch wenn die App geschlossen ist.')
+        : sessionToken() ? t('Benachrichtigungen sind an.') : t('Benachrichtigungen sind an. Für Chat und Bewerbungen melde dich mit Roblox an.'));
+    } else {
+      await unlinkPush();
+      try { const sub = await pushSubscription(false); if (sub) await sub.unsubscribe(); } catch (e) { /* schon weg */ }
+      store.set('tsg-notify', { ...ns, on: false, endpoint: null });
+      store.set('tsg-push-sig', '');
+      toast(t('Benachrichtigungen sind aus.'));
+    }
+    renderNotify();
+  }
+  async function setNotifyKind(kind, on) {
+    const ns = notifyState();
+    store.set('tsg-notify', { ...ns, prefs: { ...ns.prefs, [kind]: on } });
+    renderNotify();
+    await linkPush();
+  }
+  async function testNotify() {
+    if (!sessionToken() || !apiReady()) {
+      notify(t('Train Sim Germany'), { body: t('So sehen Benachrichtigungen aus.'), tag: 'test' });
+      return;
+    }
+    try {
+      const r = await api('/api/push/test', { method: 'POST', body: {} });
+      toast(r.sent ? t('Probe gesendet – sie kommt gleich als Benachrichtigung.') : t('Dieses Gerät ist noch nicht angemeldet. Schalte die Benachrichtigungen einmal aus und wieder an.'));
+    } catch (e) { toast(errorText(e)); }
+  }
+  function renderNotify() {
+    const box = $('[data-notify]');
+    if (!box) return;
+    const ns = notifyState();
+    const denied = 'Notification' in window && Notification.permission === 'denied';
+    const on = ns.on && !denied && pushSupported() && Notification.permission === 'granted';
+    const row = (attr, title, text, checked, off = false) => `<label class="toggle${off ? ' is-disabled' : ''}">
+        <span class="toggle__text"><b>${title}</b><small>${text}</small></span>
+        <input type="checkbox" role="switch" ${attr}${checked ? ' checked' : ''}${off ? ' disabled' : ''}>
+        <span class="toggle__ui" aria-hidden="true"></span>
+      </label>`;
+    let note = '';
+    if (!pushSupported()) note = isIOS() && !standalone() ? t('Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App: In Safari auf „Teilen“ → „Zum Home-Bildschirm“, dann die App von dort öffnen.') : t('Dein Browser unterstützt keine Benachrichtigungen.');
+    else if (denied) note = t('Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Einstellungen deines Geräts bzw. Browsers.');
+    else if (on && !sessionToken()) note = t('Für Chat und Bewerbungen melde dich mit Roblox an – Trainings-Erinnerungen gehen auch so.');
+    box.innerHTML = `${row('data-notify-set="on"', t('Benachrichtigungen erlauben'), t('Echte Benachrichtigungen auf diesem Gerät – auch wenn die App geschlossen ist.'), on, !pushSupported() || denied)}
+      ${note ? `<p class="toggle__note notify-note">${icon('fi-rr-info')}<span>${note}</span></p>` : ''}
+      <div class="notify-kinds${on ? '' : ' is-off'}">
+        ${NOTIFY_KINDS.filter(([k]) => k !== 'team' || mayTrain()).map(([k, title, text]) => row(`data-notify-kind="${k}"`, t(title), t(text), on && ns.prefs[k] !== false, !on)).join('')}
+        ${row('data-bell', t('Trainings'), t('Wenn der Server eines Trainings für deinen nächsten Rang öffnet. Einzelne Trainings stellst du über die Glocke ein.'), on && state.bell, !on)}
+      </div>
+      ${on ? `<button class="btn btn--soft btn--block" type="button" data-notify-test>${icon('fi-rr-bell')}${t('Probe-Benachrichtigung senden')}</button>` : ''}`;
   }
 
   // ---------- Tooltip & Toast ----------
@@ -3715,7 +4076,7 @@
     const page = PAGES.includes(first) ? first : 'home';
     const jobId = page === 'karriere' ? (sub || null) : null;
     const jobApply = !!jobId && sub2 === 'bewerben';
-    const jobView = !jobId ? null : jobId === 'pruefen' ? 'review' : sub2 === 'bewerbung' ? 'mine' : jobApply ? 'apply' : 'detail';
+    const jobView = !jobId ? null : jobId === 'pruefen' ? 'review' : jobId === 'verwalten' ? 'manage' : sub2 === 'bewerbung' ? 'mine' : jobApply ? 'apply' : 'detail';
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
@@ -3724,6 +4085,7 @@
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg;
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
+    if (reviewId !== state.reviewId) review.answers = 'all';
     // Liste beim Öffnen frisch laden (neue Bewerbungen von anderen Geräten)
     if (jobView === 'review' && !reviewId && state.jobView !== 'review') review.at = 0;
     if (serverId !== state.serverId) Object.assign(state, { sdTab: 'trains', sdCat: 'all', sdRole: 'all' });
@@ -3751,6 +4113,7 @@
     if (changed) window.scrollTo({ top: chatView === 'conv' ? document.body.scrollHeight : 0, behavior: 'instant' });
     chatPoll();
     if (chatView === 'mine' || chatView === 'queue') loadChats();
+    if (['home', 'karriere', 'trainings', 'news'].includes(page)) refreshOnEnter(page);
     // Aus einer Benachrichtigung: #/trainings?t=<id> öffnet das Training
     const openId = new URLSearchParams(query || '').get('t');
     if (page === 'trainings' && openId) {
@@ -3868,7 +4231,12 @@
     document.addEventListener('change', (e) => {
       const sw = e.target.closest('[data-privacy-set]');
       if (sw) setPrivacy(sw.dataset.privacySet, sw.checked);
+      const ns = e.target.closest('[data-notify-set]');
+      if (ns) setNotify(ns.checked);
+      const nk = e.target.closest('[data-notify-kind]');
+      if (nk) setNotifyKind(nk.dataset.notifyKind, nk.checked);
     });
+    document.addEventListener('click', (e) => { if (e.target.closest('[data-notify-test]')) testNotify(); });
 
     // Server-Details: Tabs, Filter, Zug- und Bahnhofsdialog
     document.addEventListener('click', (e) => {
@@ -4076,6 +4444,21 @@
         if (area) area.checked = true;
       }
     });
+    // Stellen verwalten
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-job-edit], [data-job-apps], [data-rv-answers]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.jobEdit) openModal('job-edit', ds.jobEdit);
+      else if (ds.jobApps) { review.job = ds.jobApps; review.filter = 'all'; location.hash = '#/karriere/pruefen'; }
+      else if (ds.rvAnswers) { review.answers = ds.rvAnswers; renderCareer(); }
+    });
+    document.addEventListener('change', (e) => {
+      const sw = e.target.closest('[data-job-toggle]');
+      if (!sw) return;
+      const job = D.jobs.find((x) => x.id === sw.dataset.jobToggle);
+      if (job) putJob(job.id, jobBody(job, { open: sw.checked }), sw.checked ? t('{name} ist jetzt offen', { name: t(job.title) }) : t('{name} ist jetzt geschlossen', { name: t(job.title) }));
+    });
     // Shop
     document.addEventListener('click', (e) => {
       const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-buy], [data-buy-confirm]');
@@ -4135,8 +4518,10 @@
     });
 
     document.addEventListener('submit', (e) => {
-      const jform = e.target.closest('form[data-job-admin]');
-      if (jform) { e.preventDefault(); saveJobAdmin(jform); return; }
+      const jform = e.target.closest('form[data-job-form]');
+      if (jform) { e.preventDefault(); saveJobForm(jform); return; }
+      const fp = e.target.closest('form[data-find-player]');
+      if (fp) { e.preventDefault(); findPlayer(fp); return; }
       const cform = e.target.closest('form[data-chat-new], form[data-chat-direct]');
       if (cform) { e.preventDefault(); sendChat(cform); return; }
       const mform = e.target.closest('form[data-chat-send]');
@@ -4157,8 +4542,9 @@
     document.addEventListener('click', (e) => {
       if (!e.target.closest('[data-disconnect]')) return;
       if (state.profile && state.profile.oauth) {
-        if (sessionToken()) api('/auth/logout', { method: 'POST' }).catch(() => {});
-        signedOut(t('Abgemeldet'));
+        // Dieses Gerät bekommt keine Nachrichten mehr für das Konto
+        if (sessionToken()) unlinkPush().finally(() => api('/auth/logout', { method: 'POST' }).catch(() => {}).finally(() => signedOut(t('Abgemeldet'))));
+        else signedOut(t('Abgemeldet'));
         return;
       }
       state.profile = null;

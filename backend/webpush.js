@@ -146,3 +146,74 @@ export async function sendDue(store, env, { limit = 200 } = {}) {
   }
   return sent;
 }
+
+// ---------- Benachrichtigungen an Nutzer: Chat, Bewerbungen, Team ----------
+// Wer in den Einstellungen „Benachrichtigungen“ einschaltet, meldet sein Gerät hier an (bis zu 6 Geräte).
+//   pushuser:<userId> → { subs: [{ endpoint, keys, at }], prefs: { chat, applications, team }, rank }
+//   pushstaff         → { <userId>: rang }   (Team mit Benachrichtigungen, für neue Anfragen und Bewerbungen)
+const PREFS = ['chat', 'applications', 'team'];
+const cleanPrefs = (p = {}) => Object.fromEntries(PREFS.map((k) => [k, p[k] !== false]));
+
+async function setStaff(store, sub, rank) {
+  const all = (await store.get('pushstaff')) || {};
+  if (rank) all[sub] = rank; else delete all[sub];
+  await store.put('pushstaff', all);
+}
+export async function subscribeUser(store, user, body, isStaff) {
+  const s = body && body.subscription;
+  if (!s || !validSubscription(s)) throw Object.assign(new Error('bad_request'), { status: 400 });
+  const key = `pushuser:${user.sub}`;
+  const rec = (await store.get(key)) || { subs: [] };
+  rec.subs = [{ endpoint: s.endpoint, keys: { p256dh: s.keys.p256dh, auth: s.keys.auth }, at: now() }, ...rec.subs.filter((x) => x.endpoint !== s.endpoint)].slice(0, 6);
+  rec.prefs = cleanPrefs(body.prefs || rec.prefs);
+  rec.lang = clip(body.lang, 5) || rec.lang || 'de';
+  rec.rank = user.rank || null;
+  await store.put(key, rec);
+  await setStaff(store, user.sub, isStaff ? user.rank : null);
+  return { prefs: rec.prefs, devices: rec.subs.length };
+}
+export async function unsubscribeUser(store, user, endpoint) {
+  const key = `pushuser:${user.sub}`;
+  const rec = await store.get(key);
+  if (!rec) return { devices: 0 };
+  rec.subs = rec.subs.filter((x) => x.endpoint !== endpoint);
+  if (rec.subs.length) await store.put(key, rec);
+  else { await store.delete(key); await setStaff(store, user.sub, null); }
+  return { devices: rec.subs.length };
+}
+// Nachricht an alle Geräte eines Nutzers (kind = chat | applications | team). Fehler stören die eigentliche Aktion nicht.
+export async function notifyUser(store, env, userId, kind, message) {
+  try {
+    const key = `pushuser:${userId}`;
+    const rec = await store.get(key);
+    if (!rec || !rec.subs.length || (rec.prefs && rec.prefs[kind] === false)) return 0;
+    const vapid = await vapidKeys(store);
+    const subject = env.PUSH_CONTACT || env.APP_URL || 'mailto:admin@example.com';
+    const msg = { lang: rec.lang || 'de', ...message, title: clip(message.title, 120), body: clip(message.body, 300) };
+    const gone = [];
+    let sent = 0;
+    await Promise.all(rec.subs.map(async (s) => {
+      try {
+        const res = await sendPush(s, msg, vapid, subject);
+        if (res.status === 404 || res.status === 410) gone.push(s.endpoint);
+        else if (res.ok) sent += 1;
+      } catch (e) { /* Gerät nicht erreichbar */ }
+    }));
+    if (gone.length) {
+      rec.subs = rec.subs.filter((s) => !gone.includes(s.endpoint));
+      if (rec.subs.length) await store.put(key, rec);
+      else { await store.delete(key); await setStaff(store, userId, null); }
+    }
+    return sent;
+  } catch (e) {
+    console.error('Push:', e.message);
+    return 0;
+  }
+}
+// An das Team, das die Bedingung erfüllt (z. B. zuständig für einen Bereich)
+export async function notifyStaff(store, env, allow, kind, message, except = null) {
+  const all = (await store.get('pushstaff')) || {};
+  const ids = Object.entries(all).filter(([id, rank]) => id !== except && allow(rank)).map(([id]) => id).slice(0, 100);
+  const sent = await Promise.all(ids.map((id) => notifyUser(store, env, id, kind, message)));
+  return sent.reduce((a, b) => a + b, 0);
+}

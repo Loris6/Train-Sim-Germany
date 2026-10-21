@@ -29,6 +29,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-document:before{content:"\f57a"}
 .fi-rr-download:before{content:"\f591"}
 .fi-rr-edit:before{content:"\f5c1"}
+.fi-rr-envelope:before{content:"\f5de"}
 .fi-rr-eye:before{content:"\f5f8"}
 .fi-rr-flag:before{content:"\f695"}
 .fi-rr-gamepad:before{content:"\f6df"}

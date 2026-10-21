@@ -6,7 +6,7 @@
 export const RANKS = [
   ['Chief Engineer', 'CEN'], ['Community Director', 'CDR'], ['Operation Manager', 'OM'], ['Project Engineer', 'PJE'],
   ['Public Relations Department', 'PRD'], ['Signaller Manager', 'SGM'], ['Conductor Manager', 'CDM'],
-  ['Platform Staff Manager', 'PSM'], ['Driver Manager', 'DM'], ['Alpha Test Account(s)', 'AT'], ['Supervisor', 'SV'],
+  ['Platform Staff Manager', 'PSM'], ['Driver Manager', 'DM'], ['Supervisor', 'SV'],
   ['Junior Supervisor', 'J-SV'], ['Signaller', 'SG'], ['Conductor', 'CD'], ['Platform Staff', 'PS'],
   ['Qualified Driver', 'QD'], ['Learning Driver', 'LD'], ['Guest', 'G'],
 ];
@@ -20,8 +20,11 @@ export const level = (name) => {
 };
 export const atLeast = (name, min) => level(name) >= level(min);
 
+// Testkonten (Bots, z. B. „[AT] Alpha Test Accounts“) zählen nicht als Rang
+const IGNORED = /alpha\s*test|^\s*\[\s*at\s*\]/i;
+
 export function matchRank(role) {
-  if (!role) return 'Guest';
+  if (!role || IGNORED.test(String(role.name || ''))) return 'Guest';
   const name = String(role.name || '').toLowerCase();
   const prefix = ((name.match(/^\s*\[\s*([^\]]+?)\s*\]/) || name.match(/^\s*([a-z-]{1,5})\s*[|:]/) || [])[1] || '').replace(/\s+/g, '');
   const hit = (prefix && RANKS.find(([, p]) => p.toLowerCase() === prefix))

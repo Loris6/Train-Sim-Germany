@@ -153,7 +153,6 @@ window.TSG = {
     { name: 'Signaller', prefix: 'SG', label: 'Fahrdienstleiter', desc: 'Stellwerke bedienen, Fahrstraßen stellen', color: '#2FA65A', members: 1890 },
     { name: 'Junior Supervisor', prefix: 'J-SV', label: 'Aufsicht in Ausbildung', desc: 'Hilft bei Trainings und im Betrieb', color: '#55C3DD', members: 64, staff: true },
     { name: 'Supervisor', prefix: 'SV', label: 'Aufsicht & Ausbildung', desc: 'Trainings leiten, Betrieb überwachen', color: '#1FA9C9', members: 235, staff: true },
-    { name: 'Alpha Test Account(s)', prefix: 'AT', label: 'Testkonto', desc: 'Testet neue Versionen vorab', color: '#8E949E', members: 6, staff: true },
     { name: 'Driver Manager', prefix: 'DM', label: 'Leitung Driver', desc: 'Leitet den Bereich Driver', color: '#9C72DB', members: 3, staff: true },
     { name: 'Platform Staff Manager', prefix: 'PSM', label: 'Leitung Platform Staff', desc: 'Leitet den Bereich Platform Staff', color: '#9C72DB', members: 2, staff: true },
     { name: 'Conductor Manager', prefix: 'CDM', label: 'Leitung Conductor', desc: 'Leitet den Bereich Conductor', color: '#9C72DB', members: 2, staff: true },
