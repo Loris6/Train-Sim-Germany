@@ -83,6 +83,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-trash-xmark:before{content:"\fe16"}
 .fi-rr-triangle-warning:before{content:"\fe33"}
 .fi-rr-trophy:before{content:"\fe39"}
+.fi-rr-user:before{content:"\fea0"}
 .fi-rr-user-add:before{content:"\fe7a"}
 .fi-rr-user-slash:before{content:"\fe99"}
 .fi-rr-users-alt:before{content:"\fea1"}
@@ -104,6 +105,7 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 .fi-sr-newspaper:before{content:"\f994"}
 .fi-sr-play:before{content:"\fa7f"}
 .fi-sr-shopping-cart:before{content:"\fbd6"}
+.fi-sr-signal-alt-2:before{content:"\fbeb"}
 .fi-sr-user:before{content:"\fe78"}
 
 @font-face{font-family:uicons-brands;src:url(../fonts/uicons-brands.woff2) format("woff2");font-display:block}

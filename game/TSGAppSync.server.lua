@@ -6,6 +6,11 @@
       aber nur, wenn sich etwas geändert hat
     • holt Käufe aus der App ab und verbucht sie im Spiel (Coins abziehen, Zug bzw. Strecke freischalten)
     • meldet den Server (Spieler, Plätze, Version) – damit funktionieren im App-Chat /GetServers, /GetOnline und /GetUser
+    • private Server: meldet ID und Besitzer und setzt die Einstellungen aus der App um
+        – „Nur Mitglieder des Server-Chats“: wer nicht im verbundenen App-Chat ist, wird freundlich abgewiesen
+        – Begrüßung und Regeln des Server-Chats beim Betreten
+        – Nachrichten aus dem Server-Chat der App erscheinen im Spiel-Chat (vorher von Roblox gefiltert)
+      Dafür zusätzlich game/TSGAppChat.client.lua als LocalScript nach StarterPlayer → StarterPlayerScripts legen.
 
   Einrichten (einmalig):
     1. Dieses Skript als Script nach ServerScriptService legen.
@@ -23,6 +28,8 @@
 
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextService = game:GetService("TextService")
 
 local CONFIG = {
 	Backend = "https://tsg-backend.DEIN-NAME.workers.dev",
@@ -118,16 +125,112 @@ local function snapshot(player)
 	return data
 end
 
--- Dieser Server, für die Befehle im App-Chat
+-- ===== Private Server: Einstellungen aus der App =====
+local isPrivate = game.PrivateServerId ~= ""
+local appConfig = nil -- kommt mit jedem Abgleich (siehe backend/pservers.js)
+local relaySince = 0
+local ownerName = nil
+
+-- Nachrichten an die Spieler (LocalScript TSGAppChat.client.lua zeigt sie im Chat an)
+local appMessage = Instance.new("RemoteEvent")
+appMessage.Name = "TSGAppMessage"
+appMessage.Parent = ReplicatedStorage
+
+-- Text aus der App vor dem Anzeigen von Roblox filtern lassen (Pflicht für Texte von Spielern)
+local function filtered(text, fromUserId)
+	local ok, result = pcall(function()
+		return TextService:FilterStringAsync(text, tonumber(fromUserId) or 0, Enum.TextFilterContext.PublicChat)
+	end)
+	if not ok then
+		return nil
+	end
+	local ok2, out = pcall(function()
+		return result:GetNonChatStringForBroadcastAsync()
+	end)
+	return ok2 and out or nil
+end
+
+local function allowed(player)
+	if not appConfig or appConfig.access ~= "members" or not appConfig.allowed then
+		return true
+	end
+	for _, id in ipairs(appConfig.allowed) do
+		if tostring(id) == tostring(player.UserId) then
+			return true
+		end
+	end
+	return false
+end
+
+local function checkAccess(player)
+	if not allowed(player) then
+		player:Kick("Dieser private Server ist nur für Mitglieder des App-Chats „" .. tostring(appConfig.chat or appConfig.name) .. "“. Frag dort nach einer Einladung.")
+		return false
+	end
+	return true
+end
+
+local function greet(player)
+	if not appConfig then
+		return
+	end
+	if appConfig.welcome ~= "" then
+		local text = filtered(appConfig.welcome, appConfig.welcomeBy)
+		if text then
+			appMessage:FireClient(player, { kind = "welcome", text = text })
+		end
+	end
+	if appConfig.rules and appConfig.rules ~= "" then
+		local text = filtered(appConfig.rules, appConfig.welcomeBy)
+		if text then
+			appMessage:FireClient(player, { kind = "rules", text = text })
+		end
+	end
+end
+
+local function applyConfig(config)
+	local first = appConfig == nil
+	appConfig = config
+	for _, player in ipairs(Players:GetPlayers()) do
+		if checkAccess(player) and first then
+			greet(player)
+		end
+	end
+	-- Nachrichten aus dem Server-Chat der App
+	for _, m in ipairs(config.relay or {}) do
+		if m.at > relaySince then
+			relaySince = m.at
+			local text = filtered(m.text, m.by)
+			if text then
+				appMessage:FireAllClients({ kind = "chat", name = m.name, text = text })
+			end
+		end
+	end
+end
+
+-- Dieser Server, für die Befehle im App-Chat und die privaten Server in der App
 local function serverInfo(closing)
-	return {
+	local info = {
 		jobId = game.JobId ~= "" and game.JobId or "studio",
 		players = #Players:GetPlayers(),
 		max = Players.MaxPlayers,
 		version = game.PlaceVersion,
-		private = game.PrivateServerId ~= "",
+		private = isPrivate,
 		closing = closing == true,
 	}
+	if isPrivate then
+		info.privateId = game.PrivateServerId
+		info.ownerId = tostring(game.PrivateServerOwnerId)
+		if not ownerName and game.PrivateServerOwnerId ~= 0 then
+			local ok, name = pcall(function()
+				return Players:GetNameFromUserIdAsync(game.PrivateServerOwnerId)
+			end)
+			ownerName = ok and name or nil
+		end
+		info.ownerName = ownerName
+		info.relaySince = relaySince
+	end
+	return info
 end
 
 local function sync(extra, closing)
@@ -174,6 +277,9 @@ local function sync(extra, closing)
 	end
 
 	local body = HttpService:JSONDecode(res.Body)
+	if body.config then
+		applyConfig(body.config)
+	end
 	for userId, list in pairs(body.pending or {}) do
 		local player = Players:GetPlayerByUserId(tonumber(userId))
 		if player then
@@ -201,9 +307,15 @@ local function run()
 	busy = false
 end
 
-Players.PlayerAdded:Connect(function()
+Players.PlayerAdded:Connect(function(player)
+	if appConfig and not checkAccess(player) then
+		return
+	end
 	task.wait(5) -- Spielstand laden lassen
 	run()
+	if appConfig and player.Parent then
+		greet(player)
+	end
 end)
 
 Players.PlayerRemoving:Connect(function(player)

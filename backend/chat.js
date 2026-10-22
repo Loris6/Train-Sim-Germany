@@ -27,7 +27,8 @@ import { level, atLeast, matchRank, rankLabel } from './ranks.js';
 import { notifyUser, notifyStaff } from './webpush.js';
 import { findPlayer, groupRole } from './roblox.js';
 import { startUpload, attachFiles, deleteFiles, fileLinks } from './files.js';
-import { COMMANDS, COMMAND_IDS, parseCommand, runCommand } from './commands.js';
+import { serversOfChat, linkChat, cleanLink } from './pservers.js';
+import { COMMANDS, COMMAND_IDS, FIRST_COMMANDS, parseCommand, runCommand } from './commands.js';
 
 export { findPlayer };
 
@@ -66,8 +67,14 @@ const nameOf = (p) => p.displayName || p.username;
 const COLORS = ['#EC0016', '#1455C0', '#408335', '#B35900', '#7A4BD1', '#0F8C8C', '#C2185B', '#3C414B'];
 
 // ---------- Einstellungen einer Gruppe ----------
-const DEFAULTS = { visibility: 'private', invite: 'admins', write: 'all', media: true, slow: 0, cmd: 'all', cmds: COMMAND_IDS };
-const settingsOf = (c) => (c.kind === 'group' ? { ...DEFAULTS, ...(c.settings || {}) } : { ...DEFAULTS, invite: 'none' });
+// Gespeichert wird, welche Befehle AUS sind (cmdsOff) – neue Befehle sind damit überall gleich an
+const DEFAULTS = { visibility: 'private', invite: 'admins', write: 'all', media: true, slow: 0, cmd: 'all', cmdsOff: [], photo: 'admins' };
+function settingsOf(c) {
+  if (c.kind !== 'group') return { ...DEFAULTS, invite: 'none', cmds: COMMAND_IDS };
+  const { cmds: oldCmds, ...st } = { ...DEFAULTS, ...(c.settings || {}) };
+  const off = c.settings && c.settings.cmdsOff ? c.settings.cmdsOff : Array.isArray(oldCmds) ? FIRST_COMMANDS.filter((x) => !oldCmds.includes(x)) : [];
+  return { ...st, cmdsOff: off, cmds: COMMAND_IDS.filter((x) => !off.includes(x)) };
+}
 function cleanSettings(v = {}, old = DEFAULTS) {
   const pick = (val, list, def) => (list.includes(val) ? val : def);
   return {
@@ -77,9 +84,13 @@ function cleanSettings(v = {}, old = DEFAULTS) {
     media: typeof v.media === 'boolean' ? v.media : old.media,
     slow: [0, 5, 10, 30, 60, 300].includes(+v.slow) ? +v.slow : old.slow,
     cmd: pick(v.cmd, ['all', 'admins', 'off'], old.cmd),
-    cmds: Array.isArray(v.cmds) ? v.cmds.filter((x) => COMMAND_IDS.includes(x)) : old.cmds,
+    cmdsOff: Array.isArray(v.cmds) ? COMMAND_IDS.filter((x) => !v.cmds.includes(x)) : old.cmdsOff || [],
+    photo: pick(v.photo, ['owner', 'admins', 'all'], old.photo),
   };
 }
+// Wer darf das Gruppenbild ändern?
+const canPhoto = (c, role) => c.kind === 'group' && !!role
+  && (role === 'owner' || role === 'mod' || (settingsOf(c).photo !== 'owner' && role === 'admin') || settingsOf(c).photo === 'all');
 
 // ---------- Wer ist dabei, wer darf was? ----------
 function people(c) {
@@ -136,6 +147,7 @@ const SYSTEM_TEXT = {
   added: (m) => `${m.name} hat ${m.target} hinzugefügt`, removed: (m) => `${m.name} hat ${m.target} entfernt`,
   mod: (m) => `${m.name} (Moderation) ist beigetreten`, settings: (m) => `${m.name} hat die Gruppe bearbeitet`,
   role: (m) => `${m.target} ist jetzt ${m.role === 'owner' ? 'Inhaber' : m.role === 'admin' ? 'Admin' : 'Mitglied'}`,
+  photo: (m) => `${m.name} hat das Gruppenbild geändert`, servers: (m) => `${m.name} hat die verbundenen Server geändert`,
 };
 function previewOf(m) {
   if (m.deleted) return 'Nachricht gelöscht';
@@ -152,15 +164,19 @@ function summary(c) {
   return {
     id: c.id, kind: c.kind, reason: c.reason || null, area: c.area || null, status: c.status, ref: c.ref || null,
     from: c.from, to: c.to || null, claimedBy: c.claimedBy || null,
-    name: c.name || null, desc: c.desc ? clip(c.desc, 140) : null, color: c.color || null,
+    name: c.name || null, desc: c.desc ? clip(c.desc, 140) : null, color: c.color || null, photo: c.photo || null,
+    category: c.category || null, servers: (c.servers || []).length,
     visibility: settingsOf(c).visibility, subs: Object.keys(ppl), count: Object.keys(ppl).length, top: topLevel(c),
+    admins: Object.values(ppl).filter((p) => isManager(p.role)).map((p) => p.sub),
     hidden: c.hidden || {}, banned: c.banned || [], reported: (c.reports || []).length,
     created: c.created, updated: c.updated,
     last: last ? { by: last.by, name: last.by === 'bot' ? 'TSG-Bot' : last.by === 'system' ? null : nameOf(ppl[last.by] || { username: last.name || '?' }), text: clip(previewOf(last), 120) } : null,
   };
 }
 // Für die App: ohne interne Listen
-const strip = ({ subs, hidden, banned, top, ...rest }) => rest;
+const strip = ({ subs, hidden, banned, top, admins, ...rest }) => rest;
+// Für die eigene Liste: bin ich dort Inhaber oder Admin?
+const forMe = (x, sub) => ({ ...strip(x), admin: (x.admins || []).includes(sub) });
 
 async function loadIndex(store) {
   let idx = await store.get('chats:index');
@@ -247,6 +263,7 @@ async function view(env, store, c, user) {
   return {
     id: c.id, kind: c.kind, status: c.status, reason: c.reason || null, area: c.area || null, ref: c.ref || null, app: c.app || null,
     name: c.name || null, desc: c.desc || '', rules: c.rules || '', color: c.color || null, owner: c.owner || null,
+    photo: c.photo || null, category: c.category || null, servers: c.kind === 'group' ? await serversOfChat(store, c, user) : [],
     from: c.from, to: c.to || null, claimedBy: c.claimedBy || null, created: c.created, updated: c.updated,
     settings: c.kind === 'group' ? st : null, members, messages,
     me: { sub: user.sub, role: a.role, observe: a.observe, muted: !!(c.muted && c.muted[user.sub]) },
@@ -255,6 +272,7 @@ async function view(env, store, c, user) {
     canClose: c.kind !== 'group' && c.status !== 'closed' && !!a.role,
     canInvite: canInvite(c, a.role),
     canAdmin: c.kind === 'group' && a.admin,
+    canPhoto: canPhoto(c, a.role),
     canModerate: a.moderate,
     canJoin: c.kind === 'group' && !a.role && a.pub,
     canJoinMod: !a.role && a.mod,
@@ -286,7 +304,7 @@ export async function listChats(store, user, watchingList = false) {
   const queue = areas.length ? idx.filter((x) => x.kind === 'ticket' && areas.includes(x.area) && x.from.sub !== user.sub && (x.status !== 'closed' || x.updated > done)) : [];
   const mod = isMod(user.rank);
   return {
-    chats: mine.map(strip), queue: queue.map(strip), areas, me: user.sub, mod,
+    chats: mine.map((x) => forMe(x, user.sub)), queue: queue.map(strip), areas, me: user.sub, mod,
     reported: mod ? idx.filter((x) => x.reported && x.top <= level(user.rank)).length : 0,
   };
 }
@@ -379,6 +397,7 @@ export async function createChat(store, env, user, body) {
       id: randomKey(9), kind, status: 'open', from: me, owner: user.sub, name, desc: cleanText(body.desc, 300), rules: cleanText(body.rules, 1500),
       color: COLORS.includes(body.color) ? body.color : COLORS[Math.floor(Math.random() * COLORS.length)],
       settings: cleanSettings(body.settings || {}), members: { [user.sub]: { ...me, role: 'owner', joined: t } }, created: t, updated: t, messages: [],
+      ...(body.category === 'server' ? { category: 'server', servers: [] } : {}),
     };
     sys(c, 'created', user.username);
     const added = [];
@@ -389,6 +408,12 @@ export async function createChat(store, env, user, body) {
     if (added.length) sys(c, 'added', user.username, { target: added.map(nameOf).join(', ') });
     if (text) c.messages.push({ id: randomKey(6), by: user.sub, name: nameOf(me), text, at: t + 1 });
     await save(store, c);
+    // Server-Chat: eigene private Server verbinden und gleich einstellen
+    if (c.category === 'server') {
+      await connectServers(store, user, c.id, body.servers, body.server || {});
+      Object.assign(c, await store.get(`chat:${c.id}`));
+      await saveIndex(store, c);
+    }
     for (const sub of Object.keys(c.members)) await addTo(store, sub, c.id);
     await Promise.all(added.map((p) => notifyUser(store, env, p.sub, 'chat', {
       ...fromPerson(me, text || `Du bist jetzt in der Gruppe „${name}“.`, `${nameOf(me)} hat dich zu „${name}“ hinzugefügt`), url: `./#/chat/${c.id}`, tag: `chat-${c.id}`,
@@ -437,7 +462,7 @@ export async function postMessage(store, env, user, id, body) {
     } catch (e) {
       r = { title: 'Gerade nicht verfügbar', text: 'Die Daten konnten nicht geladen werden. Bitte versuch es gleich noch einmal.', only: user.sub };
     }
-    c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: t + 1, title: r.title, text: r.text || '', rows: r.rows || [], avatar: r.avatar || null, ...(r.only ? { only: r.only } : {}) });
+    c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: t + 1, title: r.title, text: r.text || '', rows: r.rows || [], buttons: (r.buttons || []).slice(0, 6), avatar: r.avatar || null, ...(r.only ? { only: r.only } : {}) });
   }
   c.updated = t + (cmd ? 1 : 0);
   if (c.kind === 'group') c.lastPost = { ...(c.lastPost || {}), [user.sub]: t };
@@ -646,9 +671,86 @@ export async function deleteChat(store, user, id, { force = false } = {}) {
   const a = access(c, user);
   if (!force && !((c.kind === 'group' && a.role === 'owner') || a.mod)) throw bad('forbidden', 403);
   await deleteFiles(store, c.messages.flatMap((m) => m.files || []));
+  // Verbundene private Server lösen
+  for (const sid of c.servers || []) {
+    const p = await store.get(`pserver:${sid}`);
+    if (p && p.chat === c.id) { p.chat = null; await store.put(`pserver:${sid}`, p); }
+  }
+  await store.delete(`chatphoto:${c.id}`);
   await store.delete(`chat:${c.id}`);
   await saveIndex(store, c, { remove: true });
   return { ok: true };
+}
+
+// Übersicht neu schreiben, wenn sich außerhalb von chat.js etwas am Gespräch geändert hat (z. B. verbundener Server)
+export async function reindexChat(store, id) {
+  const c = id && await store.get(`chat:${id}`);
+  if (c) await saveIndex(store, c);
+}
+
+// ---------- Gruppenbild (JPEG, in der App auf 256 × 256 zugeschnitten) ----------
+export async function setChatPhoto(store, env, user, id, req) {
+  const c = await getChat(store, user, id);
+  if (!canPhoto(c, access(c, user).role)) throw bad('forbidden', 403);
+  if (req.method === 'DELETE') {
+    await store.delete(`chatphoto:${c.id}`);
+    c.photo = null;
+  } else {
+    const bytes = new Uint8Array(await req.arrayBuffer());
+    if (bytes.length > 300000) throw bad('too_large', 413);
+    if (!(bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF)) throw bad('bad_type', 415);
+    await store.put(`chatphoto:${c.id}`, bytes);
+    c.photo = Date.now();
+  }
+  c.updated = Date.now();
+  sys(c, 'photo', user.username);
+  await save(store, c);
+  return view(env, store, c, user);
+}
+export async function chatPhotoResponse(store, id, headers = {}) {
+  const bytes = /^[\w-]{6,30}$/.test(id) && await store.get(`chatphoto:${id}`);
+  if (!bytes) return new Response('not found', { status: 404, headers });
+  return new Response(bytes, {
+    headers: { ...headers, 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=604800, immutable', 'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'cross-origin' },
+  });
+}
+
+// ---------- Server-Chat: private Server verbinden oder lösen (nur der Besitzer des Servers) ----------
+async function connectServers(store, user, chatId, ids, opts = {}) {
+  for (const sid of (Array.isArray(ids) ? ids : []).slice(0, 20)) {
+    const p = await store.get(`pserver:${String(sid)}`);
+    if (!p || p.owner !== user.sub) continue;
+    if (['app', 'roblox'].includes(opts.join)) p.join = opts.join;
+    if (['all', 'members'].includes(opts.access)) p.access = opts.access;
+    if (typeof opts.relay === 'boolean') p.relay = opts.relay;
+    if (opts.welcome !== undefined) p.welcome = clip(opts.welcome, 300).trim();
+    if (opts.link) p.link = cleanLink(opts.link);
+    p.show = p.show === 'owner' ? 'members' : p.show;
+    await linkChat(store, user, p, chatId);
+    await store.put(`pserver:${p.id}`, p);
+  }
+}
+export async function chatServers(store, env, user, id, body) {
+  const c = await getChat(store, user, id);
+  const a = access(c, user);
+  if (c.kind !== 'group' || !a.admin) throw bad('forbidden', 403);
+  if (body.add) await connectServers(store, user, c.id, [body.add], body.server || {});
+  if (body.remove) {
+    const p = await store.get(`pserver:${String(body.remove)}`);
+    if (p && p.chat === c.id && (p.owner === user.sub || a.role === 'owner' || a.mod)) {
+      p.chat = null;
+      await store.put(`pserver:${p.id}`, p);
+      const fresh = await store.get(`chat:${c.id}`);
+      fresh.servers = (fresh.servers || []).filter((x) => x !== p.id);
+      await store.put(`chat:${c.id}`, fresh, { ttl: KEEP });
+    }
+  }
+  const fresh = await store.get(`chat:${c.id}`);
+  fresh.category = 'server';
+  fresh.updated = Date.now();
+  sys(fresh, 'servers', user.username);
+  await save(store, fresh);
+  return view(env, store, fresh, user);
 }
 
 // ---------- Melden: Anfrage an „Meldungen“ mit Verweis auf das Gespräch ----------

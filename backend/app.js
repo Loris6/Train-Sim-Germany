@@ -57,6 +57,10 @@
  *   POST   /api/chats/<id>/mute          { muted } – keine Benachrichtigungen für dieses Gespräch
  *   POST   /api/chats/<id>/hide          Für mich löschen
  *   POST   /api/chats/<id>/report        Gespräch melden { text }
+ *   PUT    /api/chats/<id>/photo         Gruppenbild (JPEG, 256 × 256) · DELETE entfernt es · GET /media/chat/<id> zeigt es
+ *   POST   /api/chats/<id>/servers       Server-Chat: { add: <privater Server>, server: { join, access, welcome, relay, link } } oder { remove }
+ *   GET    /api/pservers                 Private Server aus dem Spiel: eigene und die, die man sehen darf
+ *   PUT    /api/pservers/<id>            Einstellungen des Besitzers { name, join, link, access, show, welcome, relay, chat }
  *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
  *   POST   /api/chats/<id>/close         Gespräch beenden
  *   GET    /api/players/find?q=<name>    Spieler suchen, um ihn anzuschreiben
@@ -77,7 +81,9 @@ import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
 import {
   listChats, publicChats, moderationChats, createChat, readChat, postMessage, deleteMessage, claimChat, closeChat, updateChat, addMembers,
   joinChat, leaveChat, removeMember, setRole, muteChat, hideChat, deleteChat, reportChat, startChatUpload, staffList, findPlayer,
+  setChatPhoto, chatPhotoResponse, chatServers, reindexChat,
 } from './chat.js';
+import { listPrivateServers, updatePrivateServer } from './pservers.js';
 import { putChunk, fileResponse } from './files.js';
 import { mailReady } from './mail.js';
 
@@ -280,6 +286,8 @@ export async function handle(req, env, store) {
     if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
     const file = path.match(/^\/api\/files\/([\w-]+)$/);
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
+    const photo = path.match(/^\/media\/chat\/([\w-]+)$/);
+    if (photo && m === 'GET') return await chatPhotoResponse(store, photo[1], cors(req, env));
     const media = path.match(/^\/media\/([\w-]+)$/);
     if (media && m === 'GET') return await mediaResponse(store, media[1]);
     if (path === '/auth/session' && m === 'POST') return await createSession(req, env, store);
@@ -308,6 +316,7 @@ export async function handle(req, env, store) {
     }
     if (!path.startsWith('/api/')) return json(req, env, { error: 'not_found' }, 404);
     if (path === '/api/shop' && m === 'GET') return json(req, env, await shopState(store, user));
+    if (path === '/api/pservers' && m === 'GET') return json(req, env, await listPrivateServers(store, user));
     if (!user) return json(req, env, { error: 'unauthorized' }, 401);
 
     // Shop
@@ -318,7 +327,7 @@ export async function handle(req, env, store) {
     if (path === '/api/chats/public' && m === 'GET') return json(req, env, await publicChats(store, user, url.searchParams.get('q') || ''));
     if (path === '/api/chats/moderation' && m === 'GET') return json(req, env, await moderationChats(store, await freshUser(env, store, user), url.searchParams.get('q') || '', url.searchParams.get('kind') || ''));
     if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 20000)), 201);
-    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close|files|members|join|leave|mute|hide|report)(?:\/([\w-]+))?)?$/);
+    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close|files|members|join|leave|mute|hide|report|photo|servers)(?:\/([\w-]+))?)?$/);
     if (chat) {
       const [, id, action, sub] = chat;
       if (!action && m === 'GET') return json(req, env, await readChat(store, env, user, id, { since: +url.searchParams.get('since') || 0, observe: url.searchParams.get('observe') === '1' }));
@@ -335,8 +344,19 @@ export async function handle(req, env, store) {
       if (action === 'mute' && m === 'POST') return json(req, env, await muteChat(store, env, user, id, (await readJson(req, 1000)).muted === true));
       if (action === 'hide' && m === 'POST') return json(req, env, await hideChat(store, user, id));
       if (action === 'report' && m === 'POST') return json(req, env, await reportChat(store, env, await freshUser(env, store, user), id, await readJson(req, 5000)), 201);
+      if (action === 'photo' && (m === 'PUT' || m === 'DELETE')) return json(req, env, await setChatPhoto(store, env, user, id, req));
+      if (action === 'servers' && m === 'POST') return json(req, env, await chatServers(store, env, user, id, await readJson(req, 3000)));
       if (action === 'claim' && m === 'POST') return json(req, env, await claimChat(store, env, await freshUser(env, store, user), id));
       if (action === 'close' && m === 'POST') return json(req, env, await closeChat(store, env, user, id));
+    }
+    // Private Server: Einstellungen des Besitzers
+    const ps = path.match(/^\/api\/pservers\/([\w-]+)$/);
+    if (ps && m === 'PUT') {
+      const body = await readJson(req, 5000);
+      const before = body.chat !== undefined ? ((await store.get(`pserver:${ps[1]}`)) || {}).chat : null;
+      const r = await updatePrivateServer(store, user, ps[1], body);
+      if (body.chat !== undefined) { await reindexChat(store, before); await reindexChat(store, body.chat); }
+      return json(req, env, r);
     }
     const chunk = path.match(/^\/api\/files\/([\w-]+)\/(\d{1,4})$/);
     if (chunk && m === 'PUT') return json(req, env, await putChunk(store, user, chunk[1], +chunk[2], req));

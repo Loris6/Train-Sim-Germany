@@ -9,6 +9,7 @@
  *   shop:pending     → { <userId>: [{ id, kind, item, price, at }] }   (Käufe, die das Spiel noch abholen muss)
  */
 import { randomKey, clip, enc } from './lib.js';
+import { privateServerSync } from './pservers.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 
@@ -99,6 +100,7 @@ export async function gameAuthorized(req, env) {
  *   online:  [userId]                               – für diese Spieler werden offene Käufe zurückgegeben
  *   done:    [{ id, userId, ok }]                   – vom Spiel verbuchte (ok) oder abgelehnte Käufe
  *   server:  { jobId, players, max, version, private, closing } – dieser Server (für /GetServers und /GetOnline im Chat)
+ *            privater Server zusätzlich: { privateId, ownerId, ownerName, relaySince } → Antwort enthält config (siehe pservers.js)
  */
 export async function gameSync(store, body) {
   const t = Date.now();
@@ -146,13 +148,15 @@ export async function gameSync(store, body) {
     else {
       servers[jobId] = {
         at: t, players: Math.max(0, Math.round(+sv.players || online.length)), max: Math.max(0, Math.round(+sv.max || 0)),
-        version: Math.round(+sv.version) || null, private: sv.private === true, online,
+        version: Math.round(+sv.version) || null, private: sv.private === true, privateId: sv.privateId ? clip(sv.privateId, 64) : null, online,
       };
     }
     await store.put('game:servers', servers);
   }
+  // Privater Server: Stand merken, Einstellungen aus der App zurückgeben
+  const config = jobId && sv.private && sv.privateId ? await privateServerSync(store, sv, online, clip(sv.ownerName, 40)) : null;
   if (pendingChanged) await store.put('shop:pending', all);
   const pending = {};
   online.forEach((sub) => { if (all[sub]) pending[sub] = all[sub]; });
-  return { pending, catalog: CATALOG, at: t };
+  return { pending, catalog: CATALOG, at: t, ...(config ? { config } : {}) };
 }

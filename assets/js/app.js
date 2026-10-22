@@ -3083,16 +3083,34 @@
   const CHAT_COMMANDS = [
     { id: 'help', usage: '/help', desc: 'Alle Befehle in diesem Chat' },
     { id: 'rules', usage: '/rules', desc: 'Regeln dieses Chats' },
-    { id: 'getgroupdata', usage: '/GetGroupData', desc: 'Roblox-Gruppe: Mitglieder und Ränge' },
+    { id: 'getgroupdata', usage: '/GetGroupData', desc: 'Roblox-Gruppe: Mitglieder und alle Rollen' },
     { id: 'getuser', usage: '/GetUser <Name>', desc: 'Roblox-Profil, Rang und ob jemand im Spiel ist' },
     { id: 'getrank', usage: '/GetRank <Name>', desc: 'Rang eines Spielers in der Gruppe' },
-    { id: 'getservers', usage: '/GetServers', desc: 'Laufende Server im Spiel' },
+    { id: 'isonline', usage: '/Online <Name>', desc: 'Ist jemand gerade im Spiel?' },
+    { id: 'getservers', usage: '/GetServers', desc: 'Laufende Server im Spiel – mit „Beitreten“' },
+    { id: 'getprivateservers', usage: '/GetPrivateServers', desc: 'Private Server dieses Chats – Stand und Beitreten' },
     { id: 'getonline', usage: '/GetOnline', desc: 'Wer gerade im Spiel ist' },
     { id: 'getstats', usage: '/GetStats', desc: 'Spieler, Besuche, Favoriten, Discord' },
     { id: 'gettrainings', usage: '/GetTrainings', desc: 'Die nächsten Trainings' },
+    { id: 'getnews', usage: '/GetNews', desc: 'Die neuesten Neuigkeiten' },
+    { id: 'getteam', usage: '/GetTeam', desc: 'Das Team ab Supervisor nach Rang' },
+    { id: 'members', usage: '/Members', desc: 'Wer in diesem Chat ist' },
     { id: 'coins', usage: '/Coins', desc: 'Deine Coins und Züge aus dem Spiel (nur du siehst die Antwort)' },
+    { id: 'play', usage: '/Play', desc: 'Spiel starten und Gruppe beitreten' },
+    { id: 'discord', usage: '/Discord', desc: 'Zum Discord der Community' },
+    { id: 'time', usage: '/Time', desc: 'Spielzeit (Uhrzeit in Deutschland)' },
+    { id: 'roll', usage: '/Roll <Zahl>', desc: 'Würfeln (Standard 1–6)' },
+    { id: 'ping', usage: '/Ping', desc: 'Ist der Bot da?' },
   ];
-  const GROUP_DEFAULTS = { visibility: 'private', invite: 'admins', write: 'all', media: true, slow: 0, cmd: 'all', cmds: CHAT_COMMANDS.map((c) => c.id) };
+  // Knöpfe unter Antworten des TSG-Bots: nur Links in die App, zu Roblox und zu Discord, nur diese Icons
+  const BOT_ICONS = ['fi-rr-users-alt', 'fi-sr-play', 'fi-rr-user', 'fi-rr-paper-plane', 'fi-rr-signal-alt-2', 'fi-rr-calendar', 'fi-rr-newspaper',
+    'fi-rr-shopping-cart', 'fi-rr-chart-line-up', 'fi-rr-user-add', 'fi-brands-discord'];
+  const safeBotUrl = (u) => /^#\/[\w/-]*$/.test(u) || /^https:\/\/(www\.)?(roblox\.com|discord\.gg)\//.test(u);
+  const botButtons = (m) => (m.buttons || []).filter((b) => b && safeBotUrl(String(b.url))).map((b) => {
+    const ext = !b.url.startsWith('#');
+    return `<a class="bot-btn${b.primary ? ' is-primary' : ''}" href="${esc(b.url)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${BOT_ICONS.includes(b.icon) ? icon(b.icon) : ''}<span>${esc(b.label)}</span>${ext ? icon('fi-rr-arrow-up-right-from-square', 'bot-btn__ext') : ''}</a>`;
+  }).join('');
+  const GROUP_DEFAULTS = { visibility: 'private', invite: 'admins', write: 'all', media: true, slow: 0, cmd: 'all', cmds: CHAT_COMMANDS.map((c) => c.id), photo: 'admins' };
   const GROUP_COLORS = ['#EC0016', '#1455C0', '#408335', '#B35900', '#7A4BD1', '#0F8C8C', '#C2185B', '#3C414B'];
   const reasonOf = (id) => CHAT.reasons.find((r) => r.id === id) || CHAT.reasons[CHAT.reasons.length - 1];
   const areaOf = (id) => CHAT.areas.find((a) => a.id === id) || CHAT.areas[CHAT.areas.length - 1];
@@ -3124,6 +3142,8 @@
       bad_name: t('Bitte gib einen gültigen Namen ein.'),
       forbidden: t('Das darfst du hier nicht.'),
       file_incomplete: t('Eine Datei ist noch nicht ganz hochgeladen.'),
+      bad_link: t('Das ist kein Link zu einem privaten Server auf roblox.com.'),
+      chat_forbidden: t('Verbinden geht nur mit Gruppen, in denen du Inhaber oder Admin bist.'),
     };
     return map[e.message] || errorText(e);
   }
@@ -3147,7 +3167,9 @@
     }
     return t(reasonOf(c.reason).label);
   }
-  const groupBadge = (c, cls = '') => `<span class="group-badge ${cls}" style="--gc:${esc(c.color || '#3C414B')}" aria-hidden="true">${esc(initials(c.name || 'G'))}</span>`;
+  const groupBadge = (c, cls = '') => (c.photo && API
+    ? `<span class="group-badge has-photo ${cls}" aria-hidden="true"><img src="${esc(`${API}/media/chat/${c.id}?v=${c.photo}`)}" alt="" loading="lazy"></span>`
+    : `<span class="group-badge ${cls}" style="--gc:${esc(c.color || '#3C414B')}" aria-hidden="true">${esc(initials(c.name || 'G'))}</span>`);
   function chatImg(c, cls = '') {
     if (c.kind === 'group') return groupBadge(c, cls);
     const other = chatOther(c);
@@ -3159,7 +3181,8 @@
     if (c.status === 'closed') return `<span class="pill">${t('Erledigt')}</span>`;
     if (c.kind === 'group') {
       const pub = (c.visibility || (c.settings && c.settings.visibility)) === 'public';
-      return `<span class="pill${pub ? ' pill--ok' : ''}">${icon(pub ? 'fi-rr-globe' : 'fi-rr-lock')}${pub ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: memberCount(c) })}</span>`;
+      const nServers = Array.isArray(c.servers) ? c.servers.length : c.servers || 0;
+      return `<span class="pill${pub ? ' pill--ok' : ''}">${icon(pub ? 'fi-rr-globe' : 'fi-rr-lock')}${pub ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: memberCount(c) })}</span>${c.category === 'server' ? `<span class="pill pill--info">${icon('fi-rr-signal-alt-2')}${nServers === 1 ? t('1 Server') : t('{n} Server', { n: nServers })}</span>` : ''}`;
     }
     if (c.kind === 'direct') return `<span class="pill pill--info">${icon('fi-rr-lock')}${t('Privat')}</span>`;
     if (c.status === 'open') return `<span class="pill pill--warn">${t('Wartet auf Annahme')}</span>`;
@@ -3308,11 +3331,21 @@
     const gate = chatGate();
     if (gate) return gate;
     if (!chat.list) { loadChats(); return loadingHtml(); }
-    const list = chat.list.chats.slice().sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || b.updated - a.updated);
+    const all = chat.list.chats.slice().sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || b.updated - a.updated);
+    // Zwei Arten: normale Chats und Server-Chats (mit privaten Servern verbunden)
+    const servers = all.filter((c) => c.category === 'server');
+    const normal = all.filter((c) => c.category !== 'server');
+    const cat = chat.cat === 'server' ? 'server' : 'chats';
+    const tab = (id, ic, label, list) => `<button type="button" role="tab" aria-selected="${cat === id}" data-chat-cat="${id}">${icon(ic)}<span>${label}</span><i>${list.length}</i>${list.some(isUnread) ? '<b class="cat-tabs__dot"></b>' : ''}</button>`;
+    const tabs = `<div class="cat-tabs" role="tablist" aria-label="${esc(t('Art der Gespräche'))}">${tab('chats', 'fi-rr-comments', t('Chats'), normal)}${tab('server', 'fi-rr-signal-alt-2', t('Server-Chats'), servers)}</div>`;
+    const list = cat === 'server' ? servers : normal;
     if (!list.length) {
-      return `<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
+      return cat === 'server'
+        ? `${tabs}<div class="chat-empty">${icon('fi-rr-signal-alt-2')}<h2>${t('Noch keine Server-Chats')}</h2><p>${t('Verbinde deine privaten Server mit einem Chat: Mitglieder sehen, wer online ist, treten über die App bei, und auf Wunsch erscheinen die Nachrichten im Spiel.')}</p>
+          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu/server">${icon('fi-rr-plus')}${t('Server-Chat erstellen')}</a></div></div>`
+        : `${tabs}<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
     }
-    return `<div class="chat-tools"><span>${list.length === 1 ? t('1 Gespräch') : t('{n} Gespräche', { n: list.length })}</span>
+    return `${tabs}<div class="chat-tools"><span>${list.length === 1 ? t('1 Gespräch') : t('{n} Gespräche', { n: list.length })}</span>
         <button class="link-btn" type="button" data-chat-edit>${chat.edit ? t('Fertig') : `${icon('fi-rr-trash')}${t('Löschen')}`}</button></div>
       ${chat.edit ? `<p class="chat-hint">${icon('fi-rr-info')}<span>${t('Gelöschte Gespräche verschwinden nur bei dir. Schreibt jemand Neues, sind sie wieder da.')}</span></p>` : ''}
       <div class="chat-list">${list.map((c) => chatRow(c)).join('')}</div>`;
@@ -3397,6 +3430,7 @@
       ${gate || `<div class="new-grid">
         ${card('#/chat/neu/spieler', 'fi-rr-user-add', t('Spieler anschreiben'), t('Privat mit einer Person schreiben – jeden Roblox-Spieler per Name'))}
         ${card('#/chat/neu/gruppe', 'fi-rr-users-alt', t('Gruppe erstellen'), t('Mehrere Leute, privat oder öffentlich, mit eigenen Regeln und Befehlen'))}
+        ${card('#/chat/neu/server', 'fi-rr-signal-alt-2', t('Server-Chat'), t('Chat für deine privaten Server – Beitreten über die App, Begrüßung und Nachrichten im Spiel'))}
         ${card('#/chat/neu/anfrage', 'fi-rr-comments-question', t('Anfrage ans Team'), t('Frage, Fehler oder Meldung – das zuständige Team antwortet'))}
       </div>`}`;
   }
@@ -3439,6 +3473,7 @@
       <label class="f"><span class="f__label">${t('Wer darf schreiben?')}</span><select name="write">${opt('write', 'all', t('Alle Mitglieder'))}${opt('write', 'admins', t('Nur Inhaber und Admins'))}</select></label>
       <label class="f"><span class="f__label">${t('Langsam-Modus')}</span><select name="slow">${opt('slow', 0, t('Aus'))}${[5, 10, 30, 60].map((s) => opt('slow', s, t('Alle {n} Sekunden', { n: s }))).join('')}${opt('slow', 300, t('Alle 5 Minuten'))}</select></label>
       <label class="f"><span class="f__label">${t('Befehle wie /GetGroupData')}</span><select name="cmd">${opt('cmd', 'all', t('Für alle'))}${opt('cmd', 'admins', t('Nur Inhaber und Admins'))}${opt('cmd', 'off', t('Aus'))}</select></label>
+      <label class="f"><span class="f__label">${t('Wer darf das Gruppenbild ändern?')}</span><select name="photo">${opt('photo', 'owner', t('Nur der Inhaber'))}${opt('photo', 'admins', t('Inhaber und Admins'))}${opt('photo', 'all', t('Alle Mitglieder'))}</select></label>
     </div>
     <label class="toggle"><span class="toggle__text"><b>${t('Fotos, Videos und Dateien')}</b><small>${t('Aus = nur Inhaber und Admins dürfen Medien senden.')}</small></span>
       <input type="checkbox" role="switch" name="media"${st.media ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
@@ -3450,7 +3485,7 @@
     const f = form.elements;
     return {
       visibility: (form.querySelector('input[name="visibility"]:checked') || {}).value || 'private',
-      invite: f.invite.value, write: f.write.value, slow: +f.slow.value, cmd: f.cmd.value, media: f.media.checked,
+      invite: f.invite.value, write: f.write.value, slow: +f.slow.value, cmd: f.cmd.value, media: f.media.checked, photo: f.photo.value,
       cmds: [...form.querySelectorAll('input[name="cmds"]:checked')].map((x) => x.value),
     };
   }
@@ -3483,6 +3518,115 @@
         <p class="f__note">${icon('fi-rr-shield-check')} ${t('Zur Sicherheit kann die Moderation (ab Supervisor) jede Gruppe einsehen.')}</p>
       </form>`}`;
   }
+  // Beitreten: über die App (Knopf mit dem Link zum privaten Server) oder nur über Roblox
+  const joinPick = (value) => `<div class="vis-grid">
+      <label class="vis"><input type="radio" name="join" value="app"${value === 'app' ? ' checked' : ''}><span>${icon('fi-sr-play')}<b>${t('Über die App')}</b><small>${t('„Beitreten“ in der App mit deinem Link zum privaten Server')}</small></span></label>
+      <label class="vis"><input type="radio" name="join" value="roblox"${value !== 'app' ? ' checked' : ''}><span>${icon('fi-rr-lock')}<b>${t('Nur über Roblox')}</b><small>${t('Freunde und Einladungen direkt in Roblox')}</small></span></label>
+    </div>`;
+  const linkField = (value = '') => `<div class="f"><label class="f__label" for="ps-link">${t('Link zum privaten Server')}</label>
+      <input id="ps-link" name="link" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(value)}" placeholder="https://www.roblox.com/share?code=…&type=Server">
+      <small class="f__hint">${t('In Roblox beim privaten Server auf „Konfigurieren“ → „Link erstellen“ und hier einfügen. Nur nötig für „Über die App“.')}</small></div>`;
+  const psState = (p) => (p.online ? t('Online · {a}/{b} Spieler', { a: p.players, b: p.max }) : p.lastSeen ? t('Offline · zuletzt {when}', { when: fmtWhen(p.lastSeen) }) : t('Offline'));
+  function chatNewServer() {
+    const gate = chatGate();
+    if (!ps.list) loadPservers();
+    const mine = ps.list ? ps.list.mine : null;
+    const pick = !mine ? loadingHtml() : mine.length
+      ? `<div class="ps-pick">${mine.map((p) => `<label class="ps-pick__row"><input type="checkbox" name="servers" value="${esc(p.id)}"${mine.length === 1 ? ' checked' : ''}>
+          <span class="ps-pick__ic">${icon('fi-rr-signal-alt-2')}</span><span class="ps-pick__text"><b>${esc(p.name)}</b><small>${psState(p)}${p.chat ? ` · ${t('jetzt mit „{name}“ verbunden', { name: esc(p.chat.name) })}` : ''}</small></span></label>`).join('')}</div>`
+      : `<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Noch kein privater Server von dir bekannt. Starte deinen privaten Server einmal in Roblox – dann erscheint er hier (das Spiel meldet ihn automatisch). Den Chat kannst du schon jetzt erstellen und den Server später unter „Info“ verbinden.')}</span></p>`;
+    return `${backTo('#/chat/neu', t('Neu'))}
+      ${gate || `<form class="cform group-form" data-server-new novalidate>
+        <div class="f"><label class="f__label" for="gr-name">${t('Name des Server-Chats')}</label><input id="gr-name" name="name" maxlength="60" required placeholder="${esc(t('z. B. VIP-Server Nachtschicht'))}"></div>
+        <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Wofür ist der Server? (optional)'))}"></textarea></div>
+        <fieldset class="f"><legend class="f__label">${t('Private Server verbinden')}</legend>${pick}</fieldset>
+        <fieldset class="f"><legend class="f__label">${t('Wie tritt man bei?')}</legend>${joinPick('app')}</fieldset>
+        ${linkField()}
+        <label class="toggle"><span class="toggle__text"><b>${t('Nur Mitglieder dieses Chats auf den Server')}</b><small>${t('Das Spiel weist alle anderen freundlich ab.')}</small></span>
+          <input type="checkbox" role="switch" name="membersOnly"><span class="toggle__ui" aria-hidden="true"></span></label>
+        <label class="toggle"><span class="toggle__text"><b>${t('Nachrichten im Spiel anzeigen')}</b><small>${t('Was hier geschrieben wird, erscheint im Spiel-Chat des Servers (von Roblox gefiltert).')}</small></span>
+          <input type="checkbox" role="switch" name="relay"><span class="toggle__ui" aria-hidden="true"></span></label>
+        <div class="f"><label class="f__label" for="sv-welcome">${t('Begrüßung im Spiel')}</label><textarea id="sv-welcome" name="welcome" rows="2" maxlength="300" placeholder="${esc(t('Willkommen auf unserem Server! (optional)'))}"></textarea></div>
+        <fieldset class="f"><legend class="f__label">${t('Wer kann den Chat sehen?')}</legend>${visPick('private')}</fieldset>
+        <div class="f"><span class="f__label">${t('Leute hinzufügen')}</span>
+          <div class="find-player__row"><input data-member-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--soft" type="button" data-member-add>${icon('fi-rr-plus')}${t('Dazu')}</button></div>
+          <div class="mchips" data-member-chips>${memberChips()}</div>
+        </div>
+        <div class="f"><label class="f__label" for="gr-rules">${t('Regeln')}</label><textarea id="gr-rules" name="rules" rows="3" maxlength="1500" placeholder="${esc(t('Gelten im Chat und werden im Spiel beim Betreten gezeigt (optional)'))}"></textarea></div>
+        <details class="gset"><summary>${icon('fi-rr-settings-sliders')}${t('Rechte, Medien und Befehle')}</summary>${groupSettingsFields(GROUP_DEFAULTS)}</details>
+        <div class="f"><label class="f__label" for="gr-text">${t('Erste Nachricht')}</label><textarea id="gr-text" name="text" rows="2" maxlength="2000" placeholder="${esc(t('Hallo zusammen! (optional)'))}"></textarea></div>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-signal-alt-2')}${t('Server-Chat erstellen')}</button>
+        <p class="f__note">${icon('fi-rr-info')} ${t('Die Einstellungen holt sich dein Server beim nächsten Abgleich mit der App (spätestens nach 30 Sekunden).')}</p>
+      </form>`}`;
+  }
+
+  // ---------- Private Server (aus dem Spiel gemeldet) ----------
+  const ps = { list: null, at: 0, busy: false };
+  async function loadPservers(force = false) {
+    if (ps.busy || (!force && ps.list && Date.now() - ps.at < 20000)) return;
+    if (!apiReady()) { ps.list = { mine: [], visible: [] }; return; }
+    ps.busy = true;
+    try { ps.list = await api('/api/pservers'); } catch (e) { ps.list = ps.list || { mine: [], visible: [] }; } finally { ps.busy = false; ps.at = Date.now(); }
+    if (state.page === 'server' && !state.serverId) renderPservers();
+    if (state.page === 'chat' && ['new-server', 'info'].includes(state.chatView)) renderChat();
+  }
+  function pserverCard(p, { inChat = null } = {}) {
+    const status = p.online ? `<span class="status status--ok">${t('Online')} · ${p.players}/${p.max}</span>` : `<span class="status">${t('Offline')}</span>`;
+    const why = p.join === 'roblox' ? t('Beitreten nur über Roblox') : p.access === 'members' && !p.member && !p.mine ? t('Nur für Mitglieder des Server-Chats') : t('Noch kein Link hinterlegt');
+    const join = p.canJoin && p.link ? `<a class="btn btn--primary btn--sm" href="${esc(p.link)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`
+      : `<span class="ps-note">${icon(p.join === 'roblox' ? 'fi-rr-lock' : 'fi-rr-info')}${why}</span>`;
+    const unlink = inChat && (p.mine || (inChat.me && inChat.me.role === 'owner'));
+    return `<article class="ps-card">
+      <div class="ps-card__head"><span class="ps-card__ic">${icon('fi-rr-signal-alt-2')}</span>
+        <span class="ps-card__name"><b>${esc(p.name)}</b><small>${t('Privater Server')}${p.ownerName ? ` · ${t('von {name}', { name: esc(p.ownerName) })}` : ''}${!p.online && p.lastSeen ? ` · ${t('zuletzt {when}', { when: fmtWhen(p.lastSeen) })}` : ''}</small></span>${status}</div>
+      ${p.chat && !inChat ? `<a class="ps-card__chat" href="#/chat/${esc(p.chat.id)}">${icon('fi-rr-comments')}<span>${t('Server-Chat „{name}“', { name: esc(p.chat.name) })}</span>${icon('fi-rr-angle-small-right')}</a>` : ''}
+      <div class="ps-card__tags">${p.join === 'app' ? `<span class="pill pill--info">${icon('fi-sr-play')}${t('Beitritt über die App')}</span>` : `<span class="pill">${icon('fi-rr-lock')}${t('Beitritt über Roblox')}</span>`}${p.access === 'members' ? `<span class="pill">${icon('fi-rr-users-alt')}${t('Nur Mitglieder')}</span>` : ''}${p.relay ? `<span class="pill">${icon('fi-rr-comments')}${t('Chat im Spiel')}</span>` : ''}</div>
+      <div class="ps-card__foot">${join}
+        ${p.mine ? `<button class="btn btn--soft btn--sm" type="button" data-pserver-edit="${esc(p.id)}">${icon('fi-rr-settings')}${t('Einstellungen')}</button>` : ''}
+        ${unlink ? `<button class="btn btn--soft btn--sm" type="button" data-ps-unlink="${esc(p.id)}">${t('Trennen')}</button>` : ''}</div>
+    </article>`;
+  }
+  function renderPservers() {
+    const box = $('[data-pservers]');
+    if (!box) return;
+    if (!apiReady()) { box.innerHTML = ''; return; }
+    if (!ps.list) { loadPservers(); box.innerHTML = ''; return; }
+    const { mine, visible } = ps.list;
+    const title = (n) => `<h2 class="ps-sec__title">${icon('fi-rr-lock')}${t('Private Server')}${n ? `<small>${n}</small>` : ''}</h2>`;
+    if (!mine.length && !visible.length) {
+      box.innerHTML = sessionToken() ? `<section class="ps-sec">${title(0)}<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Hast du einen privaten Server? Starte ihn einmal in Roblox – dann erscheint er hier. Du kannst ihn benennen, mit einem Server-Chat verbinden und festlegen, ob man über die App oder nur über Roblox beitritt.')}</span></p></section>` : '';
+      return;
+    }
+    box.innerHTML = `<section class="ps-sec">${title(mine.length + visible.length)}
+      ${mine.length ? `<h3 class="ps-sec__sub">${t('Meine')}</h3><div class="ps-grid">${mine.map((p) => pserverCard(p)).join('')}</div>` : ''}
+      ${visible.length ? `${mine.length ? `<h3 class="ps-sec__sub">${t('Weitere')}</h3>` : ''}<div class="ps-grid">${visible.map((p) => pserverCard(p)).join('')}</div>` : ''}
+    </section>`;
+  }
+  function pserverForm(id) {
+    const p = ps.list && ps.list.mine.find((x) => x.id === id);
+    if (!p) return `<p class="muted">${t('Diesen Server gibt es nicht oder er gehört dir nicht.')}</p>`;
+    const chats = (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group' && c.admin);
+    const opt = (v, cur, label) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${label}</option>`;
+    return `<form class="cform group-form ps-form" data-pserver-form="${esc(p.id)}" novalidate>
+      <p class="ps-form__state">${icon('fi-rr-signal-alt-2')}<span>${psState(p)}</span></p>
+      <div class="f"><label class="f__label" for="ps-name">${t('Name in der App')}</label><input id="ps-name" name="name" maxlength="50" value="${esc(p.name)}"></div>
+      <fieldset class="f"><legend class="f__label">${t('Wie tritt man bei?')}</legend>${joinPick(p.join)}</fieldset>
+      ${linkField(p.link || '')}
+      <fieldset class="f"><legend class="f__label">${t('Wer darf auf den Server?')}</legend><div class="vis-grid">
+        <label class="vis"><input type="radio" name="access" value="all"${p.access !== 'members' ? ' checked' : ''}><span>${icon('fi-rr-globe')}<b>${t('Jeder mit Link')}</b><small>${t('Wie bei Roblox üblich')}</small></span></label>
+        <label class="vis"><input type="radio" name="access" value="members"${p.access === 'members' ? ' checked' : ''}><span>${icon('fi-rr-users-alt')}<b>${t('Nur Chat-Mitglieder')}</b><small>${t('Das Spiel weist andere ab')}</small></span></label>
+      </div></fieldset>
+      <label class="f"><span class="f__label">${t('Wer sieht den Server in der App?')}</span><select name="show">${opt('public', p.show, t('Alle'))}${opt('members', p.show, t('Nur Mitglieder des Server-Chats'))}${opt('owner', p.show, t('Nur ich'))}</select></label>
+      <label class="f"><span class="f__label">${t('Server-Chat')}</span><select name="chat">${opt('', p.chat ? p.chat.id : '', t('Keiner'))}${chats.map((c) => opt(c.id, p.chat ? p.chat.id : '', esc(c.name))).join('')}</select>
+        <small class="f__hint">${t('Gruppen, in denen du Inhaber oder Admin bist. Sie werden damit zum Server-Chat.')}</small></label>
+      <div class="f"><label class="f__label" for="ps-welcome">${t('Begrüßung im Spiel')}</label><textarea id="ps-welcome" name="welcome" rows="2" maxlength="300">${esc(p.welcome || '')}</textarea></div>
+      <label class="toggle"><span class="toggle__text"><b>${t('Nachrichten aus dem Server-Chat im Spiel anzeigen')}</b><small>${t('Vorher von Roblox gefiltert.')}</small></span>
+        <input type="checkbox" role="switch" name="relay"${p.relay ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+      <p class="f__note">${t('Der Server übernimmt die Einstellungen beim nächsten Abgleich (spätestens nach 30 Sekunden). Für Zutritt, Begrüßung und Chat im Spiel braucht das Spiel die Skripte TSGAppSync und TSGAppChat.')}</p>
+    </form>`;
+  }
+
   // Spieler zu einer ID oder einem Namen (für Direktnachrichten und Gruppen)
   const chatPlayers = {};
   async function loadPlayer(id, done) {
@@ -3523,6 +3667,8 @@
     mod: (m) => t('{name} ist als Moderation beigetreten', { name: esc(m.name) }),
     settings: (m) => t('{name} hat die Gruppe bearbeitet', { name: esc(m.name) }),
     role: (m) => t('{target} ist jetzt {role}', { target: esc(m.target), role: m.role === 'owner' ? t('Inhaber') : m.role === 'admin' ? t('Admin') : t('Mitglied') }),
+    photo: (m) => t('{name} hat das Gruppenbild geändert', { name: esc(m.name) }),
+    servers: (m) => t('{name} hat die verbundenen Server geändert', { name: esc(m.name) }),
   };
   const ROLE_TAG = { owner: 'Inhaber', admin: 'Admin', mod: 'Moderation' };
   function peopleOf(c) {
@@ -3568,6 +3714,7 @@
             <span class="msg-bot__title">${m.avatar ? `<img src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<b>${esc(m.title || '')}</b></span>
             ${m.text ? `<p>${esc(m.text)}</p>` : ''}
             ${(m.rows || []).length ? `<dl class="msg-bot__rows">${m.rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+            ${(m.buttons || []).length ? `<div class="msg-bot__btns">${botButtons(m)}</div>` : ''}
             <time>${time}</time>
           </div>
         </li>`;
@@ -3613,7 +3760,7 @@
     const area = c.kind === 'ticket' ? areaOf(c.area) : null;
     const other = chatOther(c);
     const [tone, stateText] = c.status === 'closed' ? ['done', t('Erledigt')]
-      : c.kind === 'group' ? [c.settings && c.settings.visibility === 'public' ? 'ok' : 'lock', `${c.settings && c.settings.visibility === 'public' ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: (c.members || []).length })}`]
+      : c.kind === 'group' ? [c.settings && c.settings.visibility === 'public' ? 'ok' : 'lock', `${c.settings && c.settings.visibility === 'public' ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: (c.members || []).length })}${c.category === 'server' ? ` · ${(c.servers || []).filter((x) => x.online).length ? t('Server online') : (c.servers || []).length === 1 ? t('1 Server') : t('{n} Server', { n: (c.servers || []).length })}` : ''}`]
         : c.kind === 'direct' ? ['lock', t('Privat')]
           : c.status === 'open' ? ['warn', t('Wartet auf Annahme')] : ['ok', t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })];
     const sub = [
@@ -3793,7 +3940,17 @@
         <h2>${esc(chatTitle(c))}</h2>
         ${c.kind === 'group' && c.desc ? `<p>${esc(c.desc)}</p>` : other ? `<p>@${esc(other.username)}</p>` : ''}
         <div class="info-head__tags">${chatStatus(c)}${other && other.rank && c.kind !== 'group' ? rankPill(rankOf(other.rank)) : ''}</div>
+        ${c.canPhoto ? `<div class="photo-ctl"><label class="btn btn--soft btn--sm photo-ctl__pick">${icon('fi-rr-picture')}${c.photo ? t('Bild ändern') : t('Gruppenbild hochladen')}<input type="file" accept="image/*" data-group-photo="${esc(c.id)}"></label>
+          ${c.photo ? `<button class="btn btn--soft btn--sm" type="button" data-group-photo-del="${esc(c.id)}">${icon('fi-rr-trash')}${t('Entfernen')}</button>` : ''}</div>` : ''}
       </div>`;
+    // Server-Chat: verbundene private Server
+    if (c.kind === 'group' && (c.category === 'server' || (c.servers || []).length) && !ps.list) loadPservers();
+    const free = ps.list ? ps.list.mine.filter((p) => !(c.servers || []).some((x) => x.id === p.id)) : [];
+    const servers = c.kind === 'group' && (c.category === 'server' || (c.servers || []).length) ? `<section class="info-sec"><h3>${icon('fi-rr-signal-alt-2')}${t('Private Server')}</h3>
+        ${(c.servers || []).length ? `<div class="ps-list">${c.servers.map((p) => pserverCard(p, { inChat: c })).join('')}</div>` : `<p class="muted">${t('Noch kein Server verbunden.')}</p>`}
+        ${c.canAdmin && free.length ? `<form class="find-player find-player--inline" data-ps-link="${esc(c.id)}"><div class="find-player__row"><select name="server">${free.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button class="btn btn--primary" type="submit">${icon('fi-rr-plus')}${t('Verbinden')}</button></div></form>` : ''}
+        ${c.canAdmin && ps.list && !ps.list.mine.length ? `<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Verbinden kann nur der Besitzer eines privaten Servers. Starte deinen privaten Server einmal in Roblox, dann erscheint er hier.')}</span></p>` : ''}
+      </section>` : '';
     // Bearbeiten (Inhaber, Admins, Moderation)
     const edit = c.canAdmin ? `<section class="info-sec"><h3>${icon('fi-rr-settings-sliders')}${t('Gruppe bearbeiten')}</h3>
         <form class="cform group-form" data-group-edit="${esc(c.id)}" novalidate>
@@ -3837,7 +3994,7 @@
         ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('fi-rr-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
         ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'fi-rr-user-add' : 'fi-rr-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
       </section>` : '';
-    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${edit}${people}${cmds}${mine}
+    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${servers}${edit}${people}${cmds}${mine}
       ${actions.length ? `<section class="info-sec"><div class="btn-stack">${actions.join('')}</div></section>` : ''}${mod}`;
   }
 
@@ -3851,10 +4008,11 @@
       body.innerHTML = r.body;
       return;
     }
-    const sub = { new: t('Neu'), 'new-dm': t('Spieler anschreiben'), 'new-group': t('Neue Gruppe'), 'new-ticket': t('Neue Anfrage'), direct: t('Direktnachricht'), info: t('Info') }[v];
+    const sub = { new: t('Neu'), 'new-dm': t('Spieler anschreiben'), 'new-group': t('Neue Gruppe'), 'new-server': t('Neuer Server-Chat'), 'new-ticket': t('Neue Anfrage'), direct: t('Direktnachricht'), info: t('Info') }[v];
     if (sub) {
       head.innerHTML = `<div class="appbar"><div class="appbar__title"><span class="appbar__label">${t('Chat')}</span><h1 class="appbar__value">${sub}</h1></div></div>`;
-      body.innerHTML = v === 'new' ? chatNewChoice() : v === 'new-dm' ? chatNewDm() : v === 'new-group' ? chatNewGroup() : v === 'new-ticket' ? chatNewTicket() : v === 'info' ? chatInfo(state.chatArg) : chatDirect(state.chatArg);
+      body.innerHTML = v === 'new' ? chatNewChoice() : v === 'new-dm' ? chatNewDm() : v === 'new-group' ? chatNewGroup() : v === 'new-server' ? chatNewServer()
+        : v === 'new-ticket' ? chatNewTicket() : v === 'info' ? chatInfo(state.chatArg) : chatDirect(state.chatArg);
       return;
     }
     head.innerHTML = chatHead();
@@ -3894,13 +4052,20 @@
   async function sendChat(form) {
     const btn = $('button[type="submit"]', form);
     let body;
-    if ('groupNew' in form.dataset) {
+    if ('groupNew' in form.dataset || 'serverNew' in form.dataset) {
       const name = form.elements.name.value.trim();
       if (name.length < 2) { toast(t('Bitte gib der Gruppe einen Namen.')); form.elements.name.focus(); return; }
       body = {
         kind: 'group', name, desc: form.elements.desc.value, rules: form.elements.rules.value, text: form.elements.text.value.trim(),
         members: chat.members.map((p) => p.userId), settings: readGroupSettings(form),
       };
+      if ('serverNew' in form.dataset) {
+        const f = form.elements;
+        Object.assign(body, {
+          category: 'server', servers: [...form.querySelectorAll('input[name="servers"]:checked')].map((x) => x.value),
+          server: { join: (form.querySelector('input[name="join"]:checked') || {}).value || 'roblox', link: f.link.value.trim(), access: f.membersOnly.checked ? 'members' : 'all', relay: f.relay.checked, welcome: f.welcome.value },
+        });
+      }
     } else {
       const text = form.elements.text.value.trim();
       if (!text) { form.elements.text.focus(); return; }
@@ -3916,9 +4081,9 @@
       const c = await api('/api/chats', { method: 'POST', body });
       chat.conv[c.id] = c;
       chat.at = 0;
-      if (body.kind === 'group') chat.members = [];
+      if (body.kind === 'group') { chat.members = []; if (body.category === 'server') { chat.cat = 'server'; loadPservers(true); } }
       location.hash = `#/chat/${c.id}`;
-      toast(body.kind === 'ticket' ? t('Anfrage gesendet') : body.kind === 'group' ? t('Gruppe erstellt') : t('Nachricht gesendet'));
+      toast(body.kind === 'ticket' ? t('Anfrage gesendet') : body.category === 'server' ? t('Server-Chat erstellt') : body.kind === 'group' ? t('Gruppe erstellt') : t('Nachricht gesendet'));
     } catch (e) {
       btn.disabled = false;
       toast(chatError(e));
@@ -3958,6 +4123,21 @@
       list.push({ key: Math.random().toString(36).slice(2), name: f.name || 'datei', type, kind, size: blob.size, blob, w, h, preview: kind === 'image' ? URL.createObjectURL(blob) : null, progress: 0 });
     }
     renderTray(id);
+  }
+  async function uploadGroupPhoto(id, file) {
+    try {
+      const bmp = await createImageBitmap(file);
+      const side = Math.min(bmp.width, bmp.height);
+      const cv = document.createElement('canvas');
+      cv.width = 256;
+      cv.height = 256;
+      cv.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 256, 256);
+      if (bmp.close) bmp.close();
+      const blob = await new Promise((ok, fail) => cv.toBlob((b) => (b ? ok(b) : fail(new Error('blob'))), 'image/jpeg', 0.86));
+      if (await chatCall(id, '/photo', { method: 'PUT', raw: blob, type: 'image/jpeg' })) { chat.at = 0; toast(t('Gruppenbild gespeichert')); }
+    } catch (e) {
+      toast(t('Dieses Bild lässt sich nicht verwenden.'));
+    }
   }
   async function uploadPending(id) {
     const ids = [];
@@ -4236,6 +4416,11 @@
     station: {
       title: () => t('Abfahrten'),
       render: (name) => stationView(name),
+    },
+    // Privater Server: Einstellungen des Besitzers
+    pserver: {
+      title: () => t('Privater Server'),
+      render: (id) => pserverForm(id),
     },
     // Foto aus dem Chat in groß
     photo: {
@@ -4683,6 +4868,7 @@
       if (state.serverId) { renderServerDetail(); return; }
       $('[data-server-search]').value = state.serverQuery;
       renderServers();
+      renderPservers();
     },
     statistiken() { renderStatsKpis(); renderChart(); renderBars(); },
     einstellungen() { renderSettings(); },
@@ -4699,7 +4885,7 @@
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
-    const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', anfrage: 'new-ticket' };
+    const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', server: 'new-server', anfrage: 'new-ticket' };
     let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', neu: 'new', an: 'direct' }[chatSub] || 'conv';
     if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
     if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
@@ -4710,7 +4896,8 @@
     if (chatView === 'public' && state.chatView !== 'public') chat.pubAt = 0;
     if (chatView === 'mod' && state.chatView !== 'mod') chat.modAt = 0;
     if (chatView === 'new-dm' && state.chatView !== 'new-dm') chat.found = null;
-    if (chatView === 'new-group' && state.chatView !== 'new-group') chat.members = [];
+    if (['new-group', 'new-server'].includes(chatView) && state.chatView !== chatView) chat.members = [];
+    if (chatView === 'new-server' || (page === 'server' && !serverId)) loadPservers(true);
     // Info öffnen: Gespräch frisch laden (Mitglieder, Rechte)
     if (chatView === 'info' && chatArg && chat.conv[chatArg] && !chat.conv[chatArg].error) openConv(chatArg);
     if (reviewId !== state.reviewId) review.answers = 'all';
@@ -5044,7 +5231,7 @@
     document.addEventListener('pointercancel', dragEnd);
     // Chat
     document.addEventListener('click', async (e) => {
-      const el = e.target.closest('[data-chat-claim], [data-chat-close], [data-chat-join], [data-chat-joinmod], [data-chat-hide], [data-chat-delete], [data-chat-leave], [data-chat-report], [data-chat-edit], [data-mem-role], [data-mem-del], [data-msg-del], [data-msg], [data-photo], [data-tray-del], [data-cmd], [data-mod-kind], [data-member-add], [data-member-del]');
+      const el = e.target.closest('[data-chat-claim], [data-chat-close], [data-chat-join], [data-chat-joinmod], [data-chat-hide], [data-chat-delete], [data-chat-leave], [data-chat-report], [data-chat-edit], [data-mem-role], [data-mem-del], [data-msg-del], [data-msg], [data-photo], [data-tray-del], [data-cmd], [data-mod-kind], [data-member-add], [data-member-del], [data-chat-cat], [data-pserver-edit], [data-ps-unlink], [data-group-photo-del]');
       if (!el) return;
       const ds = el.dataset;
       const conv = state.chatArg;
@@ -5101,6 +5288,16 @@
         const ta = $('.compose textarea');
         if (ta) { ta.value = ds.cmd; ta.focus(); hideCommands(); if (!ds.cmd.endsWith(' ')) ta.form.requestSubmit(); }
       } else if (ds.modKind !== undefined) { chat.modKind = ds.modKind; chat.mod = null; renderChat(); loadMod(true); }
+      else if (ds.chatCat) { chat.cat = ds.chatCat; renderChat(); }
+      else if (ds.pserverEdit) {
+        if (!chat.list) await loadChats(true);
+        openModal('pserver', ds.pserverEdit);
+      } else if (ds.psUnlink) {
+        if (!confirm(t('Server vom Chat trennen?'))) return;
+        if (await chatCall(conv, '/servers', { method: 'POST', body: { remove: ds.psUnlink } })) loadPservers(true);
+      } else if (ds.groupPhotoDel) {
+        if (confirm(t('Gruppenbild entfernen?'))) chatCall(ds.groupPhotoDel, '/photo', { method: 'DELETE' });
+      }
       else if ('memberAdd' in ds) addGroupMember();
       else if (ds.memberDel) { chat.members = chat.members.filter((p) => p.userId !== ds.memberDel); $('[data-member-chips]').innerHTML = memberChips(); }
     });
@@ -5108,6 +5305,11 @@
       if (e.target.matches('[data-chat-file]')) {
         addChatFiles(state.chatArg, e.target.files);
         e.target.value = '';
+      } else if (e.target.matches('[data-group-photo]')) {
+        const file = e.target.files[0];
+        const id = e.target.dataset.groupPhoto;
+        e.target.value = '';
+        if (file) uploadGroupPhoto(id, file);
       } else if (e.target.matches('[data-chat-mute]')) {
         chatCall(e.target.dataset.chatMute, '/mute', { method: 'POST', body: { muted: e.target.checked } }, () => toast(e.target.checked ? t('Stummgeschaltet') : t('Benachrichtigungen an')));
       }
@@ -5225,7 +5427,7 @@
       if (jform) { e.preventDefault(); saveJobForm(jform); return; }
       const fp = e.target.closest('form[data-find-player]');
       if (fp) { e.preventDefault(); findPlayer(fp); return; }
-      const cform = e.target.closest('form[data-chat-new], form[data-chat-direct], form[data-group-new]');
+      const cform = e.target.closest('form[data-chat-new], form[data-chat-direct], form[data-group-new], form[data-server-new]');
       if (cform) { e.preventDefault(); sendChat(cform); return; }
       const gedit = e.target.closest('form[data-group-edit]');
       if (gedit) {
@@ -5233,6 +5435,28 @@
         const f = gedit.elements;
         chatCall(gedit.dataset.groupEdit, '', { method: 'PUT', body: { name: f.name.value, desc: f.desc.value, rules: f.rules.value, color: (gedit.querySelector('input[name="color"]:checked') || {}).value, settings: readGroupSettings(gedit) } })
           .then((r) => { if (r) toast(t('Gespeichert')); });
+        return;
+      }
+      const psForm = e.target.closest('form[data-pserver-form]');
+      if (psForm) {
+        e.preventDefault();
+        const f = psForm.elements;
+        const body = {
+          name: f.name.value, join: (psForm.querySelector('input[name="join"]:checked') || {}).value, link: f.link.value.trim(),
+          access: (psForm.querySelector('input[name="access"]:checked') || {}).value, show: f.show.value, chat: f.chat.value || null,
+          welcome: f.welcome.value, relay: f.relay.checked,
+        };
+        const btn = $('button[type="submit"]', psForm);
+        btn.disabled = true;
+        api(`/api/pservers/${encodeURIComponent(psForm.dataset.pserverForm)}`, { method: 'PUT', body })
+          .then(() => { toast(t('Gespeichert')); closeModal(); chat.at = 0; loadPservers(true); if (state.chatView === 'info' && state.chatArg) openConv(state.chatArg); })
+          .catch((err) => { btn.disabled = false; toast(chatError(err)); });
+        return;
+      }
+      const psLink = e.target.closest('form[data-ps-link]');
+      if (psLink) {
+        e.preventDefault();
+        chatCall(psLink.dataset.psLink, '/servers', { method: 'POST', body: { add: psLink.elements.server.value } }).then((r) => { if (r) { toast(t('Server verbunden')); loadPservers(true); } });
         return;
       }
       const invite = e.target.closest('form[data-member-invite]');
