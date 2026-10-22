@@ -10,6 +10,7 @@
  */
 import { randomKey, clip, enc } from './lib.js';
 import { privateServerSync } from './pservers.js';
+import { recordServer, dropStale } from './game.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 
@@ -99,8 +100,10 @@ export async function gameAuthorized(req, env) {
  *   players: [{ userId, coins, trains, routes }]  – nur Spieler, deren Stand sich geändert hat (bzw. beim Betreten/Verlassen)
  *   online:  [userId]                               – für diese Spieler werden offene Käufe zurückgegeben
  *   done:    [{ id, userId, ok }]                   – vom Spiel verbuchte (ok) oder abgelehnte Käufe
- *   server:  { jobId, players, max, version, private, closing } – dieser Server (für /GetServers und /GetOnline im Chat)
+ *   server:  { jobId, players, max, version, private, closing } – dieser Server (Server-Seite, /GetServers und /GetOnline im Chat)
  *            privater Server zusätzlich: { privateId, ownerId, ownerName, relaySince } → Antwort enthält config (siehe pservers.js)
+ *   activity: [{ userId, name, displayName, role, line, train, … }] – wer was macht (siehe game.js)
+ *   trips:   [{ userId, route, vehicle, km, delay }]   – beendete Fahrten für die Statistik
  */
 export async function gameSync(store, body) {
   const t = Date.now();
@@ -139,18 +142,13 @@ export async function gameSync(store, body) {
     w.history = [{ ...hit, ok: !!d.ok, doneAt: t }, ...(w.history || [])].slice(0, 30);
   }
   await Promise.all([...wallets].map(([sub, w]) => store.put(`wallet:${sub}`, w)));
-  // Laufende Server (älter als 10 Minuten = weg)
+  // Laufende Server (älter als 10 Minuten = weg), wer was macht, Spielzeit und Fahrten (siehe game.js)
   const sv = body.server && typeof body.server === 'object' ? body.server : null;
   const jobId = sv && clip(sv.jobId, 64);
   if (jobId) {
-    const servers = Object.fromEntries(Object.entries((await store.get('game:servers')) || {}).filter(([, x]) => t - x.at < 600000));
-    if (sv.closing) delete servers[jobId];
-    else {
-      servers[jobId] = {
-        at: t, players: Math.max(0, Math.round(+sv.players || online.length)), max: Math.max(0, Math.round(+sv.max || 0)),
-        version: Math.round(+sv.version) || null, private: sv.private === true, privateId: sv.privateId ? clip(sv.privateId, 64) : null, online,
-      };
-    }
+    const servers = (await store.get('game:servers')) || {};
+    await dropStale(store, servers, t);
+    await recordServer(store, servers, jobId, sv, body, online, CATALOG, t);
     await store.put('game:servers', servers);
   }
   // Privater Server: Stand merken, Einstellungen aus der App zurückgeben

@@ -5,7 +5,10 @@
     • meldet der App alle 30 Sekunden (und beim Betreten/Verlassen) Coins, Züge und Strecken der Spieler,
       aber nur, wenn sich etwas geändert hat
     • holt Käufe aus der App ab und verbucht sie im Spiel (Coins abziehen, Zug bzw. Strecke freischalten)
-    • meldet den Server (Spieler, Plätze, Version) – damit funktionieren im App-Chat /GetServers, /GetOnline und /GetUser
+    • meldet den Server (Spieler, Plätze, Version) – für die Server-Seite der App und /GetServers, /GetOnline, /GetUser im Chat
+    • meldet, was jeder Spieler gerade macht: Rolle (Team), Zug, Linie, Ziel, Bahnhof (siehe Activity.read) –
+      daraus zeigt die App die Rollen je Server, die Züge und unter „Spieler“, wo jemand gerade ist
+    • meldet beendete Fahrten für die Statistik (siehe „Fahrten melden“ unten). Ohne Meldung bleibt die Statistik bei 0.
     • private Server: meldet ID und Besitzer und setzt die Einstellungen aus der App um
         – „Nur Mitglieder des Server-Chats“: wer nicht im verbundenen App-Chat ist, wird freundlich abgewiesen
         – Begrüßung und Regeln des Server-Chats beim Betreten
@@ -18,8 +21,14 @@
     3. Creator Dashboard → dein Spiel → Secrets: neues Secret „tsg_game_key“ mit demselben Wert wie GAME_API_KEY
        im Backend (z. B. eine lange Zufallszeichenkette). Als Domain die Adresse des Backends angeben
        (z. B. *.workers.dev). Der Schlüssel steht so nie im Spiel-Code.
-    4. Unten bei CONFIG.Backend die Adresse des Backends eintragen (wie in assets/js/config.js → api).
+    4. CONFIG.Backend unten muss die Adresse des Backends sein (wie in assets/js/config.js → api).
     5. Economy.read und Economy.apply an euer Spiel anpassen, falls Coins und Besitz anders gespeichert sind.
+    6. Optional: Activity.read anpassen und Fahrten melden (siehe unten), damit Züge und Statistik in der App erscheinen.
+
+  Fahrten melden (für die Statistik): Dieses Skript legt in ServerStorage das BindableEvent „TSGTripDone“ an.
+  Euer Spiel ruft es am Ende einer Fahrt auf:
+    game.ServerStorage:WaitForChild("TSGTripDone"):Fire(player, { route = "R001", vehicle = "talent2", km = 142, delay = 2 })
+  route = Strecke (R001 …), vehicle = Zug-ID aus dem Shop, km = gefahrene Kilometer, delay = Verspätung am Ziel in Minuten.
 
   Die IDs der Züge und Strecken müssen mit dem Shop übereinstimmen (backend/shop.js → CATALOG):
     Züge: talent2, br481, flirt3, lint41, kiss, desirohc, dosto, ic2, ic1, ice-t, eu44, ice4
@@ -29,10 +38,11 @@
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local TextService = game:GetService("TextService")
 
 local CONFIG = {
-	Backend = "https://tsg-backend.DEIN-NAME.workers.dev",
+	Backend = "https://tsg-backend.lorismziray01.workers.dev",
 	SecretName = "tsg_game_key",
 	Interval = 30,
 }
@@ -94,6 +104,30 @@ function Economy.apply(player, purchase)
 	owned.Value = true
 	return true
 end
+
+-- Was der Spieler gerade macht. Standard: Rolle = Name seines Teams (Passenger, Qualified Driver, Signaller, …),
+-- alles andere aus Attributen, die euer Spiel am Spieler setzt, z. B. player:SetAttribute("TSG_Line", "RE 1"):
+--   TSG_Line (Linie), TSG_Train (Zugnummer, z. B. „RE 3105“), TSG_Destination (Ziel), TSG_NextStop (nächster Halt),
+--   TSG_Vehicle (Zug-ID aus dem Shop, z. B. „desirohc“), TSG_Station (Bahnhof, an dem er gerade arbeitet oder wartet)
+local Activity = {}
+function Activity.read(player)
+	local function attr(name)
+		local value = player:GetAttribute(name)
+		if value == nil or value == "" then
+			return nil
+		end
+		return tostring(value)
+	end
+	return {
+		role = player.Team and player.Team.Name or nil,
+		line = attr("TSG_Line"),
+		train = attr("TSG_Train"),
+		destination = attr("TSG_Destination"),
+		nextStop = attr("TSG_NextStop"),
+		vehicle = attr("TSG_Vehicle"),
+		station = attr("TSG_Station"),
+	}
+end
 -- ===== Ende Anpassen =====
 
 local auth -- Secret mit „Bearer “ davor (wird nie ausgegeben)
@@ -113,7 +147,35 @@ end
 
 local lastSent = {} -- userId → zuletzt gemeldeter Stand
 local done = {} -- verbuchte Käufe für den nächsten Abgleich
+local trips = {} -- beendete Fahrten für den nächsten Abgleich
 local busy = false
+
+-- Fahrten aus dem Spiel: ServerStorage.TSGTripDone:Fire(player, { route, vehicle, km, delay })
+local tripDone = Instance.new("BindableEvent")
+tripDone.Name = "TSGTripDone"
+tripDone.Parent = ServerStorage
+tripDone.Event:Connect(function(player, trip)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") or type(trip) ~= "table" then
+		return
+	end
+	table.insert(trips, {
+		userId = tostring(player.UserId),
+		route = trip.route and tostring(trip.route) or nil,
+		vehicle = trip.vehicle and tostring(trip.vehicle) or nil,
+		cat = trip.cat and tostring(trip.cat) or nil,
+		km = tonumber(trip.km) or 0,
+		delay = tonumber(trip.delay) or 0,
+	})
+end)
+
+local function activity(player)
+	local ok, data = pcall(Activity.read, player)
+	data = ok and type(data) == "table" and data or {}
+	data.userId = tostring(player.UserId)
+	data.name = player.Name
+	data.displayName = player.DisplayName
+	return data
+end
 
 local function snapshot(player)
 	local ok, data = pcall(Economy.read, player)
@@ -238,10 +300,11 @@ local function sync(extra, closing)
 	if not header then
 		return
 	end
-	local players, online = {}, {}
+	local players, online, doing = {}, {}, {}
 	for _, player in ipairs(Players:GetPlayers()) do
 		local id = tostring(player.UserId)
 		table.insert(online, id)
+		table.insert(doing, activity(player))
 		local snap = snapshot(player)
 		if snap then
 			local encoded = HttpService:JSONEncode(snap)
@@ -256,19 +319,31 @@ local function sync(extra, closing)
 	end
 	local sending = done
 	done = {}
+	local sendingTrips = trips
+	trips = {}
 
 	local ok, res = pcall(function()
 		return HttpService:RequestAsync({
 			Url = CONFIG.Backend .. "/api/game/sync",
 			Method = "POST",
 			Headers = { ["Content-Type"] = "application/json", ["Authorization"] = header },
-			Body = HttpService:JSONEncode({ players = players, online = online, done = sending, server = serverInfo(closing) }),
+			Body = HttpService:JSONEncode({
+				players = players,
+				online = online,
+				done = sending,
+				server = serverInfo(closing),
+				activity = doing,
+				trips = sendingTrips,
+			}),
 		})
 	end)
 	if not ok or not res.Success then
 		warn("[TSG] Abgleich fehlgeschlagen: " .. (ok and tostring(res.StatusCode) or tostring(res)))
 		for _, d in ipairs(sending) do
 			table.insert(done, d)
+		end
+		for _, trip in ipairs(sendingTrips) do
+			table.insert(trips, trip)
 		end
 		for _, snap in ipairs(players) do
 			lastSent[snap.userId] = nil

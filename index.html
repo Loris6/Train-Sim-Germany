@@ -212,7 +212,7 @@
         <div class="container">
           <div class="appbar">
             <div class="appbar__title">
-              <span class="appbar__label"><span data-bind="servers">42</span> Server online</span>
+              <span class="appbar__label"><span data-bind="servers">0</span> Server online</span>
               <h1 class="appbar__value">Server</h1>
             </div>
             <div class="appbar__actions">
@@ -228,16 +228,9 @@
       <div class="sheet">
         <div class="container">
           <div class="stat-row" data-server-stats></div>
-          <div data-pservers></div>
-          <div class="chips chips--scroll chips--block" data-server-filter role="group" aria-label="Server filtern">
-            <button class="chip is-active" type="button" data-type="all">Alle</button>
-            <button class="chip" type="button" data-type="public">Öffentlich</button>
-            <button class="chip" type="button" data-type="free">Freie Plätze</button>
-            <button class="chip" type="button" data-type="event">Event</button>
-            <button class="chip" type="button" data-type="training">Training</button>
-            <button class="chip" type="button" data-type="vip">VIP</button>
-          </div>
+          <div class="chips chips--scroll chips--block" data-server-filter role="group" aria-label="Server filtern"></div>
           <div class="server-grid" data-servers></div>
+          <div data-pservers></div>
           <div class="info-banner">
             <span class="info-banner__ic"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i></span>
             <div>
@@ -260,6 +253,16 @@
       </div>
     </section>
 
+    <!-- ===================== SPIELER ===================== -->
+    <section class="page" data-page="spieler" aria-label="Spieler" hidden>
+      <div class="page-head">
+        <div class="container" data-players-head></div>
+      </div>
+      <div class="sheet">
+        <div class="container" data-players></div>
+      </div>
+    </section>
+
     <!-- ===================== STATISTIKEN ===================== -->
     <section class="page" data-page="statistiken" aria-label="Statistiken" hidden>
       <div class="page-head">
@@ -272,8 +275,8 @@
           </div>
           <div class="head-figure">
             <span>Besuche gesamt</span>
-            <strong data-bind="visits">12,4 Mio.</strong>
-            <span class="delta delta--up" data-visits-delta>▲ 3,8 % diese Woche</span>
+            <strong data-bind="visits">0</strong>
+            <span class="delta delta--live" data-visits-delta hidden></span>
           </div>
         </div>
       </div>
@@ -360,19 +363,8 @@
 
     <!-- ===================== SHOP ===================== -->
     <section class="page" data-page="shop" aria-label="Shop" hidden>
-      <div class="page-head">
-        <div class="container">
-          <div class="appbar">
-            <div class="appbar__title">
-              <span class="appbar__label" data-shop-sub>Deine Coins</span>
-              <h1 class="appbar__value" data-shop-coins>–</h1>
-            </div>
-          </div>
-          <div class="head-tabs head-tabs--fill" role="tablist" aria-label="Shop">
-            <button type="button" role="tab" aria-selected="true" data-shop-tab="trains"><i class="fi fi-rr-train-side ic" aria-hidden="true"></i>Züge</button>
-            <button type="button" role="tab" aria-selected="false" data-shop-tab="routes"><i class="fi fi-rr-route ic" aria-hidden="true"></i>Strecken</button>
-          </div>
-        </div>
+      <div class="page-head page-head--shop">
+        <div class="container" data-shop-head></div>
       </div>
       <div class="sheet">
         <div class="container" data-shop></div>
@@ -427,6 +419,12 @@
                 <span class="theme-picker__text"><span class="theme-picker__label"><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i>Mit Gerät synchronisieren</span><small>Hell oder dunkel – genau wie dein Gerät eingestellt ist</small></span>
               </button>
             </div>
+          </section>
+
+          <section class="card set-card" aria-labelledby="h-fx">
+            <h2 class="card__title" id="h-fx">Bewegung &amp; Haptik</h2>
+            <p class="card__sub">Wie sich Train Sim Germany anfühlt.</p>
+            <div class="toggles" data-fx></div>
           </section>
 
           <section class="card set-card" aria-labelledby="h-lang">
@@ -491,6 +489,7 @@
       <nav class="footer__links" aria-label="Seiten">
         <a href="#/trainings">Trainings</a>
         <a href="#/server">Server</a>
+        <a href="#/spieler">Spieler</a>
         <a href="#/news">Neuigkeiten</a>
         <a href="#/shop">Shop</a>
         <a href="#/chat">Chat</a>
@@ -534,6 +533,7 @@
         <a href="#/trainings" data-nav="trainings"><span class="menu__ic"><i class="fi fi-rr-calendar ic" aria-hidden="true"></i></span>Trainings</a>
         <a href="#/news" data-nav="news"><span class="menu__ic"><i class="fi fi-rr-newspaper ic" aria-hidden="true"></i></span>Neuigkeiten</a>
         <a href="#/server" data-nav="server"><span class="menu__ic"><i class="fi fi-rr-database ic" aria-hidden="true"></i></span>Server</a>
+        <a href="#/spieler" data-nav="spieler"><span class="menu__ic"><i class="fi fi-rr-users ic" aria-hidden="true"></i></span>Spieler</a>
         <a href="#/shop" data-nav="shop"><span class="menu__ic"><i class="fi fi-rr-shopping-cart ic" aria-hidden="true"></i></span>Shop</a>
         <a href="#/chat" data-nav="chat"><span class="menu__ic"><i class="fi fi-rr-comments ic" aria-hidden="true"></i></span>Chat</a>
         <a href="#/karriere" data-nav="karriere"><span class="menu__ic"><i class="fi fi-rr-briefcase ic" aria-hidden="true"></i></span>Karriere</a>

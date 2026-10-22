@@ -22,6 +22,135 @@
     },
   };
 
+  // ---------- Bewegung & Haptik ----------
+  // Animationen (aus, wenn das Gerät „Bewegung reduzieren“ meldet oder sie in den Einstellungen aus sind) und
+  // spürbares Feedback beim Tippen: Vibration (Android) bzw. der System-Schalter von iOS (Safari ab 17.4).
+  const fx = { haptics: store.get('tsg-haptics', true) !== false, motion: store.get('tsg-motion', true) !== false };
+  document.documentElement.dataset.motion = fx.motion ? 'on' : 'off';
+  const reducedMotion = () => !fx.motion || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const canVibrate = typeof navigator.vibrate === 'function';
+  const isApple = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const hapticsAvailable = () => canVibrate || isApple;
+  const HAPTIC = { tap: 8, select: 12, success: [12, 70, 20], warn: [20, 80, 20], error: [30, 60, 30, 60, 30] };
+  let iosSwitch = null;
+  function haptic(kind = 'tap') {
+    if (!fx.haptics) return;
+    try {
+      if (canVibrate) { navigator.vibrate(HAPTIC[kind] || 8); return; }
+      if (!isApple) return;
+      if (!iosSwitch) {
+        iosSwitch = document.createElement('label');
+        iosSwitch.className = 'haptic-switch';
+        iosSwitch.setAttribute('aria-hidden', 'true');
+        iosSwitch.innerHTML = '<input type="checkbox" switch tabindex="-1">';
+        document.body.appendChild(iosSwitch);
+      }
+      iosSwitch.click();
+    } catch (e) { /* ohne Feedback */ }
+  }
+  function setHaptics(on, { quiet = false } = {}) {
+    fx.haptics = !!on;
+    store.set('tsg-haptics', fx.haptics);
+    if (!quiet) { settingsChanged(); if (on) haptic('success'); }
+    renderFxSettings();
+  }
+  function setMotion(on, { quiet = false } = {}) {
+    fx.motion = !!on;
+    store.set('tsg-motion', fx.motion);
+    document.documentElement.dataset.motion = on ? 'on' : 'off';
+    if (!quiet) settingsChanged();
+    renderFxSettings();
+  }
+  function renderFxSettings() {
+    const box = $('[data-fx]');
+    if (!box) return;
+    const sysReduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const row = (attr, title, text, on, off, note) => `<label class="toggle${off ? ' is-disabled' : ''}">
+        <span class="toggle__text"><b>${title}</b><small>${text}</small>${note ? `<small class="toggle__note">${icon('fi-rr-info')}${note}</small>` : ''}</span>
+        <input type="checkbox" role="switch" ${attr}${on ? ' checked' : ''}${off ? ' disabled' : ''}>
+        <span class="toggle__ui" aria-hidden="true"></span>
+      </label>`;
+    box.innerHTML = row('data-fx-motion', t('Animationen'), t('Seitenwechsel, Karten, Zahlen und Sheets bewegen sich weich.'), fx.motion, false,
+      sysReduced ? t('Dein Gerät ist auf „Bewegung reduzieren“ gestellt – Animationen bleiben deshalb aus.') : '')
+      + row('data-fx-haptics', t('Haptisches Feedback'), t('Ein leichtes Vibrieren beim Tippen, Kaufen und Verfolgen.'), fx.haptics && hapticsAvailable(), !hapticsAvailable(),
+        hapticsAvailable() ? '' : t('Dieses Gerät kann nicht vibrieren.'));
+  }
+
+  // Elemente erscheinen nacheinander – nur nach einer Eingabe (Tippen, Seitenwechsel), nicht bei Aktualisierungen im Hintergrund
+  let lastInput = Date.now();
+  ['pointerdown', 'keydown', 'hashchange'].forEach((ev) => window.addEventListener(ev, () => { lastInput = Date.now(); }, true));
+  function reveal(box) {
+    if (!box || reducedMotion() || Date.now() - lastInput > 1500) return;
+    Array.from(box.children).forEach((el, i) => el.style.setProperty('--i', Math.min(i, 14)));
+    box.classList.remove('is-revealing');
+    void box.offsetWidth;
+    box.classList.add('is-revealing');
+    clearTimeout(box.revealTimer);
+    box.revealTimer = setTimeout(() => box.classList.remove('is-revealing'), 1400);
+  }
+  // Zahlen zählen vom letzten angezeigten Wert (beim ersten Mal von 0) zum neuen hoch
+  const countMemo = new Map();
+  function countUp(root) {
+    if (!root) return;
+    $$('[data-count]', root).forEach((el) => {
+      const to = +el.dataset.count || 0;
+      const key = el.dataset.countKey || '';
+      const from = key && countMemo.has(key) ? countMemo.get(key) : 0;
+      if (key) countMemo.set(key, to);
+      const f = FORMATS[el.dataset.fmt] || FORMATS.fmt;
+      if (from === to || reducedMotion()) { el.textContent = f(to); return; }
+      const t0 = performance.now();
+      const dur = Math.min(1200, 600 + Math.log10(Math.abs(to - from) + 1) * 120);
+      el.textContent = f(from);
+      const step = (nowT) => {
+        const k = Math.min(1, (nowT - t0) / dur);
+        el.textContent = f(from + (to - from) * (1 - Math.pow(1 - k, 3)));
+        if (k < 1 && el.isConnected) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    });
+  }
+  // Münzen fliegen nach einem Kauf aus dem Knopf
+  function coinBurst(x, y) {
+    if (reducedMotion()) return;
+    const layer = document.createElement('div');
+    layer.className = 'coin-burst';
+    layer.style.left = `${x}px`;
+    layer.style.top = `${y}px`;
+    for (let i = 0; i < 16; i++) {
+      const c = document.createElement('i');
+      const a = (Math.PI * 2 * i) / 16 + Math.random() * 0.5;
+      const d = 50 + Math.random() * 80;
+      c.style.setProperty('--dx', `${(Math.cos(a) * d).toFixed(1)}px`);
+      c.style.setProperty('--dy', `${(Math.sin(a) * d - 50).toFixed(1)}px`);
+      c.style.setProperty('--r', `${Math.round(Math.random() * 540 - 270)}deg`);
+      c.style.animationDelay = `${Math.round(Math.random() * 80)}ms`;
+      layer.appendChild(c);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 1300);
+  }
+  // Welle beim Tippen auf Knöpfe, Chips und Karten
+  document.addEventListener('pointerdown', (e) => {
+    if (reducedMotion() || e.button > 0) return;
+    const el = e.target.closest('.btn, .chip, .head-tabs button, .head-tabs a, .segmented button, .menu__nav a, .svc__people, .pcard, .sp-row, .sx-card__open, .station, .sd-btn');
+    if (!el || el.disabled) return;
+    const host = el.classList.contains('sx-card__open') ? el.parentElement : el;
+    const r = host.getBoundingClientRect();
+    const size = Math.max(r.width, r.height) * 2.2;
+    const dot = document.createElement('span');
+    dot.className = 'ripple';
+    dot.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+    host.appendChild(dot);
+    setTimeout(() => dot.remove(), 650);
+  }, { passive: true });
+  // Leichtes Tippen bei jedem Knopf, Reiter, Chip und Schalter
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('button, a[href], [role="tab"], .chip, input[type="checkbox"], input[type="radio"], summary');
+    if (!el || el.disabled || el.closest('.haptic-switch') || (el.matches('input') && el.closest('label') && e.target !== el)) return;
+    haptic(el.matches('input, [role="tab"], .chip, [role="switch"]') ? 'select' : 'tap');
+  }, true);
+
   // ---------- Sprache ----------
   // Ausgangstext ist Deutsch. Übersetzungen: assets/js/i18n/<sprache>.js ({ "deutscher Text": "Übersetzung" }).
   // „auto“ übernimmt die Sprache des Geräts; wird sie nicht angeboten, gilt Englisch.
@@ -183,84 +312,124 @@
   };
 
   // ---------- Kennzahlen ----------
-  function series(seed, n, trend = 0.02) {
-    const out = [];
-    let v = 50;
-    for (let i = 0; i < n; i++) { v += (((hash(seed + i) % 100) / 100) - 0.45) * 8 + trend * 10; out.push(v); }
-    return out;
+  // Nur echte Zahlen: Roblox und Discord (Spieler online, Besuche, Gruppe) und das Spiel selbst (backend/game.js:
+  // Fahrten, km, Pünktlichkeit, Spieler je Stunde). Was noch nicht passiert ist, steht auf 0.
+  const EMPTY_GAME = {
+    today: { trips: 0, km: 0, punctual: 0, cats: {}, routes: {} }, week: { trips: 0, km: 0, punctual: 0, routes: {} },
+    total: { trips: 0, km: 0, punctual: 0 }, hours: [], live: { servers: 0, players: 0, trains: 0 },
+  };
+  const game = { data: null, at: 0, busy: false, cached: false };
+  // Letzter Stand aus dem Speicher, bis die frischen Zahlen da sind
+  const G = () => {
+    if (!game.data && !game.cached) { game.cached = true; if (apiReady()) game.data = store.get('tsg-gamestats', null); }
+    return game.data || EMPTY_GAME;
+  };
+  async function loadGameStats(force = false) {
+    if (!apiReady() || game.busy || (!force && Date.now() - game.at < 60000)) return;
+    game.busy = true;
+    try {
+      game.data = await api('/api/gamestats');
+      store.set('tsg-gamestats', game.data);
+    } catch (e) { /* alter Stand bleibt */ }
+    game.busy = false;
+    game.at = Date.now();
+    if (state.page === 'statistiken') RENDER.statistiken();
+    if (state.page === 'home') renderHomeKpis();
+  }
+  const punctualPct = (x) => (x && x.trips ? (x.punctual / x.trips) * 100 : 0);
+  // Spieler je Stunde, fehlende Stunden = 0; die laufende Stunde mindestens mit der Zahl von jetzt
+  function hourSeries(n) {
+    const map = new Map(G().hours.map(([h, v]) => [h, v]));
+    const cur = Math.floor(Date.now() / 3600000);
+    return Array.from({ length: n }, (_, i) => {
+      const h = cur - (n - 1) + i;
+      const v = map.get(h) || 0;
+      return { h, value: h === cur ? Math.max(v, state.online) : v };
+    });
   }
   function sparkline(values) {
     const w = 64, h = 26, min = Math.min(...values), max = Math.max(...values);
     const x = (i) => (i / (values.length - 1)) * w;
-    const y = (v) => h - 3 - ((v - min) / (max - min || 1)) * (h - 6);
+    const y = (v) => (max === min ? h - 4 : h - 3 - ((v - min) / (max - min)) * (h - 6));
     const d = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
     const last = values.length - 1;
     return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}"/><circle cx="${x(last).toFixed(1)}" cy="${y(values[last]).toFixed(1)}" r="4"/></svg>`;
   }
-  function kpi({ label, value, delta, up = true, good = true, ic, seed }) {
-    const cls = up === good ? 'delta--up' : 'delta--down';
+  // Zahl, die beim Erscheinen hochzählt (siehe countUp)
+  const FORMATS = { fmt: (n) => fmt(Math.round(n)), compact: (n) => compact(Math.round(n)), pct: (n) => pct(n, 1), km: (n) => compact(Math.round(n)) };
+  const countHtml = (n, format = 'fmt', key = '') => `<span data-count="${+n || 0}" data-fmt="${format}" data-count-key="${esc(key)}">${FORMATS[format](+n || 0)}</span>`;
+  function kpi({ label, num, format = 'fmt', ic, live = false, spark = null, note = '', key = '', bindKey = '' }) {
+    const value = bindKey ? `<span data-bind="${bindKey}">${FORMATS[format](num)}</span>` : countHtml(num, format, key || label);
     return `<div class="kpi">
       <span class="kpi__label"><span class="kpi__icon">${icon(ic)}</span>${label}</span>
       <span class="kpi__value">${value}</span>
-      <span class="kpi__foot">${delta == null ? `<span class="delta delta--live"><span class="live-dot live-dot--sm"></span>${t('Live')}</span>`
-    : `<span class="delta ${cls}">${up ? '▲' : '▼'} ${delta}</span>`}${sparkline(series(seed, 12, up ? 0.04 : -0.04))}</span>
+      <span class="kpi__foot">${live ? `<span class="delta delta--live"><span class="live-dot live-dot--sm"></span>${t('Live')}</span>` : `<span class="delta delta--note">${note}</span>`}${spark ? sparkline(spark) : ''}</span>
     </div>`;
   }
   function renderHomeKpis() {
-    const s = D.stats;
-    $('[data-kpis="home"]').innerHTML = [
-      kpi({ label: t('Spieler online'), value: `<span data-bind="online">${fmt(state.online)}</span>`, delta: state.liveOnline ? null : `${pct(12)} <small>${t('vs. gestern')}</small>`, ic: 'fi-rr-users-alt', seed: 'on' }),
-      kpi({ label: t('Aktive Server'), value: fmt(s.servers), delta: `3 <small>${t('seit 1 Std.')}</small>`, ic: 'fi-rr-database', seed: 'sv' }),
-      kpi({ label: t('Züge unterwegs'), value: fmt(s.trains), delta: `${pct(8)} <small>${t('vs. gestern')}</small>`, ic: 'fi-rr-train-side', seed: 'tr' }),
-      kpi({ label: t('Pünktlichkeit'), value: pct(s.punctuality, 1), delta: `${t('{n} Pkt.', { n: nf1.format(0.6) })} <small>${t('vs. gestern')}</small>`, up: false, ic: 'fi-rr-clock-three', seed: 'pu' }),
+    const g = G();
+    const sv = liveMode() && live.data ? live.data.servers : null;
+    const box = $('[data-kpis="home"]');
+    box.innerHTML = [
+      kpi({ label: t('Spieler online'), num: state.online, ic: 'fi-rr-users-alt', live: !!state.liveOnline, spark: hourSeries(12).map((x) => x.value), bindKey: 'online' }),
+      kpi({ label: t('Aktive Server'), num: sv ? sv.length : g.live.servers, ic: 'fi-rr-database', live: liveMode(), note: t('aus dem Spiel'), key: 'home-servers' }),
+      kpi({ label: t('Züge unterwegs'), num: sv ? sv.reduce((n, s) => n + (s.trains || 0), 0) : g.live.trains, ic: 'fi-rr-train-side', live: liveMode(), note: t('aus dem Spiel'), key: 'home-trains' }),
+      kpi({ label: t('Pünktlichkeit'), num: punctualPct(g.today), format: 'pct', ic: 'fi-rr-clock-three', note: t('heute · {n} Fahrten', { n: fmt(g.today.trips) }), key: 'home-punct' }),
     ].join('');
+    countUp(box);
   }
   function renderStatsKpis() {
     const s = D.stats;
-    // Echte Zahlen haben keinen Vergleichswert – dort steht „Live“ statt einer Veränderung
-    const L = state.liveStats;
+    const g = G();
+    const L = !!state.liveStats;
     const head = $('[data-visits-delta]');
-    if (head && L) { head.className = 'delta delta--live'; head.innerHTML = `<span class="live-dot live-dot--sm"></span>${t('Live')}`; }
-    $('[data-kpis="stats"]').innerHTML = [
-      kpi({ label: t('Besuche gesamt'), value: compact(s.visits), delta: L ? null : pct(3.8, 1), ic: 'fi-rr-gamepad', seed: 'vi' }),
-      kpi({ label: t('Favoriten'), value: compact(s.favorites), delta: L ? null : pct(1.2, 1), ic: 'fi-rr-star', seed: 'fa' }),
-      kpi({ label: t('Gruppenmitglieder'), value: compact(s.groupMembers), delta: L ? null : fmt(640), ic: 'fi-rr-users-alt', seed: 'gr' }),
-      kpi({ label: 'Discord', value: compact(s.discordMembers), delta: L ? null : pct(2.1, 1), ic: 'fi-brands-discord', seed: 'dc' }),
-      kpi({ label: t('Gefahrene km'), value: compact(s.km), delta: pct(4.4, 1), ic: 'fi-rr-route', seed: 'km' }),
-      kpi({ label: t('Fahrten heute'), value: fmt(s.tripsToday), delta: pct(6), ic: 'fi-rr-train-side', seed: 'ft' }),
+    if (head) {
+      head.hidden = !L;
+      head.className = 'delta delta--live';
+      head.innerHTML = `<span class="live-dot live-dot--sm"></span>${t('Live')}`;
+    }
+    const box = $('[data-kpis="stats"]');
+    box.innerHTML = [
+      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'compact', live: L, ic: 'fi-rr-gamepad', key: 'st-visits' }),
+      kpi({ label: t('Favoriten'), num: s.favorites, format: 'compact', live: L, ic: 'fi-rr-star', key: 'st-favs' }),
+      kpi({ label: t('Gruppenmitglieder'), num: s.groupMembers, format: 'compact', live: L, ic: 'fi-rr-users-alt', key: 'st-group' }),
+      kpi({ label: 'Discord', num: s.discordMembers, format: 'compact', live: L, ic: 'fi-brands-discord', key: 'st-discord' }),
+      kpi({ label: t('Gefahrene km'), num: g.total.km, format: 'km', note: t('gesamt'), ic: 'fi-rr-route', key: 'st-km' }),
+      kpi({ label: t('Fahrten heute'), num: g.today.trips, note: t('heute'), ic: 'fi-rr-train-side', key: 'st-trips' }),
     ].join('');
+    countUp(box);
   }
 
   // ---------- Diagramme ----------
-  const HOURLY = [820, 610, 430, 310, 240, 220, 260, 330, 410, 480, 560, 640, 720, 800, 880, 980, 1100, 1220, 1350, 1460, 1520, 1430, 1250, 1030];
   function chartData(range) {
-    const now = berlinNow();
     if (range === '24') {
-      return Array.from({ length: 24 }, (_, i) => {
-        const h = (now.h - 23 + i + 24) % 24;
-        const v = i === 23 ? state.online : Math.round(HOURLY[h] * (0.92 + (hash('h' + h) % 16) / 100));
-        return { label: `${pad(h)}:00`, tick: h % 3 === 0 ? `${pad(h)}` : '', value: v, tip: t('{time} Uhr', { time: `${pad(h)}:00` }) };
+      return hourSeries(24).map((x) => {
+        const h = Math.floor(((berlinOf(x.h * 3600000).abs % 1440) + 1440) % 1440 / 60);
+        return { label: `${pad(h)}:00`, tick: h % 3 === 0 ? `${pad(h)}` : '', value: x.value, tip: t('{time} Uhr', { time: `${pad(h)}:00` }) };
       });
     }
     const n = range === '7' ? 7 : 30;
+    const now = berlinNow();
+    const peak = new Map();
+    hourSeries(n * 24 + 26).forEach((x) => {
+      const day = berlinOf(x.h * 3600000).day;
+      peak.set(day, Math.max(peak.get(day) || 0, x.value));
+    });
     return Array.from({ length: n }, (_, i) => {
       const day = now.day - (n - 1) + i;
-      const dt = dateOf(day);
-      const wd = dt.getUTCDay();
-      const weekend = wd === 0 || wd === 6 || wd === 5;
-      const v = Math.round(1250 + i * (n === 30 ? 9 : 25) + (weekend ? 260 : 0) + (hash('d' + day) % 140));
-      const label = dtf({ day: '2-digit', month: '2-digit' }).format(dt);
+      const label = dtf({ day: '2-digit', month: '2-digit' }).format(dateOf(day));
       return {
-        label, value: v,
+        label, value: peak.get(day) || 0,
         tick: n === 7 ? wdShort(day) : i % 5 === 4 || i === 0 ? label : '',
         tip: `${wdLong(day)}, ${label} · ${t('Tageshöchstwert')}`,
       };
     });
   }
   function niceMax(v) {
+    if (!(v > 0)) return 10;
     const p = Math.pow(10, Math.floor(Math.log10(v)));
     const n = v / p;
-    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+    return Math.max(10, (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p);
   }
   function renderChart() {
     const el = $('[data-chart="online"]');
@@ -305,24 +474,33 @@
     $('[data-chart-sub]').textContent = state.range === '24' ? t('Letzte 24 Stunden, stündlich') : t('Letzte {n} Tage, Tageshöchstwert', { n: state.range });
   }
 
+  // Zuggattungen für „Fahrten nach Zuggattung“ (Gattung aus dem Spiel bzw. aus dem Zug im Shop)
+  const TRAIN_SHARE = [['ICE', ['ice']], ['Eurocity', ['ec']], ['Intercity', ['ic']], ['Regional-Express', ['ire', 're']], ['Regionalbahn', ['rb']], ['S-Bahn', ['s']], ['Güterverkehr', ['g']]];
   function renderBars() {
-    const max = Math.max(...D.trainShare.map((d) => d.value));
-    $('[data-hbars]').innerHTML = D.trainShare.map((d) => `<div class="hbar" data-tip="<b>${pct(d.value)}</b><span>${esc(t(d.label))}</span>">
+    const g = G();
+    const cats = g.today.cats || {};
+    const total = Object.values(cats).reduce((a, b) => a + b, 0);
+    const rows = TRAIN_SHARE.map(([label, cs]) => ({ label, value: total ? (cs.reduce((n, c) => n + (cats[c] || 0), 0) / total) * 100 : 0 }));
+    const max = Math.max(...rows.map((d) => d.value));
+    $('[data-hbars]').innerHTML = rows.map((d) => `<div class="hbar" data-tip="<b>${pct(d.value)}</b><span>${esc(t(d.label))}</span>">
       <span class="hbar__label">${esc(t(d.label))}</span>
-      <span class="hbar__track"><span class="hbar__fill" style="width:${(d.value / max) * 86}%"></span><span class="hbar__value">${pct(d.value)}</span></span>
+      <span class="hbar__track"><span class="hbar__fill" style="width:${max ? (d.value / max) * 86 : 0}%"></span><span class="hbar__value">${pct(d.value)}</span></span>
     </div>`).join('');
 
-    $('[data-meters]').innerHTML = D.punctualityByNet.map((d) => {
-      const s = d.value >= 93 ? ['ok', t('Gut'), 'fi-rr-check'] : d.value >= 88 ? ['warn', t('Angespannt'), 'fi-rr-triangle-warning'] : ['bad', t('Kritisch'), 'fi-rr-triangle-warning'];
+    // Pünktlichkeit nach Netz: Fahrten der letzten 7 Tage auf den Strecken des Netzes
+    $('[data-meters]').innerHTML = D.nets.map((net) => {
+      const r = net.routes.reduce((a, no) => { const x = g.week.routes[no]; if (x) { a.n += x.n; a.ok += x.ok; } return a; }, { n: 0, ok: 0 });
+      const v = r.n ? (r.ok / r.n) * 100 : 0;
+      const s = !r.n ? ['none', t('Keine Fahrten'), 'fi-rr-info'] : v >= 93 ? ['ok', t('Gut'), 'fi-rr-check'] : v >= 88 ? ['warn', t('Angespannt'), 'fi-rr-triangle-warning'] : ['bad', t('Kritisch'), 'fi-rr-triangle-warning'];
       return `<li>
-        <span class="m-label">${esc(t(d.label))}</span>
-        <span class="m-value"><span class="state state--${s[0]}">${icon(s[2])}${s[1]}</span>${pct(d.value, 1)}</span>
-        <span class="bar bar--${s[0]}"><span style="width:${d.value}%"></span></span>
+        <span class="m-label">${esc(t(net.label))}</span>
+        <span class="m-value"><span class="state state--${s[0]}">${icon(s[2])}${s[1]}</span>${pct(v, 1)}</span>
+        <span class="bar bar--${s[0]}"><span style="width:${v}%"></span></span>
       </li>`;
     }).join('');
 
-    const top = Math.max(...D.topRoutes.map((d) => d.value));
-    $('[data-top-routes]').innerHTML = routeList(D.topRoutes.map((d) => ({ route: routeOf(d.no), value: d.value })), top);
+    const top = D.routes.map((r) => ({ route: r, value: (g.week.routes[r.no] || {}).n || 0 })).sort((a, b) => b.value - a.value).slice(0, 5);
+    $('[data-top-routes]').innerHTML = routeList(top, Math.max(...top.map((d) => d.value)));
   }
 
   // Strecken über ihre Nummer (R001, R002, …)
@@ -611,58 +789,261 @@
     return out.sort((a, b) => (a[0] === 'Passenger') - (b[0] === 'Passenger') || rankIdx(b[0]) - rankIdx(a[0]));
   }
 
+  // ---------- Live-Server aus dem Spiel ----------
+  // Mit Backend zeigt die Server-Seite nur echte Server (gemeldet von game/TSGAppSync.server.lua), private nur, wenn
+  // der Besitzer sie zeigt. Ohne Backend bleibt die Demo aus data.js.
+  const live = { data: null, at: 0, busy: false, detail: {}, detailAt: {} };
+  const liveMode = () => apiReady();
+  // Rollen im Spiel von Passenger bis Supervisor (wie backend/game.js)
+  const GAME_ROLES = ['Passenger', 'Learning Driver', 'Qualified Driver', 'Platform Staff', 'Conductor', 'Signaller', 'Supervisor'];
+  async function loadLive(force = false) {
+    if (!liveMode() || live.busy || (!force && live.data && Date.now() - live.at < 25000)) return;
+    live.busy = true;
+    try { live.data = await api('/api/servers'); } catch (e) { live.data = live.data || { servers: [], avatars: {}, online: 0, error: true }; } finally { live.busy = false; live.at = Date.now(); }
+    D.stats.servers = live.data.servers.length;
+    if (state.page === 'server' && !state.serverId && modal.hidden) renderServers();
+    if (state.page === 'home') renderHomeKpis();
+    if (modalView && modalView.name === 'server-players') refreshModal();
+    bind();
+  }
+  async function loadLiveDetail(id, force = false) {
+    if (!liveMode() || (!force && live.detail[id] && Date.now() - (live.detailAt[id] || 0) < 20000)) return;
+    live.detailAt[id] = Date.now();
+    try { live.detail[id] = await api(`/api/servers/${encodeURIComponent(id)}`); } catch (e) { live.detail[id] = { error: e.status || true }; }
+    if (state.page === 'server' && state.serverId === id && modal.hidden) renderServerDetail();
+    if (modalView && modalView.name === 'server-players' && modalView.arg === id) refreshModal();
+  }
+  const liveServer = (id) => (live.data ? live.data.servers.find((s) => s.id === id) : null);
+  const shortId = (id) => String(id).slice(0, 8);
+  // Profilbild eines Spielers: Roblox-Bild, sonst Initialen
+  function personPic(p, avatars = {}, cls = '') {
+    const url = p.id && avatars[p.id];
+    const name = p.name || p.dn || '?';
+    return url ? `<span class="avatar avatar--img ${cls}" aria-hidden="true"><img src="${esc(url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>` : avatar(name, cls);
+  }
+  const personName = (p) => (p.dn && p.name && p.dn !== p.name ? `${esc(p.dn)} <small>@${esc(p.name)}</small>` : esc(p.dn || p.name || t('Spieler')));
+  // Was jemand gerade macht (Live): Zug mit Linie, sonst Bahnhof
+  function doingHtml(p) {
+    if (p.line || p.train) {
+      const L = lineByName(p.line);
+      return `${icon('fi-rr-train-side')}<span>${p.line ? `<span class="line line--${L ? L.cat : catOfTrain(p.veh) || 're'}">${esc(p.line)}</span>` : ''}${p.train ? `<b>${esc(p.train)}</b>` : ''}${p.dest ? ` ${t('nach {to}', { to: esc(p.dest) })}` : ''}</span>`;
+    }
+    if (p.at) return `${icon('fi-rr-marker')}<span>${esc(p.at)}</span>`;
+    return '';
+  }
+  const lineByName = (name) => (name ? Object.values(D.lines).find((L) => L.name.replace(/\s+/g, '') === String(name).replace(/\s+/g, '')) : null);
+  const catOfTrain = (veh) => { const x = veh && D.shop.trains.find((tr) => tr.id === veh); return x ? x.cat : null; };
+  const trainName = (veh) => { const x = veh && D.shop.trains.find((tr) => tr.id === veh); return x ? x.name : veh || ''; };
+
+  // Einheitliche Karte für Demo- und Live-Server
+  function serverCardModel(s) {
+    if (s.live) return s;
+    const m = serverModel(s);
+    const roles = Object.fromEntries(GAME_ROLES.map((r) => [r, m.players.filter((p) => p.role === r).length]));
+    const people = [...m.players].sort((a, b) => GAME_ROLES.indexOf(b.role) - GAME_ROLES.indexOf(a.role)).map((p) => ({ name: p.name, role: p.role }));
+    return {
+      id: s.id, title: t(s.name), sub: `${s.region} · v${s.version}`, private: s.type === 'vip', type: s.type,
+      players: s.players, max: s.max, roles, people, avatars: {}, demo: true,
+    };
+  }
+  function liveCardModel(s) {
+    const p = s.pserver;
+    return {
+      live: true, id: s.id, private: s.private, type: s.private ? 'private' : 'public', players: s.players, max: s.max,
+      title: s.private ? (p ? p.name : t('Privater Server')) : t('Öffentlicher Server'),
+      sub: `${t('seit {time}', { time: uptime(Math.max(1, Math.round((Date.now() - s.since) / 60000))) })}${s.version ? ` · v${s.version}` : ''}`,
+      roles: s.roles, people: s.people, avatars: (live.data && live.data.avatars) || {}, pserver: p,
+    };
+  }
+  function serverCard(s) {
+    const c = s.live ? s : serverCardModel(s);
+    const ratio = c.max ? c.players / c.max : 0;
+    const level = c.max && c.players >= c.max ? 'bad' : ratio >= 0.85 ? 'warn' : 'ok';
+    const shown = c.people.slice(0, 3);
+    const more = Math.max(0, c.players - shown.length);
+    const ic = c.private ? 'fi-rr-lock' : c.type === 'training' ? 'fi-rr-calendar' : c.type === 'event' ? 'fi-rr-bolt' : 'fi-rr-signal-alt-2';
+    return `<article class="svc${c.private ? ' svc--private' : ''}">
+      <header class="svc__head">
+        <span class="svc__ic">${icon(ic)}</span>
+        <div class="svc__title">
+          <h3>${esc(c.title)}</h3>
+          <button class="svc__id" type="button" data-copy="${esc(c.id)}" aria-label="${esc(t('Server-ID kopieren'))}"><span>ID</span><code>${esc(shortId(c.id))}</code>${icon('fi-rr-copy')}</button>
+        </div>
+        <div class="svc__count"><b>${countHtml(c.players, 'fmt', `sv-${c.id}`)}</b><small>/${fmt(c.max)} ${t('Spieler')}</small></div>
+      </header>
+      <div class="svc__bar bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
+      <ul class="svc__roles" aria-label="${esc(t('Rollen'))}">${GAME_ROLES.map((r) => `<li class="${c.roles[r] ? '' : 'is-zero'}" style="--rc:${roleRank(r).color}"><i></i><span>${esc(r)}</span><b>${fmt(c.roles[r] || 0)}</b></li>`).join('')}</ul>
+      <footer class="svc__foot">
+        <button class="svc__people" type="button" data-server-people="${esc(c.id)}"${c.players ? '' : ' disabled'} aria-label="${esc(t('Alle Spieler ansehen'))}">
+          <span class="avatars">${shown.map((p) => personPic(p, c.avatars)).join('')}${more ? `<span class="avatar avatar--more">+${more > 99 ? '99' : more}</span>` : ''}</span>
+          <small>${c.players ? t('Alle ansehen') : t('Noch leer')}</small>
+        </button>
+        <a class="server__details" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('fi-rr-angle-small-right')}</a>
+      </footer>
+    </article>`;
+  }
+
   function renderServers() {
-    const free = D.servers.reduce((sum, x) => sum + Math.max(0, x.max - x.players), 0);
-    const ping = Math.round(D.servers.reduce((sum, x) => sum + x.ping, 0) / D.servers.length);
+    const isLive = liveMode();
+    if (isLive && !live.data) loadLive();
+    const list0 = isLive ? (live.data ? live.data.servers.map(liveCardModel) : null) : D.servers;
+    const all = list0 || [];
+    const players = isLive ? Math.max(state.online, live.data ? live.data.online : 0) : state.online;
+    const free = all.reduce((sum, x) => sum + Math.max(0, x.max - x.players), 0);
     $('[data-server-stats]').innerHTML = `
-      <div class="stat"><span>${t('Spieler online')}</span><b data-bind="online">${fmt(state.online)}</b></div>
-      <div class="stat"><span>${t('Freie Plätze')}</span><b>${fmt(free)}</b></div>
-      <div class="stat"><span>${t('Ø Ping')}</span><b>${ping} ms</b></div>`;
+      <div class="stat"><span>${t('Spieler online')}</span><b data-bind="online">${fmt(players)}</b></div>
+      <div class="stat"><span>${t('Server')}</span><b>${fmt(all.length)}</b></div>
+      <div class="stat"><span>${t('Freie Plätze')}</span><b>${fmt(free)}</b></div>`;
+    const types = isLive ? [['all', t('Alle')], ['public', t('Öffentlich')], ['private', t('Privat')], ['free', t('Freie Plätze')]]
+      : [['all', t('Alle')], ['public', t('Öffentlich')], ['free', t('Freie Plätze')], ['event', t('Event')], ['training', t('Training')], ['vip', 'VIP']];
+    if (!types.some(([id]) => id === state.serverType)) state.serverType = 'all';
+    $('[data-server-filter]').innerHTML = types.map(([id, label]) => `<button class="chip${state.serverType === id ? ' is-active' : ''}" type="button" data-type="${id}">${label}</button>`).join('');
 
     const q = norm(state.serverQuery.trim());
-    const list = D.servers.filter((s) => {
+    const list = all.filter((s) => {
       if (state.serverType === 'free' && s.players >= s.max * 0.8) return false;
-      if (!['all', 'free'].includes(state.serverType) && s.type !== state.serverType) return false;
-      return !q || norm(`${s.name} ${s.network} ${s.region} ${s.lines.map((id) => D.lines[id].name).join(' ')}`).includes(q);
+      if (state.serverType === 'private' && !s.private) return false;
+      if (!['all', 'free', 'private'].includes(state.serverType) && s.type !== state.serverType) return false;
+      const text = isLive ? `${s.title} ${s.id} ${s.people.map((p) => `${p.name || ''} ${p.dn || ''}`).join(' ')}` : `${s.name} ${s.id} ${s.network} ${s.region} ${s.lines.map((id) => D.lines[id].name).join(' ')}`;
+      return !q || norm(text).includes(q);
     });
-    const typeTag = { public: ['', t('Öffentlich')], event: ['tag--red', t('Event')], training: ['tag--info', t('Training')], vip: ['tag--warn', 'VIP'] };
-    $('[data-servers]').innerHTML = list.length ? list.map((s) => {
-      const m = serverModel(s);
-      const ratio = s.players / s.max;
-      const full = s.players >= s.max;
-      const level = full ? 'bad' : ratio >= 0.85 ? 'warn' : 'ok';
-      const label = full ? t('Voll') : ratio >= 0.85 ? t('Fast voll') : t('{n} frei', { n: s.max - s.players });
-      const [tagCls, tagText] = typeTag[s.type];
-      const lines = [];
-      s.lines.forEach((id) => { if (!lines.some((L) => L.name === D.lines[id].name)) lines.push(D.lines[id]); });
-      lines.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));
-      const shown = m.players.filter((p) => p.role !== 'Passenger').slice(0, 3);
-      return `<article class="server">
-        <div class="server__head">
-          <div class="server__name">
-            <span class="server__ic">${icon(s.type === 'training' ? 'fi-rr-calendar' : s.type === 'event' ? 'fi-rr-bolt' : 'fi-rr-database')}</span>
-            <div><h3>${esc(t(s.name))}</h3><small><span class="live-dot"></span>${esc(s.region)} · v${esc(s.version)}</small></div>
-          </div>
-          <span class="tag ${tagCls}">${tagText}</span>
+    const box = $('[data-servers]');
+    if (!list0) { box.innerHTML = `<div class="svc svc--skeleton" aria-hidden="true"></div>`.repeat(3); return; }
+    if (!all.length) {
+      box.innerHTML = `<div class="empty-card">
+        <span class="empty-card__ic">${icon('fi-rr-signal-alt-2')}</span>
+        <h3>${t('Gerade läuft kein Server')}</h3>
+        <p>${t('Sobald jemand Train Sim Germany spielt, erscheint der Server hier – mit Spielern und Rollen. Private Server erscheinen, wenn ihr Besitzer sie zeigt.')}</p>
+        <a class="btn btn--primary" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Jetzt spielen')}</a>
+      </div>`;
+      return;
+    }
+    box.innerHTML = list.length ? list.map(serverCard).join('') : `<p class="empty">${t('Kein Server gefunden. Versuch einen anderen Filter.')}</p>`;
+    reveal(box);
+    countUp(box);
+  }
+
+  // Alle Spieler eines Servers (Sheet)
+  function serverPeopleView(id) {
+    let people = null;
+    let avatars = {};
+    let title = '';
+    if (liveMode()) {
+      const d = live.detail[id];
+      if (!d) { loadLiveDetail(id); return `<div class="sheet-loading">${icon('fi-rr-spinner')}<span>${t('Wird geladen …')}</span></div>`; }
+      if (d.error) return `<p class="muted">${t('Dieser Server ist nicht mehr online.')}</p>`;
+      people = d.server.people;
+      avatars = d.avatars || {};
+      title = d.server.private && d.server.pserver ? d.server.pserver.name : t('Öffentlicher Server');
+    } else {
+      const s = serverById(id);
+      if (!s) return `<p class="muted">${t('Diesen Server gibt es nicht mehr.')}</p>`;
+      people = serverModel(s).players.map((p) => ({ name: p.name, role: p.role, line: p.train ? p.train.line.name : null, dest: p.train ? p.train.to : null, at: p.station ? p.station.name : null }));
+      title = t(s.name);
+    }
+    const groups = GAME_ROLES.map((r) => [r, people.filter((p) => p.role === r)]).filter(([, l]) => l.length);
+    return `<p class="sp-head">${icon('fi-rr-users-alt')}<span><b>${esc(title)}</b> · ${t('{n} Spieler', { n: fmt(people.length) })}</span></p>
+      ${groups.map(([r, l]) => `<section class="sp-group">
+        <h3 class="pgroup__title"><i style="--rc:${roleRank(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${l.length}</small></h3>
+        <ul class="sp-list">${l.map((p) => `<li>${p.id ? `<button class="sp-row" type="button" data-player="${esc(p.id)}">` : '<div class="sp-row">'}
+          ${personPic(p, avatars)}<span class="sp-row__main"><b>${personName(p)}</b><span class="sp-row__doing">${doingHtml(p)}</span></span>
+          ${p.id ? icon('fi-rr-angle-small-right', 'sp-row__chev') : ''}${p.id ? '</button>' : '</div>'}</li>`).join('')}</ul>
+      </section>`).join('')}`;
+  }
+
+  // Weitere Halte eines Zuges aus dem Spiel: Linie aus dem Fahrplan, ab dem gemeldeten nächsten Halt bis zum Ziel
+  function liveStopsHtml(tr) {
+    const L = lineByName(tr.line);
+    if (!L || !tr.next) return '';
+    const names = L.stops.map(([n]) => n);
+    const i = names.indexOf(tr.next);
+    const d = tr.dest ? names.indexOf(tr.dest) : -1;
+    if (i < 0) return '';
+    // Richtung aus dem Ziel: bis zum Ziel, in Fahrtrichtung
+    const rest = d < 0 ? names.slice(i) : d >= i ? names.slice(i, d + 1) : names.slice(d, i + 1).reverse();
+    return `<ol class="stoplist stoplist--live" aria-label="${esc(t('Weitere Halte'))}">${rest.map((n, k) => `<li class="stoplist__row is-${k === 0 ? 'next' : 'future'}"><i aria-hidden="true"></i><span class="stoplist__name">${esc(n)}</span></li>`).join('')}</ol>`;
+  }
+
+  // Server-Details mit echten Daten: Spieler nach Rollen und Züge
+  function renderLiveDetail() {
+    const id = state.serverId;
+    const head = $('[data-sd-head]');
+    const body = $('[data-sd-body]');
+    const back = `<a class="back-link" href="#/server">${icon('fi-rr-arrow-left')}${t('Alle Server')}</a>`;
+    const d = live.detail[id];
+    if (!d) {
+      loadLiveDetail(id);
+      head.innerHTML = `${back}<h1 class="appbar__value">${t('Server')}</h1>`;
+      body.innerHTML = `<div class="sheet-loading">${icon('fi-rr-spinner')}<span>${t('Wird geladen …')}</span></div>`;
+      return;
+    }
+    if (d.error) {
+      head.innerHTML = `${back}<h1 class="appbar__value">${t('Server nicht gefunden')}</h1>`;
+      body.innerHTML = `<p class="empty">${t('Diesen Server gibt es nicht mehr. Vielleicht wurde er gerade geschlossen.')}</p>`;
+      return;
+    }
+    const s = d.server;
+    const p = s.pserver;
+    const avatars = d.avatars || {};
+    const full = s.max && s.players >= s.max;
+    const joinHref = s.private ? (p && p.canJoin && p.link ? p.link : null) : joinUrl({ id: s.id });
+    const tab = state.sdTab === 'trains' ? 'trains' : 'players';
+    const tabBtn = (tid, ic, label, n) => `<button type="button" role="tab" aria-selected="${tab === tid}" data-sd-tab="${tid}">${icon(ic)}${label}<span class="head-tabs__n">${n}</span></button>`;
+    const title = s.private ? (p ? p.name : t('Privater Server')) : t('Öffentlicher Server');
+    head.innerHTML = `${back}
+      <div class="appbar">
+        <div class="appbar__title">
+          <span class="appbar__label"><span class="live-dot"></span>${t('Live')}${s.version ? ` · v${esc(s.version)}` : ''} · ${s.private ? t('Privat') : t('Öffentlich')}</span>
+          <h1 class="appbar__value">${esc(title)}</h1>
         </div>
-        <p class="server__net">${icon('fi-rr-route')}${esc(t(s.network))}</p>
-        <div class="server__lines">${lines.map(lineBadge).join('')}</div>
-        <div class="occ">
-          <div class="occ__row"><span class="status status--${level}">${label}</span><b>${s.players}/${s.max}</b></div>
-          <div class="bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
+        <div class="appbar__actions">${full ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
+          : joinHref ? `<a class="btn btn--primary btn--sm" href="${esc(joinHref)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`
+            : `<span class="ps-note">${icon('fi-rr-lock')}${t('Beitreten nur über Roblox')}</span>`}</div>
+      </div>
+      ${p && p.ownerName ? `<p class="sd-net">${icon('fi-rr-user')}${t('Privater Server von {name}', { name: esc(p.ownerName) })}</p>` : ''}
+      <button class="sd-id" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}">
+        <span>${t('Server-ID')}</span><code>${esc(s.id)}</code>${icon('fi-rr-copy')}
+      </button>
+      <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Ansicht'))}">
+        ${tabBtn('players', 'fi-rr-users-alt', t('Spieler'), s.people.length)}
+        ${tabBtn('trains', 'fi-rr-train-side', t('Züge'), s.trainList.length)}
+      </div>`;
+    const stats = `<div class="stat-row stat-row--4">
+      <div class="stat"><span>${t('Spieler')}</span><b>${s.players}/${s.max}</b></div>
+      <div class="stat"><span>${t('Züge unterwegs')}</span><b>${s.trainList.length}</b></div>
+      <div class="stat"><span>${t('Laufzeit')}</span><b>${uptime(Math.max(1, Math.round((Date.now() - s.since) / 60000)))}</b></div>
+      <div class="stat"><span>${t('Version')}</span><b>${s.version ? `v${esc(s.version)}` : '–'}</b></div>
+    </div>`;
+    let content;
+    if (tab === 'players') {
+      const roles = GAME_ROLES.map((r) => [r, s.people.filter((x) => x.role === r).length]).filter(([, n]) => n);
+      if (!roles.some(([r]) => r === state.sdRole)) state.sdRole = 'all';
+      const groups = roles.filter(([r]) => state.sdRole === 'all' || r === state.sdRole);
+      content = !s.people.length ? `<p class="empty">${t('Gerade ist niemand auf diesem Server.')}</p>` : `<div class="chips chips--scroll chips--block" role="group" aria-label="${esc(t('Rolle'))}">
+          <button class="chip${state.sdRole === 'all' ? ' is-active' : ''}" type="button" data-sd-role="all">${t('Alle')} · ${s.people.length}</button>
+          ${roles.map(([r, n]) => `<button class="chip${state.sdRole === r ? ' is-active' : ''}" type="button" data-sd-role="${esc(r)}">${esc(r)} · ${n}</button>`).join('')}
         </div>
-        <div class="server__roles"><span class="server__roles-title">${t('Rollen')}</span>${roleCounts(m.players).map(([r, n]) => `<span class="role-count" style="--rc:${roleRank(r).color}"><i></i><span>${esc(r)}</span><b>${n}</b></span>`).join('')}</div>
-        <dl class="server__meta">
-          <div><dt>${icon('fi-rr-signal-alt-2')}Ping</dt><dd>${s.ping} ms</dd></div>
-          <div><dt>${icon('fi-rr-train-side')}${t('Züge')}</dt><dd>${m.trains.length}</dd></div>
-          <div><dt>${icon('fi-rr-clock-three')}${t('Laufzeit')}</dt><dd>${uptime(s.uptime)}</dd></div>
-        </dl>
-        <div class="server__foot">
-          <span class="avatars">${shown.map((p) => avatar(p.name)).join('')}<small>${t('{n} Spieler', { n: s.players })}</small></span>
-          <a class="server__details" href="#/server/${encodeURIComponent(s.id)}" aria-label="${esc(t('Details zu {name}', { name: t(s.name) }))}">${t('Details')}${icon('fi-rr-angle-small-right')}</a>
-        </div>
-      </article>`;
-    }).join('') : `<p class="empty">${t('Kein Server gefunden. Versuch einen anderen Filter.')}</p>`;
+        <div data-reveal>${groups.map(([r, n]) => `<section class="pgroup">
+          <h2 class="pgroup__title"><i style="--rc:${roleRank(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${n}</small></h2>
+          <ul class="sp-list sp-list--card">${s.people.filter((x) => x.role === r).map((x) => `<li><button class="sp-row" type="button" data-player="${esc(x.id)}">
+            ${personPic(x, avatars)}<span class="sp-row__main"><b>${personName(x)}</b><span class="sp-row__doing">${doingHtml(x)}</span></span>${icon('fi-rr-angle-small-right', 'sp-row__chev')}</button></li>`).join('')}</ul>
+        </section>`).join('')}</div>`;
+    } else {
+      const byId = new Map(s.people.map((x) => [x.id, x]));
+      content = s.trainList.length ? `<div class="train-grid" data-reveal>${s.trainList.map((tr) => {
+        const L = lineByName(tr.line);
+        const cat = L ? L.cat : catOfTrain(tr.veh) || 're';
+        return `<article class="ltrain">
+          <div class="ltrain__head">${tr.line ? `<span class="line line--${cat}">${esc(tr.line)}</span>` : `<span class="line line--${cat}">${icon('fi-rr-train-side')}</span>`}
+            <div class="ltrain__title"><h3>${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || t('Zug'))}</h3><small>${[tr.train, trainName(tr.veh)].filter(Boolean).map(esc).join(' · ')}</small></div></div>
+          ${tr.next ? `<p class="train__now">${icon('fi-rr-marker')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
+          ${liveStopsHtml(tr)}
+          <div class="ltrain__crew">${tr.crew.map((c) => { const x = byId.get(c.id) || c; return `<button class="crew crew--btn" type="button" data-player="${esc(c.id)}">${personPic(x, avatars)}<span class="crew__text"><small>${esc(t(roleRank(c.role).label))}</small><b>${esc(x.dn || x.name || t('Spieler'))}</b></span></button>`; }).join('')}</div>
+        </article>`;
+      }).join('')}</div>` : `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-train-side')}</span><h3>${t('Kein Zug gemeldet')}</h3><p>${t('Züge erscheinen hier, sobald das Spiel Linie und Zugnummer der Fahrer meldet.')}</p></div>`;
+    }
+    body.innerHTML = stats + content;
+    reveal($('[data-reveal]', body));
   }
 
   // ---------- Server-Details ----------
@@ -784,6 +1165,7 @@
   }
 
   function renderServerDetail() {
+    if (liveMode()) { renderLiveDetail(); return; }
     const s = serverById(state.serverId);
     const head = $('[data-sd-head]');
     const body = $('[data-sd-body]');
@@ -2051,49 +2433,50 @@
     out.textContent = from.value === to.value ? dayShort(+from.value) : `${dayShort(+from.value)} – ${dayShort(+to.value)}`;
   }
 
-  // Eigene Statistik (Demo: aus dem Namen abgeleitet, damit sie stabil bleibt)
+  // Eigene Statistik aus dem Spiel (backend/game.js → pstats). Was noch nicht passiert ist, steht auf 0.
+  const mine = { data: null, at: 0, busy: false };
+  async function loadMyStats(force = false) {
+    if (!apiReady() || !sessionToken() || mine.busy || (!force && Date.now() - mine.at < 60000)) return;
+    mine.busy = true;
+    try { mine.data = await api('/api/me/stats'); } catch (e) { /* bleibt bei 0 */ }
+    mine.busy = false;
+    mine.at = Date.now();
+    if (modalView && modalView.name === 'stats') refreshModal();
+  }
+  // Bestandene Trainings = Ränge mit Training bis zum eigenen Rang
+  const trainingsPassed = () => RANKS.slice(0, rankIdx(state.rank) + 1).filter((r) => typeOf(r.name)).length;
   function myStats() {
-    const name = state.profile ? state.profile.username : D.me.username;
-    const rnd = (key, min, max) => min + (hash(name + key) % (max - min + 1));
+    loadMyStats();
+    const s = { minutes: 0, trips: 0, km: 0, punctual: 0, routes: {}, vehicles: {}, days: {}, first: null, last: null, ...(mine.data || {}) };
     const now = berlinNow();
     const monday = now.day - ((dateOf(now.day).getUTCDay() + 6) % 7);
     const week = Array.from({ length: 7 }, (_, i) => {
       const day = monday + i;
-      return { label: wdShort(day), today: day === now.day, min: day > now.day ? 0 : rnd(`w${i}`, 0, 170) };
+      return { label: wdShort(day), today: day === now.day, min: s.days[dateOf(day).toISOString().slice(0, 10)] || 0 };
     });
-    // Fahrten auf Züge und Strecken verteilen (Summe bleibt gleich), meistgefahren zuerst
-    const split = (total, labels, key) => {
-      const w = labels.map((_, i) => (4 + (hash(name + key + i) % 97)) ** 2);
-      const sum = w.reduce((a, b) => a + b, 0);
-      const rows = labels.map((label, i) => ({ label, i, value: Math.floor((total * w[i]) / sum) }));
-      rows[0].value += total - rows.reduce((a, d) => a + d.value, 0);
-      return rows.sort((a, b) => b.value - a.value);
-    };
-    const trips = rnd('trips', 120, 1600);
-    const share = split(trips, ['fern', 'regio', 'sbahn'], 'cat');
-    const part = (k) => share.find((d) => d.label === k).value;
     const groups = [
-      { key: 'fern', title: t('Fernverkehr'), cat: 'ice' },
-      { key: 'regio', title: t('Regio'), cat: 're' },
-      { key: 'sbahn', title: t('S-Bahn'), cat: 's' },
-    ].map((g) => ({ ...g, total: part(g.key), rows: split(part(g.key), D.fleet[g.key], g.key) }));
-    const routes = split(trips, D.routes.map((r) => r.no), 'route').map((d) => ({ route: D.routes[d.i], value: d.value }));
-    const fav = routes[0].route;
+      { key: 'fern', title: t('Fernverkehr'), cat: 'ice', cats: ['ice', 'ec', 'ic'] },
+      { key: 'regio', title: t('Regio'), cat: 're', cats: ['ire', 're', 'rb'] },
+      { key: 'sbahn', title: t('S-Bahn'), cat: 's', cats: ['s'] },
+    ].map((g) => {
+      const rows = D.shop.trains.filter((x) => g.cats.includes(x.cat)).map((x) => ({ label: x.name, value: s.vehicles[x.id] || 0 })).sort((a, b) => b.value - a.value);
+      return { ...g, rows, total: rows.reduce((n, r) => n + r.value, 0) };
+    });
+    const routes = D.routes.map((r) => ({ route: r, value: s.routes[r.no] || 0 })).sort((a, b) => b.value - a.value);
+    const fav = routes[0] && routes[0].value ? routes[0].route : null;
+    const w = shop.data && shop.data.wallet;
     return {
-      week,
-      groups,
-      routes,
-      trips,
+      week, groups, routes, trips: s.trips,
       tiles: [
-        { ic: 'fi-rr-star', label: t('Level'), value: fmt(state.profile ? rnd('lvl', 4, 60) : D.me.level) },
-        { ic: 'fi-rr-train-side', label: t('Kilometer'), value: fmt(rnd('km', 900, 32000)) },
-        { ic: 'fi-rr-route', label: t('Fahrten'), value: fmt(trips) },
-        { ic: 'fi-rr-clock-three', label: t('Pünktlichkeit'), value: pct(rnd('punct', 860, 992) / 10, 1) },
-        { ic: 'fi-rr-calendar', label: t('Trainings'), value: t('{n} bestanden', { n: fmt(Math.max(0, rankIdx(state.rank))) }) },
-        { ic: 'fi-rr-time-fast', label: t('Spielzeit'), value: t('{n} Std.', { n: fmt(rnd('hours', 12, 640)) }) },
-        { ic: 'fi-rr-trophy', label: t('Bestenliste'), value: t('Platz {n}', { n: fmt(rnd('place', 18, 2400)) }) },
-        { ic: 'fi-rr-user-add', label: t('Dabei seit'), value: dtf({ month: 'short', year: 'numeric' }).format(new Date(Date.UTC(rnd('year', 2023, 2025), rnd('mon', 0, 11), 1))) },
-        { ic: 'fi-rr-heart', label: t('Lieblingsstrecke'), value: `${routeNo(fav)}${esc(t(fav.title))}`, wide: true },
+        { ic: 'fi-rr-train-side', label: t('Kilometer'), value: countHtml(s.km, 'km', 'my-km') },
+        { ic: 'fi-rr-route', label: t('Fahrten'), value: countHtml(s.trips, 'fmt', 'my-trips') },
+        { ic: 'fi-rr-clock-three', label: t('Pünktlichkeit'), value: countHtml(s.trips ? (s.punctual / s.trips) * 100 : 0, 'pct', 'my-punct') },
+        { ic: 'fi-rr-time-fast', label: t('Spielzeit'), value: t('{n} Std.', { n: nf1.format(Math.round(s.minutes / 6) / 10) }) },
+        { ic: 'fi-rr-calendar', label: t('Trainings'), value: t('{n} bestanden', { n: fmt(trainingsPassed()) }) },
+        { ic: 'fi-rr-coins', label: t('Coins'), value: countHtml(w && !w.demo ? w.coins : 0, 'fmt', 'my-coins') },
+        { ic: 'fi-rr-user-add', label: t('Dabei seit'), value: s.first ? dtf({ month: 'short', year: 'numeric' }).format(new Date(s.first)) : '–' },
+        { ic: 'fi-rr-gamepad', label: t('Zuletzt gespielt'), value: s.last ? agoText(s.last) : '–' },
+        { ic: 'fi-rr-heart', label: t('Lieblingsstrecke'), value: fav ? `${routeNo(fav)}${esc(t(fav.title))}` : '–', wide: true },
       ],
     };
   }
@@ -2233,6 +2616,7 @@
   function renderSettings() {
     renderLangPicker();
     renderPrivacy();
+    renderFxSettings();
     renderNotify();
     $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === themeMode())));
     const p = state.profile;
@@ -2889,7 +3273,7 @@
 
   // ---------- Shop: Coins, Züge und Strecken ----------
   // Mit Backend kommen Katalog, Coins und Besitz vom Server (Stand aus dem Spiel); ohne Backend ist es eine Demo.
-  const shop = { data: null, at: 0, tab: 'trains', filter: 'all', loading: false };
+  const shop = { data: null, at: 0, tab: 'trains', filter: 'all', cat: 'all', sort: 'price', loading: false };
   const ART = Object.fromEntries(D.shop.trains.map((x) => [x.id, x.art]));
   let artN = 0;
   const coins = (n) => `<span class="coins">${icon('fi-sr-coins')}${fmt(n)}</span>`;
@@ -2963,64 +3347,205 @@
   }
   function shopNote() {
     const d = shop.data;
-    if (!d) return `<p class="shop-note">${t('Wird geladen …')}</p>`;
+    if (!d) return '';
     if (d.demo) return `<p class="shop-note">${icon('fi-rr-info')}<span>${t('Demo: Coins und Käufe gelten nur auf diesem Gerät. Mit dem App-Server kommen sie direkt aus dem Spiel.')}</span></p>`;
     if (!d.wallet) {
       return `<div class="shop-note shop-note--cta">${icon('fi-rr-sign-in-alt')}<span>${t('Melde dich mit Roblox an, um deine Coins und Züge aus dem Spiel zu sehen und hier einzukaufen.')}</span>
         <button class="btn btn--primary btn--sm" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
     }
     if (!d.wallet.syncedAt) return `<p class="shop-note">${icon('fi-rr-gamepad')}<span>${t('Noch keine Daten aus dem Spiel. Starte Train Sim Germany einmal – danach stehen hier deine Coins.')}</span></p>`;
-    const min = Math.max(0, Math.round((Date.now() - d.wallet.syncedAt) / 60000));
-    return `<p class="shop-note">${icon('fi-rr-check-circle')}<span>${min < 1 ? t('Stand aus dem Spiel: gerade eben') : t('Stand aus dem Spiel: vor {n} Min.', { n: min })}</span></p>`;
+    return '';
   }
-  function shopCard(kind, item) {
+  const SHOP_CATS = [['s', 'S-Bahn'], ['rb', 'RB'], ['re', 'RE'], ['ic', 'IC'], ['ice', 'ICE'], ['ec', 'EC']];
+  const catName = (c) => (CATS.find((x) => x.id === c) || { name: String(c).toUpperCase() }).name;
+  const itemName = (kind, item) => (kind === 'routes' ? `${item.route.no} ${t(item.route.title)}` : item.name);
+  // Kaufknopf bzw. Zustand eines Artikels
+  function shopAction(kind, item, { big = false } = {}) {
     const st = itemStatus(kind, item);
     const w = shop.data && shop.data.wallet;
-    const action = st === 'owned' ? `<span class="shop-own">${icon('fi-rr-check')}${t('Im Besitz')}</span>`
-      : st === 'pending' ? `<span class="shop-own shop-own--wait">${icon('fi-rr-time-fast')}${t('Wird im Spiel freigeschaltet')}</span>`
-        : st === 'locked' ? `<span class="shop-price">${coins(item.price)}</span>`
-          : `<button class="btn ${st === 'buy' ? 'btn--primary' : 'btn--soft'} shop-buy" type="button" data-buy="${kind}:${esc(item.id)}"${w && w.syncedAt === null && !w.demo ? ' disabled' : ''}>${coins(item.price)}</button>`;
-    if (kind === 'routes') {
-      const r = item.route;
-      return `<article class="shop-card shop-card--route is-${st}">
-        <div class="shop-card__media"><img src="assets/img/${r.img}" alt="" loading="lazy"><span class="line line--${r.cat}">${esc(r.line)}</span></div>
-        <div class="shop-card__body">
-          <span class="shop-card__kicker">${esc(r.no)}</span>
-          <h3>${esc(t(r.title))}</h3>
-          <p class="shop-card__meta">${esc(r.from)} → ${esc(r.to)}</p>
-          <p class="shop-card__meta">${fmt(r.km)} km · ${t('{n} Halte', { n: r.stops })}</p>
-          <div class="shop-card__foot">${action}</div>
-        </div>
-      </article>`;
-    }
-    return `<article class="shop-card is-${st}">
-      <div class="shop-card__media shop-card__media--${item.cat}">${trainArt(item.id)}<span class="line line--${item.cat}">${esc((CATS.find((c) => c.id === item.cat) || { name: item.cat.toUpperCase() }).name)}</span></div>
-      <div class="shop-card__body">
-        <span class="shop-card__kicker">${esc(item.series)}</span>
+    if (st === 'owned') return `<span class="sx-own">${icon('fi-sr-check-circle')}${t('Im Besitz')}</span>`;
+    if (st === 'pending') return `<span class="sx-own sx-own--wait">${icon('fi-rr-time-fast')}${t('Wird im Spiel freigeschaltet')}</span>`;
+    if (st === 'locked') return `<span class="sx-price">${coins(item.price)}</span>`;
+    const off = w && w.syncedAt === null && !w.demo;
+    return `<button class="btn ${st === 'buy' ? 'btn--primary' : 'btn--soft'} sx-buy${big ? ' btn--lg btn--block' : ''}" type="button" data-buy="${kind}:${esc(item.id)}"${off ? ' disabled' : ''}>${coins(item.price)}</button>`;
+  }
+  // Wie weit bin ich (für Artikel, die noch zu teuer sind)
+  function shortBar(item) {
+    const w = shop.data && shop.data.wallet;
+    if (!w || itemStatus(shop.tab, item) !== 'short') return '';
+    const p = Math.max(2, Math.min(100, (w.available / item.price) * 100));
+    return `<span class="sx-short"><span class="sx-short__bar"><i style="width:${p}%"></i></span><small>${t('Noch {n} Coins', { n: fmt(item.price - w.available) })}</small></span>`;
+  }
+  function shopTrainCard(item) {
+    const st = itemStatus('trains', item);
+    return `<article class="sx-card is-${st}">
+      <button class="sx-card__open" type="button" data-shop-item="trains:${esc(item.id)}" aria-label="${esc(t('{name} ansehen', { name: item.name }))}"></button>
+      <div class="sx-stage sx-stage--${item.cat}">${trainArt(item.id)}<span class="line line--${item.cat}">${esc(catName(item.cat))}</span>${st === 'owned' ? `<span class="sx-badge">${icon('fi-sr-check-circle')}</span>` : ''}</div>
+      <div class="sx-card__body">
+        <span class="sx-kicker">${esc(item.series)}</span>
         <h3>${esc(item.name)}</h3>
-        <p class="shop-card__meta">${icon('fi-rr-dashboard')}${t('{n} km/h', { n: item.vmax })}</p>
-        <div class="shop-card__foot">${action}</div>
+        <span class="sx-specs"><span>${icon('fi-rr-dashboard')}${t('{n} km/h', { n: item.vmax })}</span></span>
+        ${shortBar(item)}
+        <div class="sx-card__foot">${shopAction('trains', item)}</div>
       </div>
     </article>`;
   }
+  // Linienverlauf einer Strecke (Halte aus der Linie in data.js, zwischen Start und Ziel)
+  function routeStops(r) {
+    const L = lineByName(r.line);
+    if (!L) return [];
+    const names = L.stops.map(([n]) => n);
+    let a = names.indexOf(r.from);
+    let b = names.indexOf(r.to);
+    if (a < 0 || b < 0) return [];
+    const list = a <= b ? names.slice(a, b + 1) : names.slice(b, a + 1).reverse();
+    return list;
+  }
+  function shopRouteCard(item) {
+    const r = item.route;
+    const st = itemStatus('routes', item);
+    const stops = routeStops(r);
+    const dots = Math.min(8, Math.max(2, stops.length || r.stops));
+    return `<article class="rt-card is-${st}">
+      <button class="sx-card__open" type="button" data-shop-item="routes:${esc(item.id)}" aria-label="${esc(t('{name} ansehen', { name: t(r.title) }))}"></button>
+      <div class="rt-card__media"><img src="assets/img/${r.img}" alt="" loading="lazy"><span class="route-no">${esc(r.no)}</span><span class="line line--${r.cat}">${esc(r.line)}</span>${st === 'owned' ? `<span class="sx-badge">${icon('fi-sr-check-circle')}</span>` : ''}</div>
+      <div class="rt-card__body">
+        <h3>${esc(t(r.title))}</h3>
+        <div class="rt-way" style="--c:var(--c-${r.cat})">
+          <span class="rt-way__end"><b>${esc(r.from)}</b></span>
+          <span class="rt-way__line" aria-hidden="true">${'<i></i>'.repeat(dots)}</span>
+          <span class="rt-way__end rt-way__end--to"><b>${esc(r.to)}</b></span>
+        </div>
+        <p class="rt-meta"><span>${icon('fi-rr-route')}${fmt(r.km)} km</span><span>${icon('fi-rr-clock-three')}${t('{d} Std.', { d: r.dur })}</span><span>${icon('fi-rr-marker')}${t('{n} Halte', { n: r.stops })}</span></p>
+        ${shortBar(item)}
+        <div class="sx-card__foot">${r.tag ? `<span class="rt-tag">${esc(t(r.tag))}</span>` : ''}${shopAction('routes', item)}</div>
+      </div>
+    </article>`;
+  }
+  // Als Nächstes: der günstigste Artikel, den man noch nicht hat
+  function nextUp(kind, all) {
+    const open = all.filter((x) => ['buy', 'short', 'locked'].includes(itemStatus(kind, x))).sort((a, b) => a.price - b.price);
+    const item = open.find((x) => itemStatus(kind, x) === 'buy') || open[0];
+    if (!item) return '';
+    const w = shop.data && shop.data.wallet;
+    const st = itemStatus(kind, item);
+    const p = w ? Math.max(2, Math.min(100, (w.available / item.price) * 100)) : 0;
+    const media = kind === 'routes' ? `<img src="assets/img/${item.route.img}" alt="">` : trainArt(item.id);
+    return `<section class="sx-next sx-next--${kind === 'routes' ? item.route.cat : item.cat}">
+      <div class="sx-next__media">${media}</div>
+      <div class="sx-next__body">
+        <span class="sx-next__kicker">${icon('fi-rr-sparkles')}${st === 'buy' ? t('Kannst du dir leisten') : t('Dein nächstes Ziel')}</span>
+        <h2>${esc(itemName(kind, item))}</h2>
+        ${st === 'buy' || !w ? '' : `<span class="sx-short sx-short--lg"><span class="sx-short__bar"><i style="width:${p}%"></i></span><small>${t('{a} von {b} Coins', { a: fmt(w.available), b: fmt(item.price) })}</small></span>`}
+        <div class="sx-next__actions">${shopAction(kind, item)}<button class="btn btn--ghost btn--sm" type="button" data-shop-item="${kind}:${esc(item.id)}">${t('Ansehen')}</button></div>
+      </div>
+    </section>`;
+  }
+  function shopHistory() {
+    const w = shop.data && shop.data.wallet;
+    if (!w || w.demo) return '';
+    const rows = [...(w.pending || []).map((p) => ({ ...p, wait: true })), ...(w.history || [])];
+    if (!rows.length) return '';
+    const name = (x) => {
+      const it = shopItems(x.kind === 'route' ? 'routes' : 'trains').find((i) => i.id === x.item);
+      return it ? itemName(x.kind === 'route' ? 'routes' : 'trains', it) : x.item;
+    };
+    return `<section class="sx-history"><h2 class="sx-sec">${icon('fi-rr-receipt')}${t('Deine Käufe')}</h2><ul>${rows.slice(0, 12).map((x) => `<li>
+      <span class="sx-history__ic${x.wait ? ' is-wait' : x.ok ? ' is-ok' : ' is-bad'}">${icon(x.wait ? 'fi-rr-time-fast' : x.ok ? 'fi-rr-check' : 'fi-rr-cross-small')}</span>
+      <span class="sx-history__main"><b>${esc(name(x))}</b><small>${x.wait ? t('Wartet auf das Spiel') : x.ok ? t('Im Spiel freigeschaltet') : t('Abgelehnt – Coins zurück')} · ${fmtWhen(x.doneAt || x.at)}</small></span>
+      <span class="sx-history__price">${coins(x.price)}</span></li>`).join('')}</ul></section>`;
+  }
   function renderShop() {
     if (!shop.data) loadShop();
-    const w = shop.data && shop.data.wallet;
-    $('[data-shop-coins]').innerHTML = w ? coins(w.coins) : coins(0);
-    $('[data-shop-sub]').textContent = w && w.pending && w.pending.length
-      ? t('{n} Coins reserviert für offene Käufe', { n: fmt(w.coins - w.available) }) : t('Deine Coins');
-    $$('[data-shop-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.shopTab === shop.tab)));
+    const d = shop.data;
+    const w = d && d.wallet;
     const kind = shop.tab;
     const all = shopItems(kind);
+    const trainsAll = shopItems('trains');
+    const routesAll = shopItems('routes');
+    const owned = (k, list) => list.filter((x) => ['owned', 'pending'].includes(itemStatus(k, x))).length;
+    const reserved = w ? w.coins - w.available : 0;
+    const min = w && w.syncedAt ? Math.max(0, Math.round((Date.now() - w.syncedAt) / 60000)) : null;
+    const nOwned = owned('trains', trainsAll) + owned('routes', routesAll);
+    const nAll = trainsAll.length + routesAll.length;
+    $('[data-shop-head]').innerHTML = `<div class="wallet">
+        <div class="wallet__top"><span class="wallet__label">${icon('fi-rr-wallet')}${t('Deine Coins')}</span>
+          <span class="wallet__sync">${!d ? t('Wird geladen …') : d.demo ? t('Demo') : !w ? t('Nicht angemeldet') : min === null ? t('Noch kein Stand aus dem Spiel') : `${icon('fi-rr-check')}${min < 1 ? t('Stand aus dem Spiel: gerade eben') : t('Stand aus dem Spiel: vor {n} Min.', { n: min })}`}</span></div>
+        <div class="wallet__coins"><span class="wallet__coin" aria-hidden="true">${icon('fi-sr-coins')}</span>${countHtml(w ? w.coins : 0, 'fmt', 'wallet')}</div>
+        ${reserved > 0 ? `<p class="wallet__reserved">${t('{n} Coins reserviert für offene Käufe', { n: fmt(reserved) })}</p>` : ''}
+        <div class="wallet__stats">
+          <span><b>${owned('trains', trainsAll)}</b>/${trainsAll.length} ${t('Züge')}</span>
+          <span><b>${owned('routes', routesAll)}</b>/${routesAll.length} ${t('Strecken')}</span>
+          <span class="wallet__collection"><span class="wallet__bar"><i style="width:${nAll ? (nOwned / nAll) * 100 : 0}%"></i></span><small>${t('Sammlung {n}', { n: pct(nAll ? (nOwned / nAll) * 100 : 0) })}</small></span>
+        </div>
+      </div>
+      <div class="segmented segmented--shop" role="tablist" aria-label="${esc(t('Shop'))}" style="--i:${kind === 'routes' ? 1 : 0}">
+        <span class="segmented__thumb" aria-hidden="true"></span>
+        <button type="button" role="tab" aria-selected="${kind === 'trains'}" data-shop-tab="trains">${icon('fi-rr-train-side')}${t('Züge')}</button>
+        <button type="button" role="tab" aria-selected="${kind === 'routes'}" data-shop-tab="routes">${icon('fi-rr-route')}${t('Strecken')}</button>
+      </div>`;
+    countUp($('[data-shop-head]'));
+
+    const cats = kind === 'trains' ? SHOP_CATS.filter(([c]) => all.some((x) => x.cat === c)) : SHOP_CATS.filter(([c]) => all.some((x) => x.route.cat === c));
+    if (shop.cat !== 'all' && !cats.some(([c]) => c === shop.cat)) shop.cat = 'all';
+    const catOf = (x) => (kind === 'routes' ? x.route.cat : x.cat);
     const list = all.filter((x) => {
       const st = itemStatus(kind, x);
-      return shop.filter === 'all' || (shop.filter === 'owned' ? st === 'owned' || st === 'pending' : st === 'buy' || st === 'short');
-    });
-    const n = (f) => all.filter((x) => { const st = itemStatus(kind, x); return f === 'owned' ? st === 'owned' || st === 'pending' : st === 'buy' || st === 'short' || st === 'locked'; }).length;
-    const chip = (id, label) => `<button class="chip${shop.filter === id ? ' is-active' : ''}" type="button" data-shop-filter="${id}">${label}</button>`;
+      if (shop.cat !== 'all' && catOf(x) !== shop.cat) return false;
+      return shop.filter === 'all' || (shop.filter === 'owned' ? st === 'owned' || st === 'pending' : st === 'buy' || st === 'short' || st === 'locked');
+    }).sort((a, b) => (shop.sort === 'price-down' ? b.price - a.price : shop.sort === 'speed' && kind === 'trains' ? b.vmax - a.vmax : shop.sort === 'km' && kind === 'routes' ? b.route.km - a.route.km : a.price - b.price));
+    const n = (f) => all.filter((x) => { const st = itemStatus(kind, x); return f === 'owned' ? st === 'owned' || st === 'pending' : st !== 'owned' && st !== 'pending'; }).length;
+    const chip = (attr, id, cur, label) => `<button class="chip${cur === id ? ' is-active' : ''}" type="button" ${attr}="${id}">${label}</button>`;
+    const sorts = kind === 'trains' ? [['price', t('Preis aufsteigend')], ['price-down', t('Preis absteigend')], ['speed', t('Schnellste zuerst')]]
+      : [['price', t('Preis aufsteigend')], ['price-down', t('Preis absteigend')], ['km', t('Längste zuerst')]];
+    if (!sorts.some(([id]) => id === shop.sort)) shop.sort = 'price';
     $('[data-shop]').innerHTML = `${shopNote()}
-      <div class="chips chips--scroll chips--block">${chip('all', `${t('Alle')} · ${all.length}`)}${chip('owned', `${t('Im Besitz')} · ${n('owned')}`)}${chip('buy', `${t('Kaufbar')} · ${n('buy')}`)}</div>
-      <div class="shop-grid">${list.length ? list.map((x) => shopCard(kind, x)).join('') : `<p class="empty">${t('Hier ist gerade nichts.')}</p>`}</div>`;
+      ${shop.filter === 'all' && shop.cat === 'all' ? nextUp(kind, all) : ''}
+      <div class="sx-tools">
+        <div class="chips chips--scroll">${chip('data-shop-filter', 'all', shop.filter, `${t('Alle')} · ${all.length}`)}${chip('data-shop-filter', 'owned', shop.filter, `${t('Im Besitz')} · ${n('owned')}`)}${chip('data-shop-filter', 'buy', shop.filter, `${t('Noch offen')} · ${n('buy')}`)}</div>
+        <label class="sx-sort">${icon('fi-rr-sort-amount-down')}<span class="sr-only">${t('Sortieren')}</span><select data-shop-sort>${sorts.map(([id, label]) => `<option value="${id}"${shop.sort === id ? ' selected' : ''}>${label}</option>`).join('')}</select></label>
+      </div>
+      ${cats.length > 1 ? `<div class="chips chips--scroll chips--block sx-cats">${chip('data-shop-cat', 'all', shop.cat, t('Alle Gattungen'))}${cats.map(([c, label]) => `<button class="chip chip--cat${shop.cat === c ? ' is-active' : ''}" type="button" data-shop-cat="${c}"><span class="line line--${c}">${label}</span></button>`).join('')}</div>` : ''}
+      <div class="${kind === 'routes' ? 'rt-grid' : 'sx-grid'}" data-reveal>${list.length ? list.map((x) => (kind === 'routes' ? shopRouteCard(x) : shopTrainCard(x))).join('') : `<p class="empty">${t('Hier ist gerade nichts.')}</p>`}</div>
+      ${shopHistory()}`;
+    reveal($('[data-reveal]', $('[data-shop]')));
+  }
+  // Detailansicht eines Artikels
+  function itemView(arg) {
+    const [kind, id] = String(arg).split(':');
+    const item = shopItems(kind).find((x) => x.id === id);
+    if (!item) return `<p class="muted">${t('Diesen Artikel gibt es nicht mehr.')}</p>`;
+    if (kind === 'routes') {
+      const r = item.route;
+      const stops = routeStops(r);
+      const trains = D.shop.trains.filter((x) => Object.values(D.lines).some((L) => L.name === r.line && L.train === x.name));
+      return `<div class="sx-detail">
+        <div class="sx-detail__media sx-detail__media--img"><img src="assets/img/${r.img}" alt=""><span class="route-no">${esc(r.no)}</span></div>
+        <div class="sx-detail__title"><span class="line line--${r.cat}">${esc(r.line)}</span><h3>${esc(t(r.title))}</h3></div>
+        <dl class="sx-facts">
+          <div><dt>${icon('fi-rr-route')}${t('Länge')}</dt><dd>${fmt(r.km)} km</dd></div>
+          <div><dt>${icon('fi-rr-clock-three')}${t('Fahrzeit')}</dt><dd>${t('{d} Std.', { d: r.dur })}</dd></div>
+          <div><dt>${icon('fi-rr-marker')}${t('Halte')}</dt><dd>${r.stops}</dd></div>
+        </dl>
+        ${stops.length ? `<ol class="sx-stops" style="--c:var(--c-${r.cat})">${stops.map((n, i) => `<li class="${i === 0 || i === stops.length - 1 ? 'is-end' : ''}"><i></i><span>${esc(n)}</span></li>`).join('')}</ol>` : ''}
+        ${trains.length ? `<p class="sx-fits">${icon('fi-rr-train-side')}<span>${t('Im Fahrplan mit: {list}', { list: trains.map((x) => esc(x.name)).join(', ') })}</span></p>` : ''}
+        <div class="sx-detail__buy">${shortBar(item)}${shopAction('routes', item, { big: true })}</div>
+      </div>`;
+    }
+    const lines = Object.values(D.lines).filter((L) => L.train === item.name);
+    const seen = new Set();
+    const lineList = lines.filter((L) => !seen.has(L.name) && seen.add(L.name));
+    return `<div class="sx-detail">
+      <div class="sx-detail__media sx-stage sx-stage--${item.cat}">${trainArt(item.id)}</div>
+      <div class="sx-detail__title"><span class="line line--${item.cat}">${esc(catName(item.cat))}</span><h3>${esc(item.name)}</h3><small>${esc(item.series)}</small></div>
+      <dl class="sx-facts">
+        <div><dt>${icon('fi-rr-dashboard')}${t('Spitze')}</dt><dd>${t('{n} km/h', { n: item.vmax })}</dd></div>
+        <div><dt>${icon('fi-rr-train-side')}${t('Gattung')}</dt><dd>${esc(catName(item.cat))}</dd></div>
+        <div><dt>${icon('fi-rr-coins')}${t('Preis')}</dt><dd>${item.price ? coins(item.price) : t('Gratis')}</dd></div>
+      </dl>
+      ${lineList.length ? `<p class="sx-fits">${icon('fi-rr-route')}<span>${t('Fährt im Fahrplan auf')}</span>${lineList.map(lineBadge).join('')}</p>` : ''}
+      <div class="sx-detail__buy">${shortBar(item)}${shopAction('trains', item, { big: true })}</div>
+    </div>`;
   }
   function buyView(arg) {
     const [kind, id] = String(arg).split(':');
@@ -3028,11 +3553,11 @@
     if (!item) return `<p class="muted">${t('Diesen Artikel gibt es nicht mehr.')}</p>`;
     const w = shop.data && shop.data.wallet;
     const st = itemStatus(kind, item);
-    const name = kind === 'routes' ? `${item.route.no} ${t(item.route.title)}` : item.name;
+    const name = itemName(kind, item);
     if (st === 'owned' || st === 'pending') return `<p class="muted">${t('{name} gehört dir schon.', { name: esc(name) })}</p>`;
     const after = w ? w.available - item.price : 0;
     return `<div class="buy">
-      <div class="buy__media">${kind === 'routes' ? `<img src="assets/img/${item.route.img}" alt="">` : trainArt(item.id)}</div>
+      <div class="buy__media${kind === 'routes' ? '' : ` sx-stage sx-stage--${item.cat}`}">${kind === 'routes' ? `<img src="assets/img/${item.route.img}" alt="">` : trainArt(item.id)}</div>
       <h3>${esc(name)}</h3>
       <dl class="buy__sum">
         <div><dt>${t('Preis')}</dt><dd>${coins(item.price)}</dd></div>
@@ -3044,10 +3569,11 @@
           <p class="f__note">${shop.data.demo ? t('Demo: Der Kauf gilt nur auf diesem Gerät.') : t('Die Coins werden reserviert. Im Spiel wird der Kauf beim nächsten Abgleich verbucht – meist innerhalb einer Minute, sonst beim nächsten Spielstart.')}</p>`}
     </div>`;
   }
-  async function confirmBuy(arg) {
+  async function confirmBuy(arg, btn) {
     const [kind, id] = String(arg).split(':');
     const item = shopItems(kind).find((x) => x.id === id);
     if (!item) return;
+    const r = btn ? btn.getBoundingClientRect() : null;
     if (shop.data.demo) {
       const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
       if (w.coins < item.price) return;
@@ -3059,11 +3585,15 @@
       try {
         shop.data.wallet = await api('/api/shop/buy', { method: 'POST', body: { kind: kind === 'routes' ? 'route' : 'train', id } });
       } catch (e) {
+        haptic('error');
         toast(e.status === 402 ? t('Dafür reichen deine Coins nicht.') : e.status === 409 && e.message === 'not_synced'
           ? t('Starte zuerst einmal das Spiel, damit deine Coins hier ankommen.') : e.status === 409 ? t('Das gehört dir schon.') : errorText(e));
+        if (btn) btn.disabled = false;
         return;
       }
     }
+    if (r) coinBurst(r.left + r.width / 2, r.top + r.height / 2);
+    haptic('success');
     closeModal();
     renderShop();
     toast(t('Gekauft: {name}', { name: kind === 'routes' ? t(item.route.title) : item.name }));
@@ -3591,7 +4121,9 @@
     if (!box) return;
     if (!apiReady()) { box.innerHTML = ''; return; }
     if (!ps.list) { loadPservers(); box.innerHTML = ''; return; }
-    const { mine, visible } = ps.list;
+    // Laufende private Server stehen schon oben in der Liste; hier eigene (zum Einstellen) und offline erreichbare
+    const mine = ps.list.mine;
+    const visible = ps.list.visible.filter((p) => !p.online || !liveMode());
     const title = (n) => `<h2 class="ps-sec__title">${icon('fi-rr-lock')}${t('Private Server')}${n ? `<small>${n}</small>` : ''}</h2>`;
     if (!mine.length && !visible.length) {
       box.innerHTML = sessionToken() ? `<section class="ps-sec">${title(0)}<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Hast du einen privaten Server? Starte ihn einmal in Roblox – dann erscheint er hier. Du kannst ihn benennen, mit einem Server-Chat verbinden und festlegen, ob man über die App oder nur über Roblox beitritt.')}</span></p></section>` : '';
@@ -4225,6 +4757,223 @@
     else openConv(id);
   }
 
+  // ---------- Spieler: auf Roblox verfolgen ----------
+  // Verfolgte Spieler und Roblox-Freunde mit Status: nur ob jemand in Train Sim Germany ist (nie andere Spiele),
+  // auf welchem Server, in welcher Rolle und mit welchem Zug. Die Liste der Verfolgten gilt auf allen Geräten.
+  const pl = {
+    tab: 'track', track: store.get('tsg-track', []).filter((x) => /^\d{1,20}$/.test(x)), data: {}, at: 0, busy: false,
+    found: null, finding: false, friends: null, friendsAt: 0, friendsBusy: false,
+  };
+  const saveTrack = () => { store.set('tsg-track', pl.track); settingsChanged(); };
+  const isTracked = (id) => pl.track.includes(String(id));
+  function agoText(ms) {
+    const min = Math.round((Date.now() - ms) / 60000);
+    if (min < 1) return t('gerade eben');
+    if (min < 60) return t('vor {n} Min.', { n: min });
+    if (min < 24 * 60) return t('vor {n} Std.', { n: Math.round(min / 60) });
+    return fmtWhen(ms);
+  }
+  async function loadStatus(ids, done) {
+    if (!apiReady() || !ids.length) return;
+    try {
+      const r = await api('/api/players/status', { method: 'POST', body: { ids } });
+      r.players.forEach((p) => { pl.data[p.userId] = { ...p, at: Date.now() }; });
+      if (typeof r.friendsKnown === 'boolean') pl.friendsKnown = r.friendsKnown;
+    } catch (e) { /* alter Stand bleibt */ }
+    if (done) done();
+  }
+  async function loadTracked(force = false) {
+    if (pl.busy || (!force && Date.now() - pl.at < 25000)) return;
+    pl.busy = true;
+    await loadStatus(pl.track);
+    pl.busy = false;
+    pl.at = Date.now();
+    if (state.page === 'spieler') renderPlayers();
+    if (modalView && modalView.name === 'player') refreshModal();
+  }
+  async function loadFriends(force = false) {
+    if (!apiReady() || !sessionToken() || pl.friendsBusy || (!force && Date.now() - pl.friendsAt < 30000)) return;
+    pl.friendsBusy = true;
+    try {
+      const r = await api('/api/players/friends');
+      r.players.forEach((p) => { pl.data[p.userId] = { ...p, at: Date.now() }; });
+      pl.friends = { ids: r.players.map((p) => p.userId), total: r.total, known: r.friendsKnown };
+    } catch (e) { pl.friends = pl.friends || { ids: [], total: 0, known: false, error: true }; }
+    pl.friendsBusy = false;
+    pl.friendsAt = Date.now();
+    if (state.page === 'spieler') renderPlayers();
+  }
+  function setTracked(id, on) {
+    id = String(id);
+    pl.track = on ? [id, ...pl.track.filter((x) => x !== id)].slice(0, 100) : pl.track.filter((x) => x !== id);
+    saveTrack();
+    haptic(on ? 'success' : 'tap');
+    toast(on ? t('Du verfolgst jetzt {name}.', { name: (pl.data[id] && pl.data[id].displayName) || id }) : t('Nicht mehr verfolgt.'));
+    if (on && !pl.data[id]) loadStatus([id], () => { if (state.page === 'spieler') renderPlayers(); });
+    if (state.page === 'spieler') renderPlayers();
+    if (modalView && modalView.name === 'player') refreshModal();
+  }
+  async function findTrackPlayer(form) {
+    const q = form.q.value.trim();
+    if (!q) return;
+    pl.finding = true;
+    pl.found = null;
+    renderPlayers();
+    try {
+      const p = await api(`/api/players/find?q=${encodeURIComponent(q)}`);
+      pl.found = p;
+      await loadStatus([p.userId]);
+    } catch (e) {
+      pl.found = { missing: true, q };
+      haptic('error');
+    }
+    pl.finding = false;
+    renderPlayers();
+  }
+
+  // Status in einer Zeile: in Train Sim Germany (mit Zug oder Rolle) oder nicht
+  function statusLine(p) {
+    if (!p) return `<span class="pstat">${t('Wird geladen …')}</span>`;
+    if (p.inGame) {
+      const a = p.activity;
+      const what = a && (a.line || a.train) ? `${a.line ? `${esc(a.line)} ` : ''}${a.dest ? t('nach {to}', { to: esc(a.dest) }) : esc(a.train || '')}` : a ? esc(a.role) : t('privater Server');
+      return `<span class="pstat pstat--on"><i></i>${t('In Train Sim Germany')}${what ? ` · ${what}` : ''}</span>`;
+    }
+    return `<span class="pstat">${t('Nicht in Train Sim Germany')}${p.lastSeen ? ` · ${t('zuletzt {when}', { when: agoText(p.lastSeen) })}` : ''}</span>`;
+  }
+  const playerPic = (p, cls = '') => (p && p.avatar
+    ? `<span class="avatar avatar--img ${cls}" aria-hidden="true"><img src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`
+    : avatar((p && (p.username || p.displayName)) || '?', cls));
+  function playerCard(id) {
+    const p = pl.data[id];
+    const name = p ? p.displayName || p.username || id : id;
+    return `<button class="pcard${p && p.inGame ? ' is-ingame' : ''}" type="button" data-player="${esc(id)}">
+      <span class="pcard__pic">${playerPic(p, 'avatar--lg')}<i class="pcard__dot" aria-hidden="true"></i></span>
+      <span class="pcard__main">
+        <b>${esc(name)}${p && p.friend ? `<span class="pill pill--friend">${icon('fi-sr-heart')}${t('Freund')}</span>` : ''}${p && p.me ? `<span class="pill">${t('Du')}</span>` : ''}</b>
+        ${p && p.username ? `<small>@${esc(p.username)}</small>` : ''}
+        ${statusLine(p)}
+      </span>
+      ${icon('fi-rr-angle-small-right', 'pcard__chev')}
+    </button>`;
+  }
+  const playersSorted = (ids) => [...ids].sort((a, b) => {
+    const x = pl.data[a] || {}; const y = pl.data[b] || {};
+    return (!!y.inGame - !!x.inGame) || (!!y.friend - !!x.friend) || ((y.lastSeen || 0) - (x.lastSeen || 0));
+  });
+
+  function renderPlayers() {
+    const head = $('[data-players-head]');
+    const body = $('[data-players]');
+    if (!head || !body) return;
+    const nIn = (ids) => ids.filter((id) => pl.data[id] && pl.data[id].inGame).length;
+    const friendIds = pl.friends ? pl.friends.ids : [];
+    const tab = (id, ic, label, n) => `<button type="button" role="tab" aria-selected="${pl.tab === id}" data-players-tab="${id}">${icon(ic)}${label}${n != null ? `<span class="head-tabs__n">${n}</span>` : ''}</button>`;
+    // Kopf nur einmal bauen (sonst verschwindet beim Aktualisieren, was man gerade ins Suchfeld tippt)
+    if (head.dataset.lang !== lang) {
+      head.dataset.lang = lang;
+      head.innerHTML = `<div class="appbar">
+          <div class="appbar__title"><span class="appbar__label">${t('Auf Roblox verfolgen')}</span><h1 class="appbar__value">${t('Spieler')}</h1></div>
+        </div>
+        <form class="field field--action" data-player-search novalidate>
+          ${icon('fi-rr-search')}
+          <span class="field__input"><span class="sr-only">${t('Roblox-Name oder ID')}</span><input name="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name oder ID'))}"></span>
+          <button class="btn btn--primary btn--sm" type="submit">${t('Suchen')}</button>
+        </form>
+        <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Spieler'))}" data-players-tabs></div>`;
+    }
+    $('[data-players-tabs]', head).innerHTML = `${tab('track', 'fi-rr-eye', t('Verfolgt'), pl.track.length)}
+      ${tab('friends', 'fi-rr-heart', t('Freunde'), pl.friends ? pl.friends.total : null)}`;
+    if (!apiReady()) {
+      body.innerHTML = `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-database')}</span><h3>${t('Der App-Server fehlt noch')}</h3><p>${t('Spieler verfolgen, Freunde und wer gerade im Spiel ist – das geht nur mit dem Server der App.')}</p></div>`;
+      return;
+    }
+    let found = '';
+    if (pl.finding) found = `<div class="sheet-loading">${icon('fi-rr-spinner')}<span>${t('Suche auf Roblox …')}</span></div>`;
+    else if (pl.found && pl.found.missing) found = `<p class="note note--bad">${icon('fi-rr-info')}<span>${t('Auf Roblox gibt es niemanden mit „{name}“.', { name: esc(pl.found.q) })}</span></p>`;
+    else if (pl.found) {
+      const id = pl.found.userId;
+      found = `<section class="found-card"><div class="found-card__row">${playerCard(id)}</div>
+        <button class="btn ${isTracked(id) ? 'btn--soft' : 'btn--primary'} btn--block" type="button" data-track="${esc(id)}" aria-pressed="${isTracked(id)}">${icon(isTracked(id) ? 'fi-rr-check' : 'fi-rr-eye')}${isTracked(id) ? t('Wird verfolgt') : t('Verfolgen')}</button></section>`;
+    }
+    let list;
+    if (pl.tab === 'friends') {
+      if (!sessionToken()) {
+        list = `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-heart')}</span><h3>${t('Deine Roblox-Freunde')}</h3><p>${t('Melde dich mit Roblox an – dann siehst du hier, welche deiner Freunde gerade Train Sim Germany spielen.')}</p>
+          <button class="btn btn--primary" type="button" data-open="profile">${icon('fi-rr-sign-in-alt')}${t('Anmelden')}</button></div>`;
+      } else if (!pl.friends) {
+        loadFriends();
+        list = `<div class="pgrid">${'<div class="pcard pcard--skeleton" aria-hidden="true"></div>'.repeat(4)}</div>`;
+      } else if (!pl.friends.known) {
+        list = `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-lock')}</span><h3>${t('Freundesliste nicht abrufbar')}</h3><p>${t('Roblox gibt deine Freundesliste gerade nicht heraus. Prüfe in Roblox unter Einstellungen → Privatsphäre, wer deine Freunde sehen darf.')}</p></div>`;
+      } else if (!friendIds.length) {
+        list = `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-heart')}</span><h3>${t('Noch keine Freunde')}</h3><p>${t('Auf Roblox hast du noch keine Freunde hinzugefügt.')}</p></div>`;
+      } else {
+        const n = nIn(friendIds);
+        list = `<p class="plist-sum">${n ? `<span class="pstat pstat--on"><i></i>${t('{n} gerade in Train Sim Germany', { n })}</span>` : t('Gerade spielt keiner deiner Freunde Train Sim Germany.')}${pl.friends.total > friendIds.length ? ` · ${t('{n} von {total} angezeigt', { n: friendIds.length, total: pl.friends.total })}` : ''}</p>
+          <div class="pgrid" data-reveal>${playersSorted(friendIds).map(playerCard).join('')}</div>`;
+      }
+    } else if (!pl.track.length) {
+      list = `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-eye')}</span><h3>${t('Noch niemand verfolgt')}</h3><p>${t('Suche oben nach einem Roblox-Namen und tippe auf „Verfolgen“. Dann siehst du hier, ob er gerade in Train Sim Germany ist – mit Server, Rolle und Zug.')}</p></div>`;
+    } else {
+      if (!pl.at) loadTracked();
+      const n = nIn(pl.track);
+      list = `<p class="plist-sum">${n ? `<span class="pstat pstat--on"><i></i>${t('{n} gerade in Train Sim Germany', { n })}</span>` : t('Gerade ist niemand davon in Train Sim Germany.')}</p>
+        <div class="pgrid" data-reveal>${playersSorted(pl.track).map(playerCard).join('')}</div>`;
+    }
+    body.innerHTML = found + list;
+    reveal($('[data-reveal]', body));
+  }
+
+  // Sheet eines Spielers
+  function playerView(id) {
+    const p = pl.data[id];
+    if (!p || Date.now() - (p.at || 0) > 30000) loadStatus([id], () => { if (modalView && modalView.name === 'player' && modalView.arg === id) refreshModal(); if (state.page === 'spieler') renderPlayers(); });
+    if (!p) return `<div class="sheet-loading">${icon('fi-rr-spinner')}<span>${t('Wird geladen …')}</span></div>`;
+    const a = p.activity;
+    const sv = p.server;
+    let status;
+    if (p.inGame && sv && !sv.hidden) {
+      const ps0 = sv.pserver;
+      const join = sv.private ? (ps0 && ps0.canJoin && ps0.link ? ps0.link : null) : joinUrl({ id: sv.id });
+      const L = a && lineByName(a.line);
+      const cat = L ? L.cat : (a && catOfTrain(a.veh)) || 're';
+      status = `<section class="pstatus is-on">
+        <p class="pstatus__title"><span class="live-dot"></span>${t('Gerade in Train Sim Germany')}</p>
+        <div class="pstatus__server">${icon(sv.private ? 'fi-rr-lock' : 'fi-rr-signal-alt-2')}<span><b>${sv.private ? esc(ps0 ? ps0.name : t('Privater Server')) : t('Öffentlicher Server')}</b><small>ID ${esc(shortId(sv.id))} · ${t('{n} Spieler', { n: `${sv.players}/${sv.max}` })}</small></span></div>
+        ${a ? `<div class="pstatus__role"><span class="role-dot" style="--rc:${roleRank(a.role).color}">${esc(roleRank(a.role).prefix)}</span><span>${esc(a.role)}<small>${esc(t(roleRank(a.role).label))}</small></span></div>` : ''}
+        ${a && (a.line || a.train) ? `<div class="pstatus__train">
+          ${a.line ? `<span class="line line--${cat}">${esc(a.line)}</span>` : ''}
+          <span><b>${a.dest ? t('nach {to}', { to: esc(a.dest) }) : esc(a.train || '')}</b><small>${[a.train, trainName(a.veh)].filter(Boolean).map(esc).join(' · ')}</small>
+          ${a.next ? `<small>${icon('fi-rr-marker')}${t('Nächster Halt')}: ${esc(a.next)}</small>` : ''}</span></div>`
+          : a && a.at ? `<div class="pstatus__train">${icon('fi-rr-train-station')}<span><b>${esc(a.at)}</b><small>${t('Bahnhof')}</small></span></div>` : ''}
+        <div class="pstatus__actions">
+          ${join ? `<a class="btn btn--primary" href="${esc(join)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>` : `<span class="ps-note">${icon('fi-rr-lock')}${t('Beitreten nur über Roblox')}</span>`}
+          <a class="btn btn--outline" href="#/server/${encodeURIComponent(sv.id)}">${icon('fi-rr-eye')}${t('Server ansehen')}</a>
+        </div>
+      </section>`;
+    } else if (p.inGame) {
+      status = `<section class="pstatus is-on"><p class="pstatus__title"><span class="live-dot"></span>${t('Gerade in Train Sim Germany')}</p><p class="muted">${t('Auf einem privaten Server, den sein Besitzer nicht zeigt.')}</p></section>`;
+    } else {
+      status = `<section class="pstatus"><p class="pstatus__title">${icon('fi-rr-moon')}${t('Gerade nicht in Train Sim Germany')}</p>
+        <p class="muted">${p.lastSeen ? t('Zuletzt im Spiel: {when}', { when: agoText(p.lastSeen) }) : t('Noch nicht in Train Sim Germany gesehen.')}</p></section>`;
+    }
+    const tracked = isTracked(id);
+    return `<div class="profile-box profile-box--player">
+        <span class="pbig${p.inGame ? ' is-ingame' : ''}">${playerPic(p, 'avatar--xl')}</span>
+        <h3>${esc(p.displayName || p.username || id)}</h3>
+        ${p.username ? `<p>@${esc(p.username)}</p>` : ''}
+        <div class="pbadges">${p.friend ? `<span class="pill pill--friend">${icon('fi-sr-heart')}${t('Dein Freund auf Roblox')}</span>` : p.friend === false && !p.me ? `<span class="pill">${icon('fi-rr-user')}${t('Nicht befreundet')}</span>` : ''}${p.me ? `<span class="pill">${t('Das bist du')}</span>` : ''}</div>
+      </div>
+      ${status}
+      <div class="sheet-actions">
+        ${p.me ? '' : `<button class="btn ${tracked ? 'btn--soft' : 'btn--primary'} btn--lg btn--block" type="button" data-track="${esc(id)}" aria-pressed="${tracked}">${icon(tracked ? 'fi-rr-check' : 'fi-rr-eye')}${tracked ? t('Wird verfolgt – beenden') : t('Verfolgen')}</button>`}
+        ${p.me || !sessionToken() ? '' : `<a class="btn btn--outline btn--lg btn--block" href="#/chat/an/${encodeURIComponent(id)}">${icon('fi-rr-paper-plane')}${t('Nachricht schreiben')}</a>`}
+        <a class="btn btn--soft btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(id)}/profile" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}${t('Roblox-Profil ansehen')}</a>
+      </div>
+      <p class="sheet-note">${t('Angezeigt wird nur, ob jemand in Train Sim Germany ist – nie andere Spiele.')}</p>`;
+  }
+
   // ---------- Echte Zahlen: Gruppe, Spiel, Discord ----------
   const inviteCode = (String(D.links.discord).match(/discord\.(?:gg|com\/invite)\/([\w-]+)/) || [])[1];
   function applyStats(s) {
@@ -4274,7 +5023,8 @@
   // ---------- Einstellungen auf allen Geräten (mit Backend und Roblox-Login) ----------
   const settingsAt = () => store.get('tsg-settings-at', 0);
   const currentSettings = () => ({
-    theme: themeMode(), lang: langSetting(), bell: state.bell, remind: [...remind.ids], remindOff: [...remind.off], favs: [...state.favs], updatedAt: settingsAt(),
+    theme: themeMode(), lang: langSetting(), bell: state.bell, remind: [...remind.ids], remindOff: [...remind.off], favs: [...state.favs],
+    track: pl.track, haptics: fx.haptics, motion: fx.motion, updatedAt: settingsAt(),
   });
   let settingsTimer = null;
   let applyingSettings = false;
@@ -4300,6 +5050,9 @@
       saveRemind();
       state.favs = new Set(s.favs || []);
       store.set('tsg-favs', [...state.favs]);
+      if (Array.isArray(s.track)) { pl.track = s.track.filter((x) => /^\d{1,20}$/.test(x)); store.set('tsg-track', pl.track); }
+      if (typeof s.haptics === 'boolean') setHaptics(s.haptics, { quiet: true });
+      if (typeof s.motion === 'boolean') setMotion(s.motion, { quiet: true });
       if (s.lang && s.lang !== langSetting()) await setLanguage(s.lang);
     } finally {
       applyingSettings = false;
@@ -4378,11 +5131,11 @@
           <section class="mystats__block">
             <h4 class="mystats__title"><span class="mystats__dot"></span>${t('Alle Strecken')}<small>${t('{n} Fahrten', { n: fmt(st.trips) })}</small></h4>
             <p class="mystats__sub">${t('Wie oft du jede Strecke gefahren bist')}</p>
-            <ol class="rank-list rank-list--compact">${routeList(st.routes, st.routes[0].value)}</ol>
+            <ol class="rank-list rank-list--compact">${routeList(st.routes, st.routes[0] ? st.routes[0].value : 0)}</ol>
           </section>
           <h4 class="mystats__title">${t('Diese Woche gespielt')}</h4>
-          <div class="week-bars">${st.week.map((d) => `<div class="week-bars__col${d.today ? ' is-today' : ''}"><span class="week-bars__val">${d.min ? `${nf1.format(Math.round(d.min / 6) / 10)} h` : '–'}</span><span class="week-bars__bar"><i style="height:${Math.max(4, (d.min / max) * 100)}%"></i></span><span class="week-bars__day">${d.label}</span></div>`).join('')}</div>
-          <p class="sheet-note">${t('Demo-Werte – später kommen sie direkt aus dem Spiel.')}</p>
+          <div class="week-bars">${st.week.map((d) => `<div class="week-bars__col${d.today ? ' is-today' : ''}"><span class="week-bars__val">${nf1.format(Math.round(d.min / 6) / 10)} h</span><span class="week-bars__bar"><i style="height:${Math.max(4, (d.min / max) * 100)}%"></i></span><span class="week-bars__day">${d.label}</span></div>`).join('')}</div>
+          <p class="sheet-note">${t('Alle Werte kommen direkt aus dem Spiel. Was noch nicht passiert ist, steht auf 0.')}</p>
           <div class="sheet-actions"><button class="btn btn--soft btn--lg btn--block" type="button" data-open="profile">${icon('fi-rr-arrow-left')}${t('Zurück zum Profil')}</button></div>
         </div>`;
       },
@@ -4408,6 +5161,14 @@
         </div>
         <p class="sheet-note">${t('Rote Punkte zeigen Tage mit Trainings.')}</p>`;
       },
+    },
+    player: {
+      title: () => t('Spieler'),
+      render: (id) => playerView(id),
+    },
+    'server-players': {
+      title: () => t('Alle Spieler'),
+      render: (id) => serverPeopleView(id),
     },
     trip: {
       title: () => t('Fahrtverlauf'),
@@ -4494,6 +5255,10 @@
       title: () => t('Kaufen'),
       render: (arg) => buyView(arg),
     },
+    item: {
+      title: (arg) => (String(arg).startsWith('routes:') ? t('Strecke') : t('Zug')),
+      render: (arg) => itemView(arg),
+    },
     'job-edit': {
       title: () => t('Stelle bearbeiten'),
       render: (id) => jobEditView(id),
@@ -4523,8 +5288,10 @@
   const modalBody = (name, arg) => (modalStack.length
     ? `<button class="modal-back" type="button" data-modal-back>${icon('fi-rr-arrow-left')}${esc(t('Zurück zu {name}', { name: modalTitle(modalStack[modalStack.length - 1]) }))}</button>` : '') + VIEWS[name].render(arg);
   const modalTitle = (v) => { const title = VIEWS[v.name].title; return typeof title === 'function' ? title(v.arg) : title; };
+  let modalCloseTimer = null;
   function openModal(name, arg, { stack = false } = {}) {
     closeMenu();
+    if (modalCloseTimer) { clearTimeout(modalCloseTimer); modalCloseTimer = null; modal.classList.remove('is-closing'); $('[data-modal-body]').innerHTML = ''; modal.hidden = true; }
     if (stack && !modal.hidden && modalView) modalStack.push(modalView);
     else if (!stack) modalStack = [];
     modalView = { name, arg };
@@ -4535,6 +5302,7 @@
     $('.sheet-modal__panel', modal).scrollTop = 0;
     modal.hidden = false;
     document.body.classList.add('menu-open');
+    countUp($('[data-modal-body]'));
     const focusable = $('[data-modal-body] input', modal) || $('[data-modal-body] button:not([disabled])', modal) || $('[data-modal-close]', modal);
     focusable.focus({ preventScroll: true });
   }
@@ -4543,15 +5311,24 @@
     $('[data-modal-title]').textContent = modalTitle(modalView);
     // Laufendes Video nicht neu laden
     if (!$('[data-modal-body] video, [data-modal-body] iframe')) $('[data-modal-body]').innerHTML = modalBody(modalView.name, modalView.arg);
+    countUp($('[data-modal-body]'));
   }
   function closeModal() {
-    if (modal.hidden) return;
+    if (modal.hidden || modalCloseTimer) return;
     $$('[data-modal-body] video', modal).forEach((v) => v.pause());
-    $('[data-modal-body]').innerHTML = '';
-    modal.hidden = true;
     modalView = null;
     modalStack = [];
     document.body.classList.remove('menu-open');
+    const finish = () => {
+      modalCloseTimer = null;
+      modal.classList.remove('is-closing');
+      $('[data-modal-body]').innerHTML = '';
+      modal.hidden = true;
+    };
+    if (reducedMotion()) { finish(); return; }
+    // Sheet gleitet nach unten weg
+    modal.classList.add('is-closing');
+    modalCloseTimer = setTimeout(finish, 190);
   }
 
   // ---------- Benachrichtigungen für Trainings ----------
@@ -4828,15 +5605,21 @@
   });
 
   let toastTimer;
+  let toastOutTimer;
   function toast(msg) {
     const el = $('[data-toast]');
     el.innerHTML = `${icon('fi-rr-check')}<span>${esc(msg)}</span>`;
     el.hidden = false;
+    el.classList.remove('is-out');
     el.style.animation = 'none';
     void el.offsetWidth;
     el.style.animation = '';
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { el.hidden = true; }, 2800);
+    clearTimeout(toastOutTimer);
+    toastTimer = setTimeout(() => {
+      el.classList.add('is-out');
+      toastOutTimer = setTimeout(() => { el.hidden = true; el.classList.remove('is-out'); }, reducedMotion() ? 0 : 220);
+    }, 2800);
   }
 
   // ---------- Bindings ----------
@@ -4851,12 +5634,14 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
     home() {
       renderRoles(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews();
+      loadGameStats();
+      if (liveMode()) loadLive();
       $('[data-open-jobs]').textContent = D.jobs.filter((x) => x.open).length;
     },
     news() { renderNewsPage(); },
@@ -4870,7 +5655,8 @@
       renderServers();
       renderPservers();
     },
-    statistiken() { renderStatsKpis(); renderChart(); renderBars(); },
+    spieler() { renderPlayers(); loadTracked(); if (pl.tab === 'friends') loadFriends(); },
+    statistiken() { renderStatsKpis(); renderChart(); renderBars(); loadGameStats(); },
     einstellungen() { renderSettings(); },
   };
 
@@ -4898,12 +5684,13 @@
     if (chatView === 'new-dm' && state.chatView !== 'new-dm') chat.found = null;
     if (['new-group', 'new-server'].includes(chatView) && state.chatView !== chatView) chat.members = [];
     if (chatView === 'new-server' || (page === 'server' && !serverId)) loadPservers(true);
+    if (page === 'server' && liveMode()) { if (serverId) loadLiveDetail(serverId); else loadLive(); }
     // Info öffnen: Gespräch frisch laden (Mitglieder, Rechte)
     if (chatView === 'info' && chatArg && chat.conv[chatArg] && !chat.conv[chatArg].error) openConv(chatArg);
     if (reviewId !== state.reviewId) review.answers = 'all';
     // Liste beim Öffnen frisch laden (neue Bewerbungen von anderen Geräten)
     if (jobView === 'review' && !reviewId && state.jobView !== 'review') review.at = 0;
-    if (serverId !== state.serverId) Object.assign(state, { sdTab: 'trains', sdCat: 'all', sdRole: 'all' });
+    if (serverId !== state.serverId) Object.assign(state, { sdTab: liveMode() ? 'players' : 'trains', sdCat: 'all', sdRole: 'all' });
     state.page = page;
     state.jobId = jobId;
     state.jobApply = jobApply;
@@ -4917,6 +5704,15 @@
     const view = serverId ? 'server-detail' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
+    // Inhalt der neuen Seite gleitet nacheinander herein
+    const pageEl = $(`.page[data-page="${view}"]`);
+    if (changed && pageEl && page !== 'chat' && !reducedMotion()) {
+      pageEl.classList.remove('is-entering');
+      void pageEl.offsetWidth;
+      pageEl.classList.add('is-entering');
+      clearTimeout(pageEl.enterTimer);
+      pageEl.enterTimer = setTimeout(() => pageEl.classList.remove('is-entering'), 1100);
+    }
     $$('[data-nav]').forEach((a) => {
       if (a.dataset.nav === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
@@ -4937,20 +5733,37 @@
     }
   }
 
+  // Seitenwechsel mit Übergang (View Transitions): Richtung nach der Reihenfolge der Tab-Leiste
+  const NAV_ORDER = ['home', 'news', 'trainings', 'spieler', 'shop', 'chat', 'server', 'karriere', 'statistiken', 'einstellungen'];
+  function navigate() {
+    const next = (location.hash.replace(/^#\/?/, '').split(/[/?]/)[0]) || 'home';
+    const from = NAV_ORDER.indexOf(state.page);
+    const to = NAV_ORDER.indexOf(PAGES.includes(next) ? next : 'home');
+    const sub = next === state.page;
+    if (!document.startViewTransition || reducedMotion() || document.visibilityState !== 'visible' || (sub && state.page === 'chat')) { route(); return; }
+    document.documentElement.dataset.navDir = sub ? 'deeper' : to < from ? 'back' : 'fwd';
+    try { document.startViewTransition(() => route()); } catch (e) { route(); }
+  }
+
   // ---------- Menü ----------
   const menu = $('[data-menu]');
   function openMenu() {
+    if (menuCloseTimer) { clearTimeout(menuCloseTimer); menuCloseTimer = null; menu.classList.remove('is-closing'); }
     menu.hidden = false;
     document.body.classList.add('menu-open');
     $$('[data-menu-open]').forEach((b) => b.setAttribute('aria-expanded', 'true'));
     const first = $('.menu__nav a', menu);
     if (first) first.focus({ preventScroll: true });
   }
+  let menuCloseTimer = null;
   function closeMenu() {
-    if (menu.hidden) return;
-    menu.hidden = true;
+    if (menu.hidden || menuCloseTimer) return;
     document.body.classList.remove('menu-open');
     $$('[data-menu-open]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+    const finish = () => { menuCloseTimer = null; menu.classList.remove('is-closing'); menu.hidden = true; };
+    if (reducedMotion()) { finish(); return; }
+    menu.classList.add('is-closing');
+    menuCloseTimer = setTimeout(finish, 200);
   }
 
   // ---------- Events ----------
@@ -5050,12 +5863,14 @@
       if (ns) setNotify(ns.checked);
       const nk = e.target.closest('[data-notify-kind]');
       if (nk) setNotifyKind(nk.dataset.notifyKind, nk.checked);
+      if (e.target.closest('[data-fx-motion]')) setMotion(e.target.checked);
+      if (e.target.closest('[data-fx-haptics]')) setHaptics(e.target.checked);
     });
     document.addEventListener('click', (e) => { if (e.target.closest('[data-notify-test]')) testNotify(); });
 
     // Server-Details: Tabs, Filter, Zug- und Bahnhofsdialog
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-board-cat], [data-board-earlier], [data-board-later], [data-trip-mid], [data-sd-tab], [data-sd-cat], [data-sd-role], [data-trip], [data-station], [data-modal-back]');
+      const el = e.target.closest('[data-board-cat], [data-board-earlier], [data-board-later], [data-trip-mid], [data-sd-tab], [data-sd-cat], [data-sd-role], [data-trip], [data-station], [data-modal-back], [data-server-people], [data-player], [data-track], [data-players-tab]');
       if (!el) return;
       const ds = el.dataset;
       const inModal = !!el.closest('[data-modal]');
@@ -5068,6 +5883,10 @@
       else if (ds.sdRole) { state.sdRole = ds.sdRole; renderServerDetail(); }
       else if (ds.trip) openModal('trip', ds.trip, { stack: inModal });
       else if (ds.station) openModal('station', ds.station, { stack: inModal });
+      else if (ds.serverPeople) openModal('server-players', ds.serverPeople, { stack: inModal });
+      else if (ds.player) openModal('player', ds.player, { stack: inModal });
+      else if (ds.track) setTracked(ds.track, !isTracked(ds.track));
+      else if (ds.playersTab) { pl.tab = ds.playersTab; renderPlayers(); if (pl.tab === 'friends') loadFriends(); else loadTracked(); }
       else if ('modalBack' in ds && modalStack.length) {
         const prev = modalStack.pop();
         modalView = prev;
@@ -5086,6 +5905,14 @@
     $('[data-day-prev]').addEventListener('click', () => tabs.scrollBy({ left: -240, behavior: 'smooth' }));
     $('[data-day-next]').addEventListener('click', () => tabs.scrollBy({ left: 240, behavior: 'smooth' }));
     $('[data-all-toggle]').addEventListener('click', () => { state.showAll = !state.showAll; renderTrainings(); });
+
+    // Spieler suchen
+    document.addEventListener('submit', (e) => {
+      const f = e.target.closest('[data-player-search]');
+      if (!f) return;
+      e.preventDefault();
+      findTrackPlayer(f);
+    });
 
     // Server
     $('[data-server-search]').addEventListener('input', (e) => { state.serverQuery = e.target.value; renderServers(); });
@@ -5366,13 +6193,19 @@
     });
     // Shop
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-buy], [data-buy-confirm]');
+      const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-shop-cat], [data-shop-item], [data-buy], [data-buy-confirm]');
       if (!el) return;
       const ds = el.dataset;
-      if (ds.shopTab) { shop.tab = ds.shopTab; shop.filter = 'all'; renderShop(); }
+      if (ds.shopTab) { if (shop.tab !== ds.shopTab) { shop.tab = ds.shopTab; shop.filter = 'all'; shop.cat = 'all'; renderShop(); } }
       else if (ds.shopFilter) { shop.filter = ds.shopFilter; renderShop(); }
-      else if (ds.buy) openModal('buy', ds.buy);
-      else if (ds.buyConfirm) { el.disabled = true; confirmBuy(ds.buyConfirm); }
+      else if (ds.shopCat) { shop.cat = ds.shopCat; renderShop(); }
+      else if (ds.buy) openModal('buy', ds.buy, { stack: !!el.closest('[data-modal]') });
+      else if (ds.shopItem) openModal('item', ds.shopItem);
+      else if (ds.buyConfirm) { el.disabled = true; confirmBuy(ds.buyConfirm, el); }
+    });
+    document.addEventListener('change', (e) => {
+      const sel = e.target.closest('[data-shop-sort]');
+      if (sel) { shop.sort = sel.value; renderShop(); }
     });
     // Bewerbungen prüfen
     document.addEventListener('click', (e) => {
@@ -5519,7 +6352,7 @@
     });
     if (/iPhone|iPad|iPod/.test(navigator.userAgent) && !standalone) $$('[data-install-ios]').forEach((el) => { el.hidden = false; });
 
-    window.addEventListener('hashchange', route);
+    window.addEventListener('hashchange', navigate);
   }
 
   // ---------- Live-Takt ----------
@@ -5539,16 +6372,22 @@
     const minuteChanged = now.abs !== lastMinute;
     lastMinute = now.abs;
     state.updatedAt = Date.now();
-    // Ohne echte Zahl von Roblox schwankt die Demo-Zahl leicht
-    if (!state.liveOnline) state.online = Math.max(900, state.online + Math.round((Math.random() - 0.48) * 14));
     bind();
+    // Echte Server und verfolgte Spieler alle 30 Sekunden
+    if (document.visibilityState === 'visible') {
+      if (state.page === 'server' && liveMode()) { if (state.serverId) loadLiveDetail(state.serverId); else loadLive(); }
+      if (state.page === 'spieler') { loadTracked(); if (pl.tab === 'friends') loadFriends(); }
+      if (modalView && modalView.name === 'player' && pl.data[modalView.arg] && Date.now() - pl.data[modalView.arg].at > 30000) refreshModal();
+      if (state.page === 'home' && liveMode()) loadLive();
+    }
     if (!minuteChanged) return;
+    if (['home', 'statistiken'].includes(state.page) && document.visibilityState === 'visible') loadGameStats();
     remindersTick();
     // Serverstatus der Trainings (offen / öffnet bald / geschlossen) jede Minute aktualisieren
     if (state.page === 'home') renderNextSteps();
     if (state.page === 'trainings' && modal.hidden) renderTrainings();
     if (modalView && modalView.name === 'training') refreshModal();
-    if (state.page === 'server') {
+    if (state.page === 'server' && !liveMode()) {
       if (modal.hidden) RENDER.server();
       else if (modalView && (modalView.name === 'trip' || modalView.name === 'station')) refreshModal();
     }

@@ -12,6 +12,11 @@
  *   GET    /health                       Was ist eingerichtet?
  *   GET    /api/content                  Trainings, Neuigkeiten, Stellen (öffentlich)
  *   GET    /api/stats                    Echte Zahlen: Gruppe, Spiel, Discord (öffentlich)
+ *   GET    /api/gamestats                Statistik aus dem Spiel: Fahrten, km, Pünktlichkeit, Spieler je Stunde (öffentlich, sonst 0)
+ *   GET    /api/servers                  Laufende Server aus dem Spiel mit Rollen und Spielern (private nur, wenn sichtbar)
+ *   GET    /api/servers/<jobId>          Ein Server mit allen Spielern und Zügen
+ *   GET    /api/players/find?q=<name>    Spieler auf Roblox suchen (Name oder ID)
+ *   POST   /api/players/status           { ids } – verfolgte Spieler: Name, Bild, Freund, ob und wo in Train Sim Germany
  *   GET    /media/<id>                   Hochgeladenes Bild
  *   POST   /auth/session                 { id_token } aus dem Roblox-Login → Sitzung fürs Backend
  *   POST   /auth/logout                  Abmelden (alle Sitzungen des Kontos werden ungültig)
@@ -63,7 +68,8 @@
  *   PUT    /api/pservers/<id>            Einstellungen des Besitzers { name, join, link, access, show, welcome, relay, chat }
  *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
  *   POST   /api/chats/<id>/close         Gespräch beenden
- *   GET    /api/players/find?q=<name>    Spieler suchen, um ihn anzuschreiben
+ *   GET    /api/players/friends          Eigene Roblox-Freunde, wer davon gerade in Train Sim Germany ist
+ *   GET    /api/me/stats                 Eigene Statistik aus dem Spiel (Spielzeit, Fahrten, km, Pünktlichkeit)
  *   POST   /api/push/subscribe           { subscription, prefs } – Benachrichtigungen auf diesem Gerät (Chat, Bewerbungen, Team)
  *   POST   /api/push/unsubscribe         { endpoint } – Gerät abmelden
  *   POST   /api/push/test                Probe-Benachrichtigung an die eigenen Geräte
@@ -84,6 +90,7 @@ import {
   setChatPhoto, chatPhotoResponse, chatServers, reindexChat,
 } from './chat.js';
 import { listPrivateServers, updatePrivateServer } from './pservers.js';
+import { serversView, serverDetail, playersStatus, friendsStatus, gameStats, playerStats, recordOnline, liveOnline, dropStale } from './game.js';
 import { putChunk, fileResponse } from './files.js';
 import { mailReady } from './mail.js';
 
@@ -259,6 +266,8 @@ function cleanSettings(body) {
     lang: /^(auto|[a-z]{2})$/.test(body.lang || '') ? body.lang : 'auto',
     bell: body.bell === true,
     remind: ids(body.remind), remindOff: ids(body.remindOff), favs: ids(body.favs),
+    track: ids(body.track).filter((x) => /^\d{1,20}$/.test(x)).slice(0, 100),
+    haptics: body.haptics !== false, motion: body.motion !== false,
     updatedAt: Math.min(Date.now(), Math.round(+body.updatedAt) || Date.now()),
   };
 }
@@ -269,6 +278,21 @@ async function myApplications(store, user) {
     if (a) out.push(ownView(a));
   }
   return out;
+}
+
+// Zeitplan: Spieler je Stunde merken (höchster Wert aus Roblox und den gemeldeten Servern), tote Server aufräumen
+export async function recordHistory(store, env) {
+  const servers = await store.get('game:servers');
+  if (servers && Object.values(servers).some((s) => Date.now() - s.at >= 600000)) {
+    await dropStale(store, servers, Date.now());
+    await store.put('game:servers', servers);
+  }
+  let n = await liveOnline(store);
+  try {
+    const s = await liveStats(store, env, robloxUrl);
+    if (Number.isFinite(s.playing)) n = Math.max(n, s.playing);
+  } catch (e) { /* nur die Server aus dem Spiel */ }
+  await recordOnline(store, n);
 }
 
 // ---------- Anfragen verteilen ----------
@@ -284,6 +308,7 @@ export async function handle(req, env, store) {
     }
     if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
     if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
+    if (path === '/api/gamestats' && m === 'GET') return json(req, env, await gameStats(store));
     const file = path.match(/^\/api\/files\/([\w-]+)$/);
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
     const photo = path.match(/^\/media\/chat\/([\w-]+)$/);
@@ -305,7 +330,12 @@ export async function handle(req, env, store) {
     if (player && m === 'GET') {
       const user = await store.get(`user:${player[1]}`);
       if (!user || !user.privacy || !user.privacy.profile) return json(req, env, { error: 'not_found' }, 404);
-      return json(req, env, { ...publicUser(user), statsPublic: !!user.privacy.stats, stats: user.privacy.stats ? user.stats || null : null });
+      return json(req, env, { ...publicUser(user), statsPublic: !!user.privacy.stats, stats: user.privacy.stats ? await playerStats(store, user.sub) : null });
+    }
+    // Spieler auf Roblox suchen (öffentliche Daten)
+    if (path === '/api/players/find' && m === 'GET') {
+      const p = await findPlayer(env, url.searchParams.get('q'));
+      return p ? json(req, env, p) : json(req, env, { error: 'not_found' }, 404);
     }
 
     // ---------- angemeldet ----------
@@ -317,6 +347,10 @@ export async function handle(req, env, store) {
     if (!path.startsWith('/api/')) return json(req, env, { error: 'not_found' }, 404);
     if (path === '/api/shop' && m === 'GET') return json(req, env, await shopState(store, user));
     if (path === '/api/pservers' && m === 'GET') return json(req, env, await listPrivateServers(store, user));
+    if (path === '/api/servers' && m === 'GET') return json(req, env, await serversView(store, env, user));
+    const liveServer = path.match(/^\/api\/servers\/([\w-]{1,64})$/);
+    if (liveServer && m === 'GET') return json(req, env, await serverDetail(store, env, user, liveServer[1]));
+    if (path === '/api/players/status' && m === 'POST') return json(req, env, await playersStatus(store, env, user, await readJson(req, 5000)));
     if (!user) return json(req, env, { error: 'unauthorized' }, 401);
 
     // Shop
@@ -360,11 +394,7 @@ export async function handle(req, env, store) {
     }
     const chunk = path.match(/^\/api\/files\/([\w-]+)\/(\d{1,4})$/);
     if (chunk && m === 'PUT') return json(req, env, await putChunk(store, user, chunk[1], +chunk[2], req));
-    // Spieler suchen, um ihn anzuschreiben
-    if (path === '/api/players/find' && m === 'GET') {
-      const p = await findPlayer(env, url.searchParams.get('q'));
-      return p ? json(req, env, p) : json(req, env, { error: 'not_found' }, 404);
-    }
+    if (path === '/api/players/friends' && m === 'GET') return json(req, env, await friendsStatus(store, env, user));
 
     // Benachrichtigungen auf diesem Gerät (auch bei geschlossener App)
     if (path === '/api/push/subscribe' && m === 'POST') {
@@ -380,6 +410,7 @@ export async function handle(req, env, store) {
       await freshUser(env, store, user);
       return json(req, env, { ...publicUser(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
     }
+    if (path === '/api/me/stats' && m === 'GET') return json(req, env, await playerStats(store, user.sub));
     if (path === '/api/me/privacy' && m === 'PUT') {
       const body = await readJson(req, 1000);
       user.privacy = { profile: body.profile === true, stats: body.stats === true };

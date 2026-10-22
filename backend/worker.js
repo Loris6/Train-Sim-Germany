@@ -4,11 +4,11 @@
  *
  * Alle Daten liegen in einem Durable Object (SQLite, im kostenlosen Tarif enthalten). Jede Anfrage läuft dort,
  * dadurch sehen alle sofort denselben Stand – wichtig für Chat, Käufe und Bewerbungen.
- * Der Zeitplan (wrangler.toml → crons) verschickt alle 2 Minuten die fälligen Benachrichtigungen
- * und räumt einmal pro Stunde abgelaufene Dateien aus dem Chat auf.
+ * Der Zeitplan (wrangler.toml → crons) verschickt alle 2 Minuten die fälligen Benachrichtigungen, merkt sich die
+ * Spielerzahl für die Statistik und räumt einmal pro Stunde abgelaufene Dateien aus dem Chat auf.
  */
 import { DurableObject } from 'cloudflare:workers';
-import { handle, sendDue } from './app.js';
+import { handle, sendDue, recordHistory } from './app.js';
 import { cleanupFiles } from './files.js';
 
 // Speicher im Durable Object: { v: Wert, exp: Ablauf in ms (0 = nie) }
@@ -37,6 +37,8 @@ export class TSGStore extends DurableObject {
   }
   async cron() {
     await sendDue(this.store, this.env);
+    // Spieler je Stunde für die Statistik
+    await recordHistory(this.store, this.env).catch((e) => console.error(e));
     // Abgelaufene Dateien aus dem Chat (Bytes liegen unter blob:, siehe files.js)
     if (new Date().getUTCMinutes() < 2) await cleanupFiles(this.store);
     // Abgelaufene Einträge aufräumen – ohne den Bereich blob: (der würde alle Videos in den Speicher laden)

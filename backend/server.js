@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { webcrypto } from 'node:crypto';
-import { handle, sendDue } from './app.js';
+import { handle, sendDue, recordHistory } from './app.js';
 import { cleanupFiles } from './files.js';
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
@@ -106,5 +106,7 @@ server.listen(port, () => {
 });
 // Benachrichtigungen für Trainings: jede Minute nachsehen, was fällig ist
 setInterval(() => { sendDue(store, env).catch((e) => console.error(e)); }, 60000);
+// Spieler je Stunde für die Statistik: alle 2 Minuten
+setInterval(() => { recordHistory(store, env).catch((e) => console.error(e)); }, 120000);
 // Abgelaufene Fotos und Videos aus dem Chat: stündlich löschen
 setInterval(() => { cleanupFiles(store).catch((e) => console.error(e)); }, 3600000);

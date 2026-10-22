@@ -15,18 +15,15 @@ window.TSG = {
   // Angemeldeter Spieler (Demo – später aus dem Roblox-Login)
   me: { name: 'Jonas', username: 'Jonas_BR218', rank: 'Conductor', level: 24 },
 
+  // Zahlen starten bei 0 und kommen live von Roblox, Discord und aus dem Spiel (backend/game.js)
   stats: {
-    online: 1284,
-    servers: 42,
-    trains: 318,
-    punctuality: 94.2,
-    visits: 12400000,
-    favorites: 284000,
-    groupMembers: 48200,
-    discordMembers: 21700,
-    discordOnline: 3100,
-    km: 9800000,
-    tripsToday: 18430,
+    online: 0,
+    servers: 0,
+    visits: 0,
+    favorites: 0,
+    groupMembers: 0,
+    discordMembers: 0,
+    discordOnline: 0,
   },
 
   // id = Server-ID aus dem Spiel (JobId), zugleich Adresse der Detailseite (#/server/<id>) und für „Beitreten“.
@@ -143,25 +140,25 @@ window.TSG = {
   // ab Public Relations Department (PRD) Neuigkeiten, Stellen und Bewerbungen verwaltet werden.
   // Guest = nicht in der Gruppe. Beim Roblox-Login kommt der Rang aus der Rolle in der Gruppe
   // (über das Kürzel in eckigen Klammern, z. B. „[QD] Qualified Driver“).
-  // prefix = Kürzel vor dem Profilbild, members = Spieler mit diesem Rang (wird live aus der Gruppe geladen).
+  // prefix = Kürzel vor dem Profilbild, members = Spieler mit diesem Rang (0, bis die Zahl live aus der Gruppe kommt).
   ranks: [
     { name: 'Guest', prefix: 'G', label: 'Gast', desc: 'Noch nicht in der Roblox-Gruppe', color: '#AFB4BB', members: 0, guest: true },
-    { name: 'Learning Driver', prefix: 'LD', label: 'Lokführer in Ausbildung', desc: 'Neu in der Gruppe, lernt Züge zu fahren', color: '#F0646B', members: 18420 },
-    { name: 'Qualified Driver', prefix: 'QD', label: 'Lokführer', desc: 'Fährt Züge sicher und pünktlich', color: '#D3212D', members: 9650 },
-    { name: 'Platform Staff', prefix: 'PS', label: 'Bahnsteigpersonal', desc: 'Bahnsteig sichern, Abfahrtsauftrag geben', color: '#E2A512', members: 3120 },
-    { name: 'Conductor', prefix: 'CD', label: 'Zugbegleiter', desc: 'Türen, Abfahrt und Fahrgäste', color: '#E8702A', members: 4380 },
-    { name: 'Signaller', prefix: 'SG', label: 'Fahrdienstleiter', desc: 'Stellwerke bedienen, Fahrstraßen stellen', color: '#2FA65A', members: 1890 },
-    { name: 'Junior Supervisor', prefix: 'J-SV', label: 'Aufsicht in Ausbildung', desc: 'Hilft bei Trainings und im Betrieb', color: '#55C3DD', members: 64, staff: true },
-    { name: 'Supervisor', prefix: 'SV', label: 'Aufsicht & Ausbildung', desc: 'Trainings leiten, Betrieb überwachen', color: '#1FA9C9', members: 235, staff: true },
-    { name: 'Driver Manager', prefix: 'DM', label: 'Leitung Driver', desc: 'Leitet den Bereich Driver', color: '#9C72DB', members: 3, staff: true },
-    { name: 'Platform Staff Manager', prefix: 'PSM', label: 'Leitung Platform Staff', desc: 'Leitet den Bereich Platform Staff', color: '#9C72DB', members: 2, staff: true },
-    { name: 'Conductor Manager', prefix: 'CDM', label: 'Leitung Conductor', desc: 'Leitet den Bereich Conductor', color: '#9C72DB', members: 2, staff: true },
-    { name: 'Signaller Manager', prefix: 'SGM', label: 'Leitung Signaller', desc: 'Leitet den Bereich Signaller', color: '#9C72DB', members: 2, staff: true },
-    { name: 'Public Relations Department', prefix: 'PRD', label: 'Öffentlichkeitsarbeit', desc: 'Neuigkeiten, Karriere und Bewerbungen', color: '#2346D8', members: 4, staff: true },
-    { name: 'Project Engineer', prefix: 'PJE', label: 'Projekt-Ingenieur', desc: 'Entwickelt Strecken und Funktionen', color: '#E479AE', members: 5, staff: true },
-    { name: 'Operation Manager', prefix: 'OM', label: 'Betriebsleitung', desc: 'Leitet den Spielbetrieb', color: '#8A5CD0', members: 2, staff: true },
-    { name: 'Community Director', prefix: 'CDR', label: 'Community-Leitung', desc: 'Leitet die Community', color: '#3CB98C', members: 1, staff: true },
-    { name: 'Chief Engineer', prefix: 'CEN', label: 'Chefentwickler', desc: 'Leitung von Train Sim Germany', color: '#D12FC8', members: 1, staff: true },
+    { name: 'Learning Driver', prefix: 'LD', label: 'Lokführer in Ausbildung', desc: 'Neu in der Gruppe, lernt Züge zu fahren', color: '#F0646B', members: 0 },
+    { name: 'Qualified Driver', prefix: 'QD', label: 'Lokführer', desc: 'Fährt Züge sicher und pünktlich', color: '#D3212D', members: 0 },
+    { name: 'Platform Staff', prefix: 'PS', label: 'Bahnsteigpersonal', desc: 'Bahnsteig sichern, Abfahrtsauftrag geben', color: '#E2A512', members: 0 },
+    { name: 'Conductor', prefix: 'CD', label: 'Zugbegleiter', desc: 'Türen, Abfahrt und Fahrgäste', color: '#E8702A', members: 0 },
+    { name: 'Signaller', prefix: 'SG', label: 'Fahrdienstleiter', desc: 'Stellwerke bedienen, Fahrstraßen stellen', color: '#2FA65A', members: 0 },
+    { name: 'Junior Supervisor', prefix: 'J-SV', label: 'Aufsicht in Ausbildung', desc: 'Hilft bei Trainings und im Betrieb', color: '#55C3DD', members: 0, staff: true },
+    { name: 'Supervisor', prefix: 'SV', label: 'Aufsicht & Ausbildung', desc: 'Trainings leiten, Betrieb überwachen', color: '#1FA9C9', members: 0, staff: true },
+    { name: 'Driver Manager', prefix: 'DM', label: 'Leitung Driver', desc: 'Leitet den Bereich Driver', color: '#9C72DB', members: 0, staff: true },
+    { name: 'Platform Staff Manager', prefix: 'PSM', label: 'Leitung Platform Staff', desc: 'Leitet den Bereich Platform Staff', color: '#9C72DB', members: 0, staff: true },
+    { name: 'Conductor Manager', prefix: 'CDM', label: 'Leitung Conductor', desc: 'Leitet den Bereich Conductor', color: '#9C72DB', members: 0, staff: true },
+    { name: 'Signaller Manager', prefix: 'SGM', label: 'Leitung Signaller', desc: 'Leitet den Bereich Signaller', color: '#9C72DB', members: 0, staff: true },
+    { name: 'Public Relations Department', prefix: 'PRD', label: 'Öffentlichkeitsarbeit', desc: 'Neuigkeiten, Karriere und Bewerbungen', color: '#2346D8', members: 0, staff: true },
+    { name: 'Project Engineer', prefix: 'PJE', label: 'Projekt-Ingenieur', desc: 'Entwickelt Strecken und Funktionen', color: '#E479AE', members: 0, staff: true },
+    { name: 'Operation Manager', prefix: 'OM', label: 'Betriebsleitung', desc: 'Leitet den Spielbetrieb', color: '#8A5CD0', members: 0, staff: true },
+    { name: 'Community Director', prefix: 'CDR', label: 'Community-Leitung', desc: 'Leitet die Community', color: '#3CB98C', members: 0, staff: true },
+    { name: 'Chief Engineer', prefix: 'CEN', label: 'Chefentwickler', desc: 'Leitung von Train Sim Germany', color: '#D12FC8', members: 0, staff: true },
   ],
 
   // Öffentliche Roblox-Daten (Name, Profilbild, Rolle in der Gruppe) über einen Proxy mit CORS laden.
@@ -289,28 +286,11 @@ window.TSG = {
     },
   ],
 
-  trainShare: [
-    { label: 'ICE', value: 34 },
-    { label: 'Regional-Express', value: 22 },
-    { label: 'S-Bahn', value: 18 },
-    { label: 'Intercity', value: 12 },
-    { label: 'Regionalbahn', value: 9 },
-    { label: 'Güterverkehr', value: 5 },
-  ],
-
-  punctualityByNet: [
-    { label: 'Magdeburg', value: 95.2 },
-    { label: 'Halle/Leipzig', value: 93.8 },
-    { label: 'Berlin', value: 91.4 },
-    { label: 'Berlin – Warschau', value: 86.9 },
-  ],
-
-  // Meistbefahrene Strecken (Nummer aus routes, Fahrten in 7 Tagen)
-  topRoutes: [
-    { no: 'R005', value: 18420 },
-    { no: 'R008', value: 16210 },
-    { no: 'R001', value: 14980 },
-    { no: 'R004', value: 11340 },
-    { no: 'R010', value: 9870 },
+  // Netze für „Pünktlichkeit nach Netz“ (Statistik): Strecken aus routes
+  nets: [
+    { label: 'Magdeburg', routes: ['R001', 'R002', 'R003', 'R007'] },
+    { label: 'Halle/Leipzig', routes: ['R004', 'R005', 'R006'] },
+    { label: 'Berlin', routes: ['R008', 'R009'] },
+    { label: 'Berlin – Warschau', routes: ['R010'] },
   ],
 };

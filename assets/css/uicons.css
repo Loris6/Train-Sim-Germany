@@ -59,6 +59,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-pencil:before{content:"\fa29"}
 .fi-rr-picture:before{content:"\fa78"}
 .fi-rr-plus:before{content:"\faac"}
+.fi-rr-receipt:before{content:"\fb16"}
 .fi-rr-robot:before{content:"\fb61"}
 .fi-rr-route:before{content:"\fb6f"}
 .fi-rr-rules:before{content:"\fb7a"}
@@ -71,6 +72,9 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-sign-out-alt:before{content:"\fc0c"}
 .fi-rr-signal-alt-2:before{content:"\fc11"}
 .fi-rr-smartphone:before{content:"\fc44"}
+.fi-rr-sort-amount-down:before{content:"\fc6b"}
+.fi-rr-sparkles:before{content:"\fc84"}
+.fi-rr-spinner:before{content:"\fc8f"}
 .fi-rr-star:before{content:"\fce9"}
 .fi-rr-sun:before{content:"\fd17"}
 .fi-rr-terminal:before{content:"\fd78"}
@@ -86,8 +90,10 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-user:before{content:"\fea0"}
 .fi-rr-user-add:before{content:"\fe7a"}
 .fi-rr-user-slash:before{content:"\fe99"}
+.fi-rr-users:before{content:"\fea6"}
 .fi-rr-users-alt:before{content:"\fea1"}
 .fi-rr-video-camera:before{content:"\febe"}
+.fi-rr-wallet:before{content:"\fedc"}
 .fi-rr-whistle:before{content:"\ff01"}
 
 @font-face{font-family:uicons-solid-rounded;src:url(../fonts/uicons-solid-rounded.woff2) format("woff2");font-display:block}
@@ -96,6 +102,7 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 .fi-sr-bell-ring:before{content:"\f233"}
 .fi-sr-calendar:before{content:"\f336"}
 .fi-sr-check:before{content:"\f3c0"}
+.fi-sr-check-circle:before{content:"\f3bc"}
 .fi-sr-coins:before{content:"\f48c"}
 .fi-sr-comments:before{content:"\f4b4"}
 .fi-sr-heart:before{content:"\f794"}

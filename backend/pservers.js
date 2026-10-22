@@ -21,7 +21,8 @@ const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg),
 const ONLINE = 3 * 60000;
 const SHOWN_DAYS = 30;
 
-export const DEFAULTS = { join: 'roblox', link: '', access: 'all', show: 'members', welcome: '', relay: false, chat: null };
+// Neue private Server erscheinen automatisch auf der Server-Seite (der Besitzer kann sie verbergen)
+export const DEFAULTS = { join: 'roblox', link: '', access: 'all', show: 'public', welcome: '', relay: false, chat: null };
 
 // Link zum privaten Server prüfen: nur roblox.com, mit Code
 export function cleanLink(v) {
