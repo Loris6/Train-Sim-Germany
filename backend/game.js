@@ -139,6 +139,7 @@ export async function recordServer(store, servers, jobId, sv, body, online, cata
     online.forEach((id) => { if ((prev.online || []).includes(id)) acc[id] = Math.round((acc[id] || 0) + sec); });
   }
   const left = prev ? (prev.online || []).filter((id) => !online.includes(id)) : [];
+  const joined = online.filter((id) => !prev || !(prev.online || []).includes(id));
   let flushed = (prev && prev.flushed) || t;
   if (sv.closing) {
     await flushTime(store, acc, [...new Set([...online, ...left])], t);
@@ -154,6 +155,10 @@ export async function recordServer(store, servers, jobId, sv, body, online, cata
     };
   }
   await recordTrips(store, cleanTrips(body.trips, catalog), t);
+  // Wer kam, wer ging (mit Namen) – für Automationen in Server-Chats (chat.js → gameEvents)
+  const names = new Map([...((prev && prev.who) || []), ...((servers[jobId] && servers[jobId].who) || [])].map((w) => [w.id, w]));
+  const pick = (id) => { const w = names.get(id) || {}; return { id, name: w.name || null, dn: w.dn || null }; };
+  return { joined: (sv.closing ? [] : joined).map(pick), left: (sv.closing ? [...new Set([...online, ...left])] : left).map(pick) };
 }
 
 // Server, die seit 10 Minuten nichts gemeldet haben: Spielzeit gutschreiben und entfernen
@@ -166,6 +171,9 @@ export async function dropStale(store, servers, t) {
 }
 
 // ---------- Profilbilder und Namen von Roblox (zwischengespeichert) ----------
+export async function robloxNames(store, env, ids) {
+  return namesOf(store, env, ids);
+}
 export async function avatarsOf(store, env, ids) {
   const out = {};
   const miss = [];
@@ -280,6 +288,15 @@ async function visibleServers(store, user) {
     out.push({ jobId, s, p });
   }
   return out;
+}
+
+// Auf welchem Server ist ein Spieler gerade (aus Sicht von viewer, z. B. für Einladungen)? null = nicht im Spiel
+export async function serverOf(store, viewer, sub) {
+  for (const x of await visibleServers(store, viewer)) {
+    if (!(x.s.online || []).includes(sub)) continue;
+    return x.hidden ? { id: x.jobId, private: true, hidden: true } : { id: x.jobId, private: !!x.s.private, pserver: pserverLite(x.p), players: x.s.players, max: x.s.max };
+  }
+  return null;
 }
 
 // GET /api/servers – alle laufenden Server, die man sehen darf

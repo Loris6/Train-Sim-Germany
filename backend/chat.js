@@ -13,7 +13,12 @@
  * jemandem, der einen höheren Rang hat. Jedes Beobachten wird intern vermerkt. Gespräche lassen sich melden.
  *
  * Benachrichtigungen bekommen alle Beteiligten außer dem Absender – aber nicht, wer das Gespräch (oder die
- * Chat-Übersicht) gerade offen hat, und nicht, wer das Gespräch stummgeschaltet hat.
+ * Chat-Übersicht) gerade offen hat, und nicht, wer das Gespräch stummgeschaltet hat (außer bei einer Erwähnung
+ * mit @Name). Titel „[TSG] Name“, darunter die Nachricht; wo der Browser es kann, lässt sich direkt in der
+ * Benachrichtigung antworten (signierter Link, 7 Tage gültig).
+ *
+ * Gruppen haben wie Discord eigene Rollen (Name, Farbe, Rechte). Server-Chats lassen sich nach Prüfung durch das
+ * Team mit Discord verbinden (siehe discord.js).
  *
  *   chat:<id>       → Gespräch mit Nachrichten (die letzten 500)
  *   chats:index     → Übersicht aller Gespräche (eigene, Anfragen, öffentliche Gruppen, Moderation)
@@ -23,8 +28,10 @@
  * Gespräche werden 180 Tage nach der letzten Nachricht automatisch gelöscht.
  */
 import { randomKey, clip } from './lib.js';
-import { level, atLeast, matchRank, rankLabel } from './ranks.js';
+import { level, atLeast, matchRank } from './ranks.js';
 import { notifyUser, notifyStaff } from './webpush.js';
+import { sign, verify } from './secret.js';
+import { REVIEW_RANK, updateConfig, requirements, publicView, sendToDiscord, renderTemplate } from './discord.js';
 import { findPlayer, groupRole } from './roblox.js';
 import { startUpload, attachFiles, deleteFiles, fileLinks } from './files.js';
 import { serversOfChat, linkChat, cleanLink } from './pservers.js';
@@ -102,6 +109,27 @@ function people(c) {
 }
 const roleOf = (c, sub) => { const p = people(c)[sub]; return p ? p.role || 'member' : null; };
 const isManager = (role) => role === 'owner' || role === 'admin' || role === 'mod';
+
+// ---------- Eigene Rollen (wie bei Discord): Name, Farbe, Rechte ----------
+//   write – schreiben, auch wenn nur Admins dürfen · media – Fotos und Videos · invite – Leute einladen
+//   commands – Befehle, auch wenn nur Admins dürfen · messages – Nachrichten anderer löschen · kick – Mitglieder entfernen
+//   mention – @alle erwähnen · manage – Gruppe bearbeiten, Rollen und Discord einrichten
+export const PERMS = ['write', 'media', 'invite', 'commands', 'messages', 'kick', 'mention', 'manage'];
+const MAX_ROLES = 20;
+function rolesOf(c, sub) {
+  const p = c.kind === 'group' && c.members && c.members[sub];
+  const ids = (p && p.roles) || [];
+  return (c.roles || []).filter((r) => ids.includes(r.id));
+}
+const hasPerm = (c, sub, perm) => isManager(roleOf(c, sub)) || rolesOf(c, sub).some((r) => r.perms.includes(perm));
+function cleanRoles(list, old = []) {
+  return (Array.isArray(list) ? list : []).slice(0, MAX_ROLES).map((r) => ({
+    id: old.some((o) => o.id === (r && r.id)) ? r.id : randomKey(6),
+    name: clip(String((r && r.name) || ''), 30).replace(/\s+/g, ' ').trim(),
+    color: /^#[0-9a-fA-F]{6}$/.test((r && r.color) || '') ? r.color.toUpperCase() : '#878C96',
+    perms: PERMS.filter((x) => Array.isArray(r && r.perms) && r.perms.includes(x)),
+  })).filter((r) => r.name.length >= 2);
+}
 const topLevel = (c) => Math.max(-1, ...Object.values(people(c)).map((p) => level(p.rank || 'Guest')));
 // Beobachten: ab Supervisor, aber nicht bei Gesprächen mit höherem Rang
 const canObserve = (c, user) => isMod(user.rank) && topLevel(c) <= level(user.rank);
@@ -113,18 +141,19 @@ function access(c, user) {
   const pub = c.kind === 'group' && st.visibility === 'public' && !(c.banned || []).includes(user.sub);
   const mod = canObserve(c, user);
   let write = !!role && c.status !== 'closed';
-  if (write && st.write === 'admins' && !isManager(role)) write = false;
-  return { role, team, pub, mod, see: !!role || team || pub || mod, observe: !role && !team && !pub && mod, moderate: isManager(role) || mod, admin: isManager(role), write };
+  if (write && st.write === 'admins' && !hasPerm(c, user.sub, 'write')) write = false;
+  const manage = c.kind === 'group' && !!role && hasPerm(c, user.sub, 'manage');
+  return { role, team, pub, mod, see: !!role || team || pub || mod, observe: !role && !team && !pub && mod, moderate: isManager(role) || mod, admin: isManager(role), manage, write };
 }
-function enabledCommands(c, role) {
+function enabledCommands(c, role, sub) {
   const st = settingsOf(c);
-  if (st.cmd === 'off' || (st.cmd === 'admins' && !isManager(role))) return [];
+  if (st.cmd === 'off' || (st.cmd === 'admins' && !isManager(role) && !(sub && hasPerm(c, sub, 'commands')))) return [];
   return st.cmds;
 }
-const canInvite = (c, role) => {
+const canInvite = (c, role, sub) => {
   if (c.kind !== 'group' || !role) return false;
   const st = settingsOf(c);
-  return role === 'owner' || role === 'mod' || (st.invite === 'admins' && role === 'admin') || st.invite === 'all';
+  return role === 'owner' || role === 'mod' || (st.invite === 'admins' && role === 'admin') || st.invite === 'all' || hasPerm(c, sub, 'invite');
 };
 
 // ---------- Anwesenheit: wer hat das Gespräch gerade offen? (nur im Speicher, keine Schreibzugriffe) ----------
@@ -148,6 +177,8 @@ const SYSTEM_TEXT = {
   mod: (m) => `${m.name} (Moderation) ist beigetreten`, settings: (m) => `${m.name} hat die Gruppe bearbeitet`,
   role: (m) => `${m.target} ist jetzt ${m.role === 'owner' ? 'Inhaber' : m.role === 'admin' ? 'Admin' : 'Mitglied'}`,
   photo: (m) => `${m.name} hat das Gruppenbild geändert`, servers: (m) => `${m.name} hat die verbundenen Server geändert`,
+  roles: (m) => `${m.name} hat die Rollen geändert`,
+  discord: (m) => ({ pending: `${m.name} hat die Discord-Verbindung zur Prüfung eingereicht`, accepted: 'Die Discord-Verbindung wurde angenommen', denied: 'Die Discord-Verbindung wurde abgelehnt', removed: `${m.name} hat die Discord-Verbindung entfernt` }[m.target] || ''),
 };
 function previewOf(m) {
   if (m.deleted) return 'Nachricht gelöscht';
@@ -218,11 +249,28 @@ const sys = (c, text, name, extra = {}) => c.messages.push({ id: randomKey(6), b
 
 // ---------- Benachrichtigungen ----------
 const preview = (text) => (text.length > 140 ? `${text.slice(0, 139)}…` : text);
-// Wie bei Messengern: Profilbild des Absenders, Name als Titel, Text beginnt mit „[SV] Supervisor: …“
-const fromPerson = (p, text, title = nameOf(p)) => ({ title, body: `${rankLabel(p.rank)}: ${preview(text)}`, ...(p.avatar ? { icon: p.avatar } : {}) });
-async function notifyOthers(store, env, c, author, message) {
-  const ids = Object.keys(people(c)).filter((id) => id !== author && !(c.muted && c.muted[id]) && !watching(id, c.id));
-  await Promise.all(ids.map((id) => notifyUser(store, env, id, 'chat', { url: `./#/chat/${c.id}`, tag: `chat-${c.id}`, ...message })));
+// Wie bei Messengern: Profilbild des Absenders, „[TSG] Name“ als Titel, darunter die Nachricht
+const fromPerson = (p, text, title = nameOf(p)) => ({ style: 'person', title: `[TSG] ${title}`, body: preview(text), ...(p.avatar ? { icon: p.avatar } : {}) });
+const REPLY_ACTION = { action: 'reply', type: 'text', title: 'Antworten', placeholder: 'Antwort schreiben …' };
+const OPEN_ACTION = { action: 'open', title: 'Öffnen' };
+// Erwähnte (@Name) bekommen die Nachricht auch, wenn sie das Gespräch stummgeschaltet haben.
+// Wer schreiben darf, kann direkt in der Benachrichtigung antworten (signierter Link, 7 Tage).
+async function notifyOthers(store, env, c, author, message, { mentioned = [] } = {}) {
+  const ppl = people(c);
+  const ids = Object.keys(ppl).filter((id) => id !== author && !watching(id, c.id) && (mentioned.includes(id) || !(c.muted && c.muted[id])));
+  const exp = Date.now() + 7 * 86400000;
+  await Promise.all(ids.map(async (id) => {
+    const canReply = c.status !== 'closed' && access(c, { sub: id, rank: ppl[id].rank }).write;
+    const extra = canReply ? { reply: { chat: c.id, sub: id, exp, k: await sign(env, store, `reply|${id}|${c.id}|${exp}`) }, actions: [REPLY_ACTION, OPEN_ACTION] } : {};
+    return notifyUser(store, env, id, 'chat', { url: `./#/chat/${c.id}`, tag: `chat-${c.id}`, ...message, ...extra });
+  }));
+}
+// @Name (Roblox-Name eines Mitglieds), @alle nur mit Recht „mention“ bzw. für Admins
+function mentionsIn(c, text, author, everyone) {
+  const names = new Set((String(text).match(/@([A-Za-z0-9_]{2,20})/g) || []).map((x) => x.slice(1).toLowerCase()));
+  if (!names.size || c.kind !== 'group') return [];
+  const all = everyone && (names.has('alle') || names.has('everyone'));
+  return Object.values(c.members || {}).filter((p) => p.sub !== author && (all || names.has(String(p.username || '').toLowerCase()))).map((p) => p.sub);
 }
 const messageTitle = (c, p) => (c.kind === 'group' ? `${nameOf(p)} · ${c.name}` : nameOf(p));
 
@@ -259,19 +307,21 @@ async function view(env, store, c, user) {
   const order = { owner: 0, mod: 1, admin: 2, member: 3 };
   const members = Object.values(people(c)).map((p) => ({ ...p, role: p.role || 'member' }))
     .sort((x, y) => order[x.role] - order[y.role] || level(y.rank || 'Guest') - level(x.rank || 'Guest') || nameOf(x).localeCompare(nameOf(y)));
-  const cmds = enabledCommands(c, a.role);
+  const cmds = enabledCommands(c, a.role, user.sub);
   return {
     id: c.id, kind: c.kind, status: c.status, reason: c.reason || null, area: c.area || null, ref: c.ref || null, app: c.app || null,
     name: c.name || null, desc: c.desc || '', rules: c.rules || '', color: c.color || null, owner: c.owner || null,
     photo: c.photo || null, category: c.category || null, servers: c.kind === 'group' ? await serversOfChat(store, c, user) : [],
     from: c.from, to: c.to || null, claimedBy: c.claimedBy || null, created: c.created, updated: c.updated,
-    settings: c.kind === 'group' ? st : null, members, messages,
+    settings: c.kind === 'group' ? st : null, members, messages, roles: c.kind === 'group' ? c.roles || [] : [],
     me: { sub: user.sub, role: a.role, observe: a.observe, muted: !!(c.muted && c.muted[user.sub]) },
     canWrite: a.write,
     canClaim: c.kind === 'ticket' && c.status === 'open' && c.from.sub !== user.sub && canHandle(user.rank, c.area),
     canClose: c.kind !== 'group' && c.status !== 'closed' && !!a.role,
-    canInvite: canInvite(c, a.role),
+    canInvite: canInvite(c, a.role, user.sub),
     canAdmin: c.kind === 'group' && a.admin,
+    canManage: !!a.manage || (c.kind === 'group' && a.mod),
+    discord: c.kind !== 'group' ? null : (a.manage || a.mod) ? publicView(c) : c.discord && c.discord.status === 'active' ? { status: 'active' } : null,
     canPhoto: canPhoto(c, a.role),
     canModerate: a.moderate,
     canJoin: c.kind === 'group' && !a.role && a.pub,
@@ -279,7 +329,7 @@ async function view(env, store, c, user) {
     canLeave: (c.kind === 'group' && !!a.role) || a.role === 'mod',
     canDeleteAll: (c.kind === 'group' && a.role === 'owner') || a.mod,
     canReport: !!a.role && c.kind !== 'ticket' && !a.mod,
-    canMedia: !!a.role && (st.media || a.admin),
+    canMedia: !!a.role && (st.media || a.admin || hasPerm(c, user.sub, 'media')),
     commands: COMMANDS.filter((x) => cmds.includes(x.id)).map(({ usage, desc }) => ({ usage, desc })),
     ...(a.moderate ? { reports: c.reports || [], modlog: (c.modlog || []).slice(-20) } : {}),
   };
@@ -445,7 +495,7 @@ export async function postMessage(store, env, user, id, body) {
   const text = cleanText(body.text);
   const fileIds = Array.isArray(body.files) ? body.files : [];
   if (!text && !fileIds.length) throw bad('empty');
-  if (fileIds.length && !(st.media || a.admin)) throw bad('no_media', 403);
+  if (fileIds.length && !(st.media || a.admin || hasPerm(c, user.sub, 'media'))) throw bad('no_media', 403);
   const t = Date.now();
   if (c.kind === 'group' && st.slow && !a.admin && t - ((c.lastPost || {})[user.sub] || 0) < st.slow * 1000) throw bad('slow', 429);
   const files = fileIds.length ? await attachFiles(store, user, c.id, fileIds) : null;
@@ -454,7 +504,7 @@ export async function postMessage(store, env, user, id, body) {
   // Befehl? Antwort vom TSG-Bot (persönliche Antworten und Fehler sieht nur der Absender)
   const cmd = text && !files && st.cmd !== 'off' ? parseCommand(text) : null;
   if (cmd) {
-    const enabled = enabledCommands(c, a.role);
+    const enabled = enabledCommands(c, a.role, user.sub);
     let r;
     try {
       r = enabled.length || !cmd.id ? await runCommand(store, env, user, c, cmd, enabled)
@@ -468,8 +518,22 @@ export async function postMessage(store, env, user, id, body) {
   if (c.kind === 'group') c.lastPost = { ...(c.lastPost || {}), [user.sub]: t };
   await save(store, c);
   const shown = text || (files[0].kind === 'image' ? '📷 Foto' : files[0].kind === 'video' ? '🎬 Video' : `📎 ${files[0].name}`);
-  await notifyOthers(store, env, c, user.sub, fromPerson(me, shown, messageTitle(c, me)));
+  const mentioned = text ? mentionsIn(c, text, user.sub, hasPerm(c, user.sub, 'mention')) : [];
+  await notifyOthers(store, env, c, user.sub, fromPerson(me, shown, messageTitle(c, me)), { mentioned });
+  // Server-Chat mit Discord: Nachricht auch dort zeigen (Befehle bleiben in der App)
+  if (!cmd) await toDiscord(store, env, c, { username: nameOf(me), avatar: me.avatar, content: shown });
   return view(env, store, c, user);
+}
+
+// Antwort direkt aus der Benachrichtigung (ohne Anmeldung, mit signiertem Link aus der Benachrichtigung)
+export async function replyFromPush(store, env, id, body) {
+  const sub = String(body.sub || '');
+  const exp = Math.round(+body.exp || 0);
+  if (!/^\d{1,20}$/.test(sub) || exp < Date.now() || !(await verify(env, store, `reply|${sub}|${id}|${exp}`, String(body.k || '')))) throw bad('forbidden', 403);
+  const user = await store.get(`user:${sub}`);
+  if (!user) throw bad('forbidden', 403);
+  await postMessage(store, env, user, id, { text: body.text });
+  return { ok: true };
 }
 
 export async function deleteMessage(store, env, user, id, mid) {
@@ -477,7 +541,7 @@ export async function deleteMessage(store, env, user, id, mid) {
   const a = access(c, user);
   const m = c.messages.find((x) => x.id === mid);
   if (!m || m.deleted || m.by === 'system') throw bad('not_found', 404);
-  if (m.by !== user.sub && !a.moderate) throw bad('forbidden', 403);
+  if (m.by !== user.sub && !a.moderate && !hasPerm(c, user.sub, 'messages')) throw bad('forbidden', 403);
   await deleteFiles(store, m.files);
   Object.keys(m).forEach((k) => { if (!['id', 'by', 'at'].includes(k)) delete m[k]; });
   Object.assign(m, { deleted: true, deletedBy: m.by === user.sub ? null : user.username });
@@ -490,7 +554,7 @@ export async function startChatUpload(store, user, id, body) {
   const c = await getChat(store, user, id);
   const a = access(c, user);
   if (!a.write) throw bad('forbidden', 403);
-  if (!(settingsOf(c).media || a.admin)) throw bad('no_media', 403);
+  if (!(settingsOf(c).media || a.admin || hasPerm(c, user.sub, 'media'))) throw bad('no_media', 403);
   return startUpload(store, user, c.id, body);
 }
 
@@ -531,7 +595,7 @@ export async function closeChat(store, env, user, id) {
 export async function updateChat(store, env, user, id, body) {
   const c = await getChat(store, user, id);
   const a = access(c, user);
-  if (c.kind !== 'group' || !a.admin) throw bad('forbidden', 403);
+  if (c.kind !== 'group' || !(a.manage || a.mod)) throw bad('forbidden', 403);
   if (body.name !== undefined) { const name = cleanText(body.name, 60).replace(/\n/g, ' '); if (name.length < 2) throw bad('bad_name'); c.name = name; }
   if (body.desc !== undefined) c.desc = cleanText(body.desc, 300);
   if (body.rules !== undefined) c.rules = cleanText(body.rules, 1500);
@@ -546,7 +610,7 @@ export async function updateChat(store, env, user, id, body) {
 export async function addMembers(store, env, user, id, body) {
   const c = await getChat(store, user, id);
   const a = access(c, user);
-  if (!canInvite(c, a.role)) throw bad('forbidden', 403);
+  if (!canInvite(c, a.role, user.sub)) throw bad('forbidden', 403);
   const added = [];
   const t = Date.now();
   for (const q of (Array.isArray(body.users) ? body.users : [body.users]).slice(0, 10)) {
@@ -561,6 +625,7 @@ export async function addMembers(store, env, user, id, body) {
   if (!added.length) throw bad('not_found', 404);
   c.updated = t;
   sys(c, 'added', user.username, { target: added.map(nameOf).join(', ') });
+  for (const p of added) await chatEvent(store, env, c, 'join', p);
   await save(store, c);
   for (const p of added) await addTo(store, p.sub, c.id);
   await Promise.all(added.map((p) => notifyUser(store, env, p.sub, 'chat', {
@@ -586,6 +651,7 @@ export async function joinChat(store, env, user, id, { asMod = false } = {}) {
     if (Object.keys(c.members).length >= MAX_MEMBERS) throw bad('full', 409);
     c.members[user.sub] = { ...person(user), role: 'member', joined: t };
     sys(c, 'joined', user.username);
+    await chatEvent(store, env, c, 'join', person(user));
   }
   c.updated = t;
   await save(store, c);
@@ -611,6 +677,7 @@ export async function leaveChat(store, env, user, id) {
   }
   c.updated = Date.now();
   sys(c, 'left', user.username);
+  if (c.kind === 'group') await chatEvent(store, env, c, 'leave', person(user));
   await save(store, c);
   return { ok: true };
 }
@@ -620,19 +687,30 @@ export async function removeMember(store, env, user, id, sub) {
   const a = access(c, user);
   const target = c.kind === 'group' ? c.members[sub] : (c.mods || {})[sub];
   if (!target || sub === user.sub) throw bad('not_found', 404);
-  const allowed = a.mod || a.role === 'mod' || (a.role === 'owner' && target.role !== 'owner') || (a.role === 'admin' && target.role === 'member');
+  const allowed = a.mod || a.role === 'mod' || (a.role === 'owner' && target.role !== 'owner') || (a.role === 'admin' && target.role === 'member')
+    || (target.role === 'member' && hasPerm(c, user.sub, 'kick') && !hasPerm(c, sub, 'manage'));
   if (!allowed) throw bad('forbidden', 403);
   if (c.kind === 'group') { delete c.members[sub]; c.banned = [...new Set([...(c.banned || []), sub])]; } else delete c.mods[sub];
   c.updated = Date.now();
   sys(c, 'removed', user.username, { target: nameOf(target) });
+  if (c.kind === 'group') await chatEvent(store, env, c, 'leave', target);
   await save(store, c);
   return view(env, store, c, user);
 }
 
-export async function setRole(store, env, user, id, sub, role) {
+export async function setRole(store, env, user, id, sub, body = {}) {
   const c = await getChat(store, user, id);
   const a = access(c, user);
   const target = c.kind === 'group' && c.members[sub];
+  // Eigene Rollen zuweisen (wer die Gruppe verwalten darf)
+  if (target && Array.isArray(body.roles)) {
+    if (!(a.manage || a.mod)) throw bad('forbidden', 403);
+    target.roles = (c.roles || []).filter((r) => body.roles.includes(r.id)).map((r) => r.id);
+    c.updated = Date.now();
+    await save(store, c);
+    if (!body.role) return view(env, store, c, user);
+  }
+  const role = body.role;
   if (!target || !['admin', 'member', 'owner'].includes(role) || target.role === 'mod') throw bad('bad_request');
   if (!(a.role === 'owner' || a.mod || a.role === 'mod')) throw bad('forbidden', 403);
   if (role === 'owner') {
@@ -677,6 +755,7 @@ export async function deleteChat(store, user, id, { force = false } = {}) {
     if (p && p.chat === c.id) { p.chat = null; await store.put(`pserver:${sid}`, p); }
   }
   await store.delete(`chatphoto:${c.id}`);
+  if (c.discord) await requestIndex(store, c.id, false);
   await store.delete(`chat:${c.id}`);
   await saveIndex(store, c, { remove: true });
   return { ok: true };
@@ -733,7 +812,7 @@ async function connectServers(store, user, chatId, ids, opts = {}) {
 export async function chatServers(store, env, user, id, body) {
   const c = await getChat(store, user, id);
   const a = access(c, user);
-  if (c.kind !== 'group' || !a.admin) throw bad('forbidden', 403);
+  if (c.kind !== 'group' || !(a.manage || a.mod)) throw bad('forbidden', 403);
   if (body.add) await connectServers(store, user, c.id, [body.add], body.server || {});
   if (body.remove) {
     const p = await store.get(`pserver:${String(body.remove)}`);
@@ -751,6 +830,162 @@ export async function chatServers(store, env, user, id, body) {
   sys(fresh, 'servers', user.username);
   await save(store, fresh);
   return view(env, store, fresh, user);
+}
+
+// ---------- Eigene Rollen bearbeiten ----------
+export async function setChatRoles(store, env, user, id, body) {
+  const c = await getChat(store, user, id);
+  const a = access(c, user);
+  if (c.kind !== 'group' || !(a.manage || a.mod)) throw bad('forbidden', 403);
+  c.roles = cleanRoles(body.roles, c.roles || []);
+  const ids = c.roles.map((r) => r.id);
+  Object.values(c.members).forEach((m) => { if (m.roles) m.roles = m.roles.filter((r) => ids.includes(r)); });
+  c.updated = Date.now();
+  sys(c, 'roles', user.username);
+  await save(store, c);
+  return view(env, store, c, user);
+}
+
+// ---------- Discord: Nachrichten weitergeben, Automationen ----------
+async function toDiscord(store, env, c, msg) {
+  const d = c.discord;
+  if (!d || d.status !== 'active' || !d.events || !d.events.messages) return;
+  const before = JSON.stringify(d.lastError || null);
+  await sendToDiscord(env, store, d, msg);
+  if (JSON.stringify(d.lastError || null) !== before) await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+}
+// Automationen eines Server-Chats ausführen. true = es kam eine Nachricht in den Chat (dann speichern).
+async function automate(store, env, c, trigger, vars) {
+  const d = c.discord;
+  if (!d || !(d.automations || []).length) return false;
+  let posted = false;
+  for (const au of d.automations) {
+    if (!au.on || au.trigger !== trigger) continue;
+    const text = renderTemplate(au.template, vars);
+    if (au.target !== 'chat' && d.status === 'active') await sendToDiscord(env, store, d, { username: d.botName, content: text });
+    if (au.target !== 'discord') {
+      c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: Date.now(), title: d.botName || 'TSG-Bot', text, rows: [], buttons: [] });
+      posted = true;
+    }
+  }
+  return posted;
+}
+// Jemand tritt dem Server-Chat bei oder verlässt ihn
+async function chatEvent(store, env, c, trigger, p) {
+  const d = c.discord;
+  if (c.kind !== 'group' || !d) return;
+  if (d.status === 'active' && d.events && d.events.joins) {
+    await sendToDiscord(env, store, d, { username: d.botName, content: trigger === 'join' ? `➡️ ${nameOf(p)} ist dem Server-Chat beigetreten` : `⬅️ ${nameOf(p)} hat den Server-Chat verlassen` });
+  }
+  await automate(store, env, c, trigger, { username: p.username, displayName: nameOf(p), chat: c.name, server: c.name, members: Object.keys(c.members || {}).length, players: 0 });
+}
+// Spieler betreten oder verlassen einen verbundenen privaten Server (aus dem Abgleich mit dem Spiel)
+export async function gameEvents(store, env, events) {
+  for (const ev of events || []) {
+    const ps = await store.get(`pserver:${ev.privateId}`);
+    const c = ps && ps.chat ? await store.get(`chat:${ps.chat}`) : null;
+    if (!c || !c.discord) continue;
+    let posted = false;
+    const vars = (x) => ({ username: x.name || x.id, displayName: x.dn || x.name || x.id, chat: c.name, server: ps.name, players: ev.players, members: Object.keys(c.members || {}).length });
+    for (const x of ev.joined || []) posted = (await automate(store, env, c, 'game_join', vars(x))) || posted;
+    for (const x of ev.left || []) posted = (await automate(store, env, c, 'game_leave', vars(x))) || posted;
+    if (posted) { c.updated = Date.now(); await save(store, c); } else await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+  }
+}
+
+// ---------- Discord: einrichten, einreichen, prüfen ----------
+async function requestIndex(store, id, add) {
+  const ids = (await store.get('discord:requests')) || [];
+  const next = add ? [id, ...ids.filter((x) => x !== id)].slice(0, 300) : ids.filter((x) => x !== id);
+  await store.put('discord:requests', next);
+}
+async function manageable(store, user, id) {
+  const c = await getChat(store, user, id);
+  const a = access(c, user);
+  if (c.kind !== 'group' || !(a.manage || a.mod)) throw bad('forbidden', 403);
+  return c;
+}
+export async function discordGet(store, env, user, id) {
+  return publicView(await manageable(store, user, id));
+}
+export async function discordPut(store, env, user, id, body) {
+  const c = await manageable(store, user, id);
+  if (c.category !== 'server') throw bad('not_server', 409);
+  c.discord = await updateConfig(env, store, c.discord, body || {});
+  await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+  return publicView(c);
+}
+export async function discordTest(store, env, user, id) {
+  const c = await manageable(store, user, id);
+  if (!c.discord || !c.discord.verified) throw bad('no_connection', 409);
+  const ok = await sendToDiscord(env, store, c.discord, { username: c.discord.botName, content: `✅ Verbindung steht: Server-Chat „${c.name}“ aus Train Sim Germany.` });
+  await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+  if (!ok) throw bad('discord_failed', 502);
+  return publicView(c);
+}
+export async function discordSubmit(store, env, user, id) {
+  const c = await manageable(store, user, id);
+  if (!c.discord) throw bad('no_connection', 409);
+  if (requirements(c).some((r) => !r.ok)) throw bad('requirements', 409);
+  if (['pending', 'active'].includes(c.discord.status)) return publicView(c);
+  Object.assign(c.discord, { status: 'pending', requestedBy: person(user), requestedAt: Date.now(), reviewedBy: null, reviewedAt: null, reason: '' });
+  sys(c, 'discord', user.username, { target: 'pending' });
+  c.updated = Date.now();
+  await save(store, c);
+  await requestIndex(store, c.id, true);
+  await notifyStaff(store, env, (rank) => atLeast(rank, REVIEW_RANK), 'team', {
+    title: 'Neue Discord-Verbindung', body: `„${c.name}“ von ${nameOf(user)} wartet auf Prüfung.`, url: './#/chat/discord', tag: `discord-${c.id}`, actions: [OPEN_ACTION],
+  }, user.sub);
+  return publicView(c);
+}
+export async function discordRemove(store, env, user, id) {
+  const c = await manageable(store, user, id);
+  if (c.discord) {
+    delete c.discord;
+    sys(c, 'discord', user.username, { target: 'removed' });
+    c.updated = Date.now();
+    await save(store, c);
+    await requestIndex(store, c.id, false);
+  }
+  return publicView(c);
+}
+// Prüfung (Ränge über Public Relations Department)
+export async function discordRequests(store, user) {
+  if (!atLeast(user.rank, REVIEW_RANK)) throw bad('forbidden', 403);
+  const out = [];
+  for (const id of (await store.get('discord:requests')) || []) {
+    const c = await store.get(`chat:${id}`);
+    if (!c || !c.discord) continue;
+    const { requirements: req, ...d } = publicView(c);
+    const owner = c.members[c.owner];
+    out.push({
+      ...d, id: c.id, name: c.name, color: c.color || null, photo: c.photo || null, rules: clip(c.rules || '', 600),
+      members: Object.keys(c.members).length, servers: (c.servers || []).length, owner: owner ? { sub: owner.sub, name: nameOf(owner), avatar: owner.avatar || null } : null,
+      roles: (c.roles || []).map((r) => ({ name: r.name, color: r.color, perms: r.perms, count: Object.values(c.members).filter((m) => (m.roles || []).includes(r.id)).length })),
+      ok: req.every((r) => r.ok),
+    });
+  }
+  const order = { pending: 0, active: 1, denied: 2, draft: 3 };
+  out.sort((a, b) => (order[a.status] ?? 4) - (order[b.status] ?? 4) || (b.requestedAt || 0) - (a.requestedAt || 0));
+  return { requests: out };
+}
+export async function discordReview(store, env, user, id, body) {
+  if (!atLeast(user.rank, REVIEW_RANK)) throw bad('forbidden', 403);
+  const c = /^[\w-]{6,30}$/.test(id) ? await store.get(`chat:${id}`) : null;
+  if (!c || !c.discord) throw bad('not_found', 404);
+  const accept = body.decision === 'accept';
+  const reason = clip(String(body.reason || ''), 300).trim();
+  Object.assign(c.discord, { status: accept ? 'active' : 'denied', reviewedBy: { sub: user.sub, name: user.username }, reviewedAt: Date.now(), reason });
+  sys(c, 'discord', user.username, { target: accept ? 'accepted' : 'denied' });
+  c.updated = Date.now();
+  if (accept) await sendToDiscord(env, store, c.discord, { username: c.discord.botName, content: `✅ Der Server-Chat „${c.name}“ ist jetzt mit Discord verbunden.` });
+  await save(store, c);
+  const to = (c.discord.requestedBy && c.discord.requestedBy.sub) || c.owner;
+  // Angenommen: mit Knopf zum Server-Chat; abgelehnt: ohne Knopf
+  await notifyUser(store, env, to, 'chat', accept
+    ? { title: 'Discord-Verbindung angenommen', body: `„${c.name}“ ist jetzt mit Discord verbunden.`, url: `./#/chat/${c.id}/info`, tag: `discord-${c.id}`, actions: [OPEN_ACTION] }
+    : { title: 'Discord-Verbindung abgelehnt', body: `„${c.name}“${reason ? `: ${reason}` : ' wurde nicht verbunden.'}`, url: './#/chat', tag: `discord-${c.id}` });
+  return { ok: true, status: c.discord.status };
 }
 
 // ---------- Melden: Anfrage an „Meldungen“ mit Verweis auf das Gespräch ----------
@@ -841,8 +1076,8 @@ export async function postResult(store, env, reviewer, a) {
   await addTo(store, a.sub, c.id);
   if (c.claimedBy) await addTo(store, c.claimedBy.sub, c.id);
   await notifyUser(store, env, a.sub, 'applications', {
-    ...fromPerson(person(reviewer), `[${label}] Deine Bewerbung als ${job} ist ausgewertet.`, `[${label}] ${job}`),
-    url: `./#/chat/${c.id}`, tag: `app-${a.id}`,
+    title: `Bewerbung ausgewertet: ${label}`, body: `${job} · ausgewertet von ${reviewer.username}`,
+    url: `./#/chat/${c.id}`, tag: `app-${a.id}`, actions: [OPEN_ACTION],
   });
   return c.id;
 }

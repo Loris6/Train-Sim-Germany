@@ -25,7 +25,7 @@
   // ---------- Bewegung & Haptik ----------
   // Animationen (aus, wenn das Gerät „Bewegung reduzieren“ meldet oder sie in den Einstellungen aus sind) und
   // spürbares Feedback beim Tippen: Vibration (Android) bzw. der System-Schalter von iOS (Safari ab 17.4).
-  const fx = { haptics: store.get('tsg-haptics', true) !== false, motion: store.get('tsg-motion', true) !== false };
+  const fx = { haptics: store.get('tsg-haptics', true) !== false, motion: store.get('tsg-motion', true) !== false, season: store.get('tsg-season', true) !== false };
   document.documentElement.dataset.motion = fx.motion ? 'on' : 'off';
   const reducedMotion = () => !fx.motion || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const canVibrate = typeof navigator.vibrate === 'function';
@@ -878,7 +878,8 @@
           <span class="avatars">${shown.map((p) => personPic(p, c.avatars)).join('')}${more ? `<span class="avatar avatar--more">+${more > 99 ? '99' : more}</span>` : ''}</span>
           <small>${c.players ? t('Alle ansehen') : t('Noch leer')}</small>
         </button>
-        <a class="server__details" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('fi-rr-angle-small-right')}</a>
+        <span class="svc__btns">${c.pserver && c.pserver.mine ? `<button class="server__details" type="button" data-pserver-edit="${esc(c.pserver.id)}" aria-label="${esc(t('Einstellungen'))}">${icon('fi-rr-settings')}</button>` : ''}
+        <a class="server__details" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('fi-rr-angle-small-right')}</a></span>
       </footer>
     </article>`;
   }
@@ -907,9 +908,15 @@
       const text = isLive ? `${s.title} ${s.id} ${s.people.map((p) => `${p.name || ''} ${p.dn || ''}`).join(' ')}` : `${s.name} ${s.id} ${s.network} ${s.region} ${s.lines.map((id) => D.lines[id].name).join(' ')}`;
       return !q || norm(text).includes(q);
     });
+    // Private Server bleiben dauerhaft auf der Seite – auch wenn gerade niemand darauf spielt
+    const running = new Set(all.filter((s) => s.pserver).map((s) => s.pserver.id));
+    const offline = isLive && ps.list ? [...ps.list.mine, ...ps.list.visible].filter((p, i, arr) => !p.online && !running.has(p.id) && arr.findIndex((x) => x.id === p.id) === i)
+      .filter((p) => ['all', 'private'].includes(state.serverType) && (!q || norm(`${p.name} ${p.ownerName || ''} ${p.id}`).includes(q))) : [];
+    const status = $('[data-game-status]');
+    if (status) status.innerHTML = isLive ? gameStatusHtml() : '';
     const box = $('[data-servers]');
     if (!list0) { box.innerHTML = `<div class="svc svc--skeleton" aria-hidden="true"></div>`.repeat(3); return; }
-    if (!all.length) {
+    if (!all.length && !offline.length) {
       box.innerHTML = `<div class="empty-card">
         <span class="empty-card__ic">${icon('fi-rr-signal-alt-2')}</span>
         <h3>${t('Gerade läuft kein Server')}</h3>
@@ -918,9 +925,69 @@
       </div>`;
       return;
     }
-    box.innerHTML = list.length ? list.map(serverCard).join('') : `<p class="empty">${t('Kein Server gefunden. Versuch einen anderen Filter.')}</p>`;
+    box.innerHTML = list.length || offline.length ? list.map(serverCard).join('') + offline.map(offlineCard).join('') : `<p class="empty">${t('Kein Server gefunden. Versuch einen anderen Filter.')}</p>`;
     reveal(box);
     countUp(box);
+  }
+  // Privater Server, auf dem gerade niemand spielt
+  function offlineCard(p) {
+    return `<article class="svc svc--private is-offline">
+      <header class="svc__head">
+        <span class="svc__ic">${icon('fi-rr-lock')}</span>
+        <div class="svc__title"><h3>${esc(p.name)}</h3><small class="svc__owner">${p.ownerName ? t('Privat · von {name}', { name: esc(p.ownerName) }) : t('Privater Server')}</small></div>
+        <div class="svc__count svc__count--off"><b>${t('Offline')}</b><small>${p.lastSeen ? t('zuletzt {when}', { when: agoText(p.lastSeen) }) : ''}</small></div>
+      </header>
+      <ul class="svc__roles" aria-label="${esc(t('Rollen'))}">${GAME_ROLES.map((r) => `<li class="is-zero" style="--rc:${roleRank(r).color}"><i></i><span>${esc(r)}</span><b>0</b></li>`).join('')}</ul>
+      <footer class="svc__foot">
+        <span class="svc__tags">${p.join === 'app' ? `<span class="pill pill--info">${icon('fi-sr-play')}${t('Über die App')}</span>` : `<span class="pill">${icon('fi-rr-lock')}${t('Nur über Roblox')}</span>`}${p.access === 'members' ? `<span class="pill">${icon('fi-rr-users-alt')}${t('Nur Mitglieder')}</span>` : ''}</span>
+        <span class="svc__btns">${p.canJoin && p.link ? `<a class="btn btn--primary btn--sm" href="${esc(p.link)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Starten')}</a>` : ''}
+        ${p.mine ? `<button class="server__details" type="button" data-pserver-edit="${esc(p.id)}" aria-label="${esc(t('Einstellungen'))}">${icon('fi-rr-settings')}</button>` : ''}</span>
+      </footer>
+    </article>`;
+  }
+  // Verbindung zum Spiel (nur fürs Team): fehlt der Schlüssel, passt er nicht oder meldet sich das Spiel nicht?
+  const gstat = { data: null, at: 0 };
+  async function loadGameStatus() {
+    if (!apiReady() || Date.now() - gstat.at < 60000) return;
+    gstat.at = Date.now();
+    try { gstat.data = await api('/api/game/status'); } catch (e) { gstat.data = null; }
+    if (state.page === 'server' && !state.serverId) renderServers();
+  }
+  function gameStatusHtml() {
+    if (!isTeam('Public Relations Department')) return '';
+    loadGameStatus();
+    const g = gstat.data;
+    if (!g) return '';
+    const fresh = g.lastSync && Date.now() - g.lastSync < 10 * 60000;
+    const rejected = g.lastReject && (!g.lastSync || g.lastReject.at > g.lastSync);
+    if (g.configured && fresh && !rejected) {
+      return `<p class="game-link is-ok">${icon('fi-sr-check-circle')}<span>${t('Verbindung zum Spiel steht · letzte Meldung {when}', { when: agoText(g.lastSync) })}</span></p>`;
+    }
+    const steps = `<ol class="game-link__steps">
+      <li>${t('Einen langen Zufallswert als Schlüssel ausdenken (z. B. 40 Zeichen).')}</li>
+      <li>${t('GitHub → Repository → Settings → Secrets and variables → Actions: Secret {name} mit diesem Wert anlegen.', { name: '<code>GAME_API_KEY</code>' })}</li>
+      <li>${t('Roblox Creator Dashboard → dein Spiel → Secrets: {name} mit demselben Wert, Domain {domain}.', { name: '<code>tsg_game_key</code>', domain: '<code>*.workers.dev</code>' })}</li>
+      <li>${t('GitHub → Actions → „Backend veröffentlichen“ → „Run workflow“.')}</li>
+    </ol>`;
+    let title;
+    let text;
+    let help = '';
+    if (!g.configured) {
+      title = t('Dem Backend fehlt der Spiel-Schlüssel');
+      text = t('Ohne GAME_API_KEY lehnt das Backend alle Meldungen aus dem Spiel ab – deshalb erscheinen hier keine Server, auch keine privaten.');
+      help = steps;
+    } else if (rejected && g.lastReject.reason === 'bad_key') {
+      title = t('Der Schlüssel des Spiels passt nicht');
+      text = t('Das Spiel meldet sich ({when}), aber sein Secret tsg_game_key ist nicht derselbe Wert wie GAME_API_KEY im Backend.', { when: agoText(g.lastReject.at) });
+      help = steps;
+    } else if (!g.lastSync) {
+      title = t('Noch keine Meldung aus dem Spiel');
+      text = t('Das Backend ist bereit, aber das Spiel hat sich noch nie gemeldet. Liegt TSGAppSync im ServerScriptService, sind HTTP-Anfragen an und ist das Secret tsg_game_key eingerichtet?');
+    } else {
+      title = t('Das Spiel meldet sich gerade nicht');
+      text = t('Letzte Meldung {when}. Läuft gerade ein Server mit TSGAppSync?', { when: agoText(g.lastSync) });
+    }
+    return `<div class="game-link"><span class="game-link__ic">${icon('fi-rr-triangle-warning')}</span><div class="game-link__body"><b>${title}</b><p>${text}</p>${help}<small>${t('Nur für das Team sichtbar.')}</small></div></div>`;
   }
 
   // Alle Spieler eines Servers (Sheet)
@@ -2617,6 +2684,7 @@
     renderLangPicker();
     renderPrivacy();
     renderFxSettings();
+    renderSeasonSettings();
     renderNotify();
     $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === themeMode())));
     const p = state.profile;
@@ -3674,6 +3742,15 @@
       file_incomplete: t('Eine Datei ist noch nicht ganz hochgeladen.'),
       bad_link: t('Das ist kein Link zu einem privaten Server auf roblox.com.'),
       chat_forbidden: t('Verbinden geht nur mit Gruppen, in denen du Inhaber oder Admin bist.'),
+      bad_webhook: t('Das ist kein Discord-Webhook. Er beginnt mit https://discord.com/api/webhooks/'),
+      webhook_unreachable: t('Discord kennt diesen Webhook nicht. Bitte den Link aus Discord neu kopieren.'),
+      bad_token: t('Das sieht nicht wie ein Bot-Token aus.'),
+      bad_channel: t('Die Kanal-ID besteht nur aus Ziffern (in Discord: Rechtsklick auf den Kanal → ID kopieren).'),
+      bot_unreachable: t('Mit diesem Token und Kanal kommt der Bot nicht an. Ist er auf dem Server und darf in den Kanal schreiben?'),
+      requirements: t('Es fehlt noch etwas – siehe Liste „Voraussetzungen“.'),
+      not_server: t('Discord gibt es nur für Server-Chats.'),
+      discord_failed: t('Discord hat die Nachricht nicht angenommen.'),
+      no_connection: t('Bitte zuerst einen Webhook oder Bot eintragen.'),
     };
     return map[e.message] || errorText(e);
   }
@@ -3817,6 +3894,7 @@
         ${tab('public', '#/chat/gruppen', 'fi-rr-globe', t('Gruppen'))}
         ${tab('team', '#/chat/team', 'fi-rr-users-alt', t('Team'))}
         ${isModHere() ? tab('mod', '#/chat/moderation', 'fi-rr-shield-check', t('Moderation'), l && l.reported) : ''}
+        ${isReviewer() ? tab('discord', '#/chat/discord', 'fi-brands-discord', 'Discord', dreq.list ? dreq.list.filter((x) => x.status === 'pending').length : 0) : ''}
       </div>`;
   }
   function chatGate() {
@@ -4097,7 +4175,7 @@
     if (!apiReady()) { ps.list = { mine: [], visible: [] }; return; }
     ps.busy = true;
     try { ps.list = await api('/api/pservers'); } catch (e) { ps.list = ps.list || { mine: [], visible: [] }; } finally { ps.busy = false; ps.at = Date.now(); }
-    if (state.page === 'server' && !state.serverId) renderPservers();
+    if (state.page === 'server' && !state.serverId) { renderPservers(); renderServers(); }
     if (state.page === 'chat' && ['new-server', 'info'].includes(state.chatView)) renderChat();
   }
   function pserverCard(p, { inChat = null } = {}) {
@@ -4116,23 +4194,14 @@
         ${unlink ? `<button class="btn btn--soft btn--sm" type="button" data-ps-unlink="${esc(p.id)}">${t('Trennen')}</button>` : ''}</div>
     </article>`;
   }
+  // Private Server stehen als Karten in der Serverliste; hier nur der Hinweis, wenn es noch keinen gibt
   function renderPservers() {
     const box = $('[data-pservers]');
     if (!box) return;
     if (!apiReady()) { box.innerHTML = ''; return; }
     if (!ps.list) { loadPservers(); box.innerHTML = ''; return; }
-    // Laufende private Server stehen schon oben in der Liste; hier eigene (zum Einstellen) und offline erreichbare
-    const mine = ps.list.mine;
-    const visible = ps.list.visible.filter((p) => !p.online || !liveMode());
-    const title = (n) => `<h2 class="ps-sec__title">${icon('fi-rr-lock')}${t('Private Server')}${n ? `<small>${n}</small>` : ''}</h2>`;
-    if (!mine.length && !visible.length) {
-      box.innerHTML = sessionToken() ? `<section class="ps-sec">${title(0)}<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Hast du einen privaten Server? Starte ihn einmal in Roblox – dann erscheint er hier. Du kannst ihn benennen, mit einem Server-Chat verbinden und festlegen, ob man über die App oder nur über Roblox beitritt.')}</span></p></section>` : '';
-      return;
-    }
-    box.innerHTML = `<section class="ps-sec">${title(mine.length + visible.length)}
-      ${mine.length ? `<h3 class="ps-sec__sub">${t('Meine')}</h3><div class="ps-grid">${mine.map((p) => pserverCard(p)).join('')}</div>` : ''}
-      ${visible.length ? `${mine.length ? `<h3 class="ps-sec__sub">${t('Weitere')}</h3>` : ''}<div class="ps-grid">${visible.map((p) => pserverCard(p)).join('')}</div>` : ''}
-    </section>`;
+    const any = ps.list.mine.length || ps.list.visible.length;
+    box.innerHTML = !any && sessionToken() ? `<section class="ps-sec"><p class="ps-empty">${icon('fi-rr-info')}<span>${t('Hast du einen privaten Server? Starte ihn einmal in Roblox – dann erscheint er hier und bleibt dauerhaft stehen. Du kannst ihn benennen, mit einem Server-Chat verbinden und festlegen, ob man über die App oder nur über Roblox beitritt.')}</span></p></section>` : '';
   }
   function pserverForm(id) {
     const p = ps.list && ps.list.mine.find((x) => x.id === id);
@@ -4201,6 +4270,12 @@
     role: (m) => t('{target} ist jetzt {role}', { target: esc(m.target), role: m.role === 'owner' ? t('Inhaber') : m.role === 'admin' ? t('Admin') : t('Mitglied') }),
     photo: (m) => t('{name} hat das Gruppenbild geändert', { name: esc(m.name) }),
     servers: (m) => t('{name} hat die verbundenen Server geändert', { name: esc(m.name) }),
+    roles: (m) => t('{name} hat die Rollen geändert', { name: esc(m.name) }),
+    discord: (m) => ({
+      pending: t('{name} hat die Discord-Verbindung zur Prüfung eingereicht', { name: esc(m.name) }),
+      accepted: t('Die Discord-Verbindung wurde angenommen'), denied: t('Die Discord-Verbindung wurde abgelehnt'),
+      removed: t('{name} hat die Discord-Verbindung entfernt', { name: esc(m.name) }),
+    }[m.target] || ''),
   };
   const ROLE_TAG = { owner: 'Inhaber', admin: 'Admin', mod: 'Moderation' };
   function peopleOf(c) {
@@ -4220,6 +4295,11 @@
         <img src="${url(f)}" alt="${esc(f.name)}" loading="lazy"${f.w && f.h && imgs.length === 1 ? ` style="aspect-ratio:${f.w}/${f.h}"` : ''}></button>`).join('')}</div>` : ''}
       ${vids.map((f) => `<video class="msg-video" src="${url(f)}#t=0.1" controls playsinline preload="metadata"></video>`).join('')}
       ${docs.map((f) => `<a class="msg-file" href="${url(f)}" target="_blank" rel="noopener">${icon('fi-rr-file')}<span><b>${esc(f.name)}</b><small>${sizeText(f.size)}</small></span>${icon('fi-rr-download')}</a>`).join('')}`;
+  }
+  // @Name hervorheben (eigener Name und @alle in Rot)
+  function mentionHtml(text) {
+    const mine = String((state.profile && state.profile.username) || '').toLowerCase();
+    return esc(text).replace(/@([A-Za-z0-9_]{2,20})/g, (all, n) => `<span class="mention${[mine, 'alle', 'everyone'].includes(n.toLowerCase()) ? ' is-me' : ''}">@${n}</span>`);
   }
   function chatMessages(c) {
     const me = meSub();
@@ -4272,10 +4352,11 @@
       const canDel = !m.deleted && (mine || c.canModerate);
       const body = m.deleted
         ? `<p class="msg__deleted">${icon('fi-rr-ban')}${m.deletedBy ? t('Von der Moderation gelöscht') : t('Nachricht gelöscht')}</p>`
-        : `${m.files ? filesHtml(m) : ''}${m.text ? `<p>${esc(m.text)}</p>` : ''}`;
+        : `${m.files ? filesHtml(m) : ''}${m.text ? `<p>${mentionHtml(m.text)}</p>` : ''}`;
+      const tr = c.kind === 'group' ? topRole(c, p) : null;
       return `${sep}<li class="msg${mine ? ' msg--mine' : ''}${first ? ' is-first' : ''}${m.files && !m.text ? ' msg--media' : ''}">
         ${!mine ? (first ? personImg(p, 'avatar--sm') : '<span class="msg__gap"></span>') : ''}
-        <div class="msg__col"><div class="msg__bubble"${canDel ? ` data-msg="${esc(m.id)}"` : ''}>${!mine && first && (many || p.rank) ? `<b class="msg__name">${esc(nameOfP(p))}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}</b>` : ''}${body}<time>${time}</time></div>
+        <div class="msg__col"><div class="msg__bubble"${canDel ? ` data-msg="${esc(m.id)}"` : ''}>${!mine && first && (many || p.rank) ? `<b class="msg__name"${tr ? ` style="--rc:${esc(tr.color)}"` : ''}>${esc(nameOfP(p))}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}</b>` : ''}${body}<time>${time}</time></div>
         ${canDel ? `<div class="msg__acts"><button type="button" data-msg-del="${esc(m.id)}">${icon('fi-rr-trash')}${mine ? t('Löschen') : t('Löschen (Moderation)')}</button></div>` : ''}</div>
       </li>`;
     }).join('');
@@ -4445,6 +4526,7 @@
     const myRole = c.me && c.me.role;
     const boss = myRole === 'owner' || myRole === 'mod' || (c.me && c.me.observe && c.canModerate);
     const acts = [];
+    if (c.kind === 'group' && c.canManage && (c.roles || []).length) acts.push(`<button type="button" data-mem-roles="${esc(p.sub)}">${icon('fi-rr-id-badge')}${t('Rollen')}</button>`);
     if (c.kind === 'group' && p.sub !== me) {
       if (boss && p.role === 'member') acts.push(`<button type="button" data-mem-role="admin" data-mem="${esc(p.sub)}">${icon('fi-rr-crown')}${t('Admin machen')}</button>`);
       if (boss && p.role === 'admin') acts.push(`<button type="button" data-mem-role="member" data-mem="${esc(p.sub)}">${t('Kein Admin mehr')}</button>`);
@@ -4454,7 +4536,7 @@
     return `<li class="mem-row">
       ${personImg(p)}
       <span class="mem-row__main"><b>${esc(nameOfP(p))}${p.sub === me ? ` <small>(${t('Du')})</small>` : ''}</b><small>@${esc(p.username)}</small></span>
-      <span class="mem-row__tags">${p.rank ? rankPill(rankOf(p.rank)) : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}</span>
+      <span class="mem-row__tags">${p.rank ? rankPill(rankOf(p.rank)) : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}${(c.roles || []).filter((r) => (p.roles || []).includes(r.id)).map(roleChip).join('')}</span>
       ${acts.length ? `<span class="mem-row__acts">${acts.join('')}</span>` : ''}
     </li>`;
   }
@@ -4514,6 +4596,7 @@
           <input type="checkbox" role="switch" data-chat-mute="${esc(c.id)}"${c.me.muted ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label></section>` : '';
     const btn = (attr, ic, text, cls = 'btn--soft') => `<button class="btn ${cls} btn--block" type="button" ${attr}>${icon(ic)}${text}</button>`;
     const actions = [
+      c.kind === 'direct' && role && other ? `<button class="btn btn--soft btn--block" type="button" data-invite-player="${esc(other.sub)}" data-invite-name="${esc(nameOfP(other))}">${icon('fi-sr-play')}${t('{name} ins Spiel einladen', { name: esc(nameOfP(other)) })}</button>` : '',
       c.kind === 'direct' && role && other ? `<a class="btn btn--soft btn--block" href="#/chat/neu/gruppe?mit=${esc(other.sub)}">${icon('fi-rr-user-add')}${t('Gruppe mit {name} und weiteren Leuten', { name: esc(nameOfP(other)) })}</a>` : '',
       c.canJoinMod ? btn(`data-chat-joinmod="${esc(c.id)}"`, 'fi-rr-shield-check', t('Sichtbar als Moderation beitreten')) : '',
       c.canJoin ? btn(`data-chat-join="${esc(c.id)}"`, 'fi-rr-user-add', t('Gruppe beitreten'), 'btn--primary') : '',
@@ -4526,8 +4609,209 @@
         ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('fi-rr-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
         ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'fi-rr-user-add' : 'fi-rr-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
       </section>` : '';
-    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${servers}${edit}${people}${cmds}${mine}
+    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${servers}${discordSection(c)}${edit}${rolesSection(c)}${people}${cmds}${mine}
       ${actions.length ? `<section class="info-sec"><div class="btn-stack">${actions.join('')}</div></section>` : ''}${mod}`;
+  }
+
+  // ---------- Eigene Rollen in Gruppen (wie bei Discord): Name, Farbe, Rechte ----------
+  const PERM_LABELS = [
+    ['write', 'Schreiben, auch wenn nur Admins dürfen'], ['media', 'Fotos und Videos senden'], ['invite', 'Leute hinzufügen'],
+    ['commands', 'Befehle nutzen, auch wenn nur Admins dürfen'], ['messages', 'Nachrichten anderer löschen'], ['kick', 'Mitglieder entfernen'],
+    ['mention', '@alle erwähnen'], ['manage', 'Gruppe verwalten (Einstellungen, Rollen, Discord)'],
+  ];
+  const ROLE_COLORS = ['#EC0016', '#F27405', '#E2A512', '#408335', '#0F8C8C', '#1455C0', '#7A4BD1', '#C2185B', '#878C96'];
+  const topRole = (c, p) => (c.roles || []).find((r) => (p.roles || []).includes(r.id)) || null;
+  const roleChip = (r) => `<span class="crole" style="--rc:${esc(r.color)}"><i></i>${esc(r.name)}</span>`;
+  function rolesSection(c) {
+    if (c.kind !== 'group') return '';
+    const roles = c.roles || [];
+    if (!roles.length && !c.canManage) return '';
+    const count = (r) => (c.members || []).filter((m) => (m.roles || []).includes(r.id)).length;
+    const perms = (r) => (r.perms.length ? r.perms.map((x) => t((PERM_LABELS.find(([k]) => k === x) || [x, x])[1])).join(' · ') : t('Keine Extra-Rechte'));
+    return `<section class="info-sec"><h3>${icon('fi-rr-id-badge')}${t('Rollen')}</h3>
+      ${roles.length ? `<ul class="crole-list">${roles.map((r) => `<li>
+        <span class="crole-list__main">${roleChip(r)}<small>${t('{n} Mitglieder', { n: count(r) })} · ${perms(r)}</small></span>
+        ${c.canManage ? `<button class="btn btn--soft btn--sm" type="button" data-role-edit="${esc(r.id)}">${icon('fi-rr-edit')}${t('Bearbeiten')}</button>` : ''}
+      </li>`).join('')}</ul>` : `<p class="muted">${t('Noch keine eigenen Rollen. Rollen geben Mitgliedern einen Namen, eine Farbe und Rechte – wie bei Discord.')}</p>`}
+      ${c.canManage ? `<button class="btn btn--outline btn--block" type="button" data-role-edit="new">${icon('fi-rr-plus')}${t('Rolle hinzufügen')}</button>` : ''}
+    </section>`;
+  }
+  function roleView(arg) {
+    const [cid, rid] = String(arg).split(':');
+    const c = chat.conv[cid];
+    if (!c) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
+    const r = (c.roles || []).find((x) => x.id === rid) || { id: 'new', name: '', color: ROLE_COLORS[(c.roles || []).length % ROLE_COLORS.length], perms: [] };
+    return `<form class="cform role-form" data-role-form="${esc(cid)}" data-role-id="${esc(r.id)}" novalidate>
+      <div class="f"><label class="f__label" for="role-name">${t('Name der Rolle')}</label><input id="role-name" name="name" maxlength="30" value="${esc(r.name)}" placeholder="${esc(t('z. B. Fahrdienst'))}"></div>
+      <fieldset class="f"><legend class="f__label">${t('Farbe')}</legend><div class="swatches">${ROLE_COLORS.map((col) => `<label class="swatch" style="--gc:${col}"><input type="radio" name="color" value="${col}"${r.color === col ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
+      <fieldset class="f"><legend class="f__label">${t('Rechte')}</legend><div class="toggles">${PERM_LABELS.map(([k, label]) => `<label class="toggle"><span class="toggle__text"><b>${t(label)}</b></span><input type="checkbox" role="switch" name="perm" value="${k}"${r.perms.includes(k) ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>`).join('')}</div></fieldset>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+      ${r.id !== 'new' ? `<button class="btn btn--danger btn--block" type="button" data-role-del="${esc(r.id)}" data-role-chat="${esc(cid)}">${icon('fi-rr-trash')}${t('Rolle löschen')}</button>` : ''}
+    </form>`;
+  }
+  function memberRolesView(arg) {
+    const [cid, sub] = String(arg).split(':');
+    const c = chat.conv[cid];
+    const p = c && (c.members || []).find((m) => m.sub === sub);
+    if (!p) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
+    if (!(c.roles || []).length) return `<p class="muted">${t('Lege zuerst unter „Rollen“ eine Rolle an.')}</p>`;
+    return `<form class="cform" data-mem-roles-form="${esc(cid)}" data-mem="${esc(sub)}" novalidate>
+      <p class="sp-head">${personImg(p)}<span><b>${esc(nameOfP(p))}</b> · @${esc(p.username)}</span></p>
+      <div class="toggles">${c.roles.map((r) => `<label class="toggle"><span class="toggle__text">${roleChip(r)}</span><input type="checkbox" role="switch" name="role" value="${esc(r.id)}"${(p.roles || []).includes(r.id) ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>`).join('')}</div>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+    </form>`;
+  }
+  async function saveRoles(cid, roles, msg) {
+    const r = await chatCall(cid, '/roles', { method: 'PUT', body: { roles } }, () => {});
+    if (r) { closeModal(); renderChat(); toast(msg); }
+  }
+
+  // ---------- Discord: Server-Chat verbinden (Webhook oder eigener Bot), Automationen ----------
+  const DISCORD_STATUS = { none: ['', 'Nicht verbunden'], draft: ['', 'Entwurf'], pending: ['pill--warn', 'Wird geprüft'], active: ['pill--ok', 'Verbunden'], denied: ['pill--bad', 'Abgelehnt'] };
+  const TRIGGER_LABELS = [['join', 'Jemand tritt dem Chat bei'], ['leave', 'Jemand verlässt den Chat'], ['game_join', 'Jemand betritt einen verbundenen Server im Spiel'], ['game_leave', 'Jemand verlässt den Server im Spiel']];
+  const TARGET_LABELS = [['discord', 'Nach Discord'], ['chat', 'In den Chat'], ['both', 'Discord und Chat']];
+  const triggerLabel = (k) => t((TRIGGER_LABELS.find(([x]) => x === k) || [k, k])[1]);
+  function automationRow(a = {}) {
+    return `<li class="auto-row" data-auto-row data-auto-id="${esc(a.id || '')}">
+      <div class="auto-row__head">
+        <select name="trigger" aria-label="${esc(t('Wann'))}">${TRIGGER_LABELS.map(([k, l]) => `<option value="${k}"${a.trigger === k ? ' selected' : ''}>${t(l)}</option>`).join('')}</select>
+        <select name="target" aria-label="${esc(t('Wohin'))}">${TARGET_LABELS.map(([k, l]) => `<option value="${k}"${(a.target || 'discord') === k ? ' selected' : ''}>${t(l)}</option>`).join('')}</select>
+      </div>
+      <textarea class="code-field" name="template" rows="2" maxlength="500" spellcheck="false" autocapitalize="off" placeholder="Willkommen {username} auf {server}!">${esc(a.template || '')}</textarea>
+      <div class="auto-row__foot">
+        <label class="mini-toggle"><input type="checkbox" name="on"${a.on === false ? '' : ' checked'}><span>${t('Aktiv')}</span></label>
+        <button class="btn btn--ghost btn--sm" type="button" data-auto-del>${icon('fi-rr-trash')}${t('Entfernen')}</button>
+      </div>
+    </li>`;
+  }
+  function discordSection(c) {
+    const d = c.discord;
+    if (c.kind !== 'group' || !d) return '';
+    if (!c.canManage) {
+      return d.status === 'active' ? `<section class="info-sec"><h3>${icon('fi-brands-discord')}Discord</h3><p class="muted">${t('Dieser Server-Chat ist mit Discord verbunden. Nachrichten erscheinen auch dort.')}</p></section>` : '';
+    }
+    if (c.category !== 'server') return '';
+    const st = DISCORD_STATUS[d.status] || DISCORD_STATUS.none;
+    const req = d.requirements || [];
+    const ready = req.every((r) => r.ok);
+    const mode = d.mode || 'webhook';
+    return `<section class="info-sec info-sec--discord">
+      <h3>${icon('fi-brands-discord')}${t('Discord verbinden')}<span class="pill ${st[0]}">${t(st[1])}</span></h3>
+      <p class="muted">${t('Zeigt die Nachrichten dieses Server-Chats auch auf deinem Discord-Server – per Webhook oder mit deinem eigenen Bot. Das Team prüft jede Verbindung, bevor sie startet.')}</p>
+      ${d.status === 'denied' ? `<p class="note note--bad">${icon('fi-rr-info')}<span>${d.reason ? t('Abgelehnt: {reason}', { reason: esc(d.reason) }) : t('Abgelehnt. Du kannst die Verbindung anpassen und erneut einreichen.')}</span></p>` : ''}
+      ${d.status === 'pending' ? `<p class="note">${icon('fi-rr-time-fast')}<span>${t('Eingereicht – das Team prüft die Verbindung. Du bekommst eine Benachrichtigung.')}</span></p>` : ''}
+      ${d.lastError && d.status === 'active' ? `<p class="note note--bad">${icon('fi-rr-triangle-warning')}<span>${t('Discord hat zuletzt eine Nachricht abgelehnt ({when}). Webhook bzw. Bot prüfen.', { when: fmtWhen(d.lastError.at) })}</span></p>` : ''}
+      <h4 class="info-sub">${t('Voraussetzungen')}</h4>
+      <ul class="req-list">${req.map((r) => `<li class="${r.ok ? 'is-ok' : ''}">${icon(r.ok ? 'fi-sr-check-circle' : 'fi-rr-circle')}<span>${t(r.text)}</span></li>`).join('')}</ul>
+      <form class="cform dc-form" data-discord-form="${esc(c.id)}" novalidate>
+        <fieldset class="f"><legend class="f__label">${t('Verbindung')}</legend><div class="vis-grid">
+          <label class="vis"><input type="radio" name="mode" value="webhook"${mode === 'webhook' ? ' checked' : ''}><span>${icon('fi-rr-link-alt')}<b>Webhook</b><small>${t('Einfach: Link aus Discord')}</small></span></label>
+          <label class="vis"><input type="radio" name="mode" value="bot"${mode === 'bot' ? ' checked' : ''}><span>${icon('fi-rr-robot')}<b>${t('Eigener Bot')}</b><small>${t('Bot-Token und Kanal')}</small></span></label>
+        </div></fieldset>
+        <div class="f dc-webhook"><label class="f__label" for="dc-hook">Webhook</label><input id="dc-hook" name="webhook" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(mode === 'webhook' && d.hint ? d.hint : 'https://discord.com/api/webhooks/…')}">
+          <small class="f__hint">${t('In Discord: Kanal bearbeiten → Integrationen → Webhooks → „Webhook-URL kopieren“.')}${mode === 'webhook' && d.info ? ` ${t('Verbunden mit „{name}“.', { name: esc(d.info.name) })}` : ''}</small></div>
+        <div class="f dc-bot"><label class="f__label" for="dc-token">${t('Bot-Token')}</label><input id="dc-token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(mode === 'bot' && d.hint ? d.hint : t('Token aus dem Discord-Entwicklerportal'))}"></div>
+        <div class="f dc-bot"><label class="f__label" for="dc-channel">${t('Kanal-ID')}</label><input id="dc-channel" name="channel" inputmode="numeric" autocomplete="off" value="${esc(d.channel || '')}">
+          <small class="f__hint">${mode === 'bot' && d.info ? t('Bot „{name}“ schreibt in #{channel}.', { name: esc(d.info.name), channel: esc(d.info.channel) }) : t('In Discord den Entwicklermodus einschalten, dann Rechtsklick auf den Kanal → „Kanal-ID kopieren“.')}</small></div>
+        <div class="f"><label class="f__label" for="dc-name">${t('Name deines Bots')}</label><input id="dc-name" name="botName" maxlength="40" value="${esc(d.botName || 'TSG-Bot')}"></div>
+        <fieldset class="f"><legend class="f__label">${t('Was nach Discord geht')}</legend><div class="toggles">
+          <label class="toggle"><span class="toggle__text"><b>${t('Nachrichten aus dem Server-Chat')}</b><small>${t('Mit Name und Profilbild, ohne Erwähnungen.')}</small></span><input type="checkbox" role="switch" name="messages"${!d.events || d.events.messages ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+          <label class="toggle"><span class="toggle__text"><b>${t('Wer beitritt und geht')}</b></span><input type="checkbox" role="switch" name="joins"${!d.events || d.events.joins ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+        </div></fieldset>
+        <fieldset class="f"><legend class="f__label">${t('Automationen – was dein Bot tun soll')}</legend>
+          <ul class="auto-list" data-auto-list>${(d.automations || []).map(automationRow).join('')}</ul>
+          <button class="btn btn--outline btn--sm" type="button" data-auto-add>${icon('fi-rr-plus')}${t('Automation hinzufügen')}</button>
+          <p class="f__hint code-help">${t('Platzhalter:')} <code>{username}</code> <code>{displayName}</code> <code>{server}</code> <code>{chat}</code> <code>{players}</code> <code>{members}</code></p>
+        </fieldset>
+        <div class="btn-row dc-actions">
+          <button class="btn btn--primary" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+          ${d.verified ? `<button class="btn btn--soft" type="button" data-discord-test="${esc(c.id)}">${icon('fi-rr-paper-plane')}${t('Testnachricht')}</button>` : ''}
+          ${['draft', 'denied', 'none'].includes(d.status) ? `<button class="btn btn--soft" type="button" data-discord-submit="${esc(c.id)}"${ready ? '' : ' disabled'}>${icon('fi-rr-paper-plane-top')}${t('Zur Prüfung einreichen')}</button>` : ''}
+          ${d.status !== 'none' ? `<button class="btn btn--ghost" type="button" data-discord-remove="${esc(c.id)}">${icon('fi-rr-trash')}${t('Entfernen')}</button>` : ''}
+        </div>
+      </form>
+    </section>`;
+  }
+  function readDiscordForm(form) {
+    const f = form.elements;
+    const body = {
+      mode: (form.querySelector('input[name="mode"]:checked') || {}).value, botName: f.botName.value,
+      events: { messages: f.messages.checked, joins: f.joins.checked },
+      automations: $$('[data-auto-row]', form).map((row) => ({
+        id: row.dataset.autoId || undefined, trigger: $('select[name="trigger"]', row).value, target: $('select[name="target"]', row).value,
+        template: $('textarea', row).value, on: $('input[name="on"]', row).checked,
+      })),
+    };
+    if (body.mode === 'webhook' && f.webhook.value.trim()) body.webhook = f.webhook.value.trim();
+    if (body.mode === 'bot') {
+      if (f.token.value.trim()) body.token = f.token.value.trim();
+      if (f.channel.value.trim()) body.channel = f.channel.value.trim();
+    }
+    return body;
+  }
+  async function discordCall(id, path, opts, msg) {
+    try {
+      const r = await api(`/api/chats/${encodeURIComponent(id)}/discord${path}`, opts);
+      if (chat.conv[id]) chat.conv[id].discord = r;
+      if (msg) toast(msg);
+      if (state.page === 'chat') renderChat();
+      return r;
+    } catch (e) {
+      haptic('error');
+      toast(chatError(e));
+      return null;
+    }
+  }
+
+  // ---------- Prüfung der Discord-Verbindungen (Ränge über Public Relations Department) ----------
+  const dreq = { list: null, at: 0, busy: false };
+  const isReviewer = () => isTeam('Project Engineer');
+  async function loadDiscordRequests(force = false) {
+    if (!apiReady() || !sessionToken() || !isReviewer() || dreq.busy || (!force && dreq.list && Date.now() - dreq.at < 30000)) return;
+    dreq.busy = true;
+    try { dreq.list = (await api('/api/discord/requests')).requests; } catch (e) { dreq.list = dreq.list || []; }
+    dreq.busy = false;
+    dreq.at = Date.now();
+    if (state.page === 'chat' && !['conv', 'info'].includes(state.chatView)) renderChat();
+  }
+  function dreqCard(r) {
+    const st = DISCORD_STATUS[r.status] || DISCORD_STATUS.none;
+    const how = r.mode === 'bot' ? t('Eigener Bot „{name}“ in #{channel}', { name: esc((r.info || {}).name || '?'), channel: esc((r.info || {}).channel || r.channel || '?') })
+      : t('Webhook „{name}“', { name: esc((r.info || {}).name || '?') });
+    return `<article class="dreq">
+      <header class="dreq__head">${groupBadge(r)}<span class="dreq__title"><b>${esc(r.name)}</b><small>${t('{n} Mitglieder', { n: r.members })} · ${t('{n} Server', { n: r.servers })}</small></span><span class="pill ${st[0]}">${t(st[1])}</span></header>
+      <dl class="info-dl">
+        <div><dt>${t('Inhaber')}</dt><dd>${esc(r.owner ? r.owner.name : '–')}</dd></div>
+        <div><dt>${t('Eingereicht')}</dt><dd>${r.requestedBy ? `${esc(r.requestedBy.displayName || r.requestedBy.username)} · ${fmtWhen(r.requestedAt)}` : '–'}</dd></div>
+        <div><dt>${t('Verbindung')}</dt><dd>${how}</dd></div>
+        <div><dt>${t('Bot-Name')}</dt><dd>${esc(r.botName || 'TSG-Bot')}</dd></div>
+      </dl>
+      ${r.rules ? `<p class="info-rules">${esc(r.rules)}</p>` : ''}
+      ${(r.roles || []).length ? `<div class="dreq__roles">${r.roles.map((x) => `${roleChip(x)}<small>${x.count}</small>`).join('')}</div>` : ''}
+      ${(r.automations || []).length ? `<ul class="dreq__autos">${r.automations.map((a) => `<li><small>${triggerLabel(a.trigger)} → ${t((TARGET_LABELS.find(([k]) => k === a.target) || ['', ''])[1])}</small><code>${esc(a.template)}</code></li>`).join('')}</ul>` : ''}
+      ${r.status === 'pending' ? `<div class="btn-row"><button class="btn btn--primary" type="button" data-dreq-accept="${esc(r.id)}">${icon('fi-rr-check')}${t('Annehmen')}</button>
+        <button class="btn btn--soft" type="button" data-dreq-deny="${esc(r.id)}">${icon('fi-rr-cross-small')}${t('Ablehnen')}</button></div>`
+        : r.reviewedBy ? `<p class="muted">${r.status === 'active' ? t('Angenommen von {name}', { name: esc(r.reviewedBy.name) }) : t('Abgelehnt von {name}', { name: esc(r.reviewedBy.name) })} · ${fmtWhen(r.reviewedAt)}${r.reason ? ` – ${esc(r.reason)}` : ''}</p>` : ''}
+    </article>`;
+  }
+  function chatDiscordReview() {
+    if (!isReviewer()) return `<p class="empty">${t('Discord-Verbindungen prüfen die Ränge über Public Relations Department.')}</p>`;
+    if (!dreq.list) { loadDiscordRequests(); return loadingHtml(); }
+    if (!dreq.list.length) return `<div class="chat-empty">${icon('fi-brands-discord')}<h2>${t('Keine Anfragen')}</h2><p>${t('Eingereichte Discord-Verbindungen von Server-Chats erscheinen hier.')}</p></div>`;
+    return `<div class="dreq-list">${dreq.list.map(dreqCard).join('')}</div>`;
+  }
+  async function reviewDiscord(id, decision) {
+    let reason = '';
+    if (decision === 'deny') {
+      reason = prompt(t('Warum wird die Verbindung abgelehnt? (Der Antragsteller sieht den Grund.)'));
+      if (reason === null) return;
+    }
+    try {
+      await api(`/api/discord/requests/${encodeURIComponent(id)}`, { method: 'POST', body: { decision, reason } });
+      haptic('success');
+      toast(decision === 'accept' ? t('Verbindung angenommen') : t('Verbindung abgelehnt'));
+      loadDiscordRequests(true);
+    } catch (e) { toast(chatError(e)); }
   }
 
   function renderChat() {
@@ -4548,7 +4832,8 @@
       return;
     }
     head.innerHTML = chatHead();
-    body.innerHTML = v === 'team' ? chatTeam() : v === 'queue' ? chatQueue() : v === 'public' ? chatPublic() : v === 'mod' ? chatMod() : chatMine();
+    if (isReviewer() && !dreq.list) loadDiscordRequests();
+    body.innerHTML = v === 'team' ? chatTeam() : v === 'queue' ? chatQueue() : v === 'public' ? chatPublic() : v === 'mod' ? chatMod() : v === 'discord' ? chatDiscordReview() : chatMine();
   }
 
   // ---------- Aktionen ----------
@@ -4968,10 +5253,241 @@
       ${status}
       <div class="sheet-actions">
         ${p.me ? '' : `<button class="btn ${tracked ? 'btn--soft' : 'btn--primary'} btn--lg btn--block" type="button" data-track="${esc(id)}" aria-pressed="${tracked}">${icon(tracked ? 'fi-rr-check' : 'fi-rr-eye')}${tracked ? t('Wird verfolgt – beenden') : t('Verfolgen')}</button>`}
-        ${p.me || !sessionToken() ? '' : `<a class="btn btn--outline btn--lg btn--block" href="#/chat/an/${encodeURIComponent(id)}">${icon('fi-rr-paper-plane')}${t('Nachricht schreiben')}</a>`}
+        ${p.me || !sessionToken() ? '' : `<button class="btn btn--outline btn--lg btn--block" type="button" data-invite-player="${esc(id)}" data-invite-name="${esc(p.displayName || p.username || '')}">${icon('fi-sr-play')}${t('Ins Spiel einladen')}</button>
+        <a class="btn btn--outline btn--lg btn--block" href="#/chat/an/${encodeURIComponent(id)}">${icon('fi-rr-paper-plane')}${t('Nachricht schreiben')}</a>`}
         <a class="btn btn--soft btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(id)}/profile" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}${t('Roblox-Profil ansehen')}</a>
       </div>
       <p class="sheet-note">${t('Angezeigt wird nur, ob jemand in Train Sim Germany ist – nie andere Spiele.')}</p>`;
+  }
+
+  // ---------- Banner in der App (Benachrichtigungen, solange die App offen ist) ----------
+  // Personen: Profilbild, „[TSG] Name“, darunter die Nachricht (mit Antwortfeld). Alles andere: Logo, „Train Sim Germany“,
+  // eine rote Linie, darunter Betreff und Nachricht. Knöpfe wie in der Benachrichtigung (Öffnen, Beitreten, Ablehnen).
+  let noticeTimer = null;
+  function noticeHide() {
+    const box = $('[data-notice]');
+    if (!box || box.hidden) return;
+    clearTimeout(noticeTimer);
+    box.classList.add('is-out');
+    setTimeout(() => { box.hidden = true; box.classList.remove('is-out'); box.innerHTML = ''; }, reducedMotion() ? 0 : 220);
+  }
+  function noticeArm(ms = 7000) {
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => {
+      const box = $('[data-notice]');
+      if (box && (box.matches(':hover') || box.contains(document.activeElement))) noticeArm(2500); else noticeHide();
+    }, ms);
+  }
+  function showNotice(d) {
+    let box = $('[data-notice]');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'notice';
+      box.dataset.notice = '';
+      box.setAttribute('role', 'status');
+      box.setAttribute('aria-live', 'polite');
+      document.body.appendChild(box);
+    }
+    const person = d.style === 'person';
+    const subject = !person && d.title && d.title !== 'Train Sim Germany' ? d.title : '';
+    const acts = (d.actions || []).filter((a) => a && a.action !== 'reply');
+    const btn = (a) => `<button class="btn ${a.action === 'decline' ? 'btn--soft' : 'btn--primary'} btn--sm" type="button" data-notice-act="${esc(a.action)}">${esc(a.title)}</button>`;
+    box.innerHTML = `<div class="notice__card${person ? ' notice__card--person' : ''}">
+      <span class="notice__pic">${d.icon ? `<img src="${esc(d.icon)}" alt="" referrerpolicy="no-referrer">` : '<img src="assets/img/logo.svg" alt="">'}</span>
+      <div class="notice__main">
+        <b class="notice__title">${esc(person ? d.title || 'Train Sim Germany' : 'Train Sim Germany')}</b>
+        ${person ? '' : '<i class="notice__line" aria-hidden="true"></i>'}
+        ${subject ? `<span class="notice__subject">${esc(subject)}</span>` : ''}
+        ${d.body ? `<p class="notice__text">${esc(d.body)}</p>` : ''}
+        ${d.reply ? `<form class="notice__reply" data-notice-reply novalidate><input name="text" autocomplete="off" maxlength="2000" placeholder="${esc(t('Antwort schreiben …'))}"><button class="btn btn--primary btn--sm" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button></form>` : ''}
+        ${acts.length ? `<div class="notice__acts">${acts.map(btn).join('')}</div>` : ''}
+      </div>
+      <button class="notice__close" type="button" data-notice-close aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross-small')}</button>
+    </div>`;
+    box.noticeData = d;
+    box.hidden = false;
+    box.classList.remove('is-out');
+    noticeArm(d.reply || acts.length ? 9000 : 6000);
+  }
+  async function noticeAction(action) {
+    const box = $('[data-notice]');
+    const d = (box && box.noticeData) || {};
+    noticeHide();
+    if (action === 'join' && d.join) {
+      window.open(d.join, '_blank', 'noopener');
+      if (d.invite) api(`/api/invites/${encodeURIComponent(d.invite.id)}/answer`, { method: 'POST', body: { answer: 'join', k: d.invite.k } }).catch(() => {});
+    } else if (action === 'decline' && d.invite) {
+      api(`/api/invites/${encodeURIComponent(d.invite.id)}/answer`, { method: 'POST', body: { answer: 'decline', k: d.invite.k } }).then(() => toast(t('Einladung abgelehnt'))).catch(() => {});
+    } else if (d.url) {
+      location.hash = new URL(d.url, location.href).hash || '#/';
+    }
+  }
+  async function noticeReply(form) {
+    const box = $('[data-notice]');
+    const d = (box && box.noticeData) || {};
+    const text = form.elements.text.value.trim();
+    if (!text || !d.reply) return;
+    form.elements.text.disabled = true;
+    try {
+      await api(`/api/chats/${encodeURIComponent(d.reply.chat)}/messages`, { method: 'POST', body: { text } });
+      toast(t('Gesendet'));
+      noticeHide();
+      chat.at = 0;
+    } catch (e) {
+      form.elements.text.disabled = false;
+      toast(chatError(e));
+    }
+  }
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (e) => {
+      const m = e.data || {};
+      if (m.type !== 'tsg-notice' || !m.notice) return;
+      // Neue Nachricht im Chat: Liste und roten Punkt gleich aktualisieren
+      if (String(m.notice.tag || '').startsWith('chat-')) loadChats(true);
+      showNotice(m.notice);
+    });
+  }
+  document.addEventListener('click', (e) => {
+    const act = e.target.closest('[data-notice-act]');
+    if (act) { noticeAction(act.dataset.noticeAct); return; }
+    if (e.target.closest('[data-notice-close]')) { noticeHide(); return; }
+    const card = e.target.closest('.notice__card');
+    if (card && !e.target.closest('form, button, input')) noticeAction('open');
+  });
+  document.addEventListener('submit', (e) => {
+    const f = e.target.closest('form[data-notice-reply]');
+    if (f) { e.preventDefault(); noticeReply(f); }
+  });
+
+  // ---------- Einladungen ins Spiel ----------
+  async function invitePlayer(id, name, btn) {
+    if (!sessionToken()) { openModal('profile'); return; }
+    if (btn) btn.disabled = true;
+    try {
+      const r = await api('/api/invites', { method: 'POST', body: { to: String(id) } });
+      haptic('success');
+      toast(r.sent ? t('Einladung an {name} gesendet', { name: name || r.toName || t('Spieler') })
+        : t('Eingeladen – {name} hat aber keine Benachrichtigungen an.', { name: name || r.toName || t('Spieler') }));
+    } catch (e) {
+      haptic('error');
+      toast(e.status === 429 ? t('Du hast gerade sehr viele Einladungen verschickt. Bitte warte etwas.') : errorText(e));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  const invites = {};
+  function inviteView(id) {
+    const inv = invites[id];
+    if (!inv) {
+      invites[id] = 'loading';
+      api(`/api/invites/${encodeURIComponent(id)}`).then((r) => { invites[id] = r; }).catch(() => { invites[id] = { error: true }; })
+        .finally(() => { if (modalView && modalView.name === 'invite') refreshModal(); });
+    }
+    if (!inv || inv === 'loading') return `<div class="sheet-loading">${icon('fi-rr-spinner')}<span>${t('Wird geladen …')}</span></div>`;
+    if (inv.error) return `<p class="muted">${t('Diese Einladung gibt es nicht mehr.')}</p>`;
+    const from = inv.from || {};
+    const open = inv.status === 'open' && inv.to === meSub();
+    return `<div class="profile-box">
+        <span class="pbig">${from.avatar ? `<span class="avatar avatar--img avatar--xl"><img src="${esc(from.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(from.username || '?', 'avatar--xl')}</span>
+        <h3>${esc(from.displayName || from.username || t('Spieler'))}</h3>
+        <p>${inv.where ? t('Lädt dich zu Train Sim Germany ein – {where}', { where: esc(inv.where) }) : t('Lädt dich zu Train Sim Germany ein')}</p>
+      </div>
+      ${open ? `<div class="sheet-actions">
+        <a class="btn btn--primary btn--lg btn--block" href="${esc(inv.join)}" target="_blank" rel="noopener" data-invite-answer="join" data-invite-id="${esc(inv.id)}">${icon('fi-sr-play')}${t('Beitreten')}</a>
+        <button class="btn btn--soft btn--lg btn--block" type="button" data-invite-answer="decline" data-invite-id="${esc(inv.id)}">${t('Ablehnen')}</button>
+      </div>` : `<p class="sheet-note">${inv.status === 'joined' ? t('Angenommen.') : inv.status === 'declined' ? t('Abgelehnt.') : t('Offen.')}</p>`}`;
+  }
+  document.addEventListener('click', (e) => {
+    const inv = e.target.closest('[data-invite-player]');
+    if (inv) { invitePlayer(inv.dataset.invitePlayer, inv.dataset.inviteName, inv); return; }
+    const ans = e.target.closest('[data-invite-answer]');
+    if (ans) {
+      const id = ans.dataset.inviteId;
+      api(`/api/invites/${encodeURIComponent(id)}/answer`, { method: 'POST', body: { answer: ans.dataset.inviteAnswer } })
+        .then((r) => { invites[id] = r; if (ans.dataset.inviteAnswer === 'decline') { toast(t('Einladung abgelehnt')); closeModal(); } })
+        .catch((err) => toast(errorText(err)));
+    }
+  });
+
+  // ---------- Saison-Design: Halloween, Weihnachten, Neujahr, Ostern ----------
+  // Nur in der passenden Zeit (deutsche Zeit) und nur, wenn es in den Einstellungen an ist.
+  function easterSunday(y) {
+    const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+    return Math.floor(Date.UTC(y, month - 1, day) / 864e5);
+  }
+  function seasons(y) {
+    const day = (mo, d, yy = y) => Math.floor(Date.UTC(yy, mo - 1, d) / 864e5);
+    const easter = easterSunday(y);
+    return [
+      { id: 'newyear', name: t('Neujahr'), from: day(12, 27, y - 1), to: day(1, 6) },
+      { id: 'easter', name: t('Ostern'), from: easter - 7, to: easter + 1 },
+      { id: 'halloween', name: t('Halloween'), from: day(10, 17), to: day(11, 2) },
+      { id: 'christmas', name: t('Weihnachten'), from: day(12, 1), to: day(12, 26) },
+      { id: 'newyear', name: t('Neujahr'), from: day(12, 27), to: day(1, 6, y + 1) },
+    ];
+  }
+  function seasonNow() {
+    const now = berlinNow();
+    return seasons(now.y).find((s) => now.day >= s.from && now.day <= s.to) || null;
+  }
+  function seasonNext() {
+    const now = berlinNow();
+    return [...seasons(now.y), ...seasons(now.y + 1)].filter((s) => s.from > now.day).sort((a, b) => a.from - b.from)[0] || null;
+  }
+  const SEASON_ART = {
+    halloween: ['<svg viewBox="0 0 64 32"><path d="M32 10c2-4 4-6 4-6l2 5c6-4 14-4 20 1-5 0-8 3-9 7-4-2-8-1-10 3-2-3-5-4-7-3-2-1-5 0-7 3-2-4-6-5-10-3-1-4-4-7-9-7 6-5 14-5 20-1l2-5s2 2 4 6z" fill="currentColor"/></svg>',
+      '<svg viewBox="0 0 32 32"><path d="M16 7c-1-3 1-5 3-5" stroke="#3b6b2a" stroke-width="2.4" fill="none" stroke-linecap="round"/><ellipse cx="16" cy="19" rx="13" ry="11" fill="#F27405"/><path d="M16 8c-4 3-4 19 0 22M16 8c4 3 4 19 0 22M8 10c-4 5-4 14 0 19M24 10c4 5 4 14 0 19" stroke="#C25700" stroke-width="1.4" fill="none"/></svg>'],
+    christmas: ['<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="#fff"/></svg>'],
+    newyear: ['<svg viewBox="0 0 24 24"><path d="M12 1l2.6 8.4L23 12l-8.4 2.6L12 23l-2.6-8.4L1 12l8.4-2.6z" fill="#E2B33C"/></svg>'],
+    easter: ['<svg viewBox="0 0 24 30"><ellipse cx="12" cy="16" rx="10" ry="13" fill="#F6C5D3"/><path d="M2.5 14c4 2 6-2 9.5 0s5.5 2 9.5 0M2.5 19c4 2 6-2 9.5 0s5.5 2 9.5 0" stroke="#7CC4A6" stroke-width="2" fill="none"/></svg>',
+      '<svg viewBox="0 0 24 30"><ellipse cx="12" cy="16" rx="10" ry="13" fill="#FCE38A"/><circle cx="8" cy="12" r="2" fill="#9AB8F0"/><circle cx="15" cy="17" r="2" fill="#9AB8F0"/><circle cx="9" cy="21" r="2" fill="#9AB8F0"/></svg>'],
+  };
+  function applySeason() {
+    const s = fx.season ? seasonNow() : null;
+    const root = document.documentElement;
+    const old = $('[data-season-fx]');
+    if (!s) { delete root.dataset.season; if (old) old.remove(); return; }
+    if (root.dataset.season === s.id && old) return;
+    root.dataset.season = s.id;
+    if (old) old.remove();
+    const layer = document.createElement('div');
+    layer.className = 'season-fx';
+    layer.dataset.seasonFx = '';
+    layer.setAttribute('aria-hidden', 'true');
+    const art = SEASON_ART[s.id];
+    const n = s.id === 'christmas' ? 26 : 10;
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('i');
+      el.innerHTML = art[i % art.length];
+      el.style.setProperty('--x', `${Math.round(Math.random() * 100)}%`);
+      el.style.setProperty('--d', `${(s.id === 'christmas' ? 9 : 14) + Math.random() * 10}s`);
+      el.style.setProperty('--delay', `${-Math.random() * 20}s`);
+      el.style.setProperty('--s', `${s.id === 'christmas' ? 4 + Math.random() * 6 : 16 + Math.random() * 16}px`);
+      layer.appendChild(el);
+    }
+    document.body.appendChild(layer);
+  }
+  function setSeason(on, { quiet = false } = {}) {
+    fx.season = !!on;
+    store.set('tsg-season', fx.season);
+    applySeason();
+    if (!quiet) settingsChanged();
+    renderSeasonSettings();
+  }
+  function renderSeasonSettings() {
+    const box = $('[data-season-set]');
+    if (!box) return;
+    const now = seasonNow();
+    const next = seasonNext();
+    const range = (s) => `${dtf({ day: 'numeric', month: 'short' }).format(dateOf(s.from))} – ${dtf({ day: 'numeric', month: 'short' }).format(dateOf(s.to))}`;
+    box.innerHTML = `<label class="toggle">
+        <span class="toggle__text"><b>${t('Saison-Design')}</b><small>${now ? t('Gerade: {name} ({range})', { name: now.name, range: range(now) }) : next ? t('Gerade keine Saison. Als Nächstes: {name} ab {date}', { name: next.name, date: dtf({ day: 'numeric', month: 'long' }).format(dateOf(next.from)) }) : ''}</small>
+          <small class="toggle__note">${icon('fi-rr-info')}${t('Halloween, Weihnachten, Neujahr und Ostern – automatisch zur passenden Zeit.')}</small></span>
+        <input type="checkbox" role="switch" data-season-toggle${fx.season ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span>
+      </label>`;
   }
 
   // ---------- Echte Zahlen: Gruppe, Spiel, Discord ----------
@@ -5024,7 +5540,7 @@
   const settingsAt = () => store.get('tsg-settings-at', 0);
   const currentSettings = () => ({
     theme: themeMode(), lang: langSetting(), bell: state.bell, remind: [...remind.ids], remindOff: [...remind.off], favs: [...state.favs],
-    track: pl.track, haptics: fx.haptics, motion: fx.motion, updatedAt: settingsAt(),
+    track: pl.track, haptics: fx.haptics, motion: fx.motion, season: fx.season, updatedAt: settingsAt(),
   });
   let settingsTimer = null;
   let applyingSettings = false;
@@ -5053,6 +5569,7 @@
       if (Array.isArray(s.track)) { pl.track = s.track.filter((x) => /^\d{1,20}$/.test(x)); store.set('tsg-track', pl.track); }
       if (typeof s.haptics === 'boolean') setHaptics(s.haptics, { quiet: true });
       if (typeof s.motion === 'boolean') setMotion(s.motion, { quiet: true });
+      if (typeof s.season === 'boolean') setSeason(s.season, { quiet: true });
       if (s.lang && s.lang !== langSetting()) await setLanguage(s.lang);
     } finally {
       applyingSettings = false;
@@ -5165,6 +5682,18 @@
     player: {
       title: () => t('Spieler'),
       render: (id) => playerView(id),
+    },
+    invite: {
+      title: () => t('Einladung'),
+      render: (id) => inviteView(id),
+    },
+    role: {
+      title: (arg) => (String(arg).endsWith(':new') ? t('Neue Rolle') : t('Rolle bearbeiten')),
+      render: (arg) => roleView(arg),
+    },
+    memroles: {
+      title: () => t('Rollen vergeben'),
+      render: (arg) => memberRolesView(arg),
     },
     'server-players': {
       title: () => t('Alle Spieler'),
@@ -5370,13 +5899,15 @@
     return false;
   }
   // Benachrichtigung über den Service Worker (geht auch auf Android); sonst direkt
-  async function notify(title, options) {
-    const opts = { icon: 'assets/icons/icon-192.png', badge: 'assets/icons/badge-96.png', lang, ...options };
+  // Wie alle Benachrichtigungen der App: „Train Sim Germany“, darunter eine Linie, dann Betreff und Nachricht
+  const NOTE_LINE = '━━━━━━━━━━━━━━━━';
+  async function notify(subject, options) {
+    const opts = { icon: 'assets/icons/icon-192.png', badge: 'assets/icons/badge-96.png', lang, ...options, body: [NOTE_LINE, subject, options.body].filter(Boolean).join('\n') };
     try {
       const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
-      if (reg) { await reg.showNotification(title, opts); return; }
+      if (reg) { await reg.showNotification('Train Sim Germany', opts); return; }
     } catch (e) { /* weiter ohne Service Worker */ }
-    try { new Notification(title, opts); } catch (e) { /* nicht möglich */ }
+    try { new Notification('Train Sim Germany', opts); } catch (e) { /* nicht möglich */ }
   }
   const placeId = (String(D.links.play).match(/games\/(\d+)/) || [])[1];
   const trainingServer = (tn) => D.servers.find((x) => x.name === tn.server);
@@ -5672,7 +6203,7 @@
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
     const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', server: 'new-server', anfrage: 'new-ticket' };
-    let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', neu: 'new', an: 'direct' }[chatSub] || 'conv';
+    let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', discord: 'discord', neu: 'new', an: 'direct' }[chatSub] || 'conv';
     if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
     if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
     const chatArg = chatView === 'direct' ? (sub2 || '') : ['conv', 'info'].includes(chatView) ? chatSub : null;
@@ -5725,6 +6256,13 @@
     chatPoll();
     if (chatView === 'mine' || chatView === 'queue') loadChats();
     if (['home', 'karriere', 'trainings', 'news'].includes(page)) refreshOnEnter(page);
+    // Aus einer Benachrichtigung: #/spieler?invite=<id> öffnet die Einladung
+    const inviteId = new URLSearchParams(query || '').get('invite');
+    if (page === 'spieler' && inviteId && sessionToken()) {
+      history.replaceState(null, '', '#/spieler');
+      delete invites[inviteId];
+      openModal('invite', inviteId);
+    }
     // Aus einer Benachrichtigung: #/trainings?t=<id> öffnet das Training
     const openId = new URLSearchParams(query || '').get('t');
     if (page === 'trainings' && openId) {
@@ -5865,6 +6403,7 @@
       if (nk) setNotifyKind(nk.dataset.notifyKind, nk.checked);
       if (e.target.closest('[data-fx-motion]')) setMotion(e.target.checked);
       if (e.target.closest('[data-fx-haptics]')) setHaptics(e.target.checked);
+      if (e.target.closest('[data-season-toggle]')) setSeason(e.target.checked);
     });
     document.addEventListener('click', (e) => { if (e.target.closest('[data-notify-test]')) testNotify(); });
 
@@ -6056,6 +6595,58 @@
     });
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
+    // Rollen und Discord im Server-Chat, Prüfung der Discord-Verbindungen
+    document.addEventListener('click', async (e) => {
+      const el = e.target.closest('[data-role-edit], [data-role-del], [data-mem-roles], [data-auto-add], [data-auto-del], [data-discord-test], [data-discord-submit], [data-discord-remove], [data-dreq-accept], [data-dreq-deny]');
+      if (!el) return;
+      const ds = el.dataset;
+      const conv = state.chatArg;
+      if (ds.roleEdit) openModal('role', `${conv}:${ds.roleEdit}`);
+      else if (ds.roleDel) {
+        const c = chat.conv[ds.roleChat];
+        if (c && confirm(t('Rolle löschen? Alle verlieren sie.'))) saveRoles(c.id, (c.roles || []).filter((r) => r.id !== ds.roleDel), t('Rolle gelöscht'));
+      } else if (ds.memRoles) openModal('memroles', `${conv}:${ds.memRoles}`);
+      else if ('autoAdd' in ds) {
+        const list = $('[data-auto-list]', el.closest('form'));
+        if (list) { list.insertAdjacentHTML('beforeend', automationRow({ trigger: 'join', target: 'discord' })); $('textarea', list.lastElementChild).focus(); }
+      } else if ('autoDel' in ds) el.closest('[data-auto-row]').remove();
+      else if (ds.discordTest) { el.disabled = true; await discordCall(ds.discordTest, '/test', { method: 'POST' }, t('Testnachricht gesendet')); el.disabled = false; }
+      else if (ds.discordSubmit) {
+        el.disabled = true;
+        if (await discordCall(ds.discordSubmit, '/submit', { method: 'POST' }, t('Eingereicht – das Team prüft die Verbindung'))) { haptic('success'); openConv(ds.discordSubmit); }
+        el.disabled = false;
+      } else if (ds.discordRemove) {
+        if (confirm(t('Discord-Verbindung entfernen? Webhook bzw. Bot-Token werden gelöscht.'))) discordCall(ds.discordRemove, '', { method: 'DELETE' }, t('Verbindung entfernt'));
+      } else if (ds.dreqAccept) reviewDiscord(ds.dreqAccept, 'accept');
+      else if (ds.dreqDeny) reviewDiscord(ds.dreqDeny, 'deny');
+    });
+    document.addEventListener('submit', (e) => {
+      const rf = e.target.closest('form[data-role-form]');
+      if (rf) {
+        e.preventDefault();
+        const c = chat.conv[rf.dataset.roleForm];
+        if (!c) return;
+        const role = { id: rf.dataset.roleId, name: rf.elements.name.value.trim(), color: (rf.querySelector('input[name="color"]:checked') || {}).value, perms: $$('input[name="perm"]:checked', rf).map((x) => x.value) };
+        if (role.name.length < 2) { toast(t('Bitte gib der Rolle einen Namen.')); return; }
+        const roles = role.id === 'new' ? [...(c.roles || []), { ...role, id: undefined }] : (c.roles || []).map((r) => (r.id === role.id ? role : r));
+        saveRoles(c.id, roles, t('Rollen gespeichert'));
+        return;
+      }
+      const mr = e.target.closest('form[data-mem-roles-form]');
+      if (mr) {
+        e.preventDefault();
+        chatCall(mr.dataset.memRolesForm, `/members/${mr.dataset.mem}`, { method: 'PUT', body: { roles: $$('input[name="role"]:checked', mr).map((x) => x.value) } }, () => {})
+          .then((r) => { if (r) { closeModal(); renderChat(); toast(t('Rollen vergeben')); } });
+        return;
+      }
+      const df = e.target.closest('form[data-discord-form]');
+      if (df) {
+        e.preventDefault();
+        const btn = $('button[type="submit"]', df);
+        btn.disabled = true;
+        discordCall(df.dataset.discordForm, '', { method: 'PUT', body: readDiscordForm(df) }, t('Gespeichert')).finally(() => { btn.disabled = false; });
+      }
+    });
     // Chat
     document.addEventListener('click', async (e) => {
       const el = e.target.closest('[data-chat-claim], [data-chat-close], [data-chat-join], [data-chat-joinmod], [data-chat-hide], [data-chat-delete], [data-chat-leave], [data-chat-report], [data-chat-edit], [data-mem-role], [data-mem-del], [data-msg-del], [data-msg], [data-photo], [data-tray-del], [data-cmd], [data-mod-kind], [data-member-add], [data-member-del], [data-chat-cat], [data-pserver-edit], [data-ps-unlink], [data-group-photo-del]');
@@ -6382,6 +6973,7 @@
     }
     if (!minuteChanged) return;
     if (['home', 'statistiken'].includes(state.page) && document.visibilityState === 'visible') loadGameStats();
+    if (now.m === 0) applySeason();
     remindersTick();
     // Serverstatus der Trainings (offen / öffnet bald / geschlossen) jede Minute aktualisieren
     if (state.page === 'home') renderNextSteps();
@@ -6427,6 +7019,7 @@
     setInterval(loadStats, 600000);
     // Zurück in die App (z. B. auf einem anderen Gerät etwas geändert): gleich abgleichen
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastSync > 15000) sync(); });
+    applySeason();
     tick();
     lastMinute = berlinNow().abs;
     setInterval(tick, 1000);

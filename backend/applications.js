@@ -108,10 +108,9 @@ export async function submitApplication(store, env, user, body) {
   a.mailed = await sendMail(env, { to: a.email, toName: a.displayName, ...mail });
   if (a.mailed) await store.put(`app:${a.id}`, a);
   await notifyStaff(store, env, (rank) => atLeast(rank, 'Public Relations Department'), 'team', {
-    title: `${a.displayName} · Neue Bewerbung`,
-    body: `${rankLabel(matchRank(a.groupRole))}: Bewerbung als ${a.jobTitle}${a.area ? ` – ${a.area}` : ''}${a.total ? ` · ${Math.round((a.score / a.total) * 100)} %` : ''}`,
-    ...(a.avatar ? { icon: a.avatar } : {}),
-    url: `./#/karriere/pruefen/${a.id}`, tag: `app-${a.id}`,
+    title: 'Neue Bewerbung',
+    body: `${a.displayName} (${rankLabel(matchRank(a.groupRole))}) · ${a.jobTitle}${a.area ? ` – ${a.area}` : ''}${a.total ? ` · ${Math.round((a.score / a.total) * 100)} %` : ''}`,
+    url: `./#/karriere/pruefen/${a.id}`, tag: `app-${a.id}`, actions: [{ action: 'open', title: 'Ansehen' }],
   }, a.sub);
 
   // Hinweis an den Team-Kanal (optional, Fehler sind nicht schlimm – die Bewerbung ist gespeichert)

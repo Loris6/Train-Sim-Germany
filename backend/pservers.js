@@ -19,7 +19,6 @@ import { clip } from './lib.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 const ONLINE = 3 * 60000;
-const SHOWN_DAYS = 30;
 
 // Neue private Server erscheinen automatisch auf der Server-Seite (der Besitzer kann sie verbergen)
 export const DEFAULTS = { join: 'roblox', link: '', access: 'all', show: 'public', welcome: '', relay: false, chat: null };
@@ -70,10 +69,9 @@ export async function pserverView(store, p, user, chatCache = new Map()) {
   };
 }
 
-// Liste für die App: eigene Server und alle, die man sehen darf (zuletzt 30 Tage aktiv)
+// Liste für die App: eigene Server und alle, die man sehen darf – dauerhaft, auch wenn gerade niemand darauf spielt
 export async function listPrivateServers(store, user) {
   const ids = (await store.get('pservers:index')) || [];
-  const since = Date.now() - SHOWN_DAYS * 86400000;
   const cache = new Map();
   const mine = [];
   const visible = [];
@@ -83,7 +81,7 @@ export async function listPrivateServers(store, user) {
     const v = await pserverView(store, p, user, cache);
     if (!v) continue;
     if (v.mine) mine.push(v);
-    else if ((p.lastSeen || 0) > since) visible.push(v);
+    else visible.push(v);
   }
   const order = (a, b) => (b.online - a.online) || (b.players - a.players) || ((b.lastSeen || 0) - (a.lastSeen || 0));
   return { mine: mine.sort(order), visible: visible.sort(order) };

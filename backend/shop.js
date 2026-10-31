@@ -145,16 +145,24 @@ export async function gameSync(store, body) {
   // Laufende Server (älter als 10 Minuten = weg), wer was macht, Spielzeit und Fahrten (siehe game.js)
   const sv = body.server && typeof body.server === 'object' ? body.server : null;
   const jobId = sv && clip(sv.jobId, 64);
+  let events = null;
   if (jobId) {
     const servers = (await store.get('game:servers')) || {};
     await dropStale(store, servers, t);
-    await recordServer(store, servers, jobId, sv, body, online, CATALOG, t);
+    const change = await recordServer(store, servers, jobId, sv, body, online, CATALOG, t);
     await store.put('game:servers', servers);
+    // Privater Server: wer kam und ging (für Automationen im verbundenen Server-Chat)
+    if (sv.private && sv.privateId && (change.joined.length || change.left.length)) {
+      events = [{ privateId: clip(sv.privateId, 64), joined: change.joined, left: change.left, players: online.length }];
+    }
   }
+  // Letzte Meldung aus dem Spiel (für die Anzeige „Verbindung zum Spiel“), höchstens einmal pro Minute geschrieben
+  const last = await store.get('game:last');
+  if (!last || t - last.at > 60000) await store.put('game:last', { at: t, private: !!(sv && sv.private) });
   // Privater Server: Stand merken, Einstellungen aus der App zurückgeben
   const config = jobId && sv.private && sv.privateId ? await privateServerSync(store, sv, online, clip(sv.ownerName, 40)) : null;
   if (pendingChanged) await store.put('shop:pending', all);
   const pending = {};
   online.forEach((sub) => { if (all[sub]) pending[sub] = all[sub]; });
-  return { pending, catalog: CATALOG, at: t, ...(config ? { config } : {}) };
+  return { pending, catalog: CATALOG, at: t, ...(config ? { config } : {}), ...(events ? { _events: events } : {}) };
 }

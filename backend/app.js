@@ -12,6 +12,7 @@
  *   GET    /health                       Was ist eingerichtet?
  *   GET    /api/content                  Trainings, Neuigkeiten, Stellen (öffentlich)
  *   GET    /api/stats                    Echte Zahlen: Gruppe, Spiel, Discord (öffentlich)
+ *   GET    /api/game/status              Verbindung zum Spiel: Schlüssel eingerichtet? Letzte Meldung, letzte abgelehnte Meldung
  *   GET    /api/gamestats                Statistik aus dem Spiel: Fahrten, km, Pünktlichkeit, Spieler je Stunde (öffentlich, sonst 0)
  *   GET    /api/servers                  Laufende Server aus dem Spiel mit Rollen und Spielern (private nur, wenn sichtbar)
  *   GET    /api/servers/<jobId>          Ein Server mit allen Spielern und Zügen
@@ -55,7 +56,7 @@
  *   PUT    /api/files/<id>/<n>           Stück n einer Datei
  *   GET    /api/files/<id>?c=&e=&s=      Datei abrufen (signierter Link)
  *   POST   /api/chats/<id>/members       Leute hinzufügen { users: [Name oder ID] }
- *   PUT    /api/chats/<id>/members/<id>  Rolle { role: admin | member | owner }
+ *   PUT    /api/chats/<id>/members/<id>  Rolle { role: admin | member | owner } und/oder eigene Rollen { roles: [id] }
  *   DELETE /api/chats/<id>/members/<id>  Aus der Gruppe entfernen
  *   POST   /api/chats/<id>/join          Öffentlicher Gruppe beitreten ({ mod: true } = sichtbar als Moderation)
  *   POST   /api/chats/<id>/leave         Gruppe verlassen
@@ -69,6 +70,16 @@
  *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
  *   POST   /api/chats/<id>/close         Gespräch beenden
  *   GET    /api/players/friends          Eigene Roblox-Freunde, wer davon gerade in Train Sim Germany ist
+ *   POST   /api/invites                  { to } – Spieler ins Spiel einladen (Benachrichtigung mit „Beitreten“ und „Ablehnen“)
+ *   GET    /api/invites/<id>             Einladung ansehen (Einladender oder Eingeladener)
+ *   POST   /api/invites/<id>/answer      { answer: join | decline } – angemeldet oder mit Schlüssel { k } aus der Benachrichtigung
+ *   POST   /api/chats/<id>/reply         { text, sub, exp, k } – Antwort direkt aus der Benachrichtigung (signiert, ohne Anmeldung)
+ *   PUT    /api/chats/<id>/roles         Eigene Rollen der Gruppe { roles: [{ id, name, color, perms }] }
+ *   GET    /api/chats/<id>/discord       Discord-Verbindung eines Server-Chats (ohne Zugangsdaten)
+ *   PUT    /api/chats/<id>/discord       { mode, webhook | token + channel, botName, events, automations }
+ *   POST   /api/chats/<id>/discord/test  Testnachricht nach Discord · /discord/submit zur Prüfung einreichen · DELETE entfernen
+ *   GET    /api/discord/requests         Eingereichte Discord-Verbindungen (über PRD)
+ *   POST   /api/discord/requests/<id>    { decision: accept | deny, reason }
  *   GET    /api/me/stats                 Eigene Statistik aus dem Spiel (Spielzeit, Fahrten, km, Pünktlichkeit)
  *   POST   /api/push/subscribe           { subscription, prefs } – Benachrichtigungen auf diesem Gerät (Chat, Bewerbungen, Team)
  *   POST   /api/push/unsubscribe         { endpoint } – Gerät abmelden
@@ -87,8 +98,10 @@ import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
 import {
   listChats, publicChats, moderationChats, createChat, readChat, postMessage, deleteMessage, claimChat, closeChat, updateChat, addMembers,
   joinChat, leaveChat, removeMember, setRole, muteChat, hideChat, deleteChat, reportChat, startChatUpload, staffList, findPlayer,
-  setChatPhoto, chatPhotoResponse, chatServers, reindexChat,
+  setChatPhoto, chatPhotoResponse, chatServers, reindexChat, replyFromPush, setChatRoles, gameEvents,
+  discordGet, discordPut, discordTest, discordSubmit, discordRemove, discordRequests, discordReview,
 } from './chat.js';
+import { createInvite, getInvite, answerInvite } from './invites.js';
 import { listPrivateServers, updatePrivateServer } from './pservers.js';
 import { serversView, serverDetail, playersStatus, friendsStatus, gameStats, playerStats, recordOnline, liveOnline, dropStale } from './game.js';
 import { putChunk, fileResponse } from './files.js';
@@ -267,7 +280,7 @@ function cleanSettings(body) {
     bell: body.bell === true,
     remind: ids(body.remind), remindOff: ids(body.remindOff), favs: ids(body.favs),
     track: ids(body.track).filter((x) => /^\d{1,20}$/.test(x)).slice(0, 100),
-    haptics: body.haptics !== false, motion: body.motion !== false,
+    haptics: body.haptics !== false, motion: body.motion !== false, season: body.season !== false,
     updatedAt: Math.min(Date.now(), Math.round(+body.updatedAt) || Date.now()),
   };
 }
@@ -309,6 +322,11 @@ export async function handle(req, env, store) {
     if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
     if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
     if (path === '/api/gamestats' && m === 'GET') return json(req, env, await gameStats(store));
+    if (path === '/api/game/status' && m === 'GET') {
+      const [last, reject, servers] = await Promise.all([store.get('game:last'), store.get('game:reject'), store.get('game:servers')]);
+      const live = Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).length;
+      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live });
+    }
     const file = path.match(/^\/api\/files\/([\w-]+)$/);
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
     const photo = path.match(/^\/media\/chat\/([\w-]+)$/);
@@ -323,9 +341,20 @@ export async function handle(req, env, store) {
     }
     if (path === '/api/staff' && m === 'GET') return json(req, env, { staff: await staffList(store, env) });
     if (path === '/api/game/sync' && m === 'POST') {
-      if (!await gameAuthorized(req, env)) return json(req, env, { error: 'unauthorized' }, 401);
-      return json(req, env, await gameSync(store, await readJson(req, 500000)));
+      // Abgelehnte Meldungen merken (höchstens einmal pro Minute), damit die App zeigt, woran es liegt
+      const reject = async (reason) => {
+        const old = await store.get('game:reject');
+        if (!old || Date.now() - old.at > 60000 || old.reason !== reason) await store.put('game:reject', { at: Date.now(), reason });
+      };
+      if (!env.GAME_API_KEY) { await reject('not_configured'); return json(req, env, { error: 'not_configured' }, 503); }
+      if (!await gameAuthorized(req, env)) { await reject('bad_key'); return json(req, env, { error: 'unauthorized' }, 401); }
+      const { _events, ...out } = await gameSync(store, await readJson(req, 500000));
+      if (_events) await gameEvents(store, env, _events).catch((e) => console.error('gameEvents', e));
+      return json(req, env, out);
     }
+    // Antwort aus der Benachrichtigung (signiert, ohne Sitzung)
+    const pushReply = path.match(/^\/api\/chats\/([\w-]{6,30})\/reply$/);
+    if (pushReply && m === 'POST') return json(req, env, await replyFromPush(store, env, pushReply[1], await readJson(req, 5000)), 201);
     const player = path.match(/^\/api\/players\/(\d{1,20})$/);
     if (player && m === 'GET') {
       const user = await store.get(`user:${player[1]}`);
@@ -351,6 +380,9 @@ export async function handle(req, env, store) {
     const liveServer = path.match(/^\/api\/servers\/([\w-]{1,64})$/);
     if (liveServer && m === 'GET') return json(req, env, await serverDetail(store, env, user, liveServer[1]));
     if (path === '/api/players/status' && m === 'POST') return json(req, env, await playersStatus(store, env, user, await readJson(req, 5000)));
+    // Einladung annehmen/ablehnen: angemeldet oder mit Schlüssel aus der Benachrichtigung
+    const inviteAnswer = path.match(/^\/api\/invites\/([\w-]{6,20})\/answer$/);
+    if (inviteAnswer && m === 'POST') return json(req, env, await answerInvite(store, env, user, inviteAnswer[1], await readJson(req, 2000)));
     if (!user) return json(req, env, { error: 'unauthorized' }, 401);
 
     // Shop
@@ -361,7 +393,15 @@ export async function handle(req, env, store) {
     if (path === '/api/chats/public' && m === 'GET') return json(req, env, await publicChats(store, user, url.searchParams.get('q') || ''));
     if (path === '/api/chats/moderation' && m === 'GET') return json(req, env, await moderationChats(store, await freshUser(env, store, user), url.searchParams.get('q') || '', url.searchParams.get('kind') || ''));
     if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 20000)), 201);
-    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close|files|members|join|leave|mute|hide|report|photo|servers)(?:\/([\w-]+))?)?$/);
+    // Einladungen ins Spiel
+    if (path === '/api/invites' && m === 'POST') return json(req, env, await createInvite(store, env, await freshUser(env, store, user), await readJson(req, 2000)), 201);
+    const invite = path.match(/^\/api\/invites\/([\w-]{6,20})$/);
+    if (invite && m === 'GET') return json(req, env, await getInvite(store, user, invite[1]));
+    // Discord-Verbindungen prüfen (über Public Relations Department)
+    if (path === '/api/discord/requests' && m === 'GET') return json(req, env, await discordRequests(store, await freshUser(env, store, user)));
+    const review = path.match(/^\/api\/discord\/requests\/([\w-]{6,30})$/);
+    if (review && m === 'POST') return json(req, env, await discordReview(store, env, await freshUser(env, store, user), review[1], await readJson(req, 2000)));
+    const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close|files|members|join|leave|mute|hide|report|photo|servers|roles|discord)(?:\/([\w-]+))?)?$/);
     if (chat) {
       const [, id, action, sub] = chat;
       if (!action && m === 'GET') return json(req, env, await readChat(store, env, user, id, { since: +url.searchParams.get('since') || 0, observe: url.searchParams.get('observe') === '1' }));
@@ -371,7 +411,13 @@ export async function handle(req, env, store) {
       if (action === 'messages' && sub && m === 'DELETE') return json(req, env, await deleteMessage(store, env, user, id, sub));
       if (action === 'files' && m === 'POST') return json(req, env, await startChatUpload(store, user, id, await readJson(req, 2000)), 201);
       if (action === 'members' && !sub && m === 'POST') return json(req, env, await addMembers(store, env, user, id, await readJson(req, 5000)));
-      if (action === 'members' && sub && m === 'PUT') return json(req, env, await setRole(store, env, await freshUser(env, store, user), id, sub, (await readJson(req, 1000)).role));
+      if (action === 'members' && sub && m === 'PUT') return json(req, env, await setRole(store, env, await freshUser(env, store, user), id, sub, await readJson(req, 2000)));
+      if (action === 'roles' && m === 'PUT') return json(req, env, await setChatRoles(store, env, await freshUser(env, store, user), id, await readJson(req, 10000)));
+      if (action === 'discord' && !sub && m === 'GET') return json(req, env, await discordGet(store, env, await freshUser(env, store, user), id));
+      if (action === 'discord' && !sub && m === 'PUT') return json(req, env, await discordPut(store, env, await freshUser(env, store, user), id, await readJson(req, 20000)));
+      if (action === 'discord' && !sub && m === 'DELETE') return json(req, env, await discordRemove(store, env, await freshUser(env, store, user), id));
+      if (action === 'discord' && sub === 'test' && m === 'POST') return json(req, env, await discordTest(store, env, await freshUser(env, store, user), id));
+      if (action === 'discord' && sub === 'submit' && m === 'POST') return json(req, env, await discordSubmit(store, env, await freshUser(env, store, user), id));
       if (action === 'members' && sub && m === 'DELETE') return json(req, env, await removeMember(store, env, await freshUser(env, store, user), id, sub));
       if (action === 'join' && m === 'POST') return json(req, env, await joinChat(store, env, await freshUser(env, store, user), id, { asMod: (await readJson(req, 1000)).mod === true }));
       if (action === 'leave' && m === 'POST') return json(req, env, await leaveChat(store, env, user, id));
