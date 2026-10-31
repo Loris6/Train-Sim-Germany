@@ -3044,37 +3044,6 @@ button.sp-row:hover .sp-row__chev { transform: translateX(2px); }
 .btn--ghost:hover { background: var(--hover); color: var(--ink); }
 .buy__media.sx-stage { aspect-ratio: 16 / 7; border-radius: 18px; }
 
-/* ---------- Banner in der App (Benachrichtigungen bei offener App) ---------- */
-.notice {
-  position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top)); z-index: 110; width: min(440px, calc(100% - 24px));
-  transform: translateX(-50%); animation: notice-in .4s cubic-bezier(.2, .9, .25, 1.1);
-}
-.notice.is-out { animation: notice-out .22s ease forwards; }
-@keyframes notice-in { from { opacity: 0; transform: translate(-50%, -24px) scale(.96); } }
-@keyframes notice-out { to { opacity: 0; transform: translate(-50%, -16px) scale(.97); } }
-.notice__card {
-  position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 14px 12px 14px 14px;
-  border-radius: 18px; background: rgba(20, 24, 31, .94); color: #fff; font-family: var(--font); cursor: pointer;
-  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
-  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .06);
-}
-.notice__pic { width: 40px; height: 40px; flex: none; display: grid; place-items: center; overflow: hidden; border-radius: 12px; background: #fff; }
-.notice__pic img { width: 100%; height: 100%; object-fit: contain; }
-.notice__card--person .notice__pic { border-radius: 50%; background: #2a3039; }
-.notice__card--person .notice__pic img { object-fit: cover; }
-.notice__main { min-width: 0; display: grid; gap: 4px; }
-.notice__title { font-size: 15px; font-weight: 700; letter-spacing: .01em; }
-.notice__line { display: block; height: 3px; margin: 4px 0 2px; border-radius: 2px; background: linear-gradient(90deg, var(--red), #ff5a66 60%, rgba(236, 0, 22, 0)); }
-.notice__subject { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, .92); }
-.notice__text { font-size: 14px; line-height: 1.45; color: rgba(255, 255, 255, .78); white-space: pre-line; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-.notice__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.notice__acts .btn--soft { background: rgba(255, 255, 255, .12); color: #fff; }
-.notice__reply { display: flex; gap: 6px; margin-top: 6px; }
-.notice__reply input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, .16); border-radius: 10px; background: rgba(255, 255, 255, .08); color: #fff; font: inherit; font-size: 15px; }
-.notice__reply input::placeholder { color: rgba(255, 255, 255, .5); }
-.notice__close { width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: rgba(255, 255, 255, .6); cursor: pointer; }
-.notice__close:hover { background: rgba(255, 255, 255, .1); color: #fff; }
-
 /* ---------- Erwähnungen, eigene Rollen ---------- */
 .mention { padding: 0 3px; border-radius: 4px; background: var(--info-soft); color: var(--info); font-weight: 600; }
 .mention.is-me { background: var(--red-soft); color: var(--red-text); }

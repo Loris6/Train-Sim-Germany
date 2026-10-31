@@ -1,7 +1,7 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v19';
+const CACHE = 'tsg-v20';
 const SHELL = [
   './',
   'index.html',
@@ -82,19 +82,26 @@ function actionsOf(d) {
   return d.join ? [{ action: 'join', title: d.joinLabel || 'Beitreten' }] : [];
 }
 
+// Ist genau dieses Gespräch gerade offen und im Vordergrund? (wie bei Messengern: dann keine Meldung)
+function chatOpen(clients, tag) {
+  const id = String(tag || '').startsWith('chat-') ? String(tag).slice(5) : '';
+  if (!id || APPLE) return false; // Apple verlangt zu jeder Push-Nachricht eine Meldung
+  return clients.some((c) => {
+    if (c.visibilityState !== 'visible' || c.focused === false) return false;
+    const hash = new URL(c.url).hash.split('?')[0];
+    return hash === `#/chat/${id}` || hash.startsWith(`#/chat/${id}/`);
+  });
+}
+
+// Jede Push-Nachricht wird eine echte Benachrichtigung des Geräts (Mitteilungszentrale, Sperrbildschirm) –
+// auch wenn die App gerade offen ist. Die offene App aktualisiert nur still ihre Liste.
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { body: e.data ? e.data.text() : '' }; }
   e.waitUntil((async () => {
     const open = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    const visible = open.filter((c) => c.visibilityState === 'visible');
-    // Chat gerade offen? Dann keine Benachrichtigung – die Nachricht ist ja schon zu sehen
-    if (String(d.tag || '').startsWith('chat-') && visible.some((c) => new URL(c.url).hash.startsWith('#/chat'))) return;
-    // App offen: eigenes Banner in der App (Rubik, Linie, Knöpfe) statt einer Systemmeldung – außer auf Apple-Geräten
-    if (visible.length && !APPLE) {
-      visible.forEach((c) => c.postMessage({ type: 'tsg-notice', notice: d }));
-      return;
-    }
+    open.forEach((c) => c.postMessage({ type: 'tsg-push', tag: d.tag || '' }));
+    if (chatOpen(open, d.tag)) return;
     const n = shape(d);
     await self.registration.showNotification(n.title, {
       body: n.body,
@@ -104,6 +111,9 @@ self.addEventListener('push', (e) => {
       timestamp: Date.now(),
       tag: d.tag || undefined,
       lang: d.lang || 'de',
+      vibrate: d.style === 'person' ? [120, 60, 120] : [200],
+      // Einladungen bleiben stehen, bis man „Beitreten“ oder „Ablehnen“ wählt (wo das Gerät das kann)
+      requireInteraction: !!d.invite,
       data: { url: d.url || './', join: d.join || null, reply: d.reply || null, invite: d.invite || null },
       actions: actionsOf(d),
     });

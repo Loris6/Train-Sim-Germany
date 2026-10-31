@@ -5260,104 +5260,14 @@
       <p class="sheet-note">${t('Angezeigt wird nur, ob jemand in Train Sim Germany ist – nie andere Spiele.')}</p>`;
   }
 
-  // ---------- Banner in der App (Benachrichtigungen, solange die App offen ist) ----------
-  // Personen: Profilbild, „[TSG] Name“, darunter die Nachricht (mit Antwortfeld). Alles andere: Logo, „Train Sim Germany“,
-  // eine rote Linie, darunter Betreff und Nachricht. Knöpfe wie in der Benachrichtigung (Öffnen, Beitreten, Ablehnen).
-  let noticeTimer = null;
-  function noticeHide() {
-    const box = $('[data-notice]');
-    if (!box || box.hidden) return;
-    clearTimeout(noticeTimer);
-    box.classList.add('is-out');
-    setTimeout(() => { box.hidden = true; box.classList.remove('is-out'); box.innerHTML = ''; }, reducedMotion() ? 0 : 220);
-  }
-  function noticeArm(ms = 7000) {
-    clearTimeout(noticeTimer);
-    noticeTimer = setTimeout(() => {
-      const box = $('[data-notice]');
-      if (box && (box.matches(':hover') || box.contains(document.activeElement))) noticeArm(2500); else noticeHide();
-    }, ms);
-  }
-  function showNotice(d) {
-    let box = $('[data-notice]');
-    if (!box) {
-      box = document.createElement('div');
-      box.className = 'notice';
-      box.dataset.notice = '';
-      box.setAttribute('role', 'status');
-      box.setAttribute('aria-live', 'polite');
-      document.body.appendChild(box);
-    }
-    const person = d.style === 'person';
-    const subject = !person && d.title && d.title !== 'Train Sim Germany' ? d.title : '';
-    const acts = (d.actions || []).filter((a) => a && a.action !== 'reply');
-    const btn = (a) => `<button class="btn ${a.action === 'decline' ? 'btn--soft' : 'btn--primary'} btn--sm" type="button" data-notice-act="${esc(a.action)}">${esc(a.title)}</button>`;
-    box.innerHTML = `<div class="notice__card${person ? ' notice__card--person' : ''}">
-      <span class="notice__pic">${d.icon ? `<img src="${esc(d.icon)}" alt="" referrerpolicy="no-referrer">` : '<img src="assets/img/logo.svg" alt="">'}</span>
-      <div class="notice__main">
-        <b class="notice__title">${esc(person ? d.title || 'Train Sim Germany' : 'Train Sim Germany')}</b>
-        ${person ? '' : '<i class="notice__line" aria-hidden="true"></i>'}
-        ${subject ? `<span class="notice__subject">${esc(subject)}</span>` : ''}
-        ${d.body ? `<p class="notice__text">${esc(d.body)}</p>` : ''}
-        ${d.reply ? `<form class="notice__reply" data-notice-reply novalidate><input name="text" autocomplete="off" maxlength="2000" placeholder="${esc(t('Antwort schreiben …'))}"><button class="btn btn--primary btn--sm" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button></form>` : ''}
-        ${acts.length ? `<div class="notice__acts">${acts.map(btn).join('')}</div>` : ''}
-      </div>
-      <button class="notice__close" type="button" data-notice-close aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross-small')}</button>
-    </div>`;
-    box.noticeData = d;
-    box.hidden = false;
-    box.classList.remove('is-out');
-    noticeArm(d.reply || acts.length ? 9000 : 6000);
-  }
-  async function noticeAction(action) {
-    const box = $('[data-notice]');
-    const d = (box && box.noticeData) || {};
-    noticeHide();
-    if (action === 'join' && d.join) {
-      window.open(d.join, '_blank', 'noopener');
-      if (d.invite) api(`/api/invites/${encodeURIComponent(d.invite.id)}/answer`, { method: 'POST', body: { answer: 'join', k: d.invite.k } }).catch(() => {});
-    } else if (action === 'decline' && d.invite) {
-      api(`/api/invites/${encodeURIComponent(d.invite.id)}/answer`, { method: 'POST', body: { answer: 'decline', k: d.invite.k } }).then(() => toast(t('Einladung abgelehnt'))).catch(() => {});
-    } else if (d.url) {
-      location.hash = new URL(d.url, location.href).hash || '#/';
-    }
-  }
-  async function noticeReply(form) {
-    const box = $('[data-notice]');
-    const d = (box && box.noticeData) || {};
-    const text = form.elements.text.value.trim();
-    if (!text || !d.reply) return;
-    form.elements.text.disabled = true;
-    try {
-      await api(`/api/chats/${encodeURIComponent(d.reply.chat)}/messages`, { method: 'POST', body: { text } });
-      toast(t('Gesendet'));
-      noticeHide();
-      chat.at = 0;
-    } catch (e) {
-      form.elements.text.disabled = false;
-      toast(chatError(e));
-    }
-  }
+  // Push-Nachrichten erscheinen immer als Benachrichtigung des Geräts (sw.js). Ist die App offen, meldet der
+  // Service Worker das nur kurz, damit Chatliste und roter Punkt gleich stimmen.
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (e) => {
       const m = e.data || {};
-      if (m.type !== 'tsg-notice' || !m.notice) return;
-      // Neue Nachricht im Chat: Liste und roten Punkt gleich aktualisieren
-      if (String(m.notice.tag || '').startsWith('chat-')) loadChats(true);
-      showNotice(m.notice);
+      if (m.type === 'tsg-push' && String(m.tag || '').startsWith('chat-')) loadChats(true);
     });
   }
-  document.addEventListener('click', (e) => {
-    const act = e.target.closest('[data-notice-act]');
-    if (act) { noticeAction(act.dataset.noticeAct); return; }
-    if (e.target.closest('[data-notice-close]')) { noticeHide(); return; }
-    const card = e.target.closest('.notice__card');
-    if (card && !e.target.closest('form, button, input')) noticeAction('open');
-  });
-  document.addEventListener('submit', (e) => {
-    const f = e.target.closest('form[data-notice-reply]');
-    if (f) { e.preventDefault(); noticeReply(f); }
-  });
 
   // ---------- Einladungen ins Spiel ----------
   async function invitePlayer(id, name, btn) {
@@ -5936,7 +5846,7 @@
     renderReminders();
     if (on) {
       // Sofort eine echte Benachrichtigung als Bestätigung
-      notify(t('Benachrichtigung aktiviert'), {
+      notify(t(tn.title), {
         body: t('Wir melden uns, wenn der Server für „{title}“ öffnet – {day}, {time} Uhr.', { title: t(tn.title), day: dayName(tn.day), time: hhmm(tn.start - SERVER_OPENS) }),
         tag: 'tsg-remind-confirm', data: { url: trainingNote(tn).url },
       });
@@ -5954,7 +5864,7 @@
     renderReminders();
     const next = nextRank(state.rank);
     if (state.bell) {
-      notify(t('Benachrichtigungen aktiviert'), {
+      notify('', {
         body: next ? t('Wir melden uns vor jedem {type}-Training, sobald der Server öffnet.', { type: next.name }) : t('Wir melden uns vor jedem Training, sobald der Server öffnet.'),
         tag: 'tsg-remind-confirm',
       });
@@ -6080,7 +5990,7 @@
   }
   async function testNotify() {
     if (!sessionToken() || !apiReady()) {
-      notify(t('Train Sim Germany'), { body: t('So sehen Benachrichtigungen aus.'), tag: 'test' });
+      notify('', { body: t('So sehen Benachrichtigungen aus.'), tag: 'test' });
       return;
     }
     try {
