@@ -17,8 +17,8 @@
  * mit @Name). Titel „[TSG] Name“, darunter die Nachricht; wo der Browser es kann, lässt sich direkt in der
  * Benachrichtigung antworten (signierter Link, 7 Tage gültig).
  *
- * Gruppen haben wie Discord eigene Rollen (Name, Farbe, Rechte). Server-Chats lassen sich nach Prüfung durch das
- * Team mit Discord verbinden (siehe discord.js).
+ * Gruppen haben wie Discord eigene Rollen (Name, Farbe, Rechte) und eigene Bots (bots.js, Skripte in Luna).
+ * Server-Chats lassen sich nach Prüfung durch das Team mit Discord verbinden (siehe discord.js).
  *
  *   chat:<id>       → Gespräch mit Nachrichten (die letzten 500)
  *   chats:index     → Übersicht aller Gespräche (eigene, Anfragen, öffentliche Gruppen, Moderation)
@@ -31,7 +31,8 @@ import { randomKey, clip } from './lib.js';
 import { level, atLeast, matchRank } from './ranks.js';
 import { notifyUser, notifyStaff } from './webpush.js';
 import { sign, verify } from './secret.js';
-import { REVIEW_RANK, updateConfig, requirements, publicView, sendToDiscord, renderTemplate } from './discord.js';
+import { REVIEW_RANK, updateConfig, requirements, publicView, sendToDiscord } from './discord.js';
+import { metaOf as botMeta, listBots, getBot, createBot, updateBot, deleteBot, setBotPhoto, clientBundle, botsEvent } from './bots.js';
 import { findPlayer, groupRole } from './roblox.js';
 import { startUpload, attachFiles, deleteFiles, fileLinks } from './files.js';
 import { serversOfChat, linkChat, cleanLink } from './pservers.js';
@@ -178,12 +179,13 @@ const SYSTEM_TEXT = {
   role: (m) => `${m.target} ist jetzt ${m.role === 'owner' ? 'Inhaber' : m.role === 'admin' ? 'Admin' : 'Mitglied'}`,
   photo: (m) => `${m.name} hat das Gruppenbild geändert`, servers: (m) => `${m.name} hat die verbundenen Server geändert`,
   roles: (m) => `${m.name} hat die Rollen geändert`,
+  bot: (m) => (m.action === 'deleted' ? `${m.name} hat den Bot ${m.target} entfernt` : `${m.name} hat den Bot ${m.target} erstellt`),
   discord: (m) => ({ pending: `${m.name} hat die Discord-Verbindung zur Prüfung eingereicht`, accepted: 'Die Discord-Verbindung wurde angenommen', denied: 'Die Discord-Verbindung wurde abgelehnt', removed: `${m.name} hat die Discord-Verbindung entfernt` }[m.target] || ''),
 };
 function previewOf(m) {
   if (m.deleted) return 'Nachricht gelöscht';
   if (m.by === 'system') return (SYSTEM_TEXT[m.text] || (() => ''))(m);
-  if (m.kind === 'bot') return `🤖 ${m.title || ''}`;
+  if (m.kind === 'bot') return m.botId ? m.text || '' : `🤖 ${m.title || ''}`;
   if (m.text) return m.text;
   const f = (m.files || [])[0];
   return f ? (f.kind === 'image' ? '📷 Foto' : f.kind === 'video' ? '🎬 Video' : `📎 ${f.name}`) : '';
@@ -201,7 +203,7 @@ function summary(c) {
     admins: Object.values(ppl).filter((p) => isManager(p.role)).map((p) => p.sub),
     hidden: c.hidden || {}, banned: c.banned || [], reported: (c.reports || []).length,
     created: c.created, updated: c.updated,
-    last: last ? { by: last.by, name: last.by === 'bot' ? 'TSG-Bot' : last.by === 'system' ? null : nameOf(ppl[last.by] || { username: last.name || '?' }), text: clip(previewOf(last), 120) } : null,
+    last: last ? { by: last.by, name: last.by === 'bot' ? (last.botId ? last.title || 'Bot' : 'TSG-Bot') : last.by === 'system' ? null : nameOf(ppl[last.by] || { username: last.name || '?' }), text: clip(previewOf(last), 120) } : null,
   };
 }
 // Für die App: ohne interne Listen
@@ -323,6 +325,9 @@ async function view(env, store, c, user) {
     canManage: !!a.manage || (c.kind === 'group' && a.mod),
     discord: c.kind !== 'group' ? null : (a.manage || a.mod) ? publicView(c) : c.discord && c.discord.status === 'active' ? { status: 'active' } : null,
     canPhoto: canPhoto(c, a.role),
+    bots: c.kind === 'group' ? (c.bots || []).map(botMeta) : [],
+    botsClient: c.kind === 'group' && a.role ? Math.max(0, ...(c.bots || []).filter((b) => b.on !== false && b.mode === 'advanced').map((b) => b.rev || 0)) : 0,
+    canBots: c.kind === 'group' && (!!a.manage || a.mod),
     canModerate: a.moderate,
     canJoin: c.kind === 'group' && !a.role && a.pub,
     canJoinMod: !a.role && a.mod,
@@ -514,7 +519,9 @@ export async function postMessage(store, env, user, id, body) {
     }
     c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: t + 1, title: r.title, text: r.text || '', rows: r.rows || [], buttons: (r.buttons || []).slice(0, 6), avatar: r.avatar || null, ...(r.only ? { only: r.only } : {}) });
   }
-  c.updated = t + (cmd ? 1 : 0);
+  // Eigene Bots des Chats: onmessage, Befehle mit ihrem Präfix (z. B. !regeln)
+  const botPosted = !cmd && text && c.kind === 'group' ? await botsEvent(store, env, c, 'message', { person: me, text }) : false;
+  c.updated = Math.max(t + (cmd ? 1 : 0), botPosted ? Date.now() : 0);
   if (c.kind === 'group') c.lastPost = { ...(c.lastPost || {}), [user.sub]: t };
   await save(store, c);
   const shown = text || (files[0].kind === 'image' ? '📷 Foto' : files[0].kind === 'video' ? '🎬 Video' : `📎 ${files[0].name}`);
@@ -854,43 +861,81 @@ async function toDiscord(store, env, c, msg) {
   await sendToDiscord(env, store, d, msg);
   if (JSON.stringify(d.lastError || null) !== before) await store.put(`chat:${c.id}`, c, { ttl: KEEP });
 }
-// Automationen eines Server-Chats ausführen. true = es kam eine Nachricht in den Chat (dann speichern).
-async function automate(store, env, c, trigger, vars) {
-  const d = c.discord;
-  if (!d || !(d.automations || []).length) return false;
-  let posted = false;
-  for (const au of d.automations) {
-    if (!au.on || au.trigger !== trigger) continue;
-    const text = renderTemplate(au.template, vars);
-    if (au.target !== 'chat' && d.status === 'active') await sendToDiscord(env, store, d, { username: d.botName, content: text });
-    if (au.target !== 'discord') {
-      c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: Date.now(), title: d.botName || 'TSG-Bot', text, rows: [], buttons: [] });
-      posted = true;
-    }
-  }
-  return posted;
-}
-// Jemand tritt dem Server-Chat bei oder verlässt ihn
+// Jemand tritt dem Chat bei oder verlässt ihn: Hinweis nach Discord, eigene Bots
 async function chatEvent(store, env, c, trigger, p) {
+  if (c.kind !== 'group') return;
   const d = c.discord;
-  if (c.kind !== 'group' || !d) return;
-  if (d.status === 'active' && d.events && d.events.joins) {
+  if (d && d.status === 'active' && d.events && d.events.joins) {
     await sendToDiscord(env, store, d, { username: d.botName, content: trigger === 'join' ? `➡️ ${nameOf(p)} ist dem Server-Chat beigetreten` : `⬅️ ${nameOf(p)} hat den Server-Chat verlassen` });
   }
-  await automate(store, env, c, trigger, { username: p.username, displayName: nameOf(p), chat: c.name, server: c.name, members: Object.keys(c.members || {}).length, players: 0 });
+  await botsEvent(store, env, c, trigger, { person: p });
 }
 // Spieler betreten oder verlassen einen verbundenen privaten Server (aus dem Abgleich mit dem Spiel)
 export async function gameEvents(store, env, events) {
   for (const ev of events || []) {
     const ps = await store.get(`pserver:${ev.privateId}`);
     const c = ps && ps.chat ? await store.get(`chat:${ps.chat}`) : null;
-    if (!c || !c.discord) continue;
+    if (!c || (!(c.bots || []).length && !(c.discord && (c.discord.automations || []).length))) continue;
+    const ctx = (x) => ({ person: { username: x.name || x.id, displayName: x.dn || x.name || x.id, sub: x.id }, players: ev.players, serverName: ps.name, serverId: ev.privateId });
     let posted = false;
-    const vars = (x) => ({ username: x.name || x.id, displayName: x.dn || x.name || x.id, chat: c.name, server: ps.name, players: ev.players, members: Object.keys(c.members || {}).length });
-    for (const x of ev.joined || []) posted = (await automate(store, env, c, 'game_join', vars(x))) || posted;
-    for (const x of ev.left || []) posted = (await automate(store, env, c, 'game_leave', vars(x))) || posted;
+    for (const x of ev.joined || []) posted = (await botsEvent(store, env, c, 'game_join', ctx(x))) || posted;
+    for (const x of ev.left || []) posted = (await botsEvent(store, env, c, 'game_leave', ctx(x))) || posted;
     if (posted) { c.updated = Date.now(); await save(store, c); } else await store.put(`chat:${c.id}`, c, { ttl: KEEP });
   }
+}
+
+// ---------- Eigene Bots (bots.js) ----------
+async function botChat(store, user, id, manage = true) {
+  const c = await getChat(store, user, id);
+  if (c.kind !== 'group') throw bad('not_group');
+  const a = access(c, user);
+  if (manage && !(a.manage || a.mod)) throw bad('forbidden', 403);
+  if (!manage && !a.role && !a.manage && !a.mod) throw bad('forbidden', 403);
+  return { c, a };
+}
+export async function botsList(store, user, id) {
+  const { c, a } = await botChat(store, user, id, false);
+  return listBots(store, c, !!(a.manage || a.mod));
+}
+export async function botsClient(store, user, id) {
+  const { c } = await botChat(store, user, id, false);
+  return { bots: await clientBundle(store, c) };
+}
+export async function botGet(store, user, id, botId) {
+  const { c } = await botChat(store, user, id);
+  return getBot(store, c, botId);
+}
+export async function botCreate(store, env, user, id, body) {
+  const { c } = await botChat(store, user, id);
+  const b = await createBot(store, c, body);
+  sys(c, 'bot', user.username, { target: b.name, action: 'created' });
+  c.updated = Date.now();
+  await save(store, c);
+  return getBot(store, c, b.id);
+}
+export async function botUpdate(store, env, user, id, botId, body) {
+  const { c } = await botChat(store, user, id);
+  const r = await updateBot(store, env, c, botId, body);
+  // Neuer Stand für alle offenen Apps (ClientScripts, Name, Bild)
+  c.updated = Date.now();
+  await save(store, c);
+  return r.bot;
+}
+export async function botDelete(store, user, id, botId) {
+  const { c } = await botChat(store, user, id);
+  const name = ((c.bots || []).find((x) => x.id === botId) || {}).name;
+  await deleteBot(store, c, botId);
+  sys(c, 'bot', user.username, { target: name || 'Bot', action: 'deleted' });
+  c.updated = Date.now();
+  await save(store, c);
+  return { ok: true };
+}
+export async function botPhoto(store, user, id, botId, req) {
+  const { c } = await botChat(store, user, id);
+  const r = await setBotPhoto(store, c, botId, req);
+  c.updated = Date.now();
+  await save(store, c);
+  return r;
 }
 
 // ---------- Discord: einrichten, einreichen, prüfen ----------
@@ -962,6 +1007,7 @@ export async function discordRequests(store, user) {
       ...d, id: c.id, name: c.name, color: c.color || null, photo: c.photo || null, rules: clip(c.rules || '', 600),
       members: Object.keys(c.members).length, servers: (c.servers || []).length, owner: owner ? { sub: owner.sub, name: nameOf(owner), avatar: owner.avatar || null } : null,
       roles: (c.roles || []).map((r) => ({ name: r.name, color: r.color, perms: r.perms, count: Object.values(c.members).filter((m) => (m.roles || []).includes(r.id)).length })),
+      bots: (c.bots || []).map((b) => ({ name: b.name, mode: b.mode, on: b.on !== false })),
       ok: req.every((r) => r.ok),
     });
   }

@@ -2,9 +2,9 @@
  * Train Sim Germany – Server-Chats mit Discord verbinden
  *
  * Wer einen Server-Chat leitet (Inhaber, Admins, Rolle mit „Gruppe verwalten“), kann ihn mit dem eigenen Discord
- * verbinden – per Webhook (einfach: Link aus Discord → Kanal → Integrationen) oder mit einem eigenen Bot
- * (Bot-Token und Kanal-ID). Dann erscheinen die Nachrichten aus dem Server-Chat auch in Discord, und eigene
- * Automationen schreiben z. B. „Willkommen {username} auf {server}“, wenn jemand beitritt.
+ * verbinden – per Webhook (einfach: Link aus Discord → Kanal → Integrationen) oder mit einem eigenen Discord-Bot
+ * (Bot-Token und Kanal-ID). Dann erscheinen die Nachrichten aus dem Server-Chat auch in Discord, und die eigenen
+ * Bots des Chats (bots.js) können dorthin schreiben.
  *
  * Bevor etwas nach Discord geht, prüft das Team (Ränge über Public Relations Department) die Verbindung:
  *   draft → pending (eingereicht) → active (angenommen) oder denied (abgelehnt)
@@ -14,16 +14,13 @@
  * Webhook-Links und Bot-Tokens liegen nur verschlüsselt im Backend (secret.js) und gehen nie zurück an die App.
  * Nach Discord gehen keine Erwähnungen (@everyone usw.), nur Text.
  */
-import { clip, randomKey } from './lib.js';
+import { clip } from './lib.js';
 import { sealText, openText } from './secret.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 
 // Wer Verbindungen prüft: über Public Relations Department
 export const REVIEW_RANK = 'Project Engineer';
-export const TRIGGERS = ['join', 'leave', 'game_join', 'game_leave'];
-const TARGETS = ['discord', 'chat', 'both'];
-const MAX_AUTOMATIONS = 10;
 const HOOK = /^https:\/\/(?:(?:ptb|canary)\.)?discord(?:app)?\.com\/api(?:\/v\d+)?\/webhooks\/(\d{5,25})\/([\w-]{20,120})\/?$/;
 const TOKEN = /^[\w-]{20,40}\.[\w-]{4,12}\.[\w-]{20,80}$/;
 const CHANNEL = /^\d{5,25}$/;
@@ -37,20 +34,6 @@ async function call(url, init = {}) {
 // Namen, die Discord für Webhooks nicht erlaubt
 const hookName = (v) => clip(String(v || '').replace(/discord|clyde/gi, '').replace(/\s+/g, ' ').trim(), 80) || 'TSG';
 
-// Platzhalter in Automationen: {username}, {displayName}, {server}, {chat}, {players}, {members}
-export function renderTemplate(tpl, vars) {
-  return String(tpl || '').replace(/\{(\w+)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m)).slice(0, 1900);
-}
-
-function cleanAutomations(list) {
-  return (Array.isArray(list) ? list : []).slice(0, MAX_AUTOMATIONS).map((a) => ({
-    id: /^[\w-]{4,16}$/.test(String((a && a.id) || '')) ? a.id : randomKey(6),
-    trigger: TRIGGERS.includes(a && a.trigger) ? a.trigger : 'join',
-    target: TARGETS.includes(a && a.target) ? a.target : 'discord',
-    template: clip(String((a && a.template) || '').replace(/\r/g, ''), 500).trim(),
-    on: !(a && a.on === false),
-  })).filter((a) => a.template);
-}
 
 // Verbindung zu Discord prüfen (und Name von Webhook bzw. Bot und Kanal merken)
 async function verify(env, mode, secret, channel) {
@@ -76,14 +59,13 @@ async function verify(env, mode, secret, channel) {
 
 // Einstellungen speichern. Neue Zugangsdaten werden geprüft; ändert sich die Verbindung, muss sie neu eingereicht werden.
 export async function updateConfig(env, store, old, body) {
-  const d = { status: 'draft', mode: 'webhook', events: { messages: true, joins: true }, automations: [], botName: 'TSG-Bot', ...(old || {}) };
+  const d = { status: 'draft', mode: 'webhook', events: { messages: true, joins: true }, botName: 'TSG-Bot', ...(old || {}) };
   let changed = false;
   if (['webhook', 'bot'].includes(body.mode) && body.mode !== d.mode) { d.mode = body.mode; changed = true; }
   if (body.botName !== undefined) d.botName = hookName(body.botName);
   if (body.events && typeof body.events === 'object') {
     d.events = { messages: body.events.messages !== false, joins: body.events.joins !== false };
   }
-  if (body.automations !== undefined) d.automations = cleanAutomations(body.automations);
   if (d.mode === 'webhook' && body.webhook) {
     const m = String(body.webhook).trim().match(HOOK);
     if (!m) throw bad('bad_webhook');
@@ -138,7 +120,7 @@ export function publicView(c) {
   const d = c.discord;
   if (!d) return { status: 'none', requirements: requirements(c) };
   return {
-    status: d.status, mode: d.mode, botName: d.botName, events: d.events, automations: d.automations,
+    status: d.status, mode: d.mode, botName: d.botName, events: d.events,
     hint: d.mode === 'webhook' ? d.hookHint || null : d.tokenHint || null, channel: d.channel || null, info: d.info || null,
     verified: !!d.verified, requestedBy: d.requestedBy || null, requestedAt: d.requestedAt || null,
     reviewedBy: d.reviewedBy || null, reviewedAt: d.reviewedAt || null, reason: d.reason || '', lastError: d.lastError || null,

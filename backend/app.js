@@ -76,7 +76,12 @@
  *   POST   /api/chats/<id>/reply         { text, sub, exp, k } – Antwort direkt aus der Benachrichtigung (signiert, ohne Anmeldung)
  *   PUT    /api/chats/<id>/roles         Eigene Rollen der Gruppe { roles: [{ id, name, color, perms }] }
  *   GET    /api/chats/<id>/discord       Discord-Verbindung eines Server-Chats (ohne Zugangsdaten)
- *   PUT    /api/chats/<id>/discord       { mode, webhook | token + channel, botName, events, automations }
+ *   PUT    /api/chats/<id>/discord       { mode, webhook | token + channel, botName, events }
+ *   GET    /api/chats/<id>/bots          Eigene Bots des Chats · POST erstellt { name, mode: basic | advanced }
+ *   GET    /api/chats/<id>/bots/client   ClientScripts für die App (Mitglieder)
+ *   GET    /api/chats/<id>/bots/<bot>    Bot mit Regeln, Dateien, Prüfung, Protokoll (wer den Chat verwaltet)
+ *   PUT    /api/chats/<id>/bots/<bot>    { name, desc, on, mode, prefix, rules, files, clearMemory, clearLogs } · DELETE entfernt
+ *   PUT    /api/chats/<id>/bots/<bot>/photo  Bild des Bots (JPEG) · DELETE · GET /media/bot/<chat>/<bot> zeigt es
  *   POST   /api/chats/<id>/discord/test  Testnachricht nach Discord · /discord/submit zur Prüfung einreichen · DELETE entfernen
  *   GET    /api/discord/requests         Eingereichte Discord-Verbindungen (über PRD)
  *   POST   /api/discord/requests/<id>    { decision: accept | deny, reason }
@@ -99,12 +104,14 @@ import {
   listChats, publicChats, moderationChats, createChat, readChat, postMessage, deleteMessage, claimChat, closeChat, updateChat, addMembers,
   joinChat, leaveChat, removeMember, setRole, muteChat, hideChat, deleteChat, reportChat, startChatUpload, staffList, findPlayer,
   setChatPhoto, chatPhotoResponse, chatServers, reindexChat, replyFromPush, setChatRoles, gameEvents,
+  botsList, botsClient, botGet, botCreate, botUpdate, botDelete, botPhoto,
   discordGet, discordPut, discordTest, discordSubmit, discordRemove, discordRequests, discordReview,
 } from './chat.js';
 import { createInvite, getInvite, answerInvite } from './invites.js';
 import { listPrivateServers, updatePrivateServer } from './pservers.js';
 import { serversView, serverDetail, playersStatus, friendsStatus, gameStats, playerStats, recordOnline, liveOnline, dropStale } from './game.js';
 import { putChunk, fileResponse } from './files.js';
+import { botPhotoResponse } from './bots.js';
 import { mailReady } from './mail.js';
 
 export { sendDue, matchRank };
@@ -331,6 +338,8 @@ export async function handle(req, env, store) {
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
     const photo = path.match(/^\/media\/chat\/([\w-]+)$/);
     if (photo && m === 'GET') return await chatPhotoResponse(store, photo[1], cors(req, env));
+    const botImg = path.match(/^\/media\/bot\/([\w-]+)\/([\w-]+)$/);
+    if (botImg && m === 'GET') return await botPhotoResponse(store, botImg[1], botImg[2], cors(req, env));
     const media = path.match(/^\/media\/([\w-]+)$/);
     if (media && m === 'GET') return await mediaResponse(store, media[1]);
     if (path === '/auth/session' && m === 'POST') return await createSession(req, env, store);
@@ -401,6 +410,17 @@ export async function handle(req, env, store) {
     if (path === '/api/discord/requests' && m === 'GET') return json(req, env, await discordRequests(store, await freshUser(env, store, user)));
     const review = path.match(/^\/api\/discord\/requests\/([\w-]{6,30})$/);
     if (review && m === 'POST') return json(req, env, await discordReview(store, env, await freshUser(env, store, user), review[1], await readJson(req, 2000)));
+    const botRoute = path.match(/^\/api\/chats\/([\w-]+)\/bots(?:\/([\w-]+)(?:\/(photo))?)?$/);
+    if (botRoute) {
+      const [, id, bid, part] = botRoute;
+      if (!bid && m === 'GET') return json(req, env, await botsList(store, user, id));
+      if (!bid && m === 'POST') return json(req, env, await botCreate(store, env, await freshUser(env, store, user), id, await readJson(req, 3000)), 201);
+      if (bid === 'client' && !part && m === 'GET') return json(req, env, await botsClient(store, user, id));
+      if (bid && !part && m === 'GET') return json(req, env, await botGet(store, await freshUser(env, store, user), id, bid));
+      if (bid && !part && m === 'PUT') return json(req, env, await botUpdate(store, env, await freshUser(env, store, user), id, bid, await readJson(req, 160000)));
+      if (bid && !part && m === 'DELETE') return json(req, env, await botDelete(store, await freshUser(env, store, user), id, bid));
+      if (bid && part === 'photo' && (m === 'PUT' || m === 'DELETE')) return json(req, env, await botPhoto(store, await freshUser(env, store, user), id, bid, req));
+    }
     const chat = path.match(/^\/api\/chats\/([\w-]+)(?:\/(messages|claim|close|files|members|join|leave|mute|hide|report|photo|servers|roles|discord)(?:\/([\w-]+))?)?$/);
     if (chat) {
       const [, id, action, sub] = chat;

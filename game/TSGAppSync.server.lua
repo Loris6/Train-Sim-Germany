@@ -20,7 +20,10 @@
     2. Game Settings → Security → „Allow HTTP Requests“ einschalten.
     3. Creator Dashboard → dein Spiel → Secrets: neues Secret „tsg_game_key“ mit demselben Wert wie GAME_API_KEY
        im Backend (z. B. eine lange Zufallszeichenkette). Als Domain die Adresse des Backends angeben
-       (z. B. *.workers.dev). Der Schlüssel steht so nie im Spiel-Code.
+       (tsg-backend.lorismziray01.workers.dev). Der Schlüssel steht so nie im Spiel-Code.
+       Zum Testen in Studio zusätzlich: Game Settings → Security → Secrets (dort gelten die Secrets aus dem
+       Dashboard nicht): {"tsg_game_key": ["DEIN_WERT", "tsg-backend.lorismziray01.workers.dev"]}
+       Im Output steht dann „[TSG] Mit der App verbunden“ – oder was noch fehlt.
     4. CONFIG.Backend unten muss die Adresse des Backends sein (wie in assets/js/config.js → api).
     5. Economy.read und Economy.apply an euer Spiel anpassen, falls Coins und Besitz anders gespeichert sind.
     6. Optional: Activity.read anpassen und Fahrten melden (siehe unten), damit Züge und Statistik in der App erscheinen.
@@ -130,6 +133,22 @@ function Activity.read(player)
 end
 -- ===== Ende Anpassen =====
 
+local RunService = game:GetService("RunService")
+
+-- Zustand der Verbindung im Output (F9 bzw. Ausgabe in Studio) – jede Meldung nur einmal, nicht alle 30 Sekunden
+local lastState
+local function state(kind, text)
+	if lastState == text then
+		return
+	end
+	lastState = text
+	if kind == "ok" then
+		print("[TSG] " .. text)
+	else
+		warn("[TSG] " .. text)
+	end
+end
+
 local auth -- Secret mit „Bearer “ davor (wird nie ausgegeben)
 local function authHeader()
 	if not auth then
@@ -137,12 +156,39 @@ local function authHeader()
 			return HttpService:GetSecret(CONFIG.SecretName)
 		end)
 		if not ok then
-			warn("[TSG] Secret „" .. CONFIG.SecretName .. "“ fehlt: " .. tostring(secret))
+			if RunService:IsStudio() then
+				state("warn", "Secret „" .. CONFIG.SecretName .. "“ fehlt in Studio. Secrets aus dem Creator Dashboard gelten nur auf echten Servern – "
+					.. "zum Testen in Studio: Game Settings → Security → Secrets: {\"" .. CONFIG.SecretName .. "\": [\"DEIN_WERT\", \"" .. CONFIG.Backend:gsub("^https?://", "") .. "\"]}")
+			else
+				state("warn", "Secret „" .. CONFIG.SecretName .. "“ fehlt: Creator Dashboard → Spiel → Secrets anlegen (Domain: "
+					.. CONFIG.Backend:gsub("^https?://", "") .. "). Danach Server neu starten. (" .. tostring(secret) .. ")")
+			end
 			return nil
 		end
 		auth = secret:AddPrefix("Bearer ")
 	end
 	return auth
+end
+
+-- Verständliche Meldung, warum der Abgleich nicht klappt
+local function explain(ok, res)
+	if ok then
+		local code = res.StatusCode
+		if code == 401 then
+			return "Schlüssel passt nicht: Secret „" .. CONFIG.SecretName .. "“ ist nicht derselbe Wert wie GAME_API_KEY im Backend."
+		elseif code == 503 then
+			return "Dem Backend fehlt GAME_API_KEY: in GitHub als Secret anlegen und „Backend veröffentlichen“ neu starten."
+		end
+		return "Abgleich fehlgeschlagen (HTTP " .. tostring(code) .. ")."
+	end
+	local msg = tostring(res)
+	if msg:lower():find("http requests are not enabled") then
+		return "HTTP-Anfragen sind aus: Game Settings → Security → „Allow HTTP Requests“ einschalten."
+	elseif msg:lower():find("secret") or msg:lower():find("domain") then
+		return "Das Secret darf nicht an " .. CONFIG.Backend .. " gehen – als Domain im Secret „"
+			.. CONFIG.Backend:gsub("^https?://", "") .. "“ eintragen. (" .. msg .. ")"
+	end
+	return "Backend nicht erreichbar: " .. msg
 end
 
 local lastSent = {} -- userId → zuletzt gemeldeter Stand
@@ -338,7 +384,7 @@ local function sync(extra, closing)
 		})
 	end)
 	if not ok or not res.Success then
-		warn("[TSG] Abgleich fehlgeschlagen: " .. (ok and tostring(res.StatusCode) or tostring(res)))
+		state("warn", explain(ok, res))
 		for _, d in ipairs(sending) do
 			table.insert(done, d)
 		end
@@ -351,6 +397,7 @@ local function sync(extra, closing)
 		return
 	end
 
+	state("ok", "Mit der App verbunden – dieser Server erscheint jetzt auf der Server-Seite der App.")
 	local body = HttpService:JSONDecode(res.Body)
 	if body.config then
 		applyConfig(body.config)

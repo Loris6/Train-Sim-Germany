@@ -947,6 +947,18 @@
   }
   // Verbindung zum Spiel (nur fürs Team): fehlt der Schlüssel, passt er nicht oder meldet sich das Spiel nicht?
   const gstat = { data: null, at: 0 };
+  const SCRIPT_PATH = 'game/TSGAppSync.server.lua';
+  const SCRIPT_URL = `https://github.com/Loris6/Train-Sim-Germany/blob/main/${SCRIPT_PATH}`;
+  async function copyGameScript(btn) {
+    btn.disabled = true;
+    let code = '';
+    for (const url of [SCRIPT_PATH, `https://raw.githubusercontent.com/Loris6/Train-Sim-Germany/main/${SCRIPT_PATH}`]) {
+      try { const r = await fetch(url, { cache: 'no-store' }); if (r.ok) { code = await r.text(); break; } } catch (e) { /* nächste Quelle */ }
+    }
+    btn.disabled = false;
+    if (!code) { toast(t('Das Skript konnte nicht geladen werden. Öffne es auf GitHub.')); return; }
+    try { await navigator.clipboard.writeText(code); toast(t('Skript kopiert – in Roblox Studio in das neue Script einfügen.')); } catch (e) { window.open(SCRIPT_URL, '_blank', 'noopener'); }
+  }
   async function loadGameStatus() {
     if (!apiReady() || Date.now() - gstat.at < 60000) return;
     gstat.at = Date.now();
@@ -963,12 +975,28 @@
     if (g.configured && fresh && !rejected) {
       return `<p class="game-link is-ok">${icon('fi-sr-check-circle')}<span>${t('Verbindung zum Spiel steht · letzte Meldung {when}', { when: agoText(g.lastSync) })}</span></p>`;
     }
+    const host = esc(String(API).replace(/^https?:\/\//, ''));
     const steps = `<ol class="game-link__steps">
       <li>${t('Einen langen Zufallswert als Schlüssel ausdenken (z. B. 40 Zeichen).')}</li>
       <li>${t('GitHub → Repository → Settings → Secrets and variables → Actions: Secret {name} mit diesem Wert anlegen.', { name: '<code>GAME_API_KEY</code>' })}</li>
-      <li>${t('Roblox Creator Dashboard → dein Spiel → Secrets: {name} mit demselben Wert, Domain {domain}.', { name: '<code>tsg_game_key</code>', domain: '<code>*.workers.dev</code>' })}</li>
+      <li>${t('Roblox Creator Dashboard → dein Spiel → Secrets: {name} mit demselben Wert, Domain {domain}.', { name: '<code>tsg_game_key</code>', domain: `<code>${host}</code>` })}</li>
       <li>${t('GitHub → Actions → „Backend veröffentlichen“ → „Run workflow“.')}</li>
     </ol>`;
+    // TSGAppSync ist das Skript im Spiel, das Server und Spieler an die App meldet – ohne es meldet sich das Spiel nie
+    const script = `<div class="game-link__script">
+      <p>${t('{name} ist das Skript, das im Spiel läuft und der App Server, private Server und Spieler meldet. Ohne dieses Skript im Spiel bleibt die Server-Seite leer.', { name: '<b>TSGAppSync</b>' })}</p>
+      <ol class="game-link__steps">
+        <li>${t('Roblox Studio → Explorer → {where} → „+“ → {kind}, Name {name}.', { where: '<code>ServerScriptService</code>', kind: '<code>Script</code>', name: '<code>TSGAppSync</code>' })}</li>
+        <li>${t('Den ganzen Inhalt des Skripts hineinkopieren (Knopf unten).')}</li>
+        <li>${t('Home → Game Settings → Security → „Allow HTTP Requests“ einschalten.')}</li>
+        <li>${t('Secret {name} im Creator Dashboard (Domain {domain}). Zum Testen in Studio zusätzlich unter Game Settings → Security → Secrets.', { name: '<code>tsg_game_key</code>', domain: `<code>${host}</code>` })}</li>
+        <li>${t('File → Publish to Roblox und einem echten Server beitreten. In der Ausgabe (F9) steht dann „[TSG] Mit der App verbunden“ – oder was noch fehlt.')}</li>
+      </ol>
+      <div class="game-link__btns">
+        <button class="btn btn--primary btn--sm" type="button" data-copy-script>${icon('fi-rr-copy')}${t('Skript kopieren')}</button>
+        <a class="btn btn--soft btn--sm" href="${SCRIPT_URL}" target="_blank" rel="noopener">${icon('fi-rr-arrow-up-right-from-square')}${t('Auf GitHub ansehen')}</a>
+      </div>
+    </div>`;
     let title;
     let text;
     let help = '';
@@ -982,10 +1010,12 @@
       help = steps;
     } else if (!g.lastSync) {
       title = t('Noch keine Meldung aus dem Spiel');
-      text = t('Das Backend ist bereit, aber das Spiel hat sich noch nie gemeldet. Liegt TSGAppSync im ServerScriptService, sind HTTP-Anfragen an und ist das Secret tsg_game_key eingerichtet?');
+      text = t('Das Backend hat den Schlüssel, aber das Spiel hat sich noch nie gemeldet.');
+      help = script;
     } else {
       title = t('Das Spiel meldet sich gerade nicht');
       text = t('Letzte Meldung {when}. Läuft gerade ein Server mit TSGAppSync?', { when: agoText(g.lastSync) });
+      help = script;
     }
     return `<div class="game-link"><span class="game-link__ic">${icon('fi-rr-triangle-warning')}</span><div class="game-link__body"><b>${title}</b><p>${text}</p>${help}<small>${t('Nur für das Team sichtbar.')}</small></div></div>`;
   }
@@ -3751,6 +3781,13 @@
       not_server: t('Discord gibt es nur für Server-Chats.'),
       discord_failed: t('Discord hat die Nachricht nicht angenommen.'),
       no_connection: t('Bitte zuerst einen Webhook oder Bot eintragen.'),
+      too_many_bots: t('Höchstens 5 Bots pro Chat.'),
+      bad_file_name: t('Dateinamen: 1–32 Zeichen, nur Buchstaben, Zahlen, - und _.'),
+      duplicate_file: t('Zwei Dateien haben denselben Namen.'),
+      file_too_large: t('Eine Datei ist zu lang (höchstens 12 000 Zeichen).'),
+      bot_too_large: t('Der Bot ist zu groß (höchstens 100 000 Zeichen insgesamt).'),
+      bad_prefix: t('Präfix: 1–3 Zeichen wie ! ? . $ % & # + ~ - (nicht /).'),
+      not_group: t('Bots gibt es nur in Gruppen- und Server-Chats.'),
     };
     return map[e.message] || errorText(e);
   }
@@ -4307,7 +4344,10 @@
     const many = c.kind === 'group' || (c.members || []).length > 2;
     let lastDay = '';
     let lastBy = '';
-    return c.messages.map((m) => {
+    const local = cbots.local[c.id] || [];
+    const all = local.length ? [...c.messages, ...local].sort((a, b) => a.at - b.at) : c.messages;
+    const botMeta = (id) => (c.bots || []).find((b) => b.id === id) || null;
+    return all.map((m) => {
       const day = fmtDate(m.at);
       const sep = day !== lastDay ? `<li class="msg-day"><span>${day}</span></li>` : '';
       lastDay = day;
@@ -4316,6 +4356,17 @@
         return `${sep}<li class="msg-sys">${(SYS_TEXT[m.text] || (() => ''))(m)}</li>`;
       }
       const time = timeOf(m.at);
+      // Eigener Bot des Chats (local = ClientScript, nur hier sichtbar)
+      if (m.kind === 'bot' && m.botId) {
+        const key = `bot:${m.botId}`;
+        const first = key !== lastBy || sep;
+        lastBy = key;
+        const meta = botMeta(m.botId) || { id: m.botId, name: m.title };
+        return `${sep}<li class="msg msg--bot${first ? ' is-first' : ''}${m.local ? ' is-local' : ''}">
+          ${first ? botAvatar(c.id, meta, 'bot-ava--sm') : '<span class="msg__gap"></span>'}
+          <div class="msg__col"><div class="msg__bubble">${first ? `<b class="msg__name">${esc(meta.name || m.title || 'Bot')} <span class="bot-tag">BOT</span>${m.local ? `<small class="bot-only">${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}<p>${mentionHtml(m.text || '')}</p><time>${time}</time></div></div>
+        </li>`;
+      }
       // Antwort vom TSG-Bot auf einen Befehl
       if (m.kind === 'bot') {
         lastBy = '';
@@ -4481,7 +4532,9 @@
         if (c && flags.some((k) => JSON.stringify(c[k]) !== JSON.stringify(r[k]))) { flags.forEach((k) => { c[k] = r[k]; }); updateConv(id); }
         return;
       }
+      const before = since && chat.conv[id] && chat.conv[id].messages ? new Set(chat.conv[id].messages.map((m) => m.id)) : null;
       chat.conv[id] = r;
+      clientBotsAfterLoad(id, before);
     } catch (e) {
       chat.conv[id] = { error: true };
     }
@@ -4609,7 +4662,7 @@
         ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('fi-rr-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
         ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'fi-rr-user-add' : 'fi-rr-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
       </section>` : '';
-    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${servers}${discordSection(c)}${edit}${rolesSection(c)}${people}${cmds}${mine}
+    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${servers}${discordSection(c)}${edit}${rolesSection(c)}${botsSection(c)}${people}${cmds}${mine}
       ${actions.length ? `<section class="info-sec"><div class="btn-stack">${actions.join('')}</div></section>` : ''}${mod}`;
   }
 
@@ -4668,22 +4721,6 @@
 
   // ---------- Discord: Server-Chat verbinden (Webhook oder eigener Bot), Automationen ----------
   const DISCORD_STATUS = { none: ['', 'Nicht verbunden'], draft: ['', 'Entwurf'], pending: ['pill--warn', 'Wird geprüft'], active: ['pill--ok', 'Verbunden'], denied: ['pill--bad', 'Abgelehnt'] };
-  const TRIGGER_LABELS = [['join', 'Jemand tritt dem Chat bei'], ['leave', 'Jemand verlässt den Chat'], ['game_join', 'Jemand betritt einen verbundenen Server im Spiel'], ['game_leave', 'Jemand verlässt den Server im Spiel']];
-  const TARGET_LABELS = [['discord', 'Nach Discord'], ['chat', 'In den Chat'], ['both', 'Discord und Chat']];
-  const triggerLabel = (k) => t((TRIGGER_LABELS.find(([x]) => x === k) || [k, k])[1]);
-  function automationRow(a = {}) {
-    return `<li class="auto-row" data-auto-row data-auto-id="${esc(a.id || '')}">
-      <div class="auto-row__head">
-        <select name="trigger" aria-label="${esc(t('Wann'))}">${TRIGGER_LABELS.map(([k, l]) => `<option value="${k}"${a.trigger === k ? ' selected' : ''}>${t(l)}</option>`).join('')}</select>
-        <select name="target" aria-label="${esc(t('Wohin'))}">${TARGET_LABELS.map(([k, l]) => `<option value="${k}"${(a.target || 'discord') === k ? ' selected' : ''}>${t(l)}</option>`).join('')}</select>
-      </div>
-      <textarea class="code-field" name="template" rows="2" maxlength="500" spellcheck="false" autocapitalize="off" placeholder="Willkommen {username} auf {server}!">${esc(a.template || '')}</textarea>
-      <div class="auto-row__foot">
-        <label class="mini-toggle"><input type="checkbox" name="on"${a.on === false ? '' : ' checked'}><span>${t('Aktiv')}</span></label>
-        <button class="btn btn--ghost btn--sm" type="button" data-auto-del>${icon('fi-rr-trash')}${t('Entfernen')}</button>
-      </div>
-    </li>`;
-  }
   function discordSection(c) {
     const d = c.discord;
     if (c.kind !== 'group' || !d) return '';
@@ -4718,11 +4755,7 @@
           <label class="toggle"><span class="toggle__text"><b>${t('Nachrichten aus dem Server-Chat')}</b><small>${t('Mit Name und Profilbild, ohne Erwähnungen.')}</small></span><input type="checkbox" role="switch" name="messages"${!d.events || d.events.messages ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
           <label class="toggle"><span class="toggle__text"><b>${t('Wer beitritt und geht')}</b></span><input type="checkbox" role="switch" name="joins"${!d.events || d.events.joins ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
         </div></fieldset>
-        <fieldset class="f"><legend class="f__label">${t('Automationen – was dein Bot tun soll')}</legend>
-          <ul class="auto-list" data-auto-list>${(d.automations || []).map(automationRow).join('')}</ul>
-          <button class="btn btn--outline btn--sm" type="button" data-auto-add>${icon('fi-rr-plus')}${t('Automation hinzufügen')}</button>
-          <p class="f__hint code-help">${t('Platzhalter:')} <code>{username}</code> <code>{displayName}</code> <code>{server}</code> <code>{chat}</code> <code>{players}</code> <code>{members}</code></p>
-        </fieldset>
+        <p class="f__hint">${icon('fi-rr-robot')} ${t('Was dein Bot schreibt (z. B. eine Begrüßung), stellst du unter „Bots“ ein – dort kann jede Regel auch nach Discord gehen.')}</p>
         <div class="btn-row dc-actions">
           <button class="btn btn--primary" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
           ${d.verified ? `<button class="btn btn--soft" type="button" data-discord-test="${esc(c.id)}">${icon('fi-rr-paper-plane')}${t('Testnachricht')}</button>` : ''}
@@ -4737,10 +4770,6 @@
     const body = {
       mode: (form.querySelector('input[name="mode"]:checked') || {}).value, botName: f.botName.value,
       events: { messages: f.messages.checked, joins: f.joins.checked },
-      automations: $$('[data-auto-row]', form).map((row) => ({
-        id: row.dataset.autoId || undefined, trigger: $('select[name="trigger"]', row).value, target: $('select[name="target"]', row).value,
-        template: $('textarea', row).value, on: $('input[name="on"]', row).checked,
-      })),
     };
     if (body.mode === 'webhook' && f.webhook.value.trim()) body.webhook = f.webhook.value.trim();
     if (body.mode === 'bot') {
@@ -4761,6 +4790,688 @@
       toast(chatError(e));
       return null;
     }
+  }
+
+  // ---------- Eigene Bots: Basis (Vorlagen) und Erweitert (Luna im Editor) ----------
+  const BOT_TRIGGERS = [['join', 'Jemand tritt dem Chat bei'], ['leave', 'Jemand verlässt den Chat'], ['command', 'Befehl, z. B. !regeln'], ['game_join', 'Jemand betritt einen verbundenen Server im Spiel'], ['game_leave', 'Jemand verlässt den Server im Spiel']];
+  const BOT_TARGETS = [['chat', 'In den Chat'], ['discord', 'Nach Discord'], ['both', 'Chat und Discord']];
+  const SCRIPT_KINDS = {
+    server: { name: 'ServerScript', folder: 'Server', icon: 'fi-rr-cloud-code', desc: 'Läuft im Backend, wenn im Chat etwas passiert' },
+    client: { name: 'ClientScript', folder: 'Client', icon: 'fi-rr-mobile-notch', desc: 'Läuft in der App von jedem, der den Chat öffnet – nur er sieht die Ausgabe' },
+    module: { name: 'ModulScript', folder: 'Module', icon: 'fi-rr-cube', desc: 'Bausteine, die andere Skripte mit require("Name") laden' },
+    game: { name: 'GameScript', folder: 'Game', icon: 'fi-rr-gamepad', desc: 'Läuft, wenn in einem verbundenen privaten Server etwas passiert' },
+  };
+  const KIND_ORDER = ['server', 'client', 'module', 'game'];
+  const BOT_PH = ['username', 'displayName', 'server', 'chat', 'members', 'game', 'gameId', 'players', 'command', 'args', 'time', 'date'];
+  const FILE_NAME_RE = /^[\p{L}\p{N}_-]{1,32}$/u;
+  // Luna (backend/luna.js) wird erst geladen, wenn ein Bot-Skript läuft oder der Editor offen ist
+  let lunaLoad = null;
+  const lunaLib = () => (lunaLoad || (lunaLoad = import(new URL('backend/luna.js', document.baseURI).href).catch((e) => { lunaLoad = null; throw e; })));
+  const botPhotoUrl = (cid, b) => (b && b.avatar && apiReady() ? `${API}/media/bot/${encodeURIComponent(cid)}/${encodeURIComponent(b.id)}?v=${b.avatar}` : '');
+  function botAvatar(cid, b, cls = '') {
+    const src = botPhotoUrl(cid, b);
+    return `<span class="bot-ava ${cls}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : icon('fi-rr-robot')}</span>`;
+  }
+  const botsFull = {};
+  async function loadBotFull(cid, bid) {
+    try { botsFull[bid] = await api(`/api/chats/${encodeURIComponent(cid)}/bots/${encodeURIComponent(bid)}`); } catch (e) { botsFull[bid] = { error: e.message || 'error' }; }
+    return botsFull[bid];
+  }
+  async function botCall(cid, path, opts) {
+    try { return await api(`/api/chats/${encodeURIComponent(cid)}/bots${path}`, opts); } catch (e) { haptic('error'); toast(chatError(e)); return null; }
+  }
+  function botsSection(c) {
+    if (c.kind !== 'group') return '';
+    const bots = c.bots || [];
+    if (!bots.length && !c.canBots) return '';
+    return `<section class="info-sec info-sec--bots"><h3>${icon('fi-rr-robot')}${t('Bots')}</h3>
+      ${bots.length ? `<ul class="bot-list">${bots.map((b) => `<li class="bot-row${b.on ? '' : ' is-off'}">
+        ${botAvatar(c.id, b)}
+        <span class="bot-row__main"><b>${esc(b.name)} <span class="bot-tag">BOT</span></b><small>${b.desc ? esc(b.desc) : b.mode === 'advanced' ? t('Programmiert mit Luna') : t('Vorlagen mit Platzhaltern')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>
+        <span class="bot-row__tags">${b.mode === 'advanced' ? `<span class="pill pill--info">Luna</span>` : `<span class="pill">${t('Basis')}</span>`}</span>
+        ${c.canBots ? `<span class="bot-row__acts">
+          ${b.mode === 'advanced' ? `<a class="btn btn--primary btn--sm" href="#/bots/${esc(c.id)}/${esc(b.id)}">${icon('fi-rr-square-code')}${t('Editor')}</a>` : ''}
+          <button class="btn btn--soft btn--sm" type="button" data-bot-edit="${esc(c.id)}:${esc(b.id)}">${icon('fi-rr-settings')}${t('Einstellungen')}</button></span>` : ''}
+      </li>`).join('')}</ul>` : `<p class="muted">${t('Eigene Bots begrüßen neue Mitglieder, antworten auf Befehle wie !regeln und melden, wer im Spiel ist – einfach mit Vorlagen oder programmiert mit Luna.')}</p>`}
+      ${c.canBots && bots.length < 5 ? `<button class="btn btn--outline btn--block" type="button" data-bot-new="${esc(c.id)}">${icon('fi-rr-plus')}${t('Bot erstellen')}</button>` : ''}
+    </section>`;
+  }
+  function botNewView(cid) {
+    return `<form class="cform" data-bot-create="${esc(cid)}" novalidate>
+      <div class="f"><label class="f__label" for="bot-name">${t('Name des Bots')}</label><input id="bot-name" name="name" maxlength="32" placeholder="${esc(t('z. B. Fahrdienstleiter'))}"></div>
+      <fieldset class="f"><legend class="f__label">${t('Wie soll dein Bot arbeiten?')}</legend><div class="vis-grid">
+        <label class="vis"><input type="radio" name="mode" value="basic" checked><span>${icon('fi-rr-sparkles')}<b>${t('Basis')}</b><small>${t('Vorlagen wie „Willkommen {username}!“')}</small></span></label>
+        <label class="vis"><input type="radio" name="mode" value="advanced"><span>${icon('fi-rr-square-code')}<b>${t('Erweitert')}</b><small>${t('Programmieren mit Luna im Editor')}</small></span></label>
+      </div></fieldset>
+      <p class="f__hint">${t('Bild, Beschreibung und Befehle stellst du danach ein. Bots brauchen kein Discord – sie laufen direkt in diesem Chat.')}</p>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-plus')}${t('Bot erstellen')}</button>
+    </form>`;
+  }
+  function ruleRow(a = {}, discordOn = true) {
+    return `<li class="auto-row" data-auto-row data-auto-id="${esc(a.id || '')}">
+      <div class="auto-row__head">
+        <select name="trigger" aria-label="${esc(t('Wann'))}">${BOT_TRIGGERS.map(([k, l]) => `<option value="${k}"${(a.trigger || 'join') === k ? ' selected' : ''}>${t(l)}</option>`).join('')}</select>
+        <select name="target" aria-label="${esc(t('Wohin'))}">${BOT_TARGETS.map(([k, l]) => `<option value="${k}"${(a.target || 'chat') === k ? ' selected' : ''}${k !== 'chat' && !discordOn ? ' disabled' : ''}>${t(l)}</option>`).join('')}</select>
+      </div>
+      <label class="auto-row__cmd"><span>${t('Befehl')}</span><input name="command" maxlength="24" value="${esc(a.command || '')}" placeholder="regeln" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+      <textarea class="code-field" name="template" rows="2" maxlength="500" spellcheck="false" autocapitalize="off" placeholder="Willkommen {username} auf {server}!">${esc(a.template || '')}</textarea>
+      <div class="auto-row__foot">
+        <label class="mini-toggle"><input type="checkbox" name="on"${a.on === false ? '' : ' checked'}><span>${t('Aktiv')}</span></label>
+        <button class="btn btn--ghost btn--sm" type="button" data-auto-del>${icon('fi-rr-trash')}${t('Entfernen')}</button>
+      </div>
+    </li>`;
+  }
+  function botView(arg) {
+    const [cid, bid] = String(arg).split(':');
+    const c = chat.conv[cid];
+    const b = botsFull[bid];
+    if (!b) { loadBotFull(cid, bid).then(() => { if (modalView && modalView.name === 'bot') refreshModal(); }); return loadingHtml(); }
+    if (b.error) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
+    const discordOn = !!(c && c.discord && c.discord.status === 'active');
+    const files = b.files || [];
+    const broken = files.filter((f) => b.checks && b.checks[f.id] && !b.checks[f.id].ok).length;
+    const pre = esc(b.prefix || '!');
+    return `<form class="cform bot-form" data-bot-form="${esc(cid)}" data-bot-id="${esc(bid)}" novalidate>
+      <div class="bot-head">
+        ${botAvatar(cid, b, 'bot-ava--xl')}
+        <div class="photo-ctl"><label class="btn btn--soft btn--sm photo-ctl__pick">${icon('fi-rr-picture')}${b.avatar ? t('Bild ändern') : t('Bild hochladen')}<input type="file" accept="image/*" data-bot-photo="${esc(cid)}:${esc(bid)}"></label>
+          ${b.avatar ? `<button class="btn btn--soft btn--sm" type="button" data-bot-photo-del="${esc(cid)}:${esc(bid)}">${icon('fi-rr-trash')}${t('Entfernen')}</button>` : ''}</div>
+      </div>
+      <div class="f"><label class="f__label" for="bf-name">${t('Name')}</label><input id="bf-name" name="name" maxlength="32" value="${esc(b.name)}"></div>
+      <div class="f"><label class="f__label" for="bf-desc">${t('Beschreibung')}</label><input id="bf-desc" name="desc" maxlength="140" value="${esc(b.desc || '')}" placeholder="${esc(t('Was macht dein Bot?'))}"></div>
+      <div class="f"><label class="f__label" for="bf-prefix">${t('Präfix für Befehle')}</label><input id="bf-prefix" name="prefix" maxlength="3" value="${pre}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        <small class="f__hint">${t('Mit {ex} ruft man den Befehl „regeln“ auf. Befehle mit / gehören zum TSG-Bot.', { ex: `<code>${pre}regeln</code>` })}</small></div>
+      <label class="toggle"><span class="toggle__text"><b>${t('Bot ist aktiv')}</b><small>${t('Ausgeschaltet reagiert er auf nichts.')}</small></span><input type="checkbox" role="switch" name="on"${b.on ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+      <fieldset class="f"><legend class="f__label">${t('Modus')}</legend><div class="vis-grid">
+        <label class="vis"><input type="radio" name="mode" value="basic"${b.mode !== 'advanced' ? ' checked' : ''}><span>${icon('fi-rr-sparkles')}<b>${t('Basis')}</b><small>${t('Vorlagen mit Platzhaltern')}</small></span></label>
+        <label class="vis"><input type="radio" name="mode" value="advanced"${b.mode === 'advanced' ? ' checked' : ''}><span>${icon('fi-rr-square-code')}<b>${t('Erweitert')}</b><small>${t('Luna-Skripte im Editor')}</small></span></label>
+      </div></fieldset>
+      <div class="bot-basic">
+        <h4 class="info-sub">${t('Regeln')}</h4>
+        <ul class="auto-list" data-auto-list>${(b.rules || []).map((r) => ruleRow(r, discordOn)).join('')}</ul>
+        <button class="btn btn--outline btn--sm" type="button" data-auto-add data-discord-on="${discordOn ? 1 : 0}">${icon('fi-rr-plus')}${t('Regel hinzufügen')}</button>
+        <p class="f__hint code-help">${t('Platzhalter:')} ${BOT_PH.map((x) => `<code>{${x}}</code>`).join(' ')}</p>
+        ${discordOn ? '' : `<p class="f__hint">${t('Nach Discord geht es erst, wenn dieser Server-Chat mit Discord verbunden und angenommen ist.')}</p>`}
+      </div>
+      <div class="bot-adv">
+        <p class="note">${icon('fi-rr-square-code')}<span>${files.length ? t('{n} Dateien · {e} mit Fehlern', { n: files.length, e: broken }) : t('Noch keine Skripte. Im Editor legst du ServerScripts, ClientScripts, ModulScripts und GameScripts an.')}</span></p>
+        ${b.stats && b.stats.lastError ? `<p class="note note--bad">${icon('fi-rr-triangle-warning')}<span>${t('Letzter Fehler: {file}, Zeile {line} – {text}', { file: esc(b.stats.lastError.file), line: b.stats.lastError.line, text: esc(b.stats.lastError.text) })}</span></p>` : ''}
+        <a class="btn btn--soft btn--block" href="#/bots/${esc(cid)}/${esc(bid)}">${icon('fi-rr-laptop-code')}${t('Im Editor öffnen')}</a>
+      </div>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+      <button class="btn btn--danger btn--block" type="button" data-bot-del="${esc(cid)}:${esc(bid)}">${icon('fi-rr-trash')}${t('Bot löschen')}</button>
+    </form>`;
+  }
+  // Quadratisches JPEG (256 × 256) für Gruppen- und Bot-Bilder
+  async function squareJpeg(file) {
+    const bmp = await createImageBitmap(file);
+    const side = Math.min(bmp.width, bmp.height);
+    const cv = document.createElement('canvas');
+    cv.width = 256;
+    cv.height = 256;
+    cv.getContext('2d').drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 256, 256);
+    if (bmp.close) bmp.close();
+    return new Promise((ok, fail) => cv.toBlob((b) => (b ? ok(b) : fail(new Error('blob'))), 'image/jpeg', 0.86));
+  }
+  function botChanged(cid, bot) {
+    if (bot && bot.id) botsFull[bot.id] = bot;
+    if (ide.bid === (bot && bot.id) && ide.bot) Object.assign(ide.bot, { name: bot.name, avatar: bot.avatar, on: bot.on, mode: bot.mode, prefix: bot.prefix, desc: bot.desc, rules: bot.rules });
+    openConv(cid);
+    if (modalView && modalView.name === 'bot') refreshModal();
+    if (state.page === 'bots') renderIde();
+  }
+  async function uploadBotPhoto(arg, file) {
+    const [cid, bid] = arg.split(':');
+    try {
+      const blob = await squareJpeg(file);
+      const r = await botCall(cid, `/${bid}/photo`, { method: 'PUT', raw: blob, type: 'image/jpeg' });
+      if (r) { botChanged(cid, r); toast(t('Bild gespeichert')); }
+    } catch (e) {
+      toast(t('Dieses Bild lässt sich nicht verwenden.'));
+    }
+  }
+
+  // Aus den Regeln des Basis-Modus Luna-Code machen (beim Wechsel in den Editor)
+  function rulesToLuna(rules) {
+    const q = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/["“”]/g, (m) => `\\${m}`).replace(/\n/g, '\\n').replace(/\{args\}/g, '{argtext}')}"`;
+    const out = (r) => [r.target !== 'discord' ? `  print(${q(r.template)})` : '', r.target !== 'chat' ? `  discord(${q(r.template)})` : ''].filter(Boolean);
+    const block = (name, list, args = '') => (list.length ? `${name}(${args}) {\n${list.flatMap(out).join('\n')}\n}\n` : '');
+    const on = (rules || []).filter((r) => r.on !== false);
+    const cmds = on.filter((r) => r.trigger === 'command');
+    const server = ['// Aus den Regeln des Basis-Modus erzeugt', block('onjoin', on.filter((r) => r.trigger === 'join'), 'username'), block('onleave', on.filter((r) => r.trigger === 'leave'), 'username'),
+      cmds.length ? `oncommand(command, args) {\n${cmds.map((r) => `  if command == ${q(r.command)} {\n${out(r).map((l) => `  ${l}`).join('\n')}\n  }`).join('\n')}\n}\n` : ''].filter(Boolean).join('\n');
+    const game = block('onjoin', on.filter((r) => r.trigger === 'game_join'), 'username') + block('onleave', on.filter((r) => r.trigger === 'game_leave'), 'username');
+    return [
+      server.split('\n').length > 2 ? { name: 'Main', type: 'server', code: server } : null,
+      game ? { name: 'Spiel', type: 'game', code: `// Aus den Regeln des Basis-Modus erzeugt\n${game}` } : null,
+    ].filter(Boolean);
+  }
+
+  // ---------- ClientScripts: laufen hier in der App, nur die Person selbst sieht die Ausgabe ----------
+  const cbots = { rev: {}, bundles: {}, local: {}, seen: null, busy: {} };
+  async function clientBundles(c) {
+    if (!c || !c.botsClient) return [];
+    if (cbots.rev[c.id] !== c.botsClient && !cbots.busy[c.id]) {
+      cbots.busy[c.id] = true;
+      try { cbots.bundles[c.id] = (await api(`/api/chats/${encodeURIComponent(c.id)}/bots/client`)).bots || []; cbots.rev[c.id] = c.botsClient; } catch (e) { cbots.bundles[c.id] = []; }
+      cbots.busy[c.id] = false;
+    }
+    return cbots.bundles[c.id] || [];
+  }
+  async function runClientBots(c, event, extra = {}, args = []) {
+    const bundles = await clientBundles(c);
+    if (!bundles.length) return;
+    let luna;
+    try { luna = await lunaLib(); } catch (e) { return; }
+    const me = state.profile || {};
+    const list = cbots.local[c.id] || (cbots.local[c.id] = []);
+    let added = 0;
+    for (const b of bundles) {
+      const key = `tsg-botmem:${c.id}:${b.id}`;
+      const vars = {
+        username: me.username || 'Gast', displayName: me.displayName || me.username || 'Gast', userId: String(me.userId || me.sub || ''),
+        chat: c.name || '', server: c.name || '', members: (c.members || []).length, bot: b.name,
+        game: 'Train Sim Germany', gameId: placeId || '', time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
+        date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()), ...extra,
+      };
+      const res = luna.runEvent({ files: b.files, type: 'client', event, vars, args: args.length ? args : [vars.username], memory: store.get(key, {}) || {} });
+      if (res.memChanged) store.set(key, res.memory);
+      res.says.forEach((text) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text, at: Date.now(), local: true }); added += 1; });
+    }
+    if (list.length > 30) list.splice(0, list.length - 30);
+    if (added) updateConv(c.id);
+  }
+  // Beim Öffnen eines Gesprächs: onopen() · neue Nachrichten anderer: onmessage(text, username)
+  function clientBotsAfterLoad(id, before) {
+    const c = chat.conv[id];
+    if (!c || c.error || !c.botsClient || state.chatView !== 'conv' || state.chatArg !== id) return;
+    if (cbots.seen !== id) {
+      cbots.seen = id;
+      cbots.local[id] = [];
+      runClientBots(c, 'open');
+      return;
+    }
+    if (!before) return;
+    const me = meSub();
+    const people = peopleOf(c);
+    c.messages.filter((m) => !before.has(m.id) && m.by !== me && m.by !== 'bot' && m.by !== 'system' && m.text).forEach((m) => {
+      const p = people[m.by] || { username: m.name };
+      runClientBots(c, 'message', { text: m.text, message: m.text, author: p.username || m.name || '' }, [m.text, p.username || m.name || '']);
+    });
+  }
+
+  // ---------- Bot-Editor (#/bots/<chat>/<bot>): Struktur links, Editor rechts, Dateien oben ----------
+  const ide = { cid: null, bid: null, bot: null, files: [], saved: '', open: [], active: null, luna: null, panel: 'problems', panelOpen: null, tree: false, saving: false, diag: {}, bridges: [], err: null, collapsed: {}, draft: false, testMem: null, testOut: null };
+  const tmpId = () => `new-${Math.random().toString(36).slice(2, 8)}`;
+  const ideFile = (id) => ide.files.find((f) => f.id === id) || null;
+  const ideSig = (files) => JSON.stringify(files.map((f) => [f.id, f.name, f.type, f.code]));
+  const ideDirty = () => !!ide.bot && ideSig(ide.files) !== ide.saved;
+  const ideFileDirty = (f) => { const s = ide.bot && (ide.bot.files || []).find((x) => x.id === f.id); return !s || s.code !== f.code || s.name !== f.name; };
+  const draftKey = () => `tsg-ide:${ide.bid}`;
+  async function openIde(cid, bid) {
+    if (ide.cid === cid && ide.bid === bid && (ide.bot || ide.err)) { renderIde(); return; }
+    Object.assign(ide, { cid, bid, bot: null, files: [], saved: '', open: [], active: null, err: null, tree: false, draft: false, testMem: null, testOut: null, diag: {}, bridges: [] });
+    if (ide.panelOpen === null) ide.panelOpen = window.matchMedia('(min-width: 820px)').matches;
+    renderIde();
+    if (!sessionToken() || !apiReady()) { ide.err = 'login'; renderIde(); return; }
+    try {
+      const [luna, bot] = await Promise.all([lunaLib(), api(`/api/chats/${encodeURIComponent(cid)}/bots/${encodeURIComponent(bid)}`)]);
+      if (ide.bid !== bid) return;
+      ide.luna = luna;
+      ide.bot = bot;
+      botsFull[bid] = bot;
+      ide.files = (bot.files || []).map((f) => ({ ...f }));
+      ide.saved = ideSig(ide.files);
+      // Nicht gespeicherter Entwurf von vorhin (gleicher Stand auf dem Server)?
+      const d = store.get(draftKey(), null);
+      if (d && d.base === bot.updated && Array.isArray(d.files) && ideSig(d.files) !== ide.saved) { ide.files = d.files; ide.draft = true; }
+      ide.open = ide.files.filter((f) => f.type !== 'module').slice(0, 1).map((f) => f.id);
+      if (!ide.open.length && ide.files[0]) ide.open = [ide.files[0].id];
+      ide.active = ide.open[0] || null;
+      if (!chat.conv[cid]) openConv(cid);
+    } catch (e) {
+      ide.err = e;
+    }
+    ideDiagnose();
+    renderIde();
+  }
+  function ideDiagnose() {
+    if (!ide.luna) return;
+    ide.diag = {};
+    ide.files.forEach((f) => {
+      const c = ide.luna.check(f.code);
+      const o = ide.luna.outline(f.code, f.type);
+      ide.diag[f.id] = { error: c.ok ? null : c.error, warnings: o.warnings, handlers: o.handlers, functions: o.functions };
+    });
+    ide.bridges = ide.luna.bridges(ide.files);
+  }
+  function ideProblems() {
+    const out = [];
+    ide.files.forEach((f) => {
+      const d = ide.diag[f.id] || {};
+      if (d.error) out.push({ f, line: d.error.line, kind: 'error', text: d.error.message });
+      (d.warnings || []).forEach((w) => out.push({ f, line: w.line, kind: 'warn', text: w.message }));
+    });
+    ide.bridges.filter((b) => !b.ok).forEach((b) => { const f = ideFile(b.from); if (f) out.push({ f, line: b.line, kind: 'error', text: b.problem }); });
+    return out;
+  }
+  function fileState(f) {
+    const d = ide.diag[f.id] || {};
+    if (d.error || ide.bridges.some((b) => b.from === f.id && !b.ok)) return 'error';
+    return (d.warnings || []).length ? 'warn' : 'ok';
+  }
+  function ideTreeHtml() {
+    const b = ide.bot;
+    const fileNode = (f) => {
+      const d = ide.diag[f.id] || {};
+      const st = fileState(f);
+      const outline = [...(d.handlers || []).map((h) => ({ ...h, ev: true })), ...(d.functions || [])].sort((x, y) => x.line - y.line);
+      return `<li class="tree-file${f.id === ide.active ? ' is-active' : ''}">
+        <div class="tree-row">
+          <button type="button" class="tree-open" data-ide-open="${esc(f.id)}">${icon(SCRIPT_KINDS[f.type].icon)}<span>${esc(f.name)}</span>${ideFileDirty(f) ? '<i class="tree-dot" aria-label="geändert"></i>' : ''}${st !== 'ok' ? `<i class="tree-state tree-state--${st}">${icon(st === 'error' ? 'fi-rr-triangle-warning' : 'fi-rr-info')}</i>` : ''}</button>
+          <span class="tree-acts"><button type="button" data-ide-rename="${esc(f.id)}" aria-label="${esc(t('Umbenennen'))}">${icon('fi-rr-pencil')}</button><button type="button" data-ide-del="${esc(f.id)}" aria-label="${esc(t('Löschen'))}">${icon('fi-rr-trash')}</button></span>
+        </div>
+        ${outline.length ? `<ul class="tree-outline">${outline.map((x) => `<li><button type="button" data-ide-goto="${esc(f.id)}:${x.line}">${x.ev ? `${icon('fi-rr-bolt')}<span>${esc(x.name)}()</span>` : `<i class="tree-fn">ƒ</i><span>${esc(x.name)}(${esc((x.params || []).join(', '))})</span>`}<small>${x.line}</small></button></li>`).join('')}</ul>` : ''}
+      </li>`;
+    };
+    const groups = KIND_ORDER.map((k) => {
+      const list = ide.files.filter((f) => f.type === k).sort((x, y) => x.name.localeCompare(y.name));
+      const open = !ide.collapsed[k];
+      return `<li class="tree-group${open ? ' is-open' : ''}">
+        <div class="tree-row tree-row--folder">
+          <button type="button" class="tree-fold" data-ide-fold="${k}" aria-expanded="${open}">${icon('fi-rr-angle-small-right')}${icon(open ? 'fi-rr-folder-open' : 'fi-rr-folder')}<b>${SCRIPT_KINDS[k].folder}</b><small>${list.length}</small></button>
+          <button type="button" class="tree-add" data-ide-new="${k}" aria-label="${esc(t('Neues {kind}', { kind: SCRIPT_KINDS[k].name }))}" title="${esc(t('Neues {kind}', { kind: SCRIPT_KINDS[k].name }))}">${icon('fi-rr-plus')}</button>
+        </div>
+        ${open ? `<ul class="tree-files">${list.map(fileNode).join('') || `<li class="tree-empty">${t('Noch kein {kind}', { kind: SCRIPT_KINDS[k].name })}</li>`}</ul>` : ''}
+      </li>`;
+    }).join('');
+    const name = (id) => { const f = ideFile(id); return f ? esc(f.name) : '?'; };
+    const bridges = `<section class="tree-sec"><h4>${icon('fi-rr-plug-connection')}${t('Brücken')}<small>${ide.bridges.length}</small></h4>
+      ${ide.bridges.length ? `<ul class="bridge-list">${ide.bridges.map((x) => `<li class="${x.ok ? '' : 'is-broken'}"><button type="button" data-ide-goto="${esc(x.from)}:${x.line}">
+        <span class="bridge__ends"><b>${name(x.from)}</b>${icon('fi-rr-arrow-small-right')}<b>${x.ok ? name(x.to) : '?'}</b></span>
+        <code>require("${esc(x.name)}")</code>${x.ok ? '' : `<small>${esc(x.problem || '')}</small>`}</button></li>`).join('')}</ul>`
+        : `<p class="tree-hint">${t('Mit {code} verbindest du ein Skript mit einem ModulScript – so entstehen Brücken.', { code: '<code>require("Name")</code>' })}</p>`}
+    </section>`;
+    return `<div class="tree-head">
+        ${b ? botAvatar(ide.cid, b) : ''}
+        <span class="tree-head__name"><b>${esc(b ? b.name : '')}</b><small>${b && b.mode === 'advanced' ? t('Erweitert · Luna') : t('Basis-Modus')}${b && !b.on ? ` · ${t('Aus')}` : ''}</small></span>
+        <button class="tree-close" type="button" data-ide-tree="0" aria-label="${esc(t('Struktur schließen'))}">${icon('fi-rr-cross-small')}</button>
+      </div>
+      <ul class="tree">${groups}</ul>
+      ${bridges}
+      <div class="tree-foot">
+        <button class="btn btn--soft btn--sm btn--block" type="button" data-bot-edit="${esc(ide.cid)}:${esc(ide.bid)}">${icon('fi-rr-settings')}${t('Bot-Einstellungen')}</button>
+        <a class="btn btn--ghost btn--sm btn--block" href="#/chat/${esc(ide.cid)}/info">${icon('fi-rr-arrow-left')}${t('Zurück zum Chat')}</a>
+      </div>`;
+  }
+  function ideTabsHtml() {
+    const tabs = ide.open.map((id) => ideFile(id)).filter(Boolean).map((f) => `<div class="ide-tab${f.id === ide.active ? ' is-active' : ''}" role="presentation">
+        <button type="button" role="tab" aria-selected="${f.id === ide.active}" data-ide-open="${esc(f.id)}">${icon(SCRIPT_KINDS[f.type].icon)}<span>${esc(f.name)}</span>${ideFileDirty(f) ? '<i class="tree-dot"></i>' : ''}</button>
+        <button type="button" class="ide-tab__x" data-ide-close="${esc(f.id)}" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross-small')}</button>
+      </div>`).join('');
+    return `${tabs}<button class="ide-tab-add" type="button" data-ide-new="server" aria-label="${esc(t('Neue Datei'))}" title="${esc(t('Neue Datei'))}">${icon('fi-rr-plus')}</button>`;
+  }
+  function ideEditorHtml() {
+    const f = ideFile(ide.active);
+    const b = ide.bot;
+    const banner = b && b.mode !== 'advanced' ? `<div class="ide-banner">${icon('fi-rr-info')}<span>${t('Dieser Bot läuft im Basis-Modus. Die Skripte laufen erst im erweiterten Modus.')}</span><button class="btn btn--primary btn--sm" type="button" data-ide-advanced>${t('Erweitert einschalten')}</button></div>` : '';
+    const draft = ide.draft ? `<div class="ide-banner ide-banner--soft">${icon('fi-rr-time-fast')}<span>${t('Nicht gespeicherter Entwurf wiederhergestellt.')}</span><button class="btn btn--ghost btn--sm" type="button" data-ide-discard>${t('Verwerfen')}</button></div>` : '';
+    if (!f) {
+      const rules = (b && b.rules) || [];
+      return `${banner}${draft}<div class="ide-empty">
+        <span class="ide-empty__ic">${icon('fi-rr-square-code')}</span>
+        <h3>${ide.files.length ? t('Wähle links eine Datei') : t('Noch keine Datei')}</h3>
+        <p>${t('Lege ein Skript an – jede Art hat ihre eigenen Ereignisse.')}</p>
+        <div class="ide-kinds">${KIND_ORDER.map((k) => `<button type="button" class="ide-kind" data-ide-new="${k}">${icon(SCRIPT_KINDS[k].icon)}<b>${SCRIPT_KINDS[k].name}</b><small>${t(SCRIPT_KINDS[k].desc)}</small></button>`).join('')}</div>
+        ${!ide.files.length && rules.length ? `<button class="btn btn--soft" type="button" data-ide-convert>${icon('fi-rr-sparkles')}${t('Regeln aus dem Basis-Modus in Luna umwandeln')}</button>` : ''}
+      </div>`;
+    }
+    return `${banner}${draft}<div class="code" data-ide-scroll>
+        <div class="code__grid">
+          <pre class="code__gutter" data-ide-gutter aria-hidden="true"></pre>
+          <div class="code__area">
+            <i class="code__mark" data-ide-mark hidden></i>
+            <pre class="code__hl" data-ide-hl aria-hidden="true"></pre>
+            <textarea class="code__input" data-ide-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Code von {name}', { name: f.name }))}">${esc(f.code)}</textarea>
+          </div>
+        </div>
+      </div>
+      <div class="ide-keys" role="toolbar" aria-label="${esc(t('Zeichen einfügen'))}">${['⇥', '{ }', '( )', '" "', '=', '.', '!', ',', '[ ]', '+', '//'].map((k) => `<button type="button" data-ide-key="${esc(k)}">${esc(k)}</button>`).join('')}</div>`;
+  }
+  function idePanelTabs() {
+    const probs = ideProblems();
+    const tabs = [['problems', `${t('Probleme')}${probs.length ? ` <b class="ide-count${probs.some((p) => p.kind === 'error') ? ' is-error' : ''}">${probs.length}</b>` : ''}`], ['test', t('Testen')], ['log', t('Protokoll')], ['help', t('Hilfe')]];
+    return `<div class="ide-panel__tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" aria-selected="${ide.panel === k && ide.panelOpen}" data-ide-panel="${k}">${l}</button>`).join('')}
+        <button type="button" class="ide-panel__fold" data-ide-panel="fold" aria-label="${esc(ide.panelOpen ? t('Einklappen') : t('Ausklappen'))}">${icon(ide.panelOpen ? 'fi-rr-angle-small-down' : 'fi-rr-angle-small-right')}</button></div>`;
+  }
+  function idePanelHtml() {
+    const probs = ideProblems();
+    const f = ideFile(ide.active);
+    let body = '';
+    if (ide.panel === 'problems') {
+      body = probs.length ? `<ul class="ide-probs">${probs.map((p) => `<li class="is-${p.kind}"><button type="button" data-ide-goto="${esc(p.f.id)}:${p.line}">${icon(p.kind === 'error' ? 'fi-rr-triangle-warning' : 'fi-rr-info')}<span><b>${esc(p.f.name)} <em>· ${t('Zeile {n}', { n: p.line })}</em></b><small>${esc(p.text)}</small></span></button></li>`).join('')}</ul>`
+        : `<p class="ide-ok">${icon('fi-sr-check-circle')}${t('Keine Probleme gefunden.')}</p>`;
+    } else if (ide.panel === 'test') {
+      body = ideTestHtml(f);
+    } else if (ide.panel === 'log') {
+      const logs = ((ide.bot && ide.bot.logs) || []).slice().reverse();
+      body = `<div class="ide-row"><small class="muted">${t('Was der Bot zuletzt im Chat getan hat (die letzten 40 Einträge).')}</small><span class="btn-row"><button class="btn btn--ghost btn--sm" type="button" data-ide-logs="reload">${t('Aktualisieren')}</button>${logs.length ? `<button class="btn btn--ghost btn--sm" type="button" data-ide-logs="clear">${t('Leeren')}</button>` : ''}</span></div>
+        ${logs.length ? `<ul class="ide-log">${logs.map((l) => `<li class="is-${esc(l.kind)}"><time>${l.at ? timeOf(l.at) : ''}</time><span>${l.file ? `<b>${esc(l.file)}${l.line ? `:${l.line}` : ''}</b> ` : ''}${l.event ? `<small>on${esc(l.event)}</small> ` : ''}${esc(l.text)}</span></li>`).join('')}</ul>` : `<p class="muted">${t('Noch nichts passiert.')}</p>`}`;
+    } else {
+      body = ideHelpHtml(f);
+    }
+    return `${idePanelTabs()}${ide.panelOpen ? `<div class="ide-panel__body">${body}</div>` : ''}`;
+  }
+  function ideTestHtml(f) {
+    if (!f) return `<p class="muted">${t('Öffne zuerst eine Datei.')}</p>`;
+    if (f.type === 'module') return `<p class="muted">${t('ModulScripts testest du über das Skript, das sie mit require lädt.')}</p>`;
+    const evs = (ide.luna && ide.luna.EVENTS[f.type]) || [];
+    const me = state.profile || {};
+    const o = ide.testOut;
+    return `<form class="ide-test" data-ide-test novalidate>
+        <div class="ide-test__row">
+          <label><span>${t('Ereignis')}</span><select name="event">${evs.map((e) => `<option value="${e}">on${e}()</option>`).join('')}</select></label>
+          <label><span>${t('Name')}</span><input name="username" value="${esc(me.username || 'Testspieler')}" autocapitalize="off" spellcheck="false"></label>
+          <label class="ide-test__text"><span>${t('Nachricht / Befehl')}</span><input name="text" value="${esc(`${(ide.bot && ide.bot.prefix) || '!'}hallo`)}" autocapitalize="off" spellcheck="false"></label>
+          ${f.type === 'game' ? `<label><span>${t('Spieler')}</span><input name="players" type="number" min="0" max="50" value="3"></label>` : ''}
+        </div>
+        <div class="btn-row"><button class="btn btn--primary btn--sm" type="submit">${icon('fi-rr-play')}${t('Ausführen')}</button>
+          <button class="btn btn--ghost btn--sm" type="button" data-ide-mem-reset>${t('Speicher zurücksetzen')}</button>
+          <small class="muted">${t('Läuft nur hier – nichts wird gesendet.')}</small></div>
+      </form>
+      ${o ? `<div class="ide-out">
+        ${o.says.map((s) => `<div class="ide-say">${botAvatar(ide.cid, ide.bot, 'bot-ava--sm')}<p><b>${esc(ide.bot.name)} <span class="bot-tag">BOT</span></b>${esc(s)}</p></div>`).join('')}
+        ${o.discords.map((s) => `<div class="ide-say ide-say--discord">${icon('fi-brands-discord')}<p><b>Discord</b>${esc(s)}</p></div>`).join('')}
+        ${o.logs.filter((l) => l.kind !== 'out').map((l) => `<p class="ide-out__log is-${esc(l.kind)}">${l.line ? `<button type="button" data-ide-goto="${esc(f.id)}:${l.line}">${t('Zeile {n}', { n: l.line })}</button> ` : ''}${esc(l.text)}</p>`).join('')}
+        ${!o.ran && !o.errors.length ? `<p class="muted">${t('Dieses Skript hat kein on{ev}() – es ist nichts passiert.', { ev: esc(o.event) })}</p>` : ''}
+        ${o.ran && !o.says.length && !o.discords.length && !o.errors.length ? `<p class="muted">${t('Gelaufen, aber ohne Ausgabe.')}</p>` : ''}
+      </div>` : ''}`;
+  }
+  function ideHelpHtml(f) {
+    if (!ide.luna) return '';
+    const D2 = ide.luna.DOCS;
+    const type = f ? f.type : 'server';
+    const evs = D2.events[type] || [];
+    return `<div class="ide-help">
+      <section><h5>${icon('fi-rr-bolt')}${t('Ereignisse in {kind}s', { kind: SCRIPT_KINDS[type].name })}</h5>
+        ${evs.length ? `<ul>${evs.map(([sig, d]) => `<li><button type="button" data-ide-snippet="${esc(sig.replace(/\(.*\)/, ''))}"><code>${esc(sig)}</code></button><small>${esc(t(d))}</small></li>`).join('')}</ul>` : `<p class="muted">${t('Keine – ModulScripts liefern Funktionen und Werte für andere Skripte.')}</p>`}</section>
+      <section><h5>${icon('fi-rr-brackets-curly')}${t('Platzhalter und Variablen')}</h5><ul>${D2.vars.map(([n, d]) => `<li><code>{${esc(n)}}</code><small>${esc(t(d))}</small></li>`).join('')}</ul></section>
+      <section><h5>${icon('fi-rr-terminal')}${t('Funktionen')}</h5><ul>${D2.functions.map(([n, d]) => `<li><code>${esc(n)}</code><small>${esc(t(d))}</small></li>`).join('')}</ul></section>
+      <section><h5>${icon('fi-rr-square-code')}${t('Luna kurz')}</h5><pre class="ide-help__code">${esc(`let zahl = 5            // Variable
+const NAME = "TSG"      // Konstante
+if zahl > 3 { print("groß") } else { print("klein") }
+for i in 1..3 { print(i) }
+for name in ["A", "B"] { print(name) }
+function doppelt(x) { return x * 2 }
+onjoin() { print("Willkommen {username} auf {server}!") }
+let texte = require("Texte")   // ModulScript laden
+save("besuche", load("besuche", 0) + 1)`)}</pre></section>
+    </div>`;
+  }
+  function renderIde() {
+    const box = $('[data-ide]');
+    if (!box) return;
+    if (state.page !== 'bots') return;
+    if (ide.err) {
+      box.innerHTML = `<div class="ide-msg">${icon('fi-rr-robot')}<h2>${ide.err === 'login' ? t('Bitte melde dich an') : t('Diesen Bot gibt es nicht (mehr) oder du darfst ihn nicht bearbeiten.')}</h2>
+        <a class="btn btn--primary" href="${ide.cid ? `#/chat/${esc(ide.cid)}/info` : '#/chat'}">${icon('fi-rr-arrow-left')}${t('Zurück zum Chat')}</a></div>`;
+      return;
+    }
+    if (!ide.bot) { box.innerHTML = `<div class="ide-msg">${loadingHtml()}</div>`; return; }
+    const dirty = ideDirty();
+    box.innerHTML = `<header class="ide__bar">
+        <button class="ide__tree-btn" type="button" data-ide-tree="1" aria-label="${esc(t('Struktur'))}">${icon('fi-rr-sidebar')}</button>
+        <a class="ide__back" href="#/chat/${esc(ide.cid)}/info" aria-label="${esc(t('Zurück zum Chat'))}">${icon('fi-rr-arrow-left')}</a>
+        <span class="ide__title">${botAvatar(ide.cid, ide.bot, 'bot-ava--sm')}<span><b>${esc(ide.bot.name)}</b><small>${esc((chat.conv[ide.cid] && chat.conv[ide.cid].name) || '')}</small></span></span>
+        <span class="ide__state${dirty ? ' is-dirty' : ''}" data-ide-state>${dirty ? t('Nicht gespeichert') : t('Gespeichert')}</span>
+        <button class="btn btn--primary btn--sm" type="button" data-ide-save${ide.saving ? ' disabled' : ''}>${icon('fi-rr-disk')}<span>${t('Speichern')}</span></button>
+      </header>
+      <div class="ide__body${ide.tree ? ' is-tree' : ''}">
+        <aside class="ide__tree" data-ide-treebox aria-label="${esc(t('Struktur des Bots'))}">${ideTreeHtml()}</aside>
+        <button class="ide__backdrop" type="button" data-ide-tree="0" tabindex="-1" aria-hidden="true"></button>
+        <div class="ide__main">
+          <nav class="ide__tabs" role="tablist" data-ide-tabs>${ideTabsHtml()}</nav>
+          <div class="ide__editor" data-ide-editor>${ideEditorHtml()}</div>
+          <section class="ide__panel${ide.panelOpen ? ' is-open' : ''}" data-ide-panelbox>${idePanelHtml()}</section>
+        </div>
+      </div>`;
+    ideHighlight();
+  }
+  // Nur Teile neu zeichnen, damit Cursor und Eingabe im Editor bleiben
+  function ideRefreshSide() {
+    const tree = $('[data-ide-treebox]');
+    if (tree) { const top = tree.scrollTop; tree.innerHTML = ideTreeHtml(); tree.scrollTop = top; }
+    const tabs = $('[data-ide-tabs]');
+    if (tabs) tabs.innerHTML = ideTabsHtml();
+    const panel = $('[data-ide-panelbox]');
+    if (panel && ide.panel !== 'test') panel.innerHTML = idePanelHtml();
+    else if (panel) { const tb = $('.ide-panel__tabs', panel); if (tb) tb.outerHTML = idePanelTabs(); }
+    const st = $('[data-ide-state]');
+    if (st) { const d = ideDirty(); st.textContent = d ? t('Nicht gespeichert') : t('Gespeichert'); st.classList.toggle('is-dirty', d); }
+  }
+  function ideHighlight() {
+    const f = ideFile(ide.active);
+    const hl = $('[data-ide-hl]');
+    if (!f || !hl || !ide.luna) return;
+    hl.innerHTML = `${ide.luna.highlight(f.code).map(([k, s]) => (k === 'ws' ? esc(s) : `<span class="tk-${k}">${esc(s)}</span>`)).join('')}\n`;
+    const d = ide.diag[f.id] || {};
+    const errLine = d.error ? d.error.line : (ide.bridges.find((b) => b.from === f.id && !b.ok) || {}).line || 0;
+    const warn = new Set((d.warnings || []).map((w) => w.line));
+    const n = f.code.split('\n').length;
+    let g = '';
+    for (let i = 1; i <= n; i += 1) g += `<span${i === errLine ? ' class="is-error"' : warn.has(i) ? ' class="is-warn"' : ''}>${i}</span>`;
+    $('[data-ide-gutter]').innerHTML = g;
+    const mark = $('[data-ide-mark]');
+    mark.hidden = !errLine;
+    if (errLine) mark.style.setProperty('--line', errLine - 1);
+  }
+  let ideTimer = null;
+  let draftTimer = null;
+  function ideInput(ta) {
+    const f = ideFile(ide.active);
+    if (!f) return;
+    f.code = ta.value;
+    ideHighlight();
+    clearTimeout(ideTimer);
+    ideTimer = setTimeout(() => { ideDiagnose(); ideHighlight(); ideRefreshSide(); }, 220);
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => { if (ide.bot) store.set(draftKey(), ideDirty() ? { base: ide.bot.updated, files: ide.files } : null); }, 700);
+  }
+  function insertText(ta, text) {
+    ta.focus();
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+    if (!ok) { ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end'); ideInput(ta); }
+  }
+  function ideKey(e) {
+    const ta = e.target;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); return; }
+    const v = ta.value;
+    const pos = ta.selectionStart;
+    const lineStart = v.lastIndexOf('\n', pos - 1) + 1;
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const end = ta.selectionEnd;
+      if (end > pos && v.slice(pos, end).includes('\n')) {
+        // Mehrere Zeilen ein- bzw. ausrücken
+        const blockEnd = v.indexOf('\n', end - 1) < 0 ? v.length : v.indexOf('\n', end - 1);
+        const block = v.slice(lineStart, blockEnd);
+        const next = block.split('\n').map((l) => (e.shiftKey ? l.replace(/^ {1,2}/, '') : `  ${l}`)).join('\n');
+        ta.setSelectionRange(lineStart, blockEnd);
+        insertText(ta, next);
+        ta.setSelectionRange(lineStart, lineStart + next.length);
+      } else if (e.shiftKey) {
+        const lead = v.slice(lineStart).match(/^ {1,2}/);
+        if (lead) { ta.setSelectionRange(lineStart, lineStart + lead[0].length); insertText(ta, ''); ta.setSelectionRange(pos - lead[0].length, pos - lead[0].length); }
+      } else insertText(ta, '  ');
+      return;
+    }
+    if (e.key === 'Enter' && !e.isComposing && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      const before = v.slice(lineStart, pos);
+      const indent = before.match(/^[ \t]*/)[0];
+      const opens = /[{([]\s*$/.test(before);
+      const lineEnd = v.indexOf('\n', pos) < 0 ? v.length : v.indexOf('\n', pos);
+      const closes = /^\s*[}\])]/.test(v.slice(pos, lineEnd));
+      // Offener Block ohne passende „}“? Dann gleich schließen (wie in anderen Editoren)
+      const depth = ide.luna ? ide.luna.highlight(v).reduce((n, [k, x]) => n + (k === 'br' ? (x === '{' ? 1 : x === '}' ? -1 : 0) : 0), 0) : 0;
+      const autoClose = !closes && /\{\s*$/.test(before) && depth > 0;
+      if (opens && (closes || autoClose)) {
+        insertText(ta, `\n${indent}  \n${indent}${autoClose ? '}' : ''}`);
+        const c = pos + 1 + indent.length + 2;
+        ta.setSelectionRange(c, c);
+        ideInput(ta);
+      } else insertText(ta, `\n${indent}${opens ? '  ' : ''}`);
+      return;
+    }
+    if (e.key === '}' && /^ {2,}$/.test(v.slice(lineStart, pos))) {
+      e.preventDefault();
+      ta.setSelectionRange(pos - 2, pos);
+      insertText(ta, '}');
+    }
+  }
+  function ideInsertKey(k) {
+    const ta = $('[data-ide-code]');
+    if (!ta) return;
+    const pairs = { '{ }': ['{', '}'], '( )': ['(', ')'], '" "': ['"', '"'], '[ ]': ['[', ']'] };
+    if (k === '⇥') { insertText(ta, '  '); return; }
+    if (k === '//') { insertText(ta, '// '); return; }
+    if (pairs[k]) {
+      const [a, b] = pairs[k];
+      const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+      const start = ta.selectionStart;
+      insertText(ta, a + sel + b);
+      ta.setSelectionRange(start + 1, start + 1 + sel.length);
+      return;
+    }
+    insertText(ta, k);
+  }
+  function ideOpen(id, line = 0) {
+    const f = ideFile(id);
+    if (!f) return;
+    if (!ide.open.includes(id)) ide.open.push(id);
+    ide.active = id;
+    if (window.matchMedia('(max-width: 819px)').matches) ide.tree = false;
+    renderIde();
+    const ta = $('[data-ide-code]');
+    if (!ta) return;
+    if (line > 0) {
+      const lines = f.code.split('\n');
+      const at = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+      ta.focus({ preventScroll: true });
+      ta.setSelectionRange(at, at + (lines[line - 1] || '').length);
+      const sc = $('[data-ide-scroll]');
+      if (sc) sc.scrollTop = Math.max(0, (line - 4) * 20);
+    }
+  }
+  function ideCloseTab(id) {
+    const i = ide.open.indexOf(id);
+    if (i < 0) return;
+    ide.open.splice(i, 1);
+    if (ide.active === id) ide.active = ide.open[Math.min(i, ide.open.length - 1)] || null;
+    renderIde();
+  }
+  function botFileView(arg) {
+    const [mode, x] = String(arg || 'new:server').split(':');
+    const f = mode === 'rename' ? ideFile(x) : null;
+    const type = mode === 'new' ? x || 'server' : f ? f.type : 'server';
+    return `<form class="cform" data-ide-file-form="${esc(mode)}" data-ide-file="${esc(f ? f.id : '')}" novalidate>
+      <div class="f"><label class="f__label" for="if-name">${t('Name der Datei')}</label><input id="if-name" name="name" maxlength="32" value="${esc(f ? f.name : '')}" placeholder="${esc(t('z. B. Willkommen'))}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        <small class="f__hint">${t('Buchstaben, Zahlen, - und _. Ein ModulScript lädt man mit {code}.', { code: '<code>require("Name")</code>' })}</small></div>
+      ${mode === 'new' ? `<fieldset class="f"><legend class="f__label">${t('Art des Skripts')}</legend><div class="kind-grid">${KIND_ORDER.map((k) => `<label class="vis"><input type="radio" name="type" value="${k}"${k === type ? ' checked' : ''}><span>${icon(SCRIPT_KINDS[k].icon)}<b>${SCRIPT_KINDS[k].name}</b><small>${t(SCRIPT_KINDS[k].desc)}</small></span></label>`).join('')}</div></fieldset>` : ''}
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(mode === 'new' ? 'fi-rr-plus' : 'fi-rr-check')}${mode === 'new' ? t('Datei anlegen') : t('Umbenennen')}</button>
+    </form>`;
+  }
+  function ideFileSubmit(form) {
+    const name = form.elements.name.value.trim();
+    const mode = form.dataset.ideFileForm;
+    if (!FILE_NAME_RE.test(name)) { toast(t('Dateinamen: 1–32 Zeichen, nur Buchstaben, Zahlen, - und _.')); return; }
+    if (ide.files.some((f) => f.name.toLowerCase() === name.toLowerCase() && f.id !== form.dataset.ideFile)) { toast(t('Eine Datei mit diesem Namen gibt es schon.')); return; }
+    if (mode === 'rename') {
+      const f = ideFile(form.dataset.ideFile);
+      if (f) f.name = name;
+    } else {
+      if (ide.files.length >= 25) { toast(t('Höchstens 25 Dateien pro Bot.')); return; }
+      const type = (form.querySelector('input[name="type"]:checked') || {}).value || 'server';
+      const f = { id: tmpId(), name, type, code: (ide.luna ? ide.luna.TEMPLATES[type] : '').replace(/NAME/g, name), isNew: true };
+      ide.files.push(f);
+      ide.open.push(f.id);
+      ide.active = f.id;
+      ide.collapsed[type] = false;
+    }
+    closeModal();
+    ideDiagnose();
+    renderIde();
+    ideInputDraft();
+  }
+  function ideInputDraft() {
+    if (ide.bot) store.set(draftKey(), ideDirty() ? { base: ide.bot.updated, files: ide.files } : null);
+  }
+  async function ideSave() {
+    if (ide.saving || !ide.bot) return;
+    ide.saving = true;
+    renderIde();
+    const body = { files: ide.files.map((f) => ({ ...(f.isNew ? {} : { id: f.id }), name: f.name, type: f.type, code: f.code })) };
+    const r = await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body });
+    ide.saving = false;
+    if (r) {
+      const byName = Object.fromEntries((r.files || []).map((f) => [f.name.toLowerCase(), f.id]));
+      const remap = (id) => { const f = ideFile(id); return f ? byName[f.name.toLowerCase()] || id : id; };
+      ide.open = ide.open.map(remap).filter((id) => (r.files || []).some((f) => f.id === id));
+      ide.active = ide.active ? remap(ide.active) : null;
+      ide.bot = r;
+      botsFull[ide.bid] = r;
+      ide.files = (r.files || []).map((f) => ({ ...f }));
+      ide.saved = ideSig(ide.files);
+      ide.draft = false;
+      store.set(draftKey(), null);
+      haptic('success');
+      toast(t('Gespeichert'));
+      openConv(ide.cid);
+    }
+    ideDiagnose();
+    renderIde();
+  }
+  async function ideTest(form) {
+    const f = ideFile(ide.active);
+    if (!f || !ide.luna) return;
+    const fd = form.elements;
+    const event = fd.event.value;
+    const username = fd.username.value.trim() || 'Testspieler';
+    const text = fd.text.value;
+    const prefix = (ide.bot && ide.bot.prefix) || '!';
+    const words = text.startsWith(prefix) ? text.slice(prefix.length).trim().split(/\s+/) : text.trim().split(/\s+/);
+    const command = (words.shift() || '').toLowerCase();
+    const c = chat.conv[ide.cid] || {};
+    const vars = {
+      username, displayName: username, userId: '1', chat: c.name || 'Chat', server: c.name || 'Chat', members: (c.members || []).length || 1, bot: ide.bot.name,
+      game: 'Train Sim Germany', gameId: placeId || '', text, message: text, command, args: words, argtext: words.join(' '),
+      players: fd.players ? +fd.players.value || 0 : 0, serverId: 'test',
+      time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
+      date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()),
+    };
+    const args = event === 'command' ? [command, words] : event === 'message' ? [text, username] : [username];
+    if (!ide.testMem) ide.testMem = JSON.parse(JSON.stringify((ide.bot && ide.bot.memory) || {}));
+    const res = ide.luna.runEvent({ files: ide.files, type: f.type, event, vars, args, memory: ide.testMem, only: f.id });
+    if (res.memChanged) ide.testMem = res.memory;
+    ide.testOut = { ...res, event };
+    const panel = $('[data-ide-panelbox]');
+    if (panel) panel.innerHTML = idePanelHtml();
+    const sel = $('[data-ide-test] select[name="event"]');
+    if (sel) sel.value = event;
+    const box = $('[data-ide-test]');
+    if (box) { box.elements.username.value = username; box.elements.text.value = text; }
+  }
+  function ideSnippet(name) {
+    const ta = $('[data-ide-code]');
+    const f = ideFile(ide.active);
+    if (!ta || !f) return;
+    const params = { onjoin: 'username', onleave: 'username', onmessage: 'text, username', oncommand: 'command, args', onopen: 'username', onstart: '' }[name] ?? '';
+    const end = ta.value.length;
+    ta.focus();
+    ta.setSelectionRange(end, end);
+    const lead = ta.value.endsWith('\n') || !ta.value ? '' : '\n';
+    insertText(ta, `${lead}\n${name}(${params}) {\n  print("…")\n}\n`);
   }
 
   // ---------- Prüfung der Discord-Verbindungen (Ränge über Public Relations Department) ----------
@@ -4788,7 +5499,7 @@
       </dl>
       ${r.rules ? `<p class="info-rules">${esc(r.rules)}</p>` : ''}
       ${(r.roles || []).length ? `<div class="dreq__roles">${r.roles.map((x) => `${roleChip(x)}<small>${x.count}</small>`).join('')}</div>` : ''}
-      ${(r.automations || []).length ? `<ul class="dreq__autos">${r.automations.map((a) => `<li><small>${triggerLabel(a.trigger)} → ${t((TARGET_LABELS.find(([k]) => k === a.target) || ['', ''])[1])}</small><code>${esc(a.template)}</code></li>`).join('')}</ul>` : ''}
+      ${(r.bots || []).length ? `<p class="dreq__bots">${icon('fi-rr-robot')}${r.bots.map((b) => `<span>${esc(b.name)} <small>${b.mode === 'advanced' ? 'Luna' : t('Basis')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>`).join('')}</p>` : ''}
       ${r.status === 'pending' ? `<div class="btn-row"><button class="btn btn--primary" type="button" data-dreq-accept="${esc(r.id)}">${icon('fi-rr-check')}${t('Annehmen')}</button>
         <button class="btn btn--soft" type="button" data-dreq-deny="${esc(r.id)}">${icon('fi-rr-cross-small')}${t('Ablehnen')}</button></div>`
         : r.reviewedBy ? `<p class="muted">${r.status === 'active' ? t('Angenommen von {name}', { name: esc(r.reviewedBy.name) }) : t('Abgelehnt von {name}', { name: esc(r.reviewedBy.name) })} · ${fmtWhen(r.reviewedAt)}${r.reason ? ` – ${esc(r.reason)}` : ''}</p>` : ''}
@@ -5605,6 +6316,18 @@
       title: () => t('Rollen vergeben'),
       render: (arg) => memberRolesView(arg),
     },
+    botnew: {
+      title: () => t('Neuer Bot'),
+      render: (cid) => botNewView(cid),
+    },
+    bot: {
+      title: (arg) => { const b = botsFull[String(arg).split(':')[1]]; return b && b.name ? b.name : t('Bot'); },
+      render: (arg) => botView(arg),
+    },
+    botfile: {
+      title: (arg) => (String(arg).startsWith('rename') ? t('Datei umbenennen') : t('Neue Datei')),
+      render: (arg) => botFileView(arg),
+    },
     'server-players': {
       title: () => t('Alle Spieler'),
       render: (id) => serverPeopleView(id),
@@ -6075,7 +6798,7 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
@@ -6099,6 +6822,7 @@
     spieler() { renderPlayers(); loadTracked(); if (pl.tab === 'friends') loadFriends(); },
     statistiken() { renderStatsKpis(); renderChart(); renderBars(); loadGameStats(); },
     einstellungen() { renderSettings(); },
+    bots() { openIde(state.botsArg[0], state.botsArg[1]); },
   };
 
   function route() {
@@ -6117,8 +6841,14 @@
     if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
     if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
     const chatArg = chatView === 'direct' ? (sub2 || '') : ['conv', 'info'].includes(chatView) ? chatSub : null;
+    const botsArg = page === 'bots' ? [sub || '', sub2 || ''] : null;
+    if (page === 'bots' && !(/^[\w-]{6,30}$/.test(botsArg[0]) && /^[\w-]{4,16}$/.test(botsArg[1]))) { location.replace('#/chat'); return; }
+    // Gespräch verlassen: beim nächsten Öffnen läuft onopen() der ClientScripts wieder
+    if (chatView !== 'conv' || chatArg !== state.chatArg) cbots.seen = null;
+    if (state.page === 'bots' && page !== 'bots' && ideDirty()) toast(t('Nicht gespeicherte Änderungen im Bot-Editor bleiben als Entwurf erhalten.'));
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
-      || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg;
+      || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
+      || String(botsArg) !== String(state.botsArg);
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
     if (chatView === 'public' && state.chatView !== 'public') chat.pubAt = 0;
     if (chatView === 'mod' && state.chatView !== 'mod') chat.modAt = 0;
@@ -6140,6 +6870,12 @@
     state.serverId = serverId;
     state.chatView = chatView;
     state.chatArg = chatArg;
+    state.botsArg = botsArg;
+    // Gespräch aus dem Speicher: gleich auf neuen Stand bringen (und onopen() der ClientScripts)
+    if (chatView === 'conv' && chat.conv[chatArg] && !chat.conv[chatArg].error && changed) {
+      clientBotsAfterLoad(chatArg, null);
+      if (chat.conv[chatArg].updated) openConv(chatArg, { since: chat.conv[chatArg].updated });
+    }
     document.body.dataset.page = page;
     document.body.dataset.chatView = chatView || '';
     const view = serverId ? 'server-detail' : page;
@@ -6316,6 +7052,7 @@
       if (e.target.closest('[data-season-toggle]')) setSeason(e.target.checked);
     });
     document.addEventListener('click', (e) => { if (e.target.closest('[data-notify-test]')) testNotify(); });
+    document.addEventListener('click', (e) => { const b = e.target.closest('[data-copy-script]'); if (b) copyGameScript(b); });
 
     // Server-Details: Tabs, Filter, Zug- und Bahnhofsdialog
     document.addEventListener('click', (e) => {
@@ -6505,6 +7242,140 @@
     });
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
+    // Eigene Bots und Bot-Editor
+    const idePanelRedraw = () => { const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.toggle('is-open', !!ide.panelOpen); } };
+    document.addEventListener('click', async (e) => {
+      const el = e.target.closest('[data-bot-new], [data-bot-edit], [data-bot-del], [data-bot-photo-del], [data-ide-tree], [data-ide-open], [data-ide-close], [data-ide-new], [data-ide-rename], [data-ide-del], [data-ide-fold], [data-ide-goto], [data-ide-save], [data-ide-panel], [data-ide-key], [data-ide-logs], [data-ide-advanced], [data-ide-convert], [data-ide-discard], [data-ide-mem-reset], [data-ide-snippet]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.botNew) openModal('botnew', ds.botNew);
+      else if (ds.botEdit) { delete botsFull[ds.botEdit.split(':')[1]]; openModal('bot', ds.botEdit); }
+      else if (ds.botDel) {
+        const [cid, bid] = ds.botDel.split(':');
+        if (!confirm(t('Bot löschen? Seine Regeln, Skripte und sein Speicher gehen verloren.'))) return;
+        if (await botCall(cid, `/${encodeURIComponent(bid)}`, { method: 'DELETE' })) {
+          delete botsFull[bid];
+          closeModal();
+          toast(t('Bot gelöscht'));
+          if (ide.bid === bid) { ide.bid = null; ide.bot = null; store.set(`tsg-ide:${bid}`, null); }
+          if (state.page === 'bots') location.hash = `#/chat/${cid}/info`;
+          openConv(cid);
+        }
+      } else if (ds.botPhotoDel) {
+        const [cid, bid] = ds.botPhotoDel.split(':');
+        const r = await botCall(cid, `/${encodeURIComponent(bid)}/photo`, { method: 'DELETE' });
+        if (r) botChanged(cid, r);
+      } else if (ds.ideTree !== undefined) {
+        ide.tree = ds.ideTree === '1';
+        const body = $('.ide__body');
+        if (body) body.classList.toggle('is-tree', ide.tree);
+        haptic('tap');
+      } else if (ds.ideOpen) ideOpen(ds.ideOpen);
+      else if (ds.ideClose) ideCloseTab(ds.ideClose);
+      else if (ds.ideNew) openModal('botfile', `new:${ds.ideNew}`);
+      else if (ds.ideRename) openModal('botfile', `rename:${ds.ideRename}`);
+      else if (ds.ideDel) {
+        const f = ideFile(ds.ideDel);
+        if (!f || !confirm(t('„{name}“ löschen? Endgültig erst nach dem Speichern.', { name: f.name }))) return;
+        ide.files = ide.files.filter((x) => x.id !== f.id);
+        ide.open = ide.open.filter((id) => id !== f.id);
+        if (ide.active === f.id) ide.active = ide.open[0] || null;
+        ideDiagnose();
+        renderIde();
+        ideInputDraft();
+      } else if (ds.ideFold) { ide.collapsed[ds.ideFold] = !ide.collapsed[ds.ideFold]; ideRefreshSide(); }
+      else if (ds.ideGoto) { const [fid, line] = ds.ideGoto.split(':'); ideOpen(fid, +line); }
+      else if ('ideSave' in ds) ideSave();
+      else if (ds.idePanel) {
+        if (ds.idePanel === 'fold') ide.panelOpen = !ide.panelOpen;
+        else if (ide.panel === ds.idePanel && ide.panelOpen) ide.panelOpen = false;
+        else { ide.panel = ds.idePanel; ide.panelOpen = true; }
+        idePanelRedraw();
+      } else if (ds.ideKey) ideInsertKey(ds.ideKey);
+      else if (ds.ideLogs) {
+        const r = ds.ideLogs === 'clear' ? await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body: { clearLogs: true } }) : await loadBotFull(ide.cid, ide.bid);
+        if (r && !r.error && ide.bot) Object.assign(ide.bot, { logs: r.logs, stats: r.stats, memory: r.memory });
+        idePanelRedraw();
+      } else if ('ideAdvanced' in ds) {
+        const r = await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body: { mode: 'advanced' } });
+        if (r) { toast(t('Erweiterter Modus ist an')); botChanged(ide.cid, r); }
+      } else if ('ideConvert' in ds) {
+        const made = rulesToLuna((ide.bot && ide.bot.rules) || []);
+        made.forEach((f) => ide.files.push({ id: tmpId(), isNew: true, ...f }));
+        if (made.length) { ide.open = ide.files.map((f) => f.id); ide.active = ide.open[0]; }
+        ideDiagnose();
+        renderIde();
+        ideInputDraft();
+        toast(made.length ? t('Umgewandelt – prüfen und speichern') : t('Keine aktiven Regeln zum Umwandeln.'));
+      } else if ('ideDiscard' in ds) {
+        ide.files = ((ide.bot && ide.bot.files) || []).map((f) => ({ ...f }));
+        ide.draft = false;
+        store.set(draftKey(), null);
+        ide.open = ide.open.filter((id) => ideFile(id));
+        if (!ideFile(ide.active)) ide.active = ide.open[0] || (ide.files[0] && ide.files[0].id) || null;
+        ideDiagnose();
+        renderIde();
+      } else if ('ideMemReset' in ds) { ide.testMem = null; ide.testOut = null; idePanelRedraw(); toast(t('Test-Speicher geleert')); }
+      else if (ds.ideSnippet) ideSnippet(ds.ideSnippet);
+    });
+    // Zeichenleiste über der Tastatur: Fokus bleibt im Editor
+    document.addEventListener('pointerdown', (e) => { if (e.target.closest('[data-ide-key]')) e.preventDefault(); });
+    document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('[data-ide-code]')) ideInput(e.target); });
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches && e.target.matches('[data-ide-code]')) { ideKey(e); return; }
+      if (state.page === 'bots' && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); }
+      if (state.page === 'bots' && e.key === 'Escape' && ide.tree) { ide.tree = false; const body = $('.ide__body'); if (body) body.classList.remove('is-tree'); }
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('[data-bot-photo]') && e.target.files && e.target.files[0]) uploadBotPhoto(e.target.dataset.botPhoto, e.target.files[0]);
+    });
+    document.addEventListener('submit', async (e) => {
+      const bc = e.target.closest('form[data-bot-create]');
+      if (bc) {
+        e.preventDefault();
+        const cid = bc.dataset.botCreate;
+        const name = bc.elements.name.value.trim();
+        const mode = (bc.querySelector('input[name="mode"]:checked') || {}).value || 'basic';
+        if (name.length < 2) { toast(t('Bitte gib deinem Bot einen Namen (2–32 Zeichen).')); return; }
+        const btn = $('button[type="submit"]', bc);
+        btn.disabled = true;
+        const r = await botCall(cid, '', { method: 'POST', body: { name, mode } });
+        btn.disabled = false;
+        if (!r) return;
+        botsFull[r.id] = r;
+        haptic('success');
+        toast(t('Bot erstellt'));
+        openConv(cid);
+        if (mode === 'advanced') location.hash = `#/bots/${cid}/${r.id}`;
+        else openModal('bot', `${cid}:${r.id}`);
+        return;
+      }
+      const bf = e.target.closest('form[data-bot-form]');
+      if (bf) {
+        e.preventDefault();
+        const f = bf.elements;
+        const body = {
+          name: f.name.value.trim(), desc: f.desc.value.trim(), prefix: f.prefix.value.trim() || '!', on: f.on.checked,
+          mode: (bf.querySelector('input[name="mode"]:checked') || {}).value || 'basic',
+          rules: $$('[data-auto-row]', bf).map((row) => ({
+            id: row.dataset.autoId || undefined, trigger: $('select[name="trigger"]', row).value, target: $('select[name="target"]', row).value,
+            command: $('input[name="command"]', row).value.trim().replace(/^[!?.$%&#+~-]+/, ''), template: $('textarea', row).value, on: $('input[name="on"]', row).checked,
+          })).filter((r) => r.template.trim()),
+        };
+        if (body.rules.some((r) => r.trigger === 'command' && !r.command)) { toast(t('Bei einer Befehl-Regel fehlt der Befehl.')); return; }
+        const btn = $('button[type="submit"]', bf);
+        btn.disabled = true;
+        const r = await botCall(bf.dataset.botForm, `/${encodeURIComponent(bf.dataset.botId)}`, { method: 'PUT', body });
+        btn.disabled = false;
+        if (r) { haptic('success'); toast(t('Gespeichert')); botChanged(bf.dataset.botForm, r); }
+        return;
+      }
+      const ff = e.target.closest('form[data-ide-file-form]');
+      if (ff) { e.preventDefault(); ideFileSubmit(ff); return; }
+      const tf = e.target.closest('form[data-ide-test]');
+      if (tf) { e.preventDefault(); ideTest(tf); }
+    });
+    window.addEventListener('beforeunload', (e) => { if (ideDirty()) { e.preventDefault(); e.returnValue = ''; } });
     // Rollen und Discord im Server-Chat, Prüfung der Discord-Verbindungen
     document.addEventListener('click', async (e) => {
       const el = e.target.closest('[data-role-edit], [data-role-del], [data-mem-roles], [data-auto-add], [data-auto-del], [data-discord-test], [data-discord-submit], [data-discord-remove], [data-dreq-accept], [data-dreq-deny]');
@@ -6518,7 +7389,7 @@
       } else if (ds.memRoles) openModal('memroles', `${conv}:${ds.memRoles}`);
       else if ('autoAdd' in ds) {
         const list = $('[data-auto-list]', el.closest('form'));
-        if (list) { list.insertAdjacentHTML('beforeend', automationRow({ trigger: 'join', target: 'discord' })); $('textarea', list.lastElementChild).focus(); }
+        if (list) { list.insertAdjacentHTML('beforeend', ruleRow({ trigger: 'join', target: 'chat' }, el.dataset.discordOn === '1')); $('textarea', list.lastElementChild).focus(); }
       } else if ('autoDel' in ds) el.closest('[data-auto-row]').remove();
       else if (ds.discordTest) { el.disabled = true; await discordCall(ds.discordTest, '/test', { method: 'POST' }, t('Testnachricht gesendet')); el.disabled = false; }
       else if (ds.discordSubmit) {
