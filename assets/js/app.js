@@ -3788,6 +3788,8 @@
       bot_too_large: t('Der Bot ist zu groß (höchstens 100 000 Zeichen insgesamt).'),
       bad_prefix: t('Präfix: 1–3 Zeichen wie ! ? . $ % & # + ~ - (nicht /).'),
       not_group: t('Bots gibt es nur in Gruppen- und Server-Chats.'),
+      too_many_files: t('Höchstens 40 Objekte pro Bot.'),
+      bad_parent: t('Dieses Objekt kann dort nicht liegen (Kreis, oder Connectors und Webhooks enthalten nichts).'),
     };
     return map[e.message] || errorText(e);
   }
@@ -4795,15 +4797,9 @@
   // ---------- Eigene Bots: Basis (Vorlagen) und Erweitert (Luna im Editor) ----------
   const BOT_TRIGGERS = [['join', 'Jemand tritt dem Chat bei'], ['leave', 'Jemand verlässt den Chat'], ['command', 'Befehl, z. B. !regeln'], ['game_join', 'Jemand betritt einen verbundenen Server im Spiel'], ['game_leave', 'Jemand verlässt den Server im Spiel']];
   const BOT_TARGETS = [['chat', 'In den Chat'], ['discord', 'Nach Discord'], ['both', 'Chat und Discord']];
-  const SCRIPT_KINDS = {
-    server: { name: 'ServerScript', folder: 'Server', icon: 'fi-rr-cloud-code', desc: 'Läuft im Backend, wenn im Chat etwas passiert' },
-    client: { name: 'ClientScript', folder: 'Client', icon: 'fi-rr-mobile-notch', desc: 'Läuft in der App von jedem, der den Chat öffnet – nur er sieht die Ausgabe' },
-    module: { name: 'ModulScript', folder: 'Module', icon: 'fi-rr-cube', desc: 'Bausteine, die andere Skripte mit require("Name") laden' },
-    game: { name: 'GameScript', folder: 'Game', icon: 'fi-rr-gamepad', desc: 'Läuft, wenn in einem verbundenen privaten Server etwas passiert' },
-  };
-  const KIND_ORDER = ['server', 'client', 'module', 'game'];
   const BOT_PH = ['username', 'displayName', 'server', 'chat', 'members', 'game', 'gameId', 'players', 'command', 'args', 'time', 'date'];
-  const FILE_NAME_RE = /^[\p{L}\p{N}_-]{1,32}$/u;
+  // Namen wie in Luna nutzbar: script.Parent.Texte
+  const FILE_NAME_RE = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]{0,31}$/;
   // Luna (backend/luna.js) wird erst geladen, wenn ein Bot-Skript läuft oder der Editor offen ist
   let lunaLoad = null;
   const lunaLib = () => (lunaLoad || (lunaLoad = import(new URL('backend/luna.js', document.baseURI).href).catch((e) => { lunaLoad = null; throw e; })));
@@ -4834,6 +4830,7 @@
           <button class="btn btn--soft btn--sm" type="button" data-bot-edit="${esc(c.id)}:${esc(b.id)}">${icon('fi-rr-settings')}${t('Einstellungen')}</button></span>` : ''}
       </li>`).join('')}</ul>` : `<p class="muted">${t('Eigene Bots begrüßen neue Mitglieder, antworten auf Befehle wie !regeln und melden, wer im Spiel ist – einfach mit Vorlagen oder programmiert mit Luna.')}</p>`}
       ${c.canBots && bots.length < 5 ? `<button class="btn btn--outline btn--block" type="button" data-bot-new="${esc(c.id)}">${icon('fi-rr-plus')}${t('Bot erstellen')}</button>` : ''}
+      ${c.canBots ? `<a class="bots-docs" href="#/luna">${icon('fi-rr-document')}${t('Luna lernen – zur Dokumentation')}</a>` : ''}
     </section>`;
   }
   function botNewView(cid) {
@@ -4897,6 +4894,7 @@
         <p class="note">${icon('fi-rr-square-code')}<span>${files.length ? t('{n} Dateien · {e} mit Fehlern', { n: files.length, e: broken }) : t('Noch keine Skripte. Im Editor legst du ServerScripts, ClientScripts, ModulScripts und GameScripts an.')}</span></p>
         ${b.stats && b.stats.lastError ? `<p class="note note--bad">${icon('fi-rr-triangle-warning')}<span>${t('Letzter Fehler: {file}, Zeile {line} – {text}', { file: esc(b.stats.lastError.file), line: b.stats.lastError.line, text: esc(b.stats.lastError.text) })}</span></p>` : ''}
         <a class="btn btn--soft btn--block" href="#/bots/${esc(cid)}/${esc(bid)}">${icon('fi-rr-laptop-code')}${t('Im Editor öffnen')}</a>
+        <a class="btn btn--ghost btn--block" href="#/luna">${icon('fi-rr-document')}${t('Luna-Dokumentation')}</a>
       </div>
       <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
       <button class="btn btn--danger btn--block" type="button" data-bot-del="${esc(cid)}:${esc(bid)}">${icon('fi-rr-trash')}${t('Bot löschen')}</button>
@@ -4938,12 +4936,12 @@
     const block = (name, list, args = '') => (list.length ? `${name}(${args}) {\n${list.flatMap(out).join('\n')}\n}\n` : '');
     const on = (rules || []).filter((r) => r.on !== false);
     const cmds = on.filter((r) => r.trigger === 'command');
-    const server = ['// Aus den Regeln des Basis-Modus erzeugt', block('onjoin', on.filter((r) => r.trigger === 'join'), 'username'), block('onleave', on.filter((r) => r.trigger === 'leave'), 'username'),
+    const server = ['-- Aus den Regeln des Basis-Modus erzeugt', block('onjoin', on.filter((r) => r.trigger === 'join'), 'username'), block('onleave', on.filter((r) => r.trigger === 'leave'), 'username'),
       cmds.length ? `oncommand(command, args) {\n${cmds.map((r) => `  if command == ${q(r.command)} {\n${out(r).map((l) => `  ${l}`).join('\n')}\n  }`).join('\n')}\n}\n` : ''].filter(Boolean).join('\n');
     const game = block('onjoin', on.filter((r) => r.trigger === 'game_join'), 'username') + block('onleave', on.filter((r) => r.trigger === 'game_leave'), 'username');
     return [
-      server.split('\n').length > 2 ? { name: 'Main', type: 'server', code: server } : null,
-      game ? { name: 'Spiel', type: 'game', code: `// Aus den Regeln des Basis-Modus erzeugt\n${game}` } : null,
+      server.split('\n').length > 2 ? { name: 'Main', type: 'server', parent: 'ServerScriptService', code: server } : null,
+      game ? { name: 'Spiel', type: 'game', parent: 'GameService', code: `-- Aus den Regeln des Basis-Modus erzeugt\n${game}` } : null,
     ].filter(Boolean);
   }
 
@@ -4974,7 +4972,7 @@
         game: 'Train Sim Germany', gameId: placeId || '', time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
         date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()), ...extra,
       };
-      const res = luna.runEvent({ files: b.files, type: 'client', event, vars, args: args.length ? args : [vars.username], memory: store.get(key, {}) || {} });
+      const res = luna.runEvent({ files: b.files, type: 'client', event, vars, args: args.length ? args : [vars.username], memory: store.get(key, {}) || {}, botName: b.name });
       if (res.memChanged) store.set(key, res.memory);
       res.says.forEach((text) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text, at: Date.now(), local: true }); added += 1; });
     }
@@ -5000,18 +4998,130 @@
     });
   }
 
-  // ---------- Bot-Editor (#/bots/<chat>/<bot>): Struktur links, Editor rechts, Dateien oben ----------
-  const ide = { cid: null, bid: null, bot: null, files: [], saved: '', open: [], active: null, luna: null, panel: 'problems', panelOpen: null, tree: false, saving: false, diag: {}, bridges: [], err: null, collapsed: {}, draft: false, testMem: null, testOut: null };
+  // ---------- Bot-Editor (#/bots/<chat>/<bot>): Explorer und Eigenschaften links, Code rechts, Tabs oben ----------
+  // Aufbau wie im Roblox-Explorer: der Bot oben, darunter die Services; ModuleScripts, Ordner usw. dürfen überall liegen.
+  const SERVICE_ORDER = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService'];
+  const SERVICE_INFO = {
+    ServerScriptService: { icon: 'svcServer', runs: 'server', desc: 'ServerScripts laufen hier – im Backend, wenn im Chat etwas passiert.' },
+    ClientService: { icon: 'svcClient', runs: 'client', desc: 'ClientScripts laufen hier – in der App von jedem, der den Chat öffnet.' },
+    GameService: { icon: 'svcGame', runs: 'game', desc: 'GameScripts laufen hier – wenn in einem verbundenen privaten Server etwas passiert.' },
+    ConnectorService: { icon: 'svcConnector', runs: null, desc: 'Connectors verbinden Skripte miteinander, Webhooks schicken Nachrichten nach Discord.' },
+  };
+  const CLASS_INFO = {
+    server: { name: 'ServerScript', desc: 'Läuft im Backend bei Ereignissen im Chat' },
+    client: { name: 'ClientScript', desc: 'Läuft in der App der Person, die den Chat öffnet (wie ein LocalScript)' },
+    module: { name: 'ModuleScript', desc: 'Bausteine für andere Skripte – laden mit require(…)' },
+    game: { name: 'GameScript', desc: 'Läuft bei Ereignissen in verbundenen privaten Servern' },
+    connector: { name: 'Connector', desc: 'Verbindet Skripte: Fire() auf der einen, Connect() auf der anderen Seite' },
+    webhook: { name: 'Webhook', desc: 'Schickt Nachrichten an einen Discord-Kanal: Send(text)' },
+    folder: { name: 'Folder', desc: 'Ordner zum Sortieren' },
+  };
+  const INSERT_ORDER = ['server', 'client', 'module', 'game', 'connector', 'webhook', 'folder'];
+  const RECOMMENDED = { ServerScriptService: ['server', 'module', 'folder'], ClientService: ['client', 'module', 'folder'], GameService: ['game', 'module', 'folder'], ConnectorService: ['connector', 'webhook', 'folder'] };
+  const RUNS_IN = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService' };
+  const DEFAULT_PARENT = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService', module: 'ServerScriptService', connector: 'ConnectorService', webhook: 'ConnectorService', folder: 'ServerScriptService' };
+  const isScript = (t) => ['server', 'client', 'module', 'game'].includes(t);
+  const isService = (id) => SERVICE_ORDER.includes(id);
+  // Eigene, moderne Symbole (SVG) für jede Art von Objekt
+  const IC = {
+    server: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-server)"/><path d="M8.2 6.6 5.4 10l2.8 3.4M11.8 6.6l2.8 3.4-2.8 3.4" fill="none" stroke="#1f2633" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    client: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-client)"/><rect x="6.6" y="4.4" width="6.8" height="11.2" rx="1.8" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M9 13.3h2" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
+    module: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-module)"/><path d="M10 4.6 15 7.3v5.4L10 15.4 5 12.7V7.3zM5 7.3l5 2.7 5-2.7M10 10v5.4" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>',
+    game: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-game)"/><path d="M7 7.2h6a3 3 0 0 1 2.9 2.2l.7 2.8a1.5 1.5 0 0 1-2.6 1.3L12.8 12H7.2L6 13.5a1.5 1.5 0 0 1-2.6-1.3l.7-2.8A3 3 0 0 1 7 7.2z" fill="#fff"/><path d="M6.9 9.1v1.8M6 10h1.8" stroke="#047857" stroke-width="1.1" stroke-linecap="round"/><circle cx="12.6" cy="9.4" r=".75" fill="#047857"/><circle cx="13.9" cy="10.6" r=".75" fill="#047857"/>',
+    connector: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-conn)"/><path d="M8.2 4.8v2.6M11.8 4.8v2.6M6.6 7.4h6.8v1.9a3.4 3.4 0 0 1-6.8 0zM10 12.7v2.6" fill="none" stroke="#3b2405" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    webhook: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#5865F2"/><circle cx="10" cy="6.4" r="1.7" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="6.3" cy="13.2" r="1.7" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="13.7" cy="13.2" r="1.7" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M9.2 7.9 7 11.6M10.8 7.9l2.2 3.7M8 13.2h4" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
+    folder: '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.6l1.7 1.8h6.3a1.7 1.7 0 0 1 1.7 1.7v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="#c8ccd3"/><path d="M2.5 8.3h15" stroke="#a7adb7" stroke-width="1"/>',
+    svcServer: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-server)"/><rect x="5" y="5" width="10" height="2.7" rx="1.2" fill="#1f2633"/><rect x="5" y="8.65" width="10" height="2.7" rx="1.2" fill="#1f2633"/><rect x="5" y="12.3" width="10" height="2.7" rx="1.2" fill="#1f2633"/><circle cx="13.2" cy="6.35" r=".7" fill="#22c55e"/><circle cx="13.2" cy="10" r=".7" fill="#22c55e"/><circle cx="13.2" cy="13.65" r=".7" fill="#22c55e"/>',
+    svcClient: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-client)"/><rect x="6.3" y="3.9" width="7.4" height="12.2" rx="2" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="10" cy="8.6" r="1.5" fill="#fff"/><path d="M7.9 12.4a2.2 2.2 0 0 1 4.2 0" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round"/>',
+    svcGame: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-game)"/><path d="M6.8 6.9h6.4a3.2 3.2 0 0 1 3.1 2.4l.7 2.9a1.6 1.6 0 0 1-2.8 1.4L13 12.3H7l-1.2 1.3A1.6 1.6 0 0 1 3 12.2l.7-2.9a3.2 3.2 0 0 1 3.1-2.4z" fill="#fff"/><path d="M6.8 8.9v2M5.8 9.9h2" stroke="#e11d48" stroke-width="1.2" stroke-linecap="round"/><circle cx="12.7" cy="9.2" r=".8" fill="#e11d48"/><circle cx="14.1" cy="10.5" r=".8" fill="#f59e0b"/>',
+    svcConnector: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-conn)"/><path d="M8 4.6v2.7M12 4.6v2.7M6.3 7.3h7.4v2.1a3.7 3.7 0 0 1-7.4 0zM10 13.1v2.6" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    bot: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-bot)"/><rect x="5" y="7" width="10" height="7.5" rx="2.5" fill="#fff"/><circle cx="8.2" cy="10.6" r="1" fill="#0f172a"/><circle cx="11.8" cy="10.6" r="1" fill="#0f172a"/><path d="M10 4.4V7" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.2" r="1" fill="#fff"/>',
+  };
+  const IC_DEFS = `<svg class="ic-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
+    <linearGradient id="lg-server" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9dee6"/></linearGradient>
+    <linearGradient id="lg-client" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
+    <linearGradient id="lg-module" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+    <linearGradient id="lg-game" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#059669"/></linearGradient>
+    <linearGradient id="lg-conn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+    <linearGradient id="lg-svc-server" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient>
+    <linearGradient id="lg-svc-game" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset=".55" stop-color="#f43f5e"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+    <linearGradient id="lg-svc-conn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#ea580c"/></linearGradient>
+    <linearGradient id="lg-bot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#475569"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
+  </defs></svg>`;
+  // Farbverläufe der Symbole einmal für die ganze Seite (nicht in einer versteckten Seite, sonst fehlen sie)
+  function iconDefs() {
+    if (document.getElementById('lg-module')) return;
+    const holder = document.createElement('div');
+    holder.innerHTML = IC_DEFS;
+    document.body.appendChild(holder.firstElementChild);
+  }
+  const clsIcon = (k, cls = '') => `<svg class="cls-ic ${cls}" viewBox="0 0 20 20" aria-hidden="true">${IC[k] || IC.folder}</svg>`;
+  const svgPlus = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+  const svgChev = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const svgDots = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg>';
+  const svgClose = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7m0-7-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const svgNewFile = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 2.5H6A1.5 1.5 0 0 0 4.5 4v12A1.5 1.5 0 0 0 6 17.5h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M11.5 2.5 15.5 6.5V10M11.5 2.5v4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14.5 12.5v5M12 15h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const svgNewFolder = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15.5H4A1.5 1.5 0 0 1 2.5 14V5.5A1.5 1.5 0 0 1 4 4h3.3l1.6 1.8H16A1.5 1.5 0 0 1 17.5 7.3V10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14.5 12.5v5M12 15h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+  const svgBook = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 4.5A1.5 1.5 0 0 1 5 3h4.5v13H5a1.5 1.5 0 0 0-1.5 1.5zM16.5 4.5A1.5 1.5 0 0 0 15 3h-4.5v13H15a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+  const itemIcon = (f) => clsIcon(f.type);
+
+  const ide = { cid: null, bid: null, bot: null, files: [], saved: '', open: [], active: null, sel: null, luna: null, panel: 'problems', panelOpen: null, tree: false, saving: false, diag: {}, bridges: [], err: null, collapsed: {}, draft: false, testMem: null, testOut: null, renaming: null, menu: null, propsOpen: true, cur: 1 };
   const tmpId = () => `new-${Math.random().toString(36).slice(2, 8)}`;
   const ideFile = (id) => ide.files.find((f) => f.id === id) || null;
-  const ideSig = (files) => JSON.stringify(files.map((f) => [f.id, f.name, f.type, f.code]));
+  const ideSig = (files) => JSON.stringify(files.map((f) => [f.id, f.name, f.type, f.parent, f.code, f.enabled === false, f.url || '']));
   const ideDirty = () => !!ide.bot && ideSig(ide.files) !== ide.saved;
-  const ideFileDirty = (f) => { const s = ide.bot && (ide.bot.files || []).find((x) => x.id === f.id); return !s || s.code !== f.code || s.name !== f.name; };
+  const ideFileDirty = (f) => { const s = ide.bot && (ide.bot.files || []).find((x) => x.id === f.id); return !s || s.code !== f.code || s.name !== f.name || s.parent !== f.parent || !!f.url; };
   const draftKey = () => `tsg-ide:${ide.bid}`;
+  const childrenOf = (parent) => ide.files.filter((f) => f.parent === parent);
+  const parentItem = (f) => (f && !isService(f.parent) ? ideFile(f.parent) : null);
+  function serviceOfItem(f) {
+    for (let x = f, i = 0; x && i < 64; i += 1) {
+      if (isService(x.parent)) return x.parent;
+      x = ideFile(x.parent);
+    }
+    return null;
+  }
+  const isDescendant = (id, ancestorId) => { for (let x = ideFile(id), i = 0; x && i < 64; i += 1) { if (x.parent === ancestorId) return true; x = ideFile(x.parent); } return false; };
+  const botPathName = () => String((ide.bot && ide.bot.name) || 'Bot').replace(/[^A-Za-z0-9_À-ɏ]/g, '') || 'Bot';
+  function itemPath(f) {
+    const parts = [];
+    for (let x = f, i = 0; x && i < 64; i += 1) { parts.unshift(x.name); if (isService(x.parent)) { parts.unshift(x.parent); break; } x = ideFile(x.parent); }
+    return parts;
+  }
+  const absPath = (f) => `../${[botPathName(), ...itemPath(f)].join('.')}`;
+  // Pfad relativ zum Skript: script.Parent… (wie in Roblox)
+  function relPath(from, to) {
+    const up = (x) => { const out = []; for (let y = x, i = 0; y && i < 64; i += 1) { out.push(y.parent); if (isService(y.parent)) break; y = ideFile(y.parent); } return out; };
+    const chainFrom = [from.id, ...up(from)];
+    const chainTo = [to.id, ...up(to)];
+    const common = chainFrom.find((x) => chainTo.includes(x));
+    if (!common) return ['script', ...Array(chainFrom.length).fill('Parent'), ...itemPath(to)].join('.');
+    const ups = chainFrom.indexOf(common);
+    const downs = chainTo.slice(0, chainTo.indexOf(common)).reverse().map((id) => (ideFile(id) || { name: id }).name);
+    return ['script', ...Array(ups).fill('Parent'), ...downs].join('.');
+  }
+  function uniqueName(base, parent, except = null) {
+    const taken = new Set(childrenOf(parent).filter((f) => f.id !== except).map((f) => f.name.toLowerCase()));
+    if (!taken.has(base.toLowerCase())) return base;
+    for (let i = 2; i < 999; i += 1) if (!taken.has(`${base}${i}`.toLowerCase())) return `${base}${i}`;
+    return `${base}${Date.now() % 1000}`;
+  }
+  // Wohin kommt etwas Neues? In den gewählten Service, Ordner oder in das gewählte Skript (wie in Roblox)
+  function insertTarget() {
+    const s = ide.sel;
+    if (isService(s)) return s;
+    const f = ideFile(s);
+    if (!f) return 'ServerScriptService';
+    if (f.type === 'connector' || f.type === 'webhook') return f.parent;
+    return f.id;
+  }
+  const contextService = (parent) => (isService(parent) ? parent : serviceOfItem(ideFile(parent)) || 'ServerScriptService');
+
   async function openIde(cid, bid) {
     if (ide.cid === cid && ide.bid === bid && (ide.bot || ide.err)) { renderIde(); return; }
-    Object.assign(ide, { cid, bid, bot: null, files: [], saved: '', open: [], active: null, err: null, tree: false, draft: false, testMem: null, testOut: null, diag: {}, bridges: [] });
+    Object.assign(ide, { cid, bid, bot: null, files: [], saved: '', open: [], active: null, sel: null, err: null, tree: false, draft: false, testMem: null, testOut: null, diag: {}, bridges: [], renaming: null, menu: null });
     if (ide.panelOpen === null) ide.panelOpen = window.matchMedia('(min-width: 820px)').matches;
+    if (ide.propsInit !== true) { ide.propsOpen = window.matchMedia('(min-width: 820px)').matches; ide.propsInit = true; }
     renderIde();
     if (!sessionToken() || !apiReady()) { ide.err = 'login'; renderIde(); return; }
     try {
@@ -5022,12 +5132,12 @@
       botsFull[bid] = bot;
       ide.files = (bot.files || []).map((f) => ({ ...f }));
       ide.saved = ideSig(ide.files);
-      // Nicht gespeicherter Entwurf von vorhin (gleicher Stand auf dem Server)?
       const d = store.get(draftKey(), null);
       if (d && d.base === bot.updated && Array.isArray(d.files) && ideSig(d.files) !== ide.saved) { ide.files = d.files; ide.draft = true; }
-      ide.open = ide.files.filter((f) => f.type !== 'module').slice(0, 1).map((f) => f.id);
-      if (!ide.open.length && ide.files[0]) ide.open = [ide.files[0].id];
-      ide.active = ide.open[0] || null;
+      const first = ide.files.find((f) => f.type === 'server') || ide.files.find((f) => isScript(f.type));
+      ide.open = first ? [first.id] : [];
+      ide.active = first ? first.id : null;
+      ide.sel = first ? first.id : 'ServerScriptService';
       if (!chat.conv[cid]) openConv(cid);
     } catch (e) {
       ide.err = e;
@@ -5037,79 +5147,275 @@
   }
   function ideDiagnose() {
     if (!ide.luna) return;
-    ide.diag = {};
-    ide.files.forEach((f) => {
-      const c = ide.luna.check(f.code);
-      const o = ide.luna.outline(f.code, f.type);
-      ide.diag[f.id] = { error: c.ok ? null : c.error, warnings: o.warnings, handlers: o.handlers, functions: o.functions };
-    });
-    ide.bridges = ide.luna.bridges(ide.files);
+    const r = ide.luna.analyze(ide.files, (ide.bot && ide.bot.name) || 'Bot');
+    ide.diag = r.checks;
+    ide.bridges = r.bridges;
   }
   function ideProblems() {
     const out = [];
     ide.files.forEach((f) => {
-      const d = ide.diag[f.id] || {};
+      const d = ide.diag[f.id];
+      if (!d) return;
       if (d.error) out.push({ f, line: d.error.line, kind: 'error', text: d.error.message });
       (d.warnings || []).forEach((w) => out.push({ f, line: w.line, kind: 'warn', text: w.message }));
     });
-    ide.bridges.filter((b) => !b.ok).forEach((b) => { const f = ideFile(b.from); if (f) out.push({ f, line: b.line, kind: 'error', text: b.problem }); });
+    ide.bridges.filter((b) => !b.ok).forEach((b) => { const f = ideFile(b.from); if (f) out.push({ f, line: b.line, kind: 'error', text: `${b.name}: ${b.problem}` }); });
     return out;
   }
   function fileState(f) {
-    const d = ide.diag[f.id] || {};
-    if (d.error || ide.bridges.some((b) => b.from === f.id && !b.ok)) return 'error';
-    return (d.warnings || []).length ? 'warn' : 'ok';
+    const d = ide.diag[f.id];
+    if ((d && d.error) || ide.bridges.some((b) => b.from === f.id && !b.ok)) return 'error';
+    return d && (d.warnings || []).length ? 'warn' : 'ok';
   }
-  function ideTreeHtml() {
+
+  // ----- Explorer -----
+  function xpRow({ id, depth, icon: ic, name, kind, canAdd, hasKids, open, item }) {
+    const sel = ide.sel === id;
+    const active = item && ide.active === id;
+    const st = item && isScript(item.type) ? fileState(item) : 'ok';
+    const renaming = ide.renaming === id;
+    return `<div class="xp-row${sel ? ' is-selected' : ''}${active && !sel ? ' is-active' : ''}" style="--d:${depth}" data-xp="${esc(id)}" data-xp-kind="${kind}"${item ? ' draggable="true"' : ''} role="treeitem" aria-selected="${sel}"${hasKids ? ` aria-expanded="${open}"` : ''} tabindex="${sel ? 0 : -1}">
+      ${hasKids ? `<button class="xp-chev${open ? ' is-open' : ''}" type="button" data-xp-toggle="${esc(id)}" tabindex="-1" aria-label="${esc(open ? t('Zuklappen') : t('Aufklappen'))}">${svgChev}</button>` : '<span class="xp-chev"></span>'}
+      <span class="xp-ic">${ic}</span>
+      ${renaming ? `<input class="xp-rename" data-xp-rename-input="${esc(id)}" value="${esc(name)}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="${esc(t('Neuer Name'))}">` : `<span class="xp-name">${esc(name)}</span>`}
+      ${item && ideFileDirty(item) ? '<i class="xp-dot" aria-label="geändert"></i>' : ''}
+      ${st !== 'ok' ? `<i class="xp-state xp-state--${st}" aria-label="${st === 'error' ? 'Fehler' : 'Hinweis'}"></i>` : ''}
+      ${item ? `<button class="xp-more" type="button" data-xp-menu="${esc(id)}" aria-label="${esc(t('Mehr'))}">${svgDots}</button>` : ''}
+      ${canAdd ? `<button class="xp-add" type="button" data-xp-add="${esc(id)}" aria-label="${esc(t('Einfügen in {name}', { name }))}" title="${esc(t('Einfügen'))}">${svgPlus}</button>` : ''}
+    </div>`;
+  }
+  function xpBranch(parent, depth) {
+    const kids = childrenOf(parent);
+    if (!kids.length) return '';
+    return `<ul class="xp-kids" style="--d:${depth}" role="group">${kids.map((f) => {
+      const hasKids = childrenOf(f.id).length > 0;
+      const open = hasKids && !ide.collapsed[f.id];
+      const canAdd = f.type !== 'connector' && f.type !== 'webhook';
+      return `<li role="none">${xpRow({ id: f.id, depth, icon: itemIcon(f), name: f.name, kind: f.type, canAdd, hasKids, open, item: f })}${open ? xpBranch(f.id, depth + 1) : ''}</li>`;
+    }).join('')}</ul>`;
+  }
+  function ideExplorerHtml() {
     const b = ide.bot;
-    const fileNode = (f) => {
-      const d = ide.diag[f.id] || {};
-      const st = fileState(f);
-      const outline = [...(d.handlers || []).map((h) => ({ ...h, ev: true })), ...(d.functions || [])].sort((x, y) => x.line - y.line);
-      return `<li class="tree-file${f.id === ide.active ? ' is-active' : ''}">
-        <div class="tree-row">
-          <button type="button" class="tree-open" data-ide-open="${esc(f.id)}">${icon(SCRIPT_KINDS[f.type].icon)}<span>${esc(f.name)}</span>${ideFileDirty(f) ? '<i class="tree-dot" aria-label="geändert"></i>' : ''}${st !== 'ok' ? `<i class="tree-state tree-state--${st}">${icon(st === 'error' ? 'fi-rr-triangle-warning' : 'fi-rr-info')}</i>` : ''}</button>
-          <span class="tree-acts"><button type="button" data-ide-rename="${esc(f.id)}" aria-label="${esc(t('Umbenennen'))}">${icon('fi-rr-pencil')}</button><button type="button" data-ide-del="${esc(f.id)}" aria-label="${esc(t('Löschen'))}">${icon('fi-rr-trash')}</button></span>
-        </div>
-        ${outline.length ? `<ul class="tree-outline">${outline.map((x) => `<li><button type="button" data-ide-goto="${esc(f.id)}:${x.line}">${x.ev ? `${icon('fi-rr-bolt')}<span>${esc(x.name)}()</span>` : `<i class="tree-fn">ƒ</i><span>${esc(x.name)}(${esc((x.params || []).join(', '))})</span>`}<small>${x.line}</small></button></li>`).join('')}</ul>` : ''}
-      </li>`;
-    };
-    const groups = KIND_ORDER.map((k) => {
-      const list = ide.files.filter((f) => f.type === k).sort((x, y) => x.name.localeCompare(y.name));
-      const open = !ide.collapsed[k];
-      return `<li class="tree-group${open ? ' is-open' : ''}">
-        <div class="tree-row tree-row--folder">
-          <button type="button" class="tree-fold" data-ide-fold="${k}" aria-expanded="${open}">${icon('fi-rr-angle-small-right')}${icon(open ? 'fi-rr-folder-open' : 'fi-rr-folder')}<b>${SCRIPT_KINDS[k].folder}</b><small>${list.length}</small></button>
-          <button type="button" class="tree-add" data-ide-new="${k}" aria-label="${esc(t('Neues {kind}', { kind: SCRIPT_KINDS[k].name }))}" title="${esc(t('Neues {kind}', { kind: SCRIPT_KINDS[k].name }))}">${icon('fi-rr-plus')}</button>
-        </div>
-        ${open ? `<ul class="tree-files">${list.map(fileNode).join('') || `<li class="tree-empty">${t('Noch kein {kind}', { kind: SCRIPT_KINDS[k].name })}</li>`}</ul>` : ''}
-      </li>`;
+    const botOpen = !ide.collapsed.bot;
+    const services = SERVICE_ORDER.map((s) => {
+      const hasKids = childrenOf(s).length > 0;
+      const open = !ide.collapsed[s];
+      return `<li role="none">${xpRow({ id: s, depth: 1, icon: clsIcon(SERVICE_INFO[s].icon), name: s, kind: 'service', canAdd: true, hasKids, open })}${open ? xpBranch(s, 2) : ''}</li>`;
     }).join('');
-    const name = (id) => { const f = ideFile(id); return f ? esc(f.name) : '?'; };
-    const bridges = `<section class="tree-sec"><h4>${icon('fi-rr-plug-connection')}${t('Brücken')}<small>${ide.bridges.length}</small></h4>
-      ${ide.bridges.length ? `<ul class="bridge-list">${ide.bridges.map((x) => `<li class="${x.ok ? '' : 'is-broken'}"><button type="button" data-ide-goto="${esc(x.from)}:${x.line}">
-        <span class="bridge__ends"><b>${name(x.from)}</b>${icon('fi-rr-arrow-small-right')}<b>${x.ok ? name(x.to) : '?'}</b></span>
-        <code>require("${esc(x.name)}")</code>${x.ok ? '' : `<small>${esc(x.problem || '')}</small>`}</button></li>`).join('')}</ul>`
-        : `<p class="tree-hint">${t('Mit {code} verbindest du ein Skript mit einem ModulScript – so entstehen Brücken.', { code: '<code>require("Name")</code>' })}</p>`}
-    </section>`;
-    return `<div class="tree-head">
-        ${b ? botAvatar(ide.cid, b) : ''}
-        <span class="tree-head__name"><b>${esc(b ? b.name : '')}</b><small>${b && b.mode === 'advanced' ? t('Erweitert · Luna') : t('Basis-Modus')}${b && !b.on ? ` · ${t('Aus')}` : ''}</small></span>
-        <button class="tree-close" type="button" data-ide-tree="0" aria-label="${esc(t('Struktur schließen'))}">${icon('fi-rr-cross-small')}</button>
+    return `<div class="xp-head">
+        <span>${t('EXPLORER')}</span>
+        <span class="xp-head__btns">
+          <button type="button" data-xp-add="@sel" aria-label="${esc(t('Neues Objekt'))}" title="${esc(t('Neues Objekt'))}">${svgNewFile}</button>
+          <button type="button" data-xp-folder aria-label="${esc(t('Neuer Ordner'))}" title="${esc(t('Neuer Ordner'))}">${svgNewFolder}</button>
+          <button class="xp-close" type="button" data-ide-tree="0" aria-label="${esc(t('Explorer schließen'))}">${svgClose}</button>
+        </span>
       </div>
-      <ul class="tree">${groups}</ul>
-      ${bridges}
-      <div class="tree-foot">
-        <button class="btn btn--soft btn--sm btn--block" type="button" data-bot-edit="${esc(ide.cid)}:${esc(ide.bid)}">${icon('fi-rr-settings')}${t('Bot-Einstellungen')}</button>
-        <a class="btn btn--ghost btn--sm btn--block" href="#/chat/${esc(ide.cid)}/info">${icon('fi-rr-arrow-left')}${t('Zurück zum Chat')}</a>
+      <div class="xp-tree" role="tree" aria-label="${esc(t('Struktur des Bots'))}">
+        <ul role="group">
+          <li role="none">${xpRow({ id: 'bot', depth: 0, icon: b && b.avatar ? botAvatar(ide.cid, b, 'bot-ava--xs') : clsIcon('bot'), name: b ? b.name : 'Bot', kind: 'bot', canAdd: false, hasKids: true, open: botOpen })}
+            ${botOpen ? `<ul class="xp-kids" style="--d:1" role="group">${services}</ul>` : ''}
+          </li>
+        </ul>
       </div>`;
   }
+  // ----- Eigenschaften (wie das Properties-Fenster) -----
+  function idePropsHtml() {
+    const s = ide.sel;
+    const row = (k, v) => `<div class="pp-row"><span>${k}</span><span>${v}</span></div>`;
+    const copyBtn = (text) => `<button class="pp-copy" type="button" data-pp-copy="${esc(text)}" title="${esc(t('Kopieren'))}"><code>${esc(text)}</code>${icon('fi-rr-copy')}</button>`;
+    let body = '';
+    let title = '';
+    if (s === 'bot' || !s) {
+      const b = ide.bot || {};
+      title = b.name || 'Bot';
+      body = `${row('ClassName', 'Bot')}${row(t('Modus'), b.mode === 'advanced' ? t('Erweitert (Luna)') : t('Basis'))}${row(t('Aktiv'), b.on ? t('Ja') : t('Nein'))}
+        <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(`../${botPathName()}`)}</div>
+        <button class="btn btn--soft btn--sm btn--block" type="button" data-bot-edit="${esc(ide.cid)}:${esc(ide.bid)}">${icon('fi-rr-settings')}${t('Bot-Einstellungen')}</button>`;
+    } else if (isService(s)) {
+      title = s;
+      body = `${row('ClassName', s)}${row(t('Objekte'), childrenOf(s).length)}<p class="pp-note">${esc(t(SERVICE_INFO[s].desc))}</p>
+        <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(`../${botPathName()}.${s}`)}</div>`;
+    } else {
+      const f = ideFile(s);
+      if (!f) return '';
+      title = f.name;
+      const svc = serviceOfItem(f);
+      const runsOk = !RUNS_IN[f.type] || svc === RUNS_IN[f.type];
+      const outgoing = ide.bridges.filter((x) => x.from === f.id && x.ok);
+      const incoming = ide.bridges.filter((x) => x.to === f.id && x.ok);
+      const act = ideFile(ide.active);
+      body = `<label class="pp-row pp-row--input"><span>Name</span><input data-pp-name value="${esc(f.name)}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        ${row('ClassName', CLASS_INFO[f.type].name)}
+        ${row('Parent', esc(isService(f.parent) ? f.parent : (ideFile(f.parent) || {}).name || '?'))}
+        ${isScript(f.type) && f.type !== 'module' ? `<label class="pp-row pp-row--check"><span>Enabled</span><input type="checkbox" data-pp-enabled${f.enabled === false ? '' : ' checked'}></label>` : ''}
+        ${RUNS_IN[f.type] ? `<p class="pp-note${runsOk ? '' : ' is-bad'}">${runsOk ? t('Läuft in {svc}.', { svc: RUNS_IN[f.type] }) : t('Läuft nicht: {cls}s laufen nur in {svc}.', { cls: CLASS_INFO[f.type].name, svc: RUNS_IN[f.type] })}</p>` : ''}
+        ${f.type === 'webhook' ? `<label class="pp-row pp-row--input pp-row--stack"><span>${t('Discord-Webhook')}</span><input data-pp-url type="password" autocomplete="off" spellcheck="false" placeholder="${esc(f.hint || 'https://discord.com/api/webhooks/…')}" value="${esc(f.url || '')}"></label>
+          <p class="pp-note">${f.hasUrl || f.url ? t('Wird beim Speichern bei Discord geprüft und nur verschlüsselt gespeichert. Senden geht, sobald die Discord-Verbindung des Server-Chats angenommen ist.') : t('Link aus Discord: Kanal bearbeiten → Integrationen → Webhooks.')}</p>` : ''}
+        ${f.type === 'connector' ? `<p class="pp-note">${t('Ein Skript ruft {fire} auf, andere hören mit {connect} zu.', { fire: '<code>:Fire(…)</code>', connect: '<code>:Connect(function(…) … end)</code>' })}</p>` : ''}
+        <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(absPath(f))}${act && act.id !== f.id ? copyBtn(relPath(act, f)) : ''}</div>
+        ${outgoing.length ? `<div class="pp-block"><span>${t('Brücken')}</span><ul class="pp-links">${outgoing.map((x) => `<li><button type="button" data-ide-goto="${esc(f.id)}:${x.line}">${clsIcon(x.kind === 'require' ? 'module' : x.kind)}<span>${esc((ideFile(x.to) || {}).name || '?')}</span><small>${x.kind === 'require' ? 'require' : x.kind}</small></button></li>`).join('')}</ul></div>` : ''}
+        ${incoming.length ? `<div class="pp-block"><span>${t('Genutzt von')}</span><ul class="pp-links">${incoming.map((x) => { const src = ideFile(x.from) || {}; return `<li><button type="button" data-ide-goto="${esc(x.from)}:${x.line}">${clsIcon(src.type)}<span>${esc(src.name || '?')}</span><small>${t('Zeile {n}', { n: x.line })}</small></button></li>`; }).join('')}</ul></div>` : ''}`;
+    }
+    return `<button class="pp-head" type="button" data-pp-toggle aria-expanded="${ide.propsOpen}"><span>${t('EIGENSCHAFTEN')}</span><b>${esc(title)}</b>${svgChev}</button>
+      ${ide.propsOpen ? `<div class="pp-body">${body}</div>` : ''}`;
+  }
+  // ----- Einfügen-Menü (das „+“) -----
+  function ideMenuHtml() {
+    const m = ide.menu;
+    if (!m) return '';
+    if (m.kind === 'item') {
+      const f = ideFile(m.id);
+      if (!f) return '';
+      const can = f.type !== 'connector' && f.type !== 'webhook';
+      return `<div class="xp-menu xp-menu--ctx" role="menu" style="${m.style}">
+        ${isScript(f.type) ? `<button class="xp-menu__item" type="button" data-xp-act="open">${icon('fi-rr-edit')}<span><b>${t('Öffnen')}</b></span></button>` : ''}
+        ${can ? `<button class="xp-menu__item" type="button" data-xp-act="insert">${svgPlus}<span><b>${t('Objekt einfügen …')}</b></span></button>` : ''}
+        <button class="xp-menu__item" type="button" data-xp-act="rename">${icon('fi-rr-pencil')}<span><b>${t('Umbenennen')}</b><small>F2</small></span></button>
+        <button class="xp-menu__item" type="button" data-xp-act="duplicate">${icon('fi-rr-copy')}<span><b>${t('Duplizieren')}</b></span></button>
+        <button class="xp-menu__item" type="button" data-xp-act="move">${icon('fi-rr-arrow-small-right')}<span><b>${t('Verschieben nach …')}</b></span></button>
+        <button class="xp-menu__item" type="button" data-xp-act="path">${icon('fi-rr-link-alt')}<span><b>${t('Pfad kopieren')}</b><small>${esc(absPath(f))}</small></span></button>
+        <button class="xp-menu__item is-danger" type="button" data-xp-act="delete">${icon('fi-rr-trash')}<span><b>${t('Löschen')}</b><small>Entf</small></span></button>
+      </div>`;
+    }
+    const svc = contextService(m.parent);
+    const rec = RECOMMENDED[svc] || [];
+    const q = (m.q || '').toLowerCase();
+    const match = (k) => !q || CLASS_INFO[k].name.toLowerCase().includes(q) || t(CLASS_INFO[k].desc).toLowerCase().includes(q);
+    const first = INSERT_ORDER.filter((k) => rec.includes(k) && match(k));
+    const rest = INSERT_ORDER.filter((k) => !rec.includes(k) && match(k));
+    const item = (k) => `<button class="xp-menu__item" type="button" data-xp-insert="${k}" role="menuitem">${clsIcon(k)}<span><b>${CLASS_INFO[k].name}</b><small>${esc(t(CLASS_INFO[k].desc))}</small>${RUNS_IN[k] && RUNS_IN[k] !== svc ? `<em>${t('läuft nur in {svc}', { svc: RUNS_IN[k] })}</em>` : ''}</span></button>`;
+    const target = isService(m.parent) ? m.parent : (ideFile(m.parent) || {}).name || '';
+    return `<div class="xp-menu" role="menu" style="${m.style}">
+      <div class="xp-menu__head">${t('Einfügen in')} <b>${esc(target)}</b></div>
+      <input class="xp-menu__search" data-xp-search type="search" value="${esc(m.q || '')}" placeholder="${esc(t('Objekt suchen …'))}" autocomplete="off" spellcheck="false">
+      <div class="xp-menu__list">
+        ${first.length ? `<div class="xp-menu__group">${t('Empfohlen')}</div>${first.map(item).join('')}` : ''}
+        ${rest.length ? `<div class="xp-menu__group">${t('Weitere')}</div>${rest.map(item).join('')}` : ''}
+        ${!first.length && !rest.length ? `<p class="xp-menu__empty">${t('Nichts gefunden.')}</p>` : ''}
+      </div>
+    </div>`;
+  }
+  function openXpMenu(kind, id, anchor) {
+    const box = $('[data-ide]');
+    if (!box) return;
+    const r = anchor.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const narrow = window.matchMedia('(max-width: 600px)').matches;
+    const w = 300;
+    const left = Math.min(Math.max(8, r.right - b.left - w), b.width - w - 8);
+    const top = r.bottom - b.top + 4;
+    const style = narrow ? '' : `left:${left}px;top:${Math.min(top, b.height - 380)}px`;
+    ide.menu = kind === 'item' ? { kind, id, style } : { kind: 'insert', parent: id, q: '', style };
+    drawMenu();
+    const s = $('[data-xp-search]');
+    if (s && !narrow) s.focus({ preventScroll: true });
+  }
+  function drawMenu() {
+    const holder = $('[data-xp-menuholder]');
+    if (!holder) return;
+    holder.innerHTML = ide.menu ? `<div class="xp-menu-backdrop" data-xp-menu-close></div>${ideMenuHtml()}` : '';
+  }
+  const closeXpMenu = () => { if (ide.menu) { ide.menu = null; drawMenu(); } };
+  function insertItem(type, parent) {
+    if (ide.files.length >= 40) { toast(t('Höchstens 40 Objekte pro Bot.')); return; }
+    const base = CLASS_INFO[type].name;
+    const name = uniqueName(base, parent);
+    const f = { id: tmpId(), isNew: true, name, type, parent };
+    if (isScript(type)) f.code = ((ide.luna && ide.luna.TEMPLATES[type]) || '').replace(/NAME/g, name);
+    ide.files.push(f);
+    ide.collapsed[parent] = false;
+    if (!isService(parent)) { let p = ideFile(parent); while (p) { ide.collapsed[p.parent] = false; ide.collapsed[p.id] = false; p = parentItem(p); } }
+    ide.sel = f.id;
+    if (isScript(type)) { ide.open.push(f.id); ide.active = f.id; }
+    ide.renaming = f.id;
+    ide.menu = null;
+    ideDiagnose();
+    renderIde();
+    ideInputDraft();
+    focusRename();
+  }
+  function focusRename() {
+    const inp = $('[data-xp-rename-input]');
+    if (inp) { inp.focus(); inp.select(); }
+  }
+  function renameItem(id, value) {
+    const f = ideFile(id);
+    ide.renaming = null;
+    if (!f) { renderIde(); return; }
+    const name = String(value || '').trim();
+    if (name && name !== f.name) {
+      if (!FILE_NAME_RE.test(name)) toast(t('Namen: Buchstaben, Zahlen und _, nicht mit einer Zahl anfangen (für script.Parent.Name).'));
+      else if (childrenOf(f.parent).some((x) => x.id !== f.id && x.name.toLowerCase() === name.toLowerCase())) toast(t('Hier gibt es schon ein Objekt mit diesem Namen.'));
+      else {
+        // Frisch eingefügtes ModuleScript (noch die Vorlage): Namen in der Vorlage mitändern
+        const tpl = ide.luna && ide.luna.TEMPLATES.module;
+        if (f.type === 'module' && tpl && f.code === tpl.replace(/NAME/g, f.name)) f.code = tpl.replace(/NAME/g, name);
+        f.name = name;
+      }
+    }
+    ideDiagnose();
+    renderIde();
+    ideInputDraft();
+  }
+  function deleteItem(id) {
+    const f = ideFile(id);
+    if (!f) return;
+    const kids = ide.files.filter((x) => x.id === id || isDescendant(x.id, id));
+    if (!confirm(kids.length > 1 ? t('„{name}“ mit {n} Objekten darin löschen? Endgültig erst nach dem Speichern.', { name: f.name, n: kids.length - 1 }) : t('„{name}“ löschen? Endgültig erst nach dem Speichern.', { name: f.name }))) return;
+    const gone = new Set(kids.map((x) => x.id));
+    ide.files = ide.files.filter((x) => !gone.has(x.id));
+    ide.open = ide.open.filter((x) => !gone.has(x));
+    if (gone.has(ide.active)) ide.active = ide.open[0] || null;
+    ide.sel = f.parent;
+    ideDiagnose();
+    renderIde();
+    ideInputDraft();
+  }
+  function duplicateItem(id) {
+    const f = ideFile(id);
+    if (!f) return;
+    const copy = (src, parent) => {
+      const n = { ...src, id: tmpId(), isNew: true, parent, name: uniqueName(src.name, parent) };
+      delete n.hasUrl;
+      delete n.hint;
+      ide.files.push(n);
+      ide.files.filter((x) => x.parent === src.id && x.id !== n.id).forEach((x) => copy(x, n.id));
+      return n;
+    };
+    const n = copy(f, f.parent);
+    ide.sel = n.id;
+    ideDiagnose();
+    renderIde();
+    ideInputDraft();
+  }
+  function moveItem(id, parent) {
+    const f = ideFile(id);
+    if (!f || f.parent === parent || id === parent || isDescendant(parent, id)) return false;
+    const target = ideFile(parent);
+    if (target && (target.type === 'connector' || target.type === 'webhook')) { toast(t('Connectors und Webhooks können nichts enthalten.')); return false; }
+    f.name = uniqueName(f.name, parent, f.id);
+    f.parent = parent;
+    ide.collapsed[parent] = false;
+    ideDiagnose();
+    renderIde();
+    ideInputDraft();
+    return true;
+  }
+  function botMoveView(id) {
+    const f = ideFile(id);
+    if (!f) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
+    const can = (x) => x.id !== id && !isDescendant(x.id, id) && x.type !== 'connector' && x.type !== 'webhook';
+    const branch = (parent, depth) => childrenOf(parent).filter(can).map((x) => `<button class="mv-item" type="button" style="--d:${depth}" data-mv-to="${esc(x.id)}"${x.id === f.parent ? ' disabled' : ''}>${itemIcon(x)}<span>${esc(x.name)}</span></button>${branch(x.id, depth + 1)}`).join('');
+    return `<div class="mv-list">${SERVICE_ORDER.map((s) => `<button class="mv-item mv-item--svc" type="button" style="--d:0" data-mv-to="${s}"${f.parent === s ? ' disabled' : ''}>${clsIcon(SERVICE_INFO[s].icon)}<span>${s}</span></button>${branch(s, 1)}`).join('')}</div>`;
+  }
+
+  // ----- Tabs, Editor, unteres Fenster -----
   function ideTabsHtml() {
     const tabs = ide.open.map((id) => ideFile(id)).filter(Boolean).map((f) => `<div class="ide-tab${f.id === ide.active ? ' is-active' : ''}" role="presentation">
-        <button type="button" role="tab" aria-selected="${f.id === ide.active}" data-ide-open="${esc(f.id)}">${icon(SCRIPT_KINDS[f.type].icon)}<span>${esc(f.name)}</span>${ideFileDirty(f) ? '<i class="tree-dot"></i>' : ''}</button>
-        <button type="button" class="ide-tab__x" data-ide-close="${esc(f.id)}" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross-small')}</button>
+        <button type="button" role="tab" aria-selected="${f.id === ide.active}" data-ide-open="${esc(f.id)}">${itemIcon(f)}<span>${esc(f.name)}</span>${ideFileDirty(f) ? '<i class="xp-dot"></i>' : ''}</button>
+        <button type="button" class="ide-tab__x" data-ide-close="${esc(f.id)}" aria-label="${esc(t('Schließen'))}">${svgClose}</button>
       </div>`).join('');
-    return `${tabs}<button class="ide-tab-add" type="button" data-ide-new="server" aria-label="${esc(t('Neue Datei'))}" title="${esc(t('Neue Datei'))}">${icon('fi-rr-plus')}</button>`;
+    return tabs || `<span class="ide-tabs__empty">${t('Keine Datei offen')}</span>`;
   }
   function ideEditorHtml() {
     const f = ideFile(ide.active);
@@ -5119,30 +5425,32 @@
     if (!f) {
       const rules = (b && b.rules) || [];
       return `${banner}${draft}<div class="ide-empty">
-        <span class="ide-empty__ic">${icon('fi-rr-square-code')}</span>
-        <h3>${ide.files.length ? t('Wähle links eine Datei') : t('Noch keine Datei')}</h3>
-        <p>${t('Lege ein Skript an – jede Art hat ihre eigenen Ereignisse.')}</p>
-        <div class="ide-kinds">${KIND_ORDER.map((k) => `<button type="button" class="ide-kind" data-ide-new="${k}">${icon(SCRIPT_KINDS[k].icon)}<b>${SCRIPT_KINDS[k].name}</b><small>${t(SCRIPT_KINDS[k].desc)}</small></button>`).join('')}</div>
+        <span class="ide-empty__ic">${clsIcon('bot')}</span>
+        <h3>${ide.files.some((x) => isScript(x.type)) ? t('Wähle links ein Skript') : t('Noch kein Skript')}</h3>
+        <p>${t('Füge mit „+“ neben einem Service etwas ein – oder starte hier:')}</p>
+        <div class="ide-kinds">${['server', 'client', 'game', 'module'].map((k) => `<button type="button" class="ide-kind" data-ide-new="${k}">${clsIcon(k)}<b>${CLASS_INFO[k].name}</b><small>${esc(t(CLASS_INFO[k].desc))}</small></button>`).join('')}</div>
         ${!ide.files.length && rules.length ? `<button class="btn btn--soft" type="button" data-ide-convert>${icon('fi-rr-sparkles')}${t('Regeln aus dem Basis-Modus in Luna umwandeln')}</button>` : ''}
+        <a class="ide-empty__docs" href="#/luna">${svgBook}${t('Luna lernen – zur Dokumentation')}</a>
       </div>`;
     }
     return `${banner}${draft}<div class="code" data-ide-scroll>
         <div class="code__grid">
           <pre class="code__gutter" data-ide-gutter aria-hidden="true"></pre>
           <div class="code__area">
+            <i class="code__cur" data-ide-cur></i>
             <i class="code__mark" data-ide-mark hidden></i>
             <pre class="code__hl" data-ide-hl aria-hidden="true"></pre>
-            <textarea class="code__input" data-ide-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Code von {name}', { name: f.name }))}">${esc(f.code)}</textarea>
+            <textarea class="code__input" data-ide-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Code von {name}', { name: f.name }))}">${esc(f.code || '')}</textarea>
           </div>
         </div>
       </div>
-      <div class="ide-keys" role="toolbar" aria-label="${esc(t('Zeichen einfügen'))}">${['⇥', '{ }', '( )', '" "', '=', '.', '!', ',', '[ ]', '+', '//'].map((k) => `<button type="button" data-ide-key="${esc(k)}">${esc(k)}</button>`).join('')}</div>`;
+      <div class="ide-keys" role="toolbar" aria-label="${esc(t('Zeichen einfügen'))}">${['⇥', '{ }', '( )', '" "', '=', '.', ':', '..', '[ ]', 'script.Parent', '--'].map((k) => `<button type="button" data-ide-key="${esc(k)}">${esc(k)}</button>`).join('')}</div>`;
   }
   function idePanelTabs() {
     const probs = ideProblems();
-    const tabs = [['problems', `${t('Probleme')}${probs.length ? ` <b class="ide-count${probs.some((p) => p.kind === 'error') ? ' is-error' : ''}">${probs.length}</b>` : ''}`], ['test', t('Testen')], ['log', t('Protokoll')], ['help', t('Hilfe')]];
+    const tabs = [['problems', `${t('Skriptanalyse')}${probs.length ? ` <b class="ide-count${probs.some((p) => p.kind === 'error') ? ' is-error' : ''}">${probs.length}</b>` : ''}`], ['test', t('Testen')], ['log', t('Ausgabe')], ['help', t('Hilfe')]];
     return `<div class="ide-panel__tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" aria-selected="${ide.panel === k && ide.panelOpen}" data-ide-panel="${k}">${l}</button>`).join('')}
-        <button type="button" class="ide-panel__fold" data-ide-panel="fold" aria-label="${esc(ide.panelOpen ? t('Einklappen') : t('Ausklappen'))}">${icon(ide.panelOpen ? 'fi-rr-angle-small-down' : 'fi-rr-angle-small-right')}</button></div>`;
+        <button type="button" class="ide-panel__fold" data-ide-panel="fold" aria-label="${esc(ide.panelOpen ? t('Einklappen') : t('Ausklappen'))}">${svgChev}</button></div>`;
   }
   function idePanelHtml() {
     const probs = ideProblems();
@@ -5163,8 +5471,8 @@
     return `${idePanelTabs()}${ide.panelOpen ? `<div class="ide-panel__body">${body}</div>` : ''}`;
   }
   function ideTestHtml(f) {
-    if (!f) return `<p class="muted">${t('Öffne zuerst eine Datei.')}</p>`;
-    if (f.type === 'module') return `<p class="muted">${t('ModulScripts testest du über das Skript, das sie mit require lädt.')}</p>`;
+    if (!f) return `<p class="muted">${t('Öffne zuerst ein Skript.')}</p>`;
+    if (f.type === 'module') return `<p class="muted">${t('ModuleScripts testest du über das Skript, das sie mit require lädt.')}</p>`;
     const evs = (ide.luna && ide.luna.EVENTS[f.type]) || [];
     const me = state.profile || {};
     const o = ide.testOut;
@@ -5177,14 +5485,15 @@
         </div>
         <div class="btn-row"><button class="btn btn--primary btn--sm" type="submit">${icon('fi-rr-play')}${t('Ausführen')}</button>
           <button class="btn btn--ghost btn--sm" type="button" data-ide-mem-reset>${t('Speicher zurücksetzen')}</button>
-          <small class="muted">${t('Läuft nur hier – nichts wird gesendet.')}</small></div>
+          <small class="muted">${t('Läuft nur hier – nichts wird gesendet. Connectors und Module laufen mit.')}</small></div>
       </form>
       ${o ? `<div class="ide-out">
         ${o.says.map((s) => `<div class="ide-say">${botAvatar(ide.cid, ide.bot, 'bot-ava--sm')}<p><b>${esc(ide.bot.name)} <span class="bot-tag">BOT</span></b>${esc(s)}</p></div>`).join('')}
         ${o.discords.map((s) => `<div class="ide-say ide-say--discord">${icon('fi-brands-discord')}<p><b>Discord</b>${esc(s)}</p></div>`).join('')}
-        ${o.logs.filter((l) => l.kind !== 'out').map((l) => `<p class="ide-out__log is-${esc(l.kind)}">${l.line ? `<button type="button" data-ide-goto="${esc(f.id)}:${l.line}">${t('Zeile {n}', { n: l.line })}</button> ` : ''}${esc(l.text)}</p>`).join('')}
+        ${(o.webhooks || []).map((w) => `<div class="ide-say ide-say--discord">${clsIcon('webhook')}<p><b>Webhook ${esc(w.name)}</b>${esc(w.text)}</p></div>`).join('')}
+        ${o.logs.filter((l) => l.kind !== 'out').map((l) => `<p class="ide-out__log is-${esc(l.kind)}">${l.line ? `<button type="button" data-ide-goto="${esc((ide.files.find((x) => x.name === l.file) || f).id)}:${l.line}">${esc(l.file || f.name)}:${l.line}</button> ` : ''}${esc(l.text)}</p>`).join('')}
         ${!o.ran && !o.errors.length ? `<p class="muted">${t('Dieses Skript hat kein on{ev}() – es ist nichts passiert.', { ev: esc(o.event) })}</p>` : ''}
-        ${o.ran && !o.says.length && !o.discords.length && !o.errors.length ? `<p class="muted">${t('Gelaufen, aber ohne Ausgabe.')}</p>` : ''}
+        ${o.ran && !o.says.length && !o.discords.length && !(o.webhooks || []).length && !o.errors.length ? `<p class="muted">${t('Gelaufen, aber ohne Ausgabe.')}</p>` : ''}
       </div>` : ''}`;
   }
   function ideHelpHtml(f) {
@@ -5193,54 +5502,56 @@
     const type = f ? f.type : 'server';
     const evs = D2.events[type] || [];
     return `<div class="ide-help">
-      <section><h5>${icon('fi-rr-bolt')}${t('Ereignisse in {kind}s', { kind: SCRIPT_KINDS[type].name })}</h5>
-        ${evs.length ? `<ul>${evs.map(([sig, d]) => `<li><button type="button" data-ide-snippet="${esc(sig.replace(/\(.*\)/, ''))}"><code>${esc(sig)}</code></button><small>${esc(t(d))}</small></li>`).join('')}</ul>` : `<p class="muted">${t('Keine – ModulScripts liefern Funktionen und Werte für andere Skripte.')}</p>`}</section>
+      <a class="btn btn--soft btn--sm" href="#/luna">${svgBook}${t('Ganze Dokumentation öffnen')}</a>
+      <section><h5>${icon('fi-rr-bolt')}${t('Ereignisse in {kind}s', { kind: CLASS_INFO[type].name })}</h5>
+        ${evs.length ? `<ul>${evs.map(([sig, d]) => `<li><button type="button" data-ide-snippet="${esc(sig.replace(/\(.*\)/, ''))}"><code>${esc(sig)}</code></button><small>${esc(t(d))}</small></li>`).join('')}</ul>` : `<p class="muted">${t('Keine – ModuleScripts liefern Funktionen und Werte für andere Skripte.')}</p>`}</section>
       <section><h5>${icon('fi-rr-brackets-curly')}${t('Platzhalter und Variablen')}</h5><ul>${D2.vars.map(([n, d]) => `<li><code>{${esc(n)}}</code><small>${esc(t(d))}</small></li>`).join('')}</ul></section>
       <section><h5>${icon('fi-rr-terminal')}${t('Funktionen')}</h5><ul>${D2.functions.map(([n, d]) => `<li><code>${esc(n)}</code><small>${esc(t(d))}</small></li>`).join('')}</ul></section>
-      <section><h5>${icon('fi-rr-square-code')}${t('Luna kurz')}</h5><pre class="ide-help__code">${esc(`let zahl = 5            // Variable
-const NAME = "TSG"      // Konstante
-if zahl > 3 { print("groß") } else { print("klein") }
-for i in 1..3 { print(i) }
-for name in ["A", "B"] { print(name) }
-function doppelt(x) { return x * 2 }
-onjoin() { print("Willkommen {username} auf {server}!") }
-let texte = require("Texte")   // ModulScript laden
-save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     </div>`;
   }
   function renderIde() {
     const box = $('[data-ide]');
-    if (!box) return;
-    if (state.page !== 'bots') return;
+    if (!box || state.page !== 'bots') return;
     if (ide.err) {
-      box.innerHTML = `<div class="ide-msg">${icon('fi-rr-robot')}<h2>${ide.err === 'login' ? t('Bitte melde dich an') : t('Diesen Bot gibt es nicht (mehr) oder du darfst ihn nicht bearbeiten.')}</h2>
+      box.innerHTML = `<div class="ide-msg">${clsIcon('bot', 'cls-ic--xl')}<h2>${ide.err === 'login' ? t('Bitte melde dich an') : t('Diesen Bot gibt es nicht (mehr) oder du darfst ihn nicht bearbeiten.')}</h2>
         <a class="btn btn--primary" href="${ide.cid ? `#/chat/${esc(ide.cid)}/info` : '#/chat'}">${icon('fi-rr-arrow-left')}${t('Zurück zum Chat')}</a></div>`;
       return;
     }
     if (!ide.bot) { box.innerHTML = `<div class="ide-msg">${loadingHtml()}</div>`; return; }
     const dirty = ideDirty();
+    const act = ideFile(ide.active);
+    const crumbs = act ? [ide.bot.name, ...itemPath(act)] : [ide.bot.name];
+    iconDefs();
     box.innerHTML = `<header class="ide__bar">
-        <button class="ide__tree-btn" type="button" data-ide-tree="1" aria-label="${esc(t('Struktur'))}">${icon('fi-rr-sidebar')}</button>
+        <button class="ide__tree-btn" type="button" data-ide-tree="1" aria-label="${esc(t('Explorer'))}">${icon('fi-rr-sidebar')}</button>
         <a class="ide__back" href="#/chat/${esc(ide.cid)}/info" aria-label="${esc(t('Zurück zum Chat'))}">${icon('fi-rr-arrow-left')}</a>
-        <span class="ide__title">${botAvatar(ide.cid, ide.bot, 'bot-ava--sm')}<span><b>${esc(ide.bot.name)}</b><small>${esc((chat.conv[ide.cid] && chat.conv[ide.cid].name) || '')}</small></span></span>
+        <nav class="ide__crumbs" aria-label="${esc(t('Pfad'))}">${crumbs.map((c, i) => `<span${i === crumbs.length - 1 ? ' aria-current="page"' : ''}>${esc(c)}</span>`).join(svgChev)}</nav>
         <span class="ide__state${dirty ? ' is-dirty' : ''}" data-ide-state>${dirty ? t('Nicht gespeichert') : t('Gespeichert')}</span>
-        <button class="btn btn--primary btn--sm" type="button" data-ide-save${ide.saving ? ' disabled' : ''}>${icon('fi-rr-disk')}<span>${t('Speichern')}</span></button>
+        <a class="ide__docs" href="#/luna" title="${esc(t('Dokumentation'))}">${svgBook}<span>${t('Dokumentation')}</span></a>
+        <button class="btn btn--primary btn--sm ide__save" type="button" data-ide-save${ide.saving ? ' disabled' : ''}>${icon('fi-rr-disk')}<span>${t('Speichern')}</span></button>
       </header>
       <div class="ide__body${ide.tree ? ' is-tree' : ''}">
-        <aside class="ide__tree" data-ide-treebox aria-label="${esc(t('Struktur des Bots'))}">${ideTreeHtml()}</aside>
+        <aside class="ide__side" aria-label="${esc(t('Explorer und Eigenschaften'))}">
+          <section class="xp" data-ide-explorer>${ideExplorerHtml()}</section>
+          <section class="pp${ide.propsOpen ? ' is-open' : ''}" data-ide-props>${idePropsHtml()}</section>
+        </aside>
         <button class="ide__backdrop" type="button" data-ide-tree="0" tabindex="-1" aria-hidden="true"></button>
         <div class="ide__main">
           <nav class="ide__tabs" role="tablist" data-ide-tabs>${ideTabsHtml()}</nav>
           <div class="ide__editor" data-ide-editor>${ideEditorHtml()}</div>
           <section class="ide__panel${ide.panelOpen ? ' is-open' : ''}" data-ide-panelbox>${idePanelHtml()}</section>
         </div>
-      </div>`;
+      </div>
+      <div data-xp-menuholder>${ide.menu ? `<div class="xp-menu-backdrop" data-xp-menu-close></div>${ideMenuHtml()}` : ''}</div>`;
     ideHighlight();
+    if (ide.renaming) focusRename();
   }
   // Nur Teile neu zeichnen, damit Cursor und Eingabe im Editor bleiben
   function ideRefreshSide() {
-    const tree = $('[data-ide-treebox]');
-    if (tree) { const top = tree.scrollTop; tree.innerHTML = ideTreeHtml(); tree.scrollTop = top; }
+    const xp = $('[data-ide-explorer]');
+    if (xp) { const tree = $('.xp-tree', xp); const top = tree ? tree.scrollTop : 0; xp.innerHTML = ideExplorerHtml(); const t2 = $('.xp-tree', xp); if (t2) t2.scrollTop = top; }
+    const pp = $('[data-ide-props]');
+    if (pp && !pp.contains(document.activeElement)) pp.innerHTML = idePropsHtml();
     const tabs = $('[data-ide-tabs]');
     if (tabs) tabs.innerHTML = ideTabsHtml();
     const panel = $('[data-ide-panelbox]');
@@ -5249,21 +5560,49 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     const st = $('[data-ide-state]');
     if (st) { const d = ideDirty(); st.textContent = d ? t('Nicht gespeichert') : t('Gespeichert'); st.classList.toggle('is-dirty', d); }
   }
+  // Farben, Einrückungslinien, Zeilennummern, aktuelle Zeile
   function ideHighlight() {
     const f = ideFile(ide.active);
     const hl = $('[data-ide-hl]');
     if (!f || !hl || !ide.luna) return;
-    hl.innerHTML = `${ide.luna.highlight(f.code).map(([k, s]) => (k === 'ws' ? esc(s) : `<span class="tk-${k}">${esc(s)}</span>`)).join('')}\n`;
+    let html = '';
+    let lineStart = true;
+    ide.luna.highlight(f.code || '').forEach(([k, s]) => {
+      if (k !== 'ws') { html += `<span class="tk-${k}">${esc(s)}</span>`; lineStart = false; return; }
+      s.split(/(\n)/).forEach((part) => {
+        if (part === '\n') { html += '\n'; lineStart = true; return; }
+        if (lineStart && part) {
+          const lead = part.match(/^ */)[0];
+          html += `${lead.replace(/ {2}/g, '<span class="ig">  </span>')}${esc(part.slice(lead.length))}`;
+          if (part.length > lead.length) lineStart = false;
+        } else html += esc(part);
+      });
+    });
+    hl.innerHTML = `${html}\n`;
     const d = ide.diag[f.id] || {};
     const errLine = d.error ? d.error.line : (ide.bridges.find((b) => b.from === f.id && !b.ok) || {}).line || 0;
     const warn = new Set((d.warnings || []).map((w) => w.line));
-    const n = f.code.split('\n').length;
+    const n = (f.code || '').split('\n').length;
     let g = '';
-    for (let i = 1; i <= n; i += 1) g += `<span${i === errLine ? ' class="is-error"' : warn.has(i) ? ' class="is-warn"' : ''}>${i}</span>`;
+    for (let i = 1; i <= n; i += 1) g += `<span class="${i === errLine ? 'is-error' : warn.has(i) ? 'is-warn' : ''}${i === ide.cur ? ' is-cur' : ''}">${i}</span>`;
     $('[data-ide-gutter]').innerHTML = g;
     const mark = $('[data-ide-mark]');
     mark.hidden = !errLine;
     if (errLine) mark.style.setProperty('--line', errLine - 1);
+    const cur = $('[data-ide-cur]');
+    if (cur) cur.style.setProperty('--line', ide.cur - 1);
+  }
+  function ideCaret() {
+    const ta = $('[data-ide-code]');
+    if (!ta) return;
+    const line = ta.value.slice(0, ta.selectionStart).split('\n').length;
+    if (line === ide.cur) return;
+    ide.cur = line;
+    const cur = $('[data-ide-cur]');
+    if (cur) cur.style.setProperty('--line', line - 1);
+    $$('[data-ide-gutter] .is-cur').forEach((x) => x.classList.remove('is-cur'));
+    const g = $(`[data-ide-gutter] span:nth-child(${line})`);
+    if (g) g.classList.add('is-cur');
   }
   let ideTimer = null;
   let draftTimer = null;
@@ -5271,11 +5610,17 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     const f = ideFile(ide.active);
     if (!f) return;
     f.code = ta.value;
+    ide.cur = ta.value.slice(0, ta.selectionStart).split('\n').length;
     ideHighlight();
     clearTimeout(ideTimer);
     ideTimer = setTimeout(() => { ideDiagnose(); ideHighlight(); ideRefreshSide(); }, 220);
     clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => { if (ide.bot) store.set(draftKey(), ideDirty() ? { base: ide.bot.updated, files: ide.files } : null); }, 700);
+    draftTimer = setTimeout(ideInputDraft, 700);
+  }
+  function ideInputDraft() {
+    if (ide.bot) store.set(draftKey(), ideDirty() ? { base: ide.bot.updated, files: ide.files } : null);
+    const st = $('[data-ide-state]');
+    if (st) { const d = ideDirty(); st.textContent = d ? t('Nicht gespeichert') : t('Gespeichert'); st.classList.toggle('is-dirty', d); }
   }
   function insertText(ta, text) {
     ta.focus();
@@ -5293,10 +5638,8 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
       e.preventDefault();
       const end = ta.selectionEnd;
       if (end > pos && v.slice(pos, end).includes('\n')) {
-        // Mehrere Zeilen ein- bzw. ausrücken
         const blockEnd = v.indexOf('\n', end - 1) < 0 ? v.length : v.indexOf('\n', end - 1);
-        const block = v.slice(lineStart, blockEnd);
-        const next = block.split('\n').map((l) => (e.shiftKey ? l.replace(/^ {1,2}/, '') : `  ${l}`)).join('\n');
+        const next = v.slice(lineStart, blockEnd).split('\n').map((l) => (e.shiftKey ? l.replace(/^ {1,2}/, '') : `  ${l}`)).join('\n');
         ta.setSelectionRange(lineStart, blockEnd);
         insertText(ta, next);
         ta.setSelectionRange(lineStart, lineStart + next.length);
@@ -5310,18 +5653,26 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
       e.preventDefault();
       const before = v.slice(lineStart, pos);
       const indent = before.match(/^[ \t]*/)[0];
-      const opens = /[{([]\s*$/.test(before);
       const lineEnd = v.indexOf('\n', pos) < 0 ? v.length : v.indexOf('\n', pos);
-      const closes = /^\s*[}\])]/.test(v.slice(pos, lineEnd));
-      // Offener Block ohne passende „}“? Dann gleich schließen (wie in anderen Editoren)
+      const after = v.slice(pos, lineEnd);
+      const opensBrace = /[{([]\s*$/.test(before);
+      const opensWord = /(\bthen|\bdo|\bfunction\b.*\)|\brepeat)\s*$/.test(before) && !/\bend\s*$/.test(before);
+      const closes = /^\s*[}\])]/.test(after);
+      // Offener Block ohne passendes Ende? Dann gleich schließen (} bzw. end – wie in Roblox Studio)
       const depth = ide.luna ? ide.luna.highlight(v).reduce((n, [k, x]) => n + (k === 'br' ? (x === '{' ? 1 : x === '}' ? -1 : 0) : 0), 0) : 0;
-      const autoClose = !closes && /\{\s*$/.test(before) && depth > 0;
-      if (opens && (closes || autoClose)) {
-        insertText(ta, `\n${indent}  \n${indent}${autoClose ? '}' : ''}`);
+      const opens = (v.match(/\b(then|do|function|repeat)\b/g) || []).length - (v.match(/\b(end|until)\b/g) || []).length - (v.match(/\bfunction\b[^\n]*\{/g) || []).length - (v.match(/\b(then|do)\s*\{/g) || []).length;
+      if (opensBrace && (closes || (/\{\s*$/.test(before) && depth > 0))) {
+        insertText(ta, `\n${indent}  \n${indent}${closes ? '' : '}'}`);
         const c = pos + 1 + indent.length + 2;
         ta.setSelectionRange(c, c);
         ideInput(ta);
-      } else insertText(ta, `\n${indent}${opens ? '  ' : ''}`);
+      } else if (opensWord && !after.trim() && opens > 0) {
+        const closer = /\brepeat\s*$/.test(before) ? 'until ' : 'end';
+        insertText(ta, `\n${indent}  \n${indent}${closer}`);
+        const c = pos + 1 + indent.length + 2;
+        ta.setSelectionRange(c, c);
+        ideInput(ta);
+      } else insertText(ta, `\n${indent}${opensBrace || opensWord ? '  ' : ''}`);
       return;
     }
     if (e.key === '}' && /^ {2,}$/.test(v.slice(lineStart, pos))) {
@@ -5335,7 +5686,7 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     if (!ta) return;
     const pairs = { '{ }': ['{', '}'], '( )': ['(', ')'], '" "': ['"', '"'], '[ ]': ['[', ']'] };
     if (k === '⇥') { insertText(ta, '  '); return; }
-    if (k === '//') { insertText(ta, '// '); return; }
+    if (k === '--') { insertText(ta, '-- '); return; }
     if (pairs[k]) {
       const [a, b] = pairs[k];
       const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
@@ -5344,25 +5695,35 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
       ta.setSelectionRange(start + 1, start + 1 + sel.length);
       return;
     }
-    insertText(ta, k);
+    insertText(ta, k === '..' ? ' .. ' : k);
   }
   function ideOpen(id, line = 0) {
     const f = ideFile(id);
     if (!f) return;
-    if (!ide.open.includes(id)) ide.open.push(id);
-    ide.active = id;
-    if (window.matchMedia('(max-width: 819px)').matches) ide.tree = false;
+    ide.sel = id;
+    if (isScript(f.type)) {
+      if (!ide.open.includes(id)) ide.open.push(id);
+      ide.active = id;
+      if (window.matchMedia('(max-width: 819px)').matches) ide.tree = false;
+    }
+    ide.cur = line > 0 ? line : 1;
     renderIde();
     const ta = $('[data-ide-code]');
-    if (!ta) return;
+    if (!ta || !isScript(f.type)) return;
     if (line > 0) {
-      const lines = f.code.split('\n');
+      const lines = (f.code || '').split('\n');
       const at = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
       ta.focus({ preventScroll: true });
       ta.setSelectionRange(at, at + (lines[line - 1] || '').length);
       const sc = $('[data-ide-scroll]');
       if (sc) sc.scrollTop = Math.max(0, (line - 4) * 20);
     }
+  }
+  function ideSelect(id) {
+    ide.sel = id;
+    const f = ideFile(id);
+    if (f && isScript(f.type)) { ideOpen(id); return; }
+    ideRefreshSide();
   }
   function ideCloseTab(id) {
     const i = ide.open.indexOf(id);
@@ -5371,54 +5732,25 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     if (ide.active === id) ide.active = ide.open[Math.min(i, ide.open.length - 1)] || null;
     renderIde();
   }
-  function botFileView(arg) {
-    const [mode, x] = String(arg || 'new:server').split(':');
-    const f = mode === 'rename' ? ideFile(x) : null;
-    const type = mode === 'new' ? x || 'server' : f ? f.type : 'server';
-    return `<form class="cform" data-ide-file-form="${esc(mode)}" data-ide-file="${esc(f ? f.id : '')}" novalidate>
-      <div class="f"><label class="f__label" for="if-name">${t('Name der Datei')}</label><input id="if-name" name="name" maxlength="32" value="${esc(f ? f.name : '')}" placeholder="${esc(t('z. B. Willkommen'))}" autocapitalize="off" autocomplete="off" spellcheck="false">
-        <small class="f__hint">${t('Buchstaben, Zahlen, - und _. Ein ModulScript lädt man mit {code}.', { code: '<code>require("Name")</code>' })}</small></div>
-      ${mode === 'new' ? `<fieldset class="f"><legend class="f__label">${t('Art des Skripts')}</legend><div class="kind-grid">${KIND_ORDER.map((k) => `<label class="vis"><input type="radio" name="type" value="${k}"${k === type ? ' checked' : ''}><span>${icon(SCRIPT_KINDS[k].icon)}<b>${SCRIPT_KINDS[k].name}</b><small>${t(SCRIPT_KINDS[k].desc)}</small></span></label>`).join('')}</div></fieldset>` : ''}
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(mode === 'new' ? 'fi-rr-plus' : 'fi-rr-check')}${mode === 'new' ? t('Datei anlegen') : t('Umbenennen')}</button>
-    </form>`;
-  }
-  function ideFileSubmit(form) {
-    const name = form.elements.name.value.trim();
-    const mode = form.dataset.ideFileForm;
-    if (!FILE_NAME_RE.test(name)) { toast(t('Dateinamen: 1–32 Zeichen, nur Buchstaben, Zahlen, - und _.')); return; }
-    if (ide.files.some((f) => f.name.toLowerCase() === name.toLowerCase() && f.id !== form.dataset.ideFile)) { toast(t('Eine Datei mit diesem Namen gibt es schon.')); return; }
-    if (mode === 'rename') {
-      const f = ideFile(form.dataset.ideFile);
-      if (f) f.name = name;
-    } else {
-      if (ide.files.length >= 25) { toast(t('Höchstens 25 Dateien pro Bot.')); return; }
-      const type = (form.querySelector('input[name="type"]:checked') || {}).value || 'server';
-      const f = { id: tmpId(), name, type, code: (ide.luna ? ide.luna.TEMPLATES[type] : '').replace(/NAME/g, name), isNew: true };
-      ide.files.push(f);
-      ide.open.push(f.id);
-      ide.active = f.id;
-      ide.collapsed[type] = false;
-    }
-    closeModal();
-    ideDiagnose();
-    renderIde();
-    ideInputDraft();
-  }
-  function ideInputDraft() {
-    if (ide.bot) store.set(draftKey(), ideDirty() ? { base: ide.bot.updated, files: ide.files } : null);
-  }
+  // Pfad eines Objekts → Schlüssel, um neue IDs nach dem Speichern zuzuordnen
+  const pathKey = (files, f) => { const parts = []; for (let x = f, i = 0; x && i < 64; i += 1) { parts.unshift(x.name.toLowerCase()); if (!files.some((y) => y.id === x.parent)) { parts.unshift(x.parent); break; } x = files.find((y) => y.id === x.parent); } return parts.join('/'); };
   async function ideSave() {
     if (ide.saving || !ide.bot) return;
     ide.saving = true;
     renderIde();
-    const body = { files: ide.files.map((f) => ({ ...(f.isNew ? {} : { id: f.id }), name: f.name, type: f.type, code: f.code })) };
+    const body = { files: ide.files.map((f) => ({ id: f.id, name: f.name, type: f.type, parent: f.parent, ...(isScript(f.type) ? { code: f.code || '' } : {}), ...(f.enabled === false ? { enabled: false } : {}), ...(f.url ? { url: f.url } : {}) })) };
     const r = await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body });
     ide.saving = false;
     if (r) {
-      const byName = Object.fromEntries((r.files || []).map((f) => [f.name.toLowerCase(), f.id]));
-      const remap = (id) => { const f = ideFile(id); return f ? byName[f.name.toLowerCase()] || id : id; };
-      ide.open = ide.open.map(remap).filter((id) => (r.files || []).some((f) => f.id === id));
+      const before = ide.files;
+      const byPath = Object.fromEntries((r.files || []).map((f) => [pathKey(r.files, f), f.id]));
+      const remap = (id) => { if (isService(id) || id === 'bot') return id; const f = before.find((x) => x.id === id); return f ? byPath[pathKey(before, f)] || null : null; };
+      ide.open = ide.open.map(remap).filter(Boolean);
       ide.active = ide.active ? remap(ide.active) : null;
+      ide.sel = ide.sel ? remap(ide.sel) || 'ServerScriptService' : null;
+      const collapsed = {};
+      Object.keys(ide.collapsed).forEach((k) => { const n = remap(k); if (n) collapsed[n] = ide.collapsed[k]; });
+      ide.collapsed = collapsed;
       ide.bot = r;
       botsFull[ide.bid] = r;
       ide.files = (r.files || []).map((f) => ({ ...f }));
@@ -5452,7 +5784,7 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     };
     const args = event === 'command' ? [command, words] : event === 'message' ? [text, username] : [username];
     if (!ide.testMem) ide.testMem = JSON.parse(JSON.stringify((ide.bot && ide.bot.memory) || {}));
-    const res = ide.luna.runEvent({ files: ide.files, type: f.type, event, vars, args, memory: ide.testMem, only: f.id });
+    const res = ide.luna.runEvent({ files: ide.files, type: f.type, event, vars, args, memory: ide.testMem, only: f.id, botName: ide.bot.name });
     if (res.memChanged) ide.testMem = res.memory;
     ide.testOut = { ...res, event };
     const panel = $('[data-ide-panelbox]');
@@ -5472,6 +5804,80 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     ta.setSelectionRange(end, end);
     const lead = ta.value.endsWith('\n') || !ta.value ? '' : '\n';
     insertText(ta, `${lead}\n${name}(${params}) {\n  print("…")\n}\n`);
+  }
+
+
+  // ---------- Luna-Dokumentation (#/luna/<seite>) – aufgebaut wie die Roblox-Doku ----------
+  let docsLoad = null;
+  const docsLib = () => (docsLoad || (docsLoad = import(new URL('assets/js/luna-docs.js', document.baseURI).href).catch((e) => { docsLoad = null; throw e; })));
+  const docs = { lib: null, q: '', nav: false, spy: null };
+  async function renderDocs(pageId, heading) {
+    const box = $('[data-docs]');
+    if (!box) return;
+    if (!docs.lib) {
+      box.innerHTML = `<div class="docs-loading">${loadingHtml()}</div>`;
+      try { docs.lib = await docsLib(); } catch (e) { box.innerHTML = `<p class="empty">${t('Die Dokumentation konnte nicht geladen werden.')}</p>`; return; }
+      if (state.page !== 'luna') return;
+    }
+    const D = docs.lib;
+    const page = D.PAGES.find((x) => x.id === pageId) || D.PAGES[0];
+    const idx = D.PAGES.indexOf(page);
+    const prev = D.PAGES[idx - 1];
+    const next = D.PAGES[idx + 1];
+    const r = D.render(page.md, page.id);
+    const back = ide.cid && ide.bid ? `<a class="docs__back" href="#/bots/${esc(ide.cid)}/${esc(ide.bid)}">${icon('fi-rr-arrow-left')}${t('Zurück zum Editor')}</a>` : '';
+    iconDefs();
+    box.innerHTML = `<aside class="docs__nav${docs.nav ? ' is-open' : ''}" data-docs-navbox aria-label="${esc(t('Inhalt der Dokumentation'))}">
+        <div class="docs__brand">${clsIcon('module')}<span><b>Luna</b><small>${t('Dokumentation')}</small></span><button class="docs__nav-close" type="button" data-docs-nav="0" aria-label="${esc(t('Schließen'))}">${svgClose}</button></div>
+        <label class="docs__search">${icon('fi-rr-search')}<input type="search" data-docs-search value="${esc(docs.q)}" placeholder="${esc(t('Dokumentation durchsuchen …'))}" autocomplete="off" spellcheck="false"></label>
+        <div class="docs__links" data-docs-links>${docsNavHtml(page.id)}</div>
+        ${back}
+      </aside>
+      <button class="docs__backdrop" type="button" data-docs-nav="0" tabindex="-1" aria-hidden="true"></button>
+      <div class="docs__main">
+        <div class="docs__top">
+          <button class="docs__menu" type="button" data-docs-nav="1">${icon('fi-rr-menu-burger')}${t('Inhalt')}</button>
+          <nav class="docs__crumbs" aria-label="${esc(t('Pfad'))}"><a href="#/luna">Luna</a>${svgChev}<span>${esc(t(page.group))}</span>${svgChev}<span aria-current="page">${esc(t(page.title))}</span></nav>
+        </div>
+        <article class="doc">
+          <h1>${esc(t(page.title))}</h1>
+          <p class="doc__lead">${esc(t(page.lead))}</p>
+          ${r.toc.length > 2 ? `<details class="doc__toc-inline"><summary>${t('Auf dieser Seite')}</summary>${r.toc.map((h) => `<a class="lv-${h.level}" href="#/luna/${esc(page.id)}?h=${esc(h.id)}">${esc(h.text)}</a>`).join('')}</details>` : ''}
+          ${r.html}
+        </article>
+        <nav class="doc__pager">
+          ${prev ? `<a href="#/luna/${esc(prev.id)}"><small>${t('Zurück')}</small><b>${esc(t(prev.title))}</b></a>` : '<span></span>'}
+          ${next ? `<a class="is-next" href="#/luna/${esc(next.id)}"><small>${t('Weiter')}</small><b>${esc(t(next.title))}</b></a>` : '<span></span>'}
+        </nav>
+      </div>
+      <aside class="docs__toc" aria-label="${esc(t('Auf dieser Seite'))}">
+        ${r.toc.length ? `<h6>${t('Auf dieser Seite')}</h6><nav>${r.toc.map((h) => `<a class="lv-${h.level}" href="#/luna/${esc(page.id)}?h=${esc(h.id)}" data-toc="${esc(h.id)}">${esc(h.text)}</a>`).join('')}</nav>` : ''}
+      </aside>`;
+    // Mitlaufendes „Auf dieser Seite“
+    if (docs.spy) docs.spy.disconnect();
+    if ('IntersectionObserver' in window) {
+      docs.spy = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          if (!en.isIntersecting) return;
+          const id = en.target.id.replace(/^doc-/, '');
+          $$('.docs__toc a').forEach((a) => a.classList.toggle('is-active', a.dataset.toc === id));
+        });
+      }, { rootMargin: '-80px 0px -70% 0px' });
+      $$('.doc h2, .doc h3').forEach((h) => docs.spy.observe(h));
+    }
+    if (heading) {
+      const el = document.getElementById(`doc-${heading}`);
+      if (el) setTimeout(() => el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }), 30);
+    }
+  }
+  function docsNavHtml(current) {
+    const D = docs.lib;
+    if (docs.q.trim().length >= 2) {
+      const hits = D.search(docs.q);
+      return hits.length ? `<div class="docs__results">${hits.map((h) => `<a href="#/luna/${esc(h.id)}"><b>${esc(t(h.title))}</b><small>${esc(t(h.group))}</small><span>${esc(h.snip)}</span></a>`).join('')}</div>`
+        : `<p class="docs__none">${t('Nichts gefunden.')}</p>`;
+    }
+    return D.GROUPS.map((g) => `<div class="docs__group"><h6>${esc(t(g))}</h6>${D.PAGES.filter((x) => x.group === g).map((x) => `<a href="#/luna/${esc(x.id)}"${x.id === current ? ' class="is-active" aria-current="page"' : ''}>${esc(t(x.title))}</a>`).join('')}</div>`).join('');
   }
 
   // ---------- Prüfung der Discord-Verbindungen (Ränge über Public Relations Department) ----------
@@ -6324,9 +6730,9 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
       title: (arg) => { const b = botsFull[String(arg).split(':')[1]]; return b && b.name ? b.name : t('Bot'); },
       render: (arg) => botView(arg),
     },
-    botfile: {
-      title: (arg) => (String(arg).startsWith('rename') ? t('Datei umbenennen') : t('Neue Datei')),
-      render: (arg) => botFileView(arg),
+    botmove: {
+      title: () => t('Verschieben nach …'),
+      render: (id) => botMoveView(id),
     },
     'server-players': {
       title: () => t('Alle Spieler'),
@@ -6798,7 +7204,7 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots', 'luna'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
@@ -6823,6 +7229,7 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     statistiken() { renderStatsKpis(); renderChart(); renderBars(); loadGameStats(); },
     einstellungen() { renderSettings(); },
     bots() { openIde(state.botsArg[0], state.botsArg[1]); },
+    luna() { renderDocs(state.docsArg, state.docsHeading); },
   };
 
   function route() {
@@ -6842,13 +7249,20 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
     const chatArg = chatView === 'direct' ? (sub2 || '') : ['conv', 'info'].includes(chatView) ? chatSub : null;
     const botsArg = page === 'bots' ? [sub || '', sub2 || ''] : null;
+    const docsArg = page === 'luna' ? (sub || 'einfuehrung') : null;
+    const docsHeading = page === 'luna' ? new URLSearchParams(query || '').get('h') : null;
+    // Nur zu einer Überschrift springen: Seite nicht neu aufbauen
+    if (page === 'luna' && state.page === 'luna' && docsArg === state.docsArg && docsHeading) {
+      const el = document.getElementById(`doc-${docsHeading}`);
+      if (el) { el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }); docs.nav = false; const nav = $('[data-docs-navbox]'); if (nav) nav.classList.remove('is-open'); return; }
+    }
     if (page === 'bots' && !(/^[\w-]{6,30}$/.test(botsArg[0]) && /^[\w-]{4,16}$/.test(botsArg[1]))) { location.replace('#/chat'); return; }
     // Gespräch verlassen: beim nächsten Öffnen läuft onopen() der ClientScripts wieder
     if (chatView !== 'conv' || chatArg !== state.chatArg) cbots.seen = null;
     if (state.page === 'bots' && page !== 'bots' && ideDirty()) toast(t('Nicht gespeicherte Änderungen im Bot-Editor bleiben als Entwurf erhalten.'));
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
-      || String(botsArg) !== String(state.botsArg);
+      || String(botsArg) !== String(state.botsArg) || docsArg !== state.docsArg;
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
     if (chatView === 'public' && state.chatView !== 'public') chat.pubAt = 0;
     if (chatView === 'mod' && state.chatView !== 'mod') chat.modAt = 0;
@@ -6871,6 +7285,9 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     state.chatView = chatView;
     state.chatArg = chatArg;
     state.botsArg = botsArg;
+    state.docsArg = docsArg;
+    state.docsHeading = docsHeading;
+    if (page === 'luna') docs.nav = false;
     // Gespräch aus dem Speicher: gleich auf neuen Stand bringen (und onopen() der ClientScripts)
     if (chatView === 'conv' && chat.conv[chatArg] && !chat.conv[chatArg].error && changed) {
       clientBotsAfterLoad(chatArg, null);
@@ -7242,10 +7659,33 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
     });
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
+    // Luna-Dokumentation
+    document.addEventListener('input', (e) => {
+      if (!e.target.matches || !e.target.matches('[data-docs-search]') || !docs.lib) return;
+      docs.q = e.target.value;
+      const links = $('[data-docs-links]');
+      if (links) links.innerHTML = docsNavHtml(state.docsArg);
+    });
+    document.addEventListener('click', async (e) => {
+      const el = e.target.closest('[data-doc-copy], [data-docs-nav]');
+      if (!el) return;
+      if ('docCopy' in el.dataset) {
+        const src = $('[data-doc-src]', el.closest('.doc-code'));
+        try { await navigator.clipboard.writeText(src ? src.value : ''); el.textContent = t('Kopiert'); setTimeout(() => { el.textContent = t('Kopieren'); }, 1400); } catch (err) { toast(t('Kopieren geht hier nicht.')); }
+      } else {
+        docs.nav = el.dataset.docsNav === '1';
+        const nav = $('[data-docs-navbox]');
+        if (nav) nav.classList.toggle('is-open', docs.nav);
+        const page = $('.docs');
+        if (page) page.classList.toggle('is-nav', docs.nav);
+      }
+    });
+
     // Eigene Bots und Bot-Editor
     const idePanelRedraw = () => { const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.toggle('is-open', !!ide.panelOpen); } };
+    const setTree = (open) => { ide.tree = open; const body = $('.ide__body'); if (body) body.classList.toggle('is-tree', open); };
     document.addEventListener('click', async (e) => {
-      const el = e.target.closest('[data-bot-new], [data-bot-edit], [data-bot-del], [data-bot-photo-del], [data-ide-tree], [data-ide-open], [data-ide-close], [data-ide-new], [data-ide-rename], [data-ide-del], [data-ide-fold], [data-ide-goto], [data-ide-save], [data-ide-panel], [data-ide-key], [data-ide-logs], [data-ide-advanced], [data-ide-convert], [data-ide-discard], [data-ide-mem-reset], [data-ide-snippet]');
+      const el = e.target.closest('[data-bot-new], [data-bot-edit], [data-bot-del], [data-bot-photo-del], [data-ide-tree], [data-ide-open], [data-ide-close], [data-ide-new], [data-ide-goto], [data-ide-save], [data-ide-panel], [data-ide-key], [data-ide-logs], [data-ide-advanced], [data-ide-convert], [data-ide-discard], [data-ide-mem-reset], [data-ide-snippet], [data-xp-toggle], [data-xp-add], [data-xp-folder], [data-xp-menu], [data-xp-insert], [data-xp-act], [data-xp-menu-close], [data-pp-copy], [data-pp-toggle], [data-mv-to], [data-xp]');
       if (!el) return;
       const ds = el.dataset;
       if (ds.botNew) openModal('botnew', ds.botNew);
@@ -7265,25 +7705,10 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
         const [cid, bid] = ds.botPhotoDel.split(':');
         const r = await botCall(cid, `/${encodeURIComponent(bid)}/photo`, { method: 'DELETE' });
         if (r) botChanged(cid, r);
-      } else if (ds.ideTree !== undefined) {
-        ide.tree = ds.ideTree === '1';
-        const body = $('.ide__body');
-        if (body) body.classList.toggle('is-tree', ide.tree);
-        haptic('tap');
-      } else if (ds.ideOpen) ideOpen(ds.ideOpen);
+      } else if (ds.ideTree !== undefined) { setTree(ds.ideTree === '1'); haptic('tap'); }
+      else if (ds.ideOpen) ideOpen(ds.ideOpen);
       else if (ds.ideClose) ideCloseTab(ds.ideClose);
-      else if (ds.ideNew) openModal('botfile', `new:${ds.ideNew}`);
-      else if (ds.ideRename) openModal('botfile', `rename:${ds.ideRename}`);
-      else if (ds.ideDel) {
-        const f = ideFile(ds.ideDel);
-        if (!f || !confirm(t('„{name}“ löschen? Endgültig erst nach dem Speichern.', { name: f.name }))) return;
-        ide.files = ide.files.filter((x) => x.id !== f.id);
-        ide.open = ide.open.filter((id) => id !== f.id);
-        if (ide.active === f.id) ide.active = ide.open[0] || null;
-        ideDiagnose();
-        renderIde();
-        ideInputDraft();
-      } else if (ds.ideFold) { ide.collapsed[ds.ideFold] = !ide.collapsed[ds.ideFold]; ideRefreshSide(); }
+      else if (ds.ideNew) insertItem(ds.ideNew, DEFAULT_PARENT[ds.ideNew]);
       else if (ds.ideGoto) { const [fid, line] = ds.ideGoto.split(':'); ideOpen(fid, +line); }
       else if ('ideSave' in ds) ideSave();
       else if (ds.idePanel) {
@@ -7302,7 +7727,7 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
       } else if ('ideConvert' in ds) {
         const made = rulesToLuna((ide.bot && ide.bot.rules) || []);
         made.forEach((f) => ide.files.push({ id: tmpId(), isNew: true, ...f }));
-        if (made.length) { ide.open = ide.files.map((f) => f.id); ide.active = ide.open[0]; }
+        if (made.length) { ide.open = ide.files.filter((f) => isScript(f.type)).map((f) => f.id); ide.active = ide.open[0]; ide.sel = ide.active; }
         ideDiagnose();
         renderIde();
         ideInputDraft();
@@ -7312,19 +7737,141 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
         ide.draft = false;
         store.set(draftKey(), null);
         ide.open = ide.open.filter((id) => ideFile(id));
-        if (!ideFile(ide.active)) ide.active = ide.open[0] || (ide.files[0] && ide.files[0].id) || null;
+        if (!ideFile(ide.active)) ide.active = ide.open[0] || null;
         ideDiagnose();
         renderIde();
       } else if ('ideMemReset' in ds) { ide.testMem = null; ide.testOut = null; idePanelRedraw(); toast(t('Test-Speicher geleert')); }
       else if (ds.ideSnippet) ideSnippet(ds.ideSnippet);
+      else if (ds.xpToggle) { e.stopPropagation(); ide.collapsed[ds.xpToggle] = !ide.collapsed[ds.xpToggle]; ideRefreshSide(); }
+      else if (ds.xpAdd) { e.stopPropagation(); openXpMenu('insert', ds.xpAdd === '@sel' ? insertTarget() : ds.xpAdd, el); }
+      else if ('xpFolder' in ds) insertItem('folder', insertTarget());
+      else if (ds.xpMenu) { e.stopPropagation(); ide.sel = ds.xpMenu; ideRefreshSide(); openXpMenu('item', ds.xpMenu, el); }
+      else if (ds.xpInsert) insertItem(ds.xpInsert, ide.menu ? ide.menu.parent : insertTarget());
+      else if (ds.xpAct) {
+        const id = ide.menu && ide.menu.id;
+        const f = ideFile(id);
+        closeXpMenu();
+        if (!f) return;
+        if (ds.xpAct === 'open') ideOpen(id);
+        else if (ds.xpAct === 'insert') { const row = $(`.xp-row[data-xp="${CSS.escape(id)}"] .xp-add`) || $(`.xp-row[data-xp="${CSS.escape(id)}"]`); if (row) openXpMenu('insert', id, row); }
+        else if (ds.xpAct === 'rename') { ide.renaming = id; ideRefreshSide(); focusRename(); }
+        else if (ds.xpAct === 'duplicate') duplicateItem(id);
+        else if (ds.xpAct === 'move') openModal('botmove', id);
+        else if (ds.xpAct === 'path') { try { await navigator.clipboard.writeText(absPath(f)); toast(t('Pfad kopiert')); } catch (err) { toast(absPath(f)); } }
+        else if (ds.xpAct === 'delete') deleteItem(id);
+      } else if ('xpMenuClose' in ds) closeXpMenu();
+      else if (ds.ppCopy) { try { await navigator.clipboard.writeText(ds.ppCopy); toast(t('Kopiert')); } catch (err) { toast(ds.ppCopy); } }
+      else if ('ppToggle' in ds) { ide.propsOpen = !ide.propsOpen; const pp = $('[data-ide-props]'); if (pp) { pp.classList.toggle('is-open', ide.propsOpen); pp.innerHTML = idePropsHtml(); } }
+      else if (ds.mvTo) { if (modalView && modalView.name === 'botmove') { const id = modalView.arg; closeModal(); if (moveItem(id, ds.mvTo)) toast(t('Verschoben')); } }
+      else if (ds.xp) {
+        if (e.target.closest('input')) return;
+        const id = ds.xp;
+        if (id === 'bot' || isService(id)) { ide.sel = id; ideRefreshSide(); return; }
+        ideSelect(id);
+      }
     });
+    // Rechtsklick (und langes Drücken) auf ein Objekt: Menü wie im Explorer
+    document.addEventListener('contextmenu', (e) => {
+      const row = e.target.closest('.xp-row[data-xp]');
+      if (!row || !ideFile(row.dataset.xp)) return;
+      e.preventDefault();
+      ide.sel = row.dataset.xp;
+      ideRefreshSide();
+      openXpMenu('item', row.dataset.xp, $(`.xp-row[data-xp="${CSS.escape(row.dataset.xp)}"]`) || row);
+    });
+    document.addEventListener('dblclick', (e) => {
+      const row = e.target.closest('.xp-row[data-xp]');
+      if (!row || !ideFile(row.dataset.xp)) return;
+      ide.renaming = row.dataset.xp;
+      ideRefreshSide();
+      focusRename();
+    });
+    // Ziehen und Ablegen im Explorer (Desktop)
+    let dragId = null;
+    document.addEventListener('dragstart', (e) => {
+      const row = e.target.closest && e.target.closest('.xp-row[data-xp]');
+      if (!row || !ideFile(row.dataset.xp)) return;
+      dragId = row.dataset.xp;
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', dragId); } catch (err) { /* egal */ }
+    });
+    document.addEventListener('dragover', (e) => {
+      const row = dragId && e.target.closest && e.target.closest('.xp-row[data-xp]');
+      if (!row) return;
+      const to = row.dataset.xp;
+      const target = ideFile(to);
+      const ok = to !== dragId && to !== 'bot' && !isDescendant(to, dragId) && (!target || (target.type !== 'connector' && target.type !== 'webhook'));
+      if (!ok) return;
+      e.preventDefault();
+      $$('.xp-row.is-drop').forEach((x) => x !== row && x.classList.remove('is-drop'));
+      row.classList.add('is-drop');
+    });
+    document.addEventListener('drop', (e) => {
+      const row = dragId && e.target.closest && e.target.closest('.xp-row[data-xp]');
+      if (!row) return;
+      e.preventDefault();
+      const id = dragId;
+      dragId = null;
+      if (moveItem(id, row.dataset.xp)) toast(t('Verschoben'));
+    });
+    document.addEventListener('dragend', () => { dragId = null; $$('.xp-row.is-drop').forEach((x) => x.classList.remove('is-drop')); });
     // Zeichenleiste über der Tastatur: Fokus bleibt im Editor
     document.addEventListener('pointerdown', (e) => { if (e.target.closest('[data-ide-key]')) e.preventDefault(); });
-    document.addEventListener('input', (e) => { if (e.target.matches && e.target.matches('[data-ide-code]')) ideInput(e.target); });
+    document.addEventListener('input', (e) => {
+      if (!e.target.matches) return;
+      if (e.target.matches('[data-ide-code]')) ideInput(e.target);
+      else if (e.target.matches('[data-xp-search]') && ide.menu) {
+        ide.menu.q = e.target.value;
+        const menu = $('.xp-menu');
+        if (menu) { const list = $('.xp-menu__list', menu); const tmp = document.createElement('div'); tmp.innerHTML = ideMenuHtml(); const nl = $('.xp-menu__list', tmp); if (list && nl) list.innerHTML = nl.innerHTML; }
+      } else if (e.target.matches('[data-pp-url]')) {
+        const f = ideFile(ide.sel);
+        if (f) { f.url = e.target.value.trim(); ideInputDraft(); }
+      }
+    });
+    document.addEventListener('change', (e) => {
+      if (!e.target.matches) return;
+      if (e.target.matches('[data-pp-name]')) renameItem(ide.sel, e.target.value);
+      else if (e.target.matches('[data-pp-enabled]')) {
+        const f = ideFile(ide.sel);
+        if (f) { if (e.target.checked) delete f.enabled; else f.enabled = false; ideDiagnose(); ideRefreshSide(); ideInputDraft(); }
+      }
+    });
+    document.addEventListener('focusout', (e) => {
+      if (e.target.matches && e.target.matches('[data-xp-rename-input]') && ide.renaming === e.target.dataset.xpRenameInput) renameItem(ide.renaming, e.target.value);
+    });
+    ['keyup', 'click', 'select'].forEach((ev) => document.addEventListener(ev, (e) => { if (e.target.matches && e.target.matches('[data-ide-code]')) ideCaret(); }));
     document.addEventListener('keydown', (e) => {
-      if (e.target.matches && e.target.matches('[data-ide-code]')) { ideKey(e); return; }
-      if (state.page === 'bots' && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); }
-      if (state.page === 'bots' && e.key === 'Escape' && ide.tree) { ide.tree = false; const body = $('.ide__body'); if (body) body.classList.remove('is-tree'); }
+      if (!e.target.matches) return;
+      if (e.target.matches('[data-ide-code]')) { ideKey(e); return; }
+      if (e.target.matches('[data-xp-rename-input]')) {
+        if (e.key === 'Enter') { e.preventDefault(); renameItem(e.target.dataset.xpRenameInput, e.target.value); }
+        if (e.key === 'Escape') { e.preventDefault(); ide.renaming = null; ideRefreshSide(); }
+        return;
+      }
+      if (e.target.matches('[data-pp-name]') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); return; }
+      if (e.target.matches('[data-xp-search]') && e.key === 'Enter') { e.preventDefault(); const first = $('.xp-menu [data-xp-insert]'); if (first) first.click(); return; }
+      if (state.page !== 'bots') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); return; }
+      if (e.key === 'Escape') { if (ide.menu) { closeXpMenu(); return; } if (ide.tree) setTree(false); return; }
+      const row = e.target.closest('.xp-row[data-xp]');
+      if (!row) return;
+      const id = row.dataset.xp;
+      if (e.key === 'F2' && ideFile(id)) { e.preventDefault(); ide.renaming = id; ideRefreshSide(); focusRename(); }
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && ideFile(id)) { e.preventDefault(); deleteItem(id); }
+      else if (e.key === 'Enter') { e.preventDefault(); row.click(); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const rows = $$('.xp-row[data-xp]');
+        const next = rows[rows.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1)];
+        if (next) { ide.sel = next.dataset.xp; ideRefreshSide(); const n2 = $(`.xp-row[data-xp="${CSS.escape(ide.sel)}"]`); if (n2) n2.focus(); }
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        ide.collapsed[id] = e.key === 'ArrowLeft';
+        ideRefreshSide();
+        const n2 = $(`.xp-row[data-xp="${CSS.escape(id)}"]`);
+        if (n2) n2.focus();
+      }
     });
     document.addEventListener('change', (e) => {
       if (e.target.matches('[data-bot-photo]') && e.target.files && e.target.files[0]) uploadBotPhoto(e.target.dataset.botPhoto, e.target.files[0]);
@@ -7370,8 +7917,6 @@ save("besuche", load("besuche", 0) + 1)`)}</pre></section>
         if (r) { haptic('success'); toast(t('Gespeichert')); botChanged(bf.dataset.botForm, r); }
         return;
       }
-      const ff = e.target.closest('form[data-ide-file-form]');
-      if (ff) { e.preventDefault(); ideFileSubmit(ff); return; }
       const tf = e.target.closest('form[data-ide-test]');
       if (tf) { e.preventDefault(); ideTest(tf); }
     });

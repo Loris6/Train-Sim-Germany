@@ -57,6 +57,15 @@ async function verify(env, mode, secret, channel) {
   }
 }
 
+// Webhook-Objekt eines Bots (ConnectorService): Link prüfen und verschlüsselt ablegen
+export async function checkWebhook(env, store, url) {
+  const m = String(url || '').trim().match(HOOK);
+  if (!m) throw bad('bad_webhook');
+  const info = await verify(env, 'webhook', `${m[1]}/${m[2]}`);
+  if (!info) throw bad('webhook_unreachable', 422);
+  return { hook: await sealText(env, store, `${m[1]}/${m[2]}`), hint: `…/webhooks/${m[1].slice(-4)}/••••`, info };
+}
+
 // Einstellungen speichern. Neue Zugangsdaten werden geprüft; ändert sich die Verbindung, muss sie neu eingereicht werden.
 export async function updateConfig(env, store, old, body) {
   const d = { status: 'draft', mode: 'webhook', events: { messages: true, joins: true }, botName: 'TSG-Bot', ...(old || {}) };
