@@ -78,7 +78,8 @@ export const DOCS = {
     ['script', 'Das Skript selbst (Instance) – script.Parent ist der Ordner bzw. Service darüber'],
   ],
   functions: [
-    ['print(…)', 'Nachricht des Bots in den Chat (ClientScript: nur für die Person)'], ['warn(…) · log(…)', 'Nur ins Protokoll bzw. die Ausgabe im Editor'],
+    ['print(…)', 'Nachricht des Bots in den Chat (ClientScript: nur für die Person)'], ['embed({ title, text, color, fields, footer })', 'Karte statt Text – nur für eigene Bots'],
+    ['Wert.Value', 'BoolValue, IntValue, NumberValue, StringValue lesen und setzen (bleibt gespeichert)'], ['warn(…) · log(…)', 'Nur ins Protokoll bzw. die Ausgabe im Editor'],
     ['discord(text)', 'Nachricht über die Discord-Verbindung des Chats'], ['require(modul)', 'ModuleScript laden – require(script.Parent.Texte) oder require("Texte")'],
     ['save(key, wert) · load(key, standard)', 'Werte merken, die erhalten bleiben'], ['tostring(x) · tonumber(x) · typeof(x)', 'Umwandeln, Typ'],
     ['pairs(t) · ipairs(t)', 'Für for-Schleifen (Zählung ab 1 wie in Luau)'], ['math.random(a, b) · math.floor(x) · …', 'Rechnen'],
@@ -1658,7 +1659,7 @@ export function runScript(code, { vars = {}, events = [], limits, name = 'Skript
 }
 
 // ---------- Farben im Editor ----------
-const BUILTIN_NAMES = new Set(['print', 'say', 'reply', 'discord', 'log', 'warn', 'error', 'assert', 'require', 'len', 'str', 'num', 'type', 'typeof', 'tostring', 'tonumber', 'pairs', 'ipairs', 'upper', 'lower', 'trim', 'contains', 'startsWith', 'endsWith', 'split', 'join', 'replace', 'format', 'random', 'round', 'floor', 'ceil', 'abs', 'sqrt', 'min', 'max', 'keys', 'values', 'has', 'range', 'now', 'time', 'date', 'weekday', 'save', 'load']);
+const BUILTIN_NAMES = new Set(['print', 'embed', 'say', 'reply', 'discord', 'log', 'warn', 'error', 'assert', 'require', 'len', 'str', 'num', 'type', 'typeof', 'tostring', 'tonumber', 'pairs', 'ipairs', 'upper', 'lower', 'trim', 'contains', 'startsWith', 'endsWith', 'split', 'join', 'replace', 'format', 'random', 'round', 'floor', 'ceil', 'abs', 'sqrt', 'min', 'max', 'keys', 'values', 'has', 'range', 'now', 'time', 'date', 'weekday', 'save', 'load']);
 const LIB_NAMES = new Set(['math', 'string', 'table']);
 const VAR_NAMES = new Set(DOCS.vars.map(([n]) => n).filter((n) => n !== 'script'));
 export function highlight(src) {

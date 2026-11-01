@@ -5312,12 +5312,14 @@
 
   // ---------- Bot-Editor (#/bots/<chat>/<bot>): Explorer und Eigenschaften links, Code rechts, Tabs oben ----------
   // Aufbau wie im Roblox-Explorer: der Bot oben, darunter die Services; ModuleScripts, Ordner usw. dürfen überall liegen.
-  const SERVICE_ORDER = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService'];
+  const SERVICE_ORDER = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService', 'ReplicatedStorage', 'ServerStorage'];
   const SERVICE_INFO = {
     ServerScriptService: { icon: 'svcServer', runs: 'server', desc: 'ServerScripts laufen hier – im Backend, wenn im Chat etwas passiert.' },
     ClientService: { icon: 'svcClient', runs: 'client', desc: 'ClientScripts laufen hier – in der App von jedem, der den Chat öffnet.' },
     GameService: { icon: 'svcGame', runs: 'game', desc: 'GameScripts laufen hier – wenn in einem verbundenen privaten Server etwas passiert.' },
     ConnectorService: { icon: 'svcConnector', runs: null, desc: 'Connectors verbinden Skripte miteinander, Webhooks schicken Nachrichten nach Discord.' },
+    ReplicatedStorage: { icon: 'svcRep', runs: null, desc: 'ModuleScripts und Werte für alle Skripte – auch ClientScripts in der App sehen sie.' },
+    ServerStorage: { icon: 'svcStore', runs: null, desc: 'Nur im Backend: ModuleScripts und Werte, die keine App zu sehen bekommt.' },
   };
   const CLASS_INFO = {
     server: { name: 'ServerScript', desc: 'Läuft im Backend bei Ereignissen im Chat' },
@@ -5327,11 +5329,20 @@
     connector: { name: 'Connector', desc: 'Verbindet Skripte: Fire() auf der einen, Connect() auf der anderen Seite' },
     webhook: { name: 'Webhook', desc: 'Schickt Nachrichten an einen Discord-Kanal: Send(text)' },
     folder: { name: 'Folder', desc: 'Ordner zum Sortieren' },
+    boolvalue: { name: 'BoolValue', desc: 'Ein Ja/Nein-Wert (true/false) – .Value lesen und setzen' },
+    intvalue: { name: 'IntValue', desc: 'Eine ganze Zahl, z. B. ein Zähler – bleibt gespeichert' },
+    numbervalue: { name: 'NumberValue', desc: 'Eine Zahl mit Komma, z. B. 2.5' },
+    stringvalue: { name: 'StringValue', desc: 'Ein Text, z. B. eine Begrüßung zum Ändern ohne Code' },
   };
-  const INSERT_ORDER = ['server', 'client', 'module', 'game', 'connector', 'webhook', 'folder'];
-  const RECOMMENDED = { ServerScriptService: ['server', 'module', 'folder'], ClientService: ['client', 'module', 'folder'], GameService: ['game', 'module', 'folder'], ConnectorService: ['connector', 'webhook', 'folder'] };
+  const VALUE_TYPES = ['boolvalue', 'intvalue', 'numbervalue', 'stringvalue'];
+  const isLeaf = (type) => type === 'connector' || type === 'webhook' || VALUE_TYPES.includes(type);
+  const INSERT_ORDER = ['server', 'client', 'module', 'game', 'connector', 'webhook', 'folder', 'boolvalue', 'intvalue', 'numbervalue', 'stringvalue'];
+  const RECOMMENDED = {
+    ServerScriptService: ['server', 'module', 'folder'], ClientService: ['client', 'module', 'folder'], GameService: ['game', 'module', 'folder'], ConnectorService: ['connector', 'webhook', 'folder'],
+    ReplicatedStorage: ['module', 'intvalue', 'stringvalue', 'boolvalue', 'folder'], ServerStorage: ['module', 'intvalue', 'stringvalue', 'boolvalue', 'folder'],
+  };
   const RUNS_IN = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService' };
-  const DEFAULT_PARENT = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService', module: 'ServerScriptService', connector: 'ConnectorService', webhook: 'ConnectorService', folder: 'ServerScriptService' };
+  const DEFAULT_PARENT = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService', module: 'ServerScriptService', connector: 'ConnectorService', webhook: 'ConnectorService', folder: 'ServerScriptService', boolvalue: 'ReplicatedStorage', intvalue: 'ReplicatedStorage', numbervalue: 'ReplicatedStorage', stringvalue: 'ReplicatedStorage' };
   const isScript = (t) => ['server', 'client', 'module', 'game'].includes(t);
   const isService = (id) => SERVICE_ORDER.includes(id);
   // Eigene, moderne Symbole (SVG) für jede Art von Objekt
@@ -5347,6 +5358,12 @@
     svcClient: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-client)"/><rect x="6.3" y="3.9" width="7.4" height="12.2" rx="2" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="10" cy="8.6" r="1.5" fill="#fff"/><path d="M7.9 12.4a2.2 2.2 0 0 1 4.2 0" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round"/>',
     svcGame: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-game)"/><path d="M6.8 6.9h6.4a3.2 3.2 0 0 1 3.1 2.4l.7 2.9a1.6 1.6 0 0 1-2.8 1.4L13 12.3H7l-1.2 1.3A1.6 1.6 0 0 1 3 12.2l.7-2.9a3.2 3.2 0 0 1 3.1-2.4z" fill="#fff"/><path d="M6.8 8.9v2M5.8 9.9h2" stroke="#e11d48" stroke-width="1.2" stroke-linecap="round"/><circle cx="12.7" cy="9.2" r=".8" fill="#e11d48"/><circle cx="14.1" cy="10.5" r=".8" fill="#f59e0b"/>',
     svcConnector: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-conn)"/><path d="M8 4.6v2.7M12 4.6v2.7M6.3 7.3h7.4v2.1a3.7 3.7 0 0 1-7.4 0zM10 13.1v2.6" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
+    svcRep: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-rep)"/><path d="M6 7.5h8M6 12.5h8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><path d="M11.5 5 14 7.5 11.5 10M8.5 10 6 12.5 8.5 15" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
+    svcStore: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-store)"/><rect x="4.5" y="5" width="11" height="4" rx="1.3" fill="#fff"/><rect x="5.3" y="9.6" width="9.4" height="5.6" rx="1.3" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M8.6 12h2.8" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
+    boolvalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#0ea5e9"/><rect x="4.5" y="7" width="11" height="6" rx="3" fill="#fff"/><circle cx="12.4" cy="10" r="2" fill="#0ea5e9"/>',
+    intvalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#14b8a6"/><path d="M8 5.5 7 14.5M12.5 5.5l-1 9M5.5 8.3h9M5 11.7h9" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
+    numbervalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#22c55e"/><path d="M5.5 13.5V6.5l-1.3 1M9 13.6h.1M11.5 7.2a1.8 1.8 0 0 1 3.4.9c0 1.7-3.4 3-3.4 5.4h3.6" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    stringvalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#f43f5e"/><path d="M5 7.5c0-1 .7-1.6 1.6-1.6M5 7.5v2h2v-2H5zM11 7.5c0-1 .7-1.6 1.6-1.6M11 7.5v2h2v-2h-2z" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M5 13.5h10" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
     bot: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-bot)"/><rect x="5" y="7" width="10" height="7.5" rx="2.5" fill="#fff"/><circle cx="8.2" cy="10.6" r="1" fill="#0f172a"/><circle cx="11.8" cy="10.6" r="1" fill="#0f172a"/><path d="M10 4.4V7" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.2" r="1" fill="#fff"/>',
   };
   const IC_DEFS = `<svg class="ic-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
@@ -5358,6 +5375,8 @@
     <linearGradient id="lg-svc-server" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient>
     <linearGradient id="lg-svc-game" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset=".55" stop-color="#f43f5e"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
     <linearGradient id="lg-svc-conn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#ea580c"/></linearGradient>
+    <linearGradient id="lg-svc-rep" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#4f46e5"/></linearGradient>
+    <linearGradient id="lg-svc-store" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient>
     <linearGradient id="lg-bot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#475569"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
   </defs></svg>`;
   // Farbverläufe der Symbole einmal für die ganze Seite (nicht in einer versteckten Seite, sonst fehlen sie)
@@ -5380,7 +5399,7 @@
   const ide = { cid: null, bid: null, bot: null, files: [], saved: '', open: [], active: null, sel: null, luna: null, panel: 'problems', panelOpen: null, tree: false, saving: false, diag: {}, bridges: [], err: null, collapsed: {}, draft: false, testMem: null, testOut: null, renaming: null, menu: null, propsOpen: true, cur: 1 };
   const tmpId = () => `new-${Math.random().toString(36).slice(2, 8)}`;
   const ideFile = (id) => ide.files.find((f) => f.id === id) || null;
-  const ideSig = (files) => JSON.stringify(files.map((f) => [f.id, f.name, f.type, f.parent, f.code, f.enabled === false, f.url || '']));
+  const ideSig = (files) => JSON.stringify(files.map((f) => [f.id, f.name, f.type, f.parent, f.code, f.enabled === false, f.url || '', f.value ?? null]));
   const ideDirty = () => !!ide.bot && ideSig(ide.files) !== ide.saved;
   const ideFileDirty = (f) => { const s = ide.bot && (ide.bot.files || []).find((x) => x.id === f.id); return !s || s.code !== f.code || s.name !== f.name || s.parent !== f.parent || !!f.url; };
   const draftKey = () => `tsg-ide:${ide.bid}`;
@@ -5424,7 +5443,7 @@
     if (isService(s)) return s;
     const f = ideFile(s);
     if (!f) return 'ServerScriptService';
-    if (f.type === 'connector' || f.type === 'webhook') return f.parent;
+    if (isLeaf(f.type)) return f.parent;
     return f.id;
   }
   const contextService = (parent) => (isService(parent) ? parent : serviceOfItem(ideFile(parent)) || 'ServerScriptService');
@@ -5502,7 +5521,7 @@
     return `<ul class="xp-kids" style="--d:${depth}" role="group">${kids.map((f) => {
       const hasKids = childrenOf(f.id).length > 0;
       const open = hasKids && !ide.collapsed[f.id];
-      const canAdd = f.type !== 'connector' && f.type !== 'webhook';
+      const canAdd = !isLeaf(f.type);
       return `<li role="none">${xpRow({ id: f.id, depth, icon: itemIcon(f), name: f.name, kind: f.type, canAdd, hasKids, open, item: f })}${open ? xpBranch(f.id, depth + 1) : ''}</li>`;
     }).join('')}</ul>`;
   }
@@ -5563,6 +5582,9 @@
         ${RUNS_IN[f.type] ? `<p class="pp-note${runsOk ? '' : ' is-bad'}">${runsOk ? t('Läuft in {svc}.', { svc: RUNS_IN[f.type] }) : t('Läuft nicht: {cls}s laufen nur in {svc}.', { cls: CLASS_INFO[f.type].name, svc: RUNS_IN[f.type] })}</p>` : ''}
         ${f.type === 'webhook' ? `<label class="pp-row pp-row--input pp-row--stack"><span>${t('Discord-Webhook')}</span><input data-pp-url type="password" autocomplete="off" spellcheck="false" placeholder="${esc(f.hint || 'https://discord.com/api/webhooks/…')}" value="${esc(f.url || '')}"></label>
           <p class="pp-note">${f.hasUrl || f.url ? t('Wird beim Speichern bei Discord geprüft und nur verschlüsselt gespeichert. Senden geht, sobald die Discord-Verbindung des Server-Chats angenommen ist.') : t('Link aus Discord: Kanal bearbeiten → Integrationen → Webhooks.')}</p>` : ''}
+        ${VALUE_TYPES.includes(f.type) ? (f.type === 'boolvalue' ? `<label class="pp-row pp-row--check"><span>Value</span><input type="checkbox" data-pp-value${f.value ? ' checked' : ''}></label>`
+          : `<label class="pp-row pp-row--input"><span>Value</span><input data-pp-value ${f.type === 'stringvalue' ? 'maxlength="500"' : `type="number" step="${f.type === 'intvalue' ? '1' : 'any'}" inputmode="decimal"`} value="${esc(f.value ?? '')}" autocomplete="off" spellcheck="false"></label>`)
+          + `<p class="pp-note">${t('Im Skript: {code}. Ändert ein Skript den Wert, bleibt er gespeichert.', { code: `<code>${esc(act && isScript(act.type) ? relPath(act, f) : absPath(f))}.Value</code>` })}</p>` : ''}
         ${f.type === 'connector' ? `<p class="pp-note">${t('Ein Skript ruft {fire} auf, andere hören mit {connect} zu.', { fire: '<code>:Fire(…)</code>', connect: '<code>:Connect(function(…) … end)</code>' })}</p>` : ''}
         <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(absPath(f))}${act && act.id !== f.id ? copyBtn(relPath(act, f)) : ''}</div>
         ${outgoing.length ? `<div class="pp-block"><span>${t('Brücken')}</span><ul class="pp-links">${outgoing.map((x) => `<li><button type="button" data-ide-goto="${esc(f.id)}:${x.line}">${clsIcon(x.kind === 'require' ? 'module' : x.kind)}<span>${esc((ideFile(x.to) || {}).name || '?')}</span><small>${x.kind === 'require' ? 'require' : x.kind}</small></button></li>`).join('')}</ul></div>` : ''}
@@ -5578,7 +5600,7 @@
     if (m.kind === 'item') {
       const f = ideFile(m.id);
       if (!f) return '';
-      const can = f.type !== 'connector' && f.type !== 'webhook';
+      const can = !isLeaf(f.type);
       return `<div class="xp-menu xp-menu--ctx" role="menu" style="${m.style}">
         ${isScript(f.type) ? `<button class="xp-menu__item" type="button" data-xp-act="open">${icon('fi-rr-edit')}<span><b>${t('Öffnen')}</b></span></button>` : ''}
         ${can ? `<button class="xp-menu__item" type="button" data-xp-act="insert">${svgPlus}<span><b>${t('Objekt einfügen …')}</b></span></button>` : ''}
@@ -5634,6 +5656,7 @@
     const name = uniqueName(base, parent);
     const f = { id: tmpId(), isNew: true, name, type, parent };
     if (isScript(type)) f.code = ((ide.luna && ide.luna.TEMPLATES[type]) || '').replace(/NAME/g, name);
+    if (VALUE_TYPES.includes(type)) f.value = type === 'boolvalue' ? false : type === 'stringvalue' ? '' : 0;
     ide.files.push(f);
     ide.collapsed[parent] = false;
     if (!isService(parent)) { let p = ideFile(parent); while (p) { ide.collapsed[p.parent] = false; ide.collapsed[p.id] = false; p = parentItem(p); } }
@@ -5704,7 +5727,7 @@
     const f = ideFile(id);
     if (!f || f.parent === parent || id === parent || isDescendant(parent, id)) return false;
     const target = ideFile(parent);
-    if (target && (target.type === 'connector' || target.type === 'webhook')) { toast(t('Connectors und Webhooks können nichts enthalten.')); return false; }
+    if (target && isLeaf(target.type)) { toast(t('Connectors, Webhooks und Werte können nichts enthalten.')); return false; }
     f.name = uniqueName(f.name, parent, f.id);
     f.parent = parent;
     ide.collapsed[parent] = false;
@@ -5716,7 +5739,7 @@
   function botMoveView(id) {
     const f = ideFile(id);
     if (!f) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
-    const can = (x) => x.id !== id && !isDescendant(x.id, id) && x.type !== 'connector' && x.type !== 'webhook';
+    const can = (x) => x.id !== id && !isDescendant(x.id, id) && !isLeaf(x.type);
     const branch = (parent, depth) => childrenOf(parent).filter(can).map((x) => `<button class="mv-item" type="button" style="--d:${depth}" data-mv-to="${esc(x.id)}"${x.id === f.parent ? ' disabled' : ''}>${itemIcon(x)}<span>${esc(x.name)}</span></button>${branch(x.id, depth + 1)}`).join('');
     return `<div class="mv-list">${SERVICE_ORDER.map((s) => `<button class="mv-item mv-item--svc" type="button" style="--d:0" data-mv-to="${s}"${f.parent === s ? ' disabled' : ''}>${clsIcon(SERVICE_INFO[s].icon)}<span>${s}</span></button>${branch(s, 1)}`).join('')}</div>`;
   }
@@ -5728,6 +5751,311 @@
         <button type="button" class="ide-tab__x" data-ide-close="${esc(f.id)}" aria-label="${esc(t('Schließen'))}">${svgClose}</button>
       </div>`).join('');
     return tabs || `<span class="ide-tabs__empty">${t('Keine Datei offen')}</span>`;
+  }
+  // ---------- Editor-Werkzeuge: Leiste (✓ ↶ ↷ T + ⋯), Vorschläge beim Tippen, Suchen und Ersetzen, Statusleiste ----------
+  const edx = { ac: null, tool: null, find: false, q: '', rep: '', fs: Math.min(18, Math.max(12, +store.get('tsg-ide-fs', 14) || 14)) };
+  const LUNA_KEYWORDS = ['local', 'function', 'return', 'if', 'then', 'else', 'elseif', 'end', 'for', 'in', 'do', 'while', 'repeat', 'until', 'break', 'continue', 'true', 'false', 'nil', 'and', 'or', 'not', 'const'];
+  const LUNA_GLOBALS = [
+    ['print', 'Funktion', 'Nachricht in den Chat'], ['embed', 'Funktion', 'Karte mit Titel, Text und Feldern (nur eigene Bots)'], ['warn', 'Funktion', 'Warnung ins Protokoll'],
+    ['log', 'Funktion', 'Zeile ins Protokoll'], ['discord', 'Funktion', 'Über die Discord-Verbindung senden'], ['require', 'Funktion', 'ModuleScript laden'],
+    ['typeof', 'Funktion', 'Typ eines Werts'], ['tostring', 'Funktion', 'In Text umwandeln'], ['tonumber', 'Funktion', 'In Zahl umwandeln'], ['pairs', 'Funktion', 'Über Tabellen laufen'],
+    ['ipairs', 'Funktion', 'Über Listen laufen (ab 1)'], ['save', 'Funktion', 'Wert merken'], ['load', 'Funktion', 'Gemerkten Wert laden'], ['error', 'Funktion', 'Mit Fehler beenden'],
+    ['assert', 'Funktion', 'Bedingung prüfen'], ['now', 'Funktion', 'Zeitstempel'], ['time', 'Funktion', 'Uhrzeit'], ['date', 'Funktion', 'Datum'], ['weekday', 'Funktion', 'Wochentag'],
+    ['math', 'Bibliothek', 'Rechnen'], ['string', 'Bibliothek', 'Texte'], ['table', 'Bibliothek', 'Listen und Tabellen'], ['script', 'Objekt', 'Dieses Skript'],
+    ['onjoin', 'Ereignis', 'Jemand tritt bei'], ['onleave', 'Ereignis', 'Jemand geht'], ['onmessage', 'Ereignis', 'Neue Nachricht'], ['oncommand', 'Ereignis', 'Befehl mit Präfix'],
+    ['onstart', 'Ereignis', 'Beim Speichern/Einschalten'], ['onopen', 'Ereignis', 'Chat wird geöffnet (ClientScript)'],
+  ];
+  const LUNA_LIBS = {
+    math: ['abs', 'ceil', 'floor', 'max', 'min', 'random', 'round', 'sqrt', 'pi', 'huge', 'clamp'],
+    string: ['upper', 'lower', 'len', 'sub', 'rep', 'split', 'find', 'reverse', 'trim', 'format'],
+    table: ['insert', 'remove', 'concat', 'find', 'clear', 'sort'],
+  };
+  const INST_METHODS = ['GetChildren', 'GetDescendants', 'FindFirstChild', 'FindFirstChildOfClass', 'WaitForChild', 'IsA', 'GetFullName'];
+  // Kinder eines Knotens im Explorer: 'bot', ein Service oder eine Objekt-ID
+  const nodeKids = (id) => (id === 'bot' ? SERVICE_ORDER.map((sv) => ({ name: sv, id: sv, type: 'service' })) : ide.files.filter((f) => f.parent === id));
+  const nodeParent = (id) => (id === 'bot' ? null : isService(id) ? 'bot' : (ideFile(id) || {}).parent || null);
+  // „script.Parent.Lib“, „../MyBot.ConnectorService“, „c“ (lokale Variable mit Pfad) → Knoten
+  function resolveChain(chain, code, depth = 0) {
+    let node = null;
+    let parts;
+    if (chain.startsWith('../')) {
+      node = 'bot';
+      parts = chain.slice(3).split(/[.:]/);
+      parts.shift(); // Name des Bots
+    } else {
+      parts = chain.split(/[.:]/);
+      const first = parts.shift();
+      if (first === 'script') node = ide.active;
+      else if (depth < 2) {
+        const m = String(code).match(new RegExp(`local\\s+${first.replace(/[^\w]/g, '')}\\s*=\\s*([.\\w/:\u00C0-\u024F]+)`));
+        node = m ? resolveChain(m[1], code, depth + 1) : null;
+      }
+    }
+    for (const p of parts) {
+      if (!node) break;
+      if (!p) continue;
+      if (p === 'Parent') node = nodeParent(node);
+      else { const kid = nodeKids(node).find((k) => k.name === p); node = kid ? kid.id : null; }
+    }
+    return node;
+  }
+  function acSuggest(ta) {
+    const v = ta.value;
+    const pos = ta.selectionStart;
+    if (pos !== ta.selectionEnd) return null;
+    const before = v.slice(0, pos);
+    const word = (before.match(/[\wÀ-ɏ]*$/) || [''])[0];
+    const head = before.slice(0, before.length - word.length);
+    const line = before.slice(before.lastIndexOf('\n') + 1);
+    if (/--/.test(line.replace(/"[^"]*"|'[^']*'/g, ''))) return null;
+    const quotes = (line.match(/"/g) || []).length;
+    // In einem Text nur Platzhalter nach „{“
+    if (quotes % 2 === 1) {
+      if (!head.endsWith('{')) return null;
+      const vars = ((ide.luna && ide.luna.DOCS && ide.luna.DOCS.vars) || []).map(([n, d]) => ({ label: n, kind: 'Platzhalter', detail: d, insert: `${n}}` }));
+      return { word, items: vars.filter((x) => x.label.toLowerCase().startsWith(word.toLowerCase())) };
+    }
+    const sep = head.slice(-1);
+    if (sep === '.' || sep === ':') {
+      const chainM = head.slice(0, -1).match(/((?:\.\.\/)?[\wÀ-ɏ]+(?:[.:][\wÀ-ɏ]+)*)$/);
+      const chain = chainM ? chainM[1] : '';
+      if (sep === '.' && LUNA_LIBS[chain]) return { word, items: LUNA_LIBS[chain].map((n) => ({ label: n, kind: chain, detail: `${chain}.${n}`, insert: ['pi', 'huge'].includes(n) ? n : `${n}()`, back: ['pi', 'huge'].includes(n) ? 0 : 1 })).filter((x) => x.label.toLowerCase().startsWith(word.toLowerCase())) };
+      const node = chain ? resolveChain(chain, v) : null;
+      if (!node) return null;
+      const f = ideFile(node);
+      const type = node === 'bot' ? 'bot' : isService(node) ? 'service' : f && f.type;
+      let items = [];
+      if (sep === '.') {
+        items = nodeKids(node).map((k) => ({ label: k.name, kind: k.type === 'service' ? 'Service' : CLASS_INFO[k.type] ? CLASS_INFO[k.type].name : 'Objekt', detail: k.type === 'service' ? t('Service') : t('Kind'), insert: k.name, icon: k.type === 'service' ? SERVICE_INFO[k.name].icon : k.type }));
+        items.push(...['Name', 'ClassName', 'Parent'].map((n) => ({ label: n, kind: 'Eigenschaft', detail: t('Eigenschaft'), insert: n })));
+        if (VALUE_TYPES.includes(type)) items.unshift({ label: 'Value', kind: 'Eigenschaft', detail: CLASS_INFO[type].name, insert: 'Value' });
+        if (isScript(type)) items.push({ label: 'Enabled', kind: 'Eigenschaft', detail: t('Läuft das Skript?'), insert: 'Enabled' });
+      } else {
+        items = INST_METHODS.map((n) => ({ label: n, kind: 'Methode', detail: t('Methode'), insert: `${n}()`, back: 1 }));
+        if (type === 'connector') items.unshift({ label: 'Connect', kind: 'Methode', detail: 'Connector', insert: 'Connect(function()\n  \nend)', back: 5 }, { label: 'Fire', kind: 'Methode', detail: 'Connector', insert: 'Fire()', back: 1 });
+        if (type === 'webhook') items.unshift({ label: 'Send', kind: 'Methode', detail: 'Webhook', insert: 'Send("")', back: 2 });
+      }
+      return { word, items: items.filter((x) => x.label.toLowerCase().startsWith(word.toLowerCase())) };
+    }
+    if (!word || /\d/.test(word[0])) return null;
+    const w = word.toLowerCase();
+    const own = [...new Set((v.match(/[A-Za-z_À-ɏ][\wÀ-ɏ]{2,}/g) || []))].filter((x) => x !== word && !LUNA_KEYWORDS.includes(x));
+    const items = [
+      ...LUNA_GLOBALS.map(([n, k, d]) => ({ label: n, kind: k, detail: d, insert: k === 'Funktion' ? `${n}()` : k === 'Ereignis' ? `${n}(${n === 'onmessage' ? 'text, username' : n === 'oncommand' ? 'command, args' : n === 'onstart' ? '' : 'username'}) {\n  \n}` : n, back: k === 'Funktion' ? 1 : k === 'Ereignis' ? 2 : 0 })),
+      ...LUNA_KEYWORDS.map((n) => ({ label: n, kind: 'Schlüsselwort', detail: '', insert: n })),
+      ...own.map((n) => ({ label: n, kind: 'Name', detail: t('aus diesem Skript'), insert: n })),
+    ].filter((x) => x.label.toLowerCase().startsWith(w) && x.label !== word);
+    const seen = new Set();
+    return { word, items: items.filter((x) => (seen.has(x.label) ? false : seen.add(x.label))).slice(0, 40) };
+  }
+  // Breite eines Zeichens im Code (Monospace)
+  let chW = 0;
+  function charWidth(ta) {
+    if (chW) return chW;
+    const cv = document.createElement('canvas').getContext('2d');
+    cv.font = getComputedStyle(ta).font;
+    chW = cv.measureText('MMMMMMMMMM').width / 10 || 8;
+    return chW;
+  }
+  function acShow(ta) {
+    const box = $('[data-ac]');
+    if (!box) return;
+    const r = acSuggest(ta);
+    if (!r || !r.items.length) { acHide(); return; }
+    edx.ac = { ...r, i: 0, items: r.items.slice(0, 40) };
+    const before = ta.value.slice(0, ta.selectionStart);
+    const line = before.split('\n').length - 1;
+    const col = before.length - before.lastIndexOf('\n') - 1;
+    const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+    box.style.top = `${14 + (line + 1) * lh + 2}px`;
+    box.style.left = `${Math.max(4, 12 + (col - r.word.length) * charWidth(ta))}px`;
+    box.hidden = false;
+    acDraw();
+  }
+  function acDraw() {
+    const box = $('[data-ac]');
+    if (!box || !edx.ac) return;
+    box.innerHTML = edx.ac.items.slice(0, 40).map((x, i) => `<button type="button" class="ac-item${i === edx.ac.i ? ' is-on' : ''}" data-ac-pick="${i}" tabindex="-1">
+        ${x.icon ? clsIcon(x.icon) : `<span class="ac-kind ac-kind--${esc(x.kind.toLowerCase())}">${esc(x.kind[0])}</span>`}<b>${esc(x.label)}</b><small>${esc(x.detail || x.kind)}</small></button>`).join('');
+    const on = $('.ac-item.is-on', box);
+    if (on) on.scrollIntoView({ block: 'nearest' });
+  }
+  function acHide() { edx.ac = null; const box = $('[data-ac]'); if (box) { box.hidden = true; box.innerHTML = ''; } }
+  function acAccept(i = edx.ac ? edx.ac.i : 0) {
+    const ta = $('[data-ide-code]');
+    if (!ta || !edx.ac) return;
+    const x = edx.ac.items[i];
+    if (!x) return;
+    const pos = ta.selectionStart;
+    const indent = (ta.value.slice(0, pos).split('\n').pop().match(/^\s*/) || [''])[0];
+    const text = x.insert.replace(/\n/g, `\n${indent}`);
+    ta.setSelectionRange(pos - edx.ac.word.length, pos);
+    acHide();
+    edx.skipAc = true;
+    insertText(ta, text);
+    if (x.back) { const c = ta.selectionStart - x.back - (x.kind === 'Ereignis' || x.label === 'Connect' ? indent.length : 0); ta.setSelectionRange(c, c); }
+    ideInput(ta);
+  }
+  // Kommentar an/aus für die markierten Zeilen
+  function toggleComment(ta) {
+    const v = ta.value;
+    const a = v.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+    const endIdx = v.indexOf('\n', Math.max(ta.selectionEnd - (ta.selectionEnd > ta.selectionStart ? 1 : 0), a));
+    const b = endIdx < 0 ? v.length : endIdx;
+    const lines = v.slice(a, b).split('\n');
+    const all = lines.filter((l) => l.trim()).every((l) => /^\s*--/.test(l));
+    const next = lines.map((l) => (!l.trim() ? l : all ? l.replace(/^(\s*)-- ?/, '$1') : l.replace(/^(\s*)/, '$1-- '))).join('\n');
+    ta.setSelectionRange(a, b);
+    insertText(ta, next);
+    ta.setSelectionRange(a, a + next.length);
+    ideInput(ta);
+  }
+  // „T“: Einrückung neu ordnen (Blöcke mit then/do/function/repeat bzw. { … })
+  function formatCode(ta) {
+    let depth = 0;
+    const out = ta.value.split('\n').map((raw) => {
+      const l = raw.trim();
+      const plain = l.replace(/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'|--.*$/g, '');
+      const closes = /^(end\b|until\b|else\b|elseif\b|\}|\))/.test(plain);
+      if (closes) depth = Math.max(0, depth - 1);
+      const line = l ? `${'  '.repeat(depth)}${l}` : '';
+      const opensWord = (plain.match(/\b(then|do|repeat)\b/g) || []).length + (plain.match(/\bfunction\b/g) || []).length - (plain.match(/\bend\b/g) || []).length - (plain.match(/\buntil\b/g) || []).length
+        - (plain.match(/\b(then|do)\s*\{|\bfunction\b[^\n]*\)\s*\{/g) || []).length;
+      const braces = (plain.match(/\{/g) || []).length - (plain.match(/\}/g) || []).length + (/^\}/.test(plain) ? 1 : 0);
+      depth = Math.max(0, depth + opensWord + braces + (/^(else\b|elseif\b)/.test(plain) ? 1 : 0) - (/^(end\b|until\b)/.test(plain) && opensWord < 0 ? -1 : 0) + (closes && !/^(else|elseif)\b/.test(plain) && /^(end|until)\b/.test(plain) ? 1 : 0));
+      return line;
+    });
+    const next = out.join('\n');
+    if (next === ta.value) { toast(t('Schon ordentlich eingerückt')); return; }
+    const pos = ta.selectionStart;
+    ta.setSelectionRange(0, ta.value.length);
+    insertText(ta, next);
+    ta.setSelectionRange(Math.min(pos, next.length), Math.min(pos, next.length));
+    ideInput(ta);
+    toast(t('Eingerückt'));
+  }
+  function scrollToLine(line) {
+    const box = $('[data-ide-scroll]');
+    const ta = $('[data-ide-code]');
+    if (!box || !ta) return;
+    const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+    box.scrollTop = Math.max(0, (line - 4) * lh);
+  }
+  function findNext(back = false) {
+    const ta = $('[data-ide-code]');
+    if (!ta || !edx.q) return;
+    const v = ta.value.toLowerCase();
+    const q = edx.q.toLowerCase();
+    let i = back ? v.lastIndexOf(q, ta.selectionStart - 1) : v.indexOf(q, ta.selectionEnd);
+    if (i < 0) i = back ? v.lastIndexOf(q) : v.indexOf(q);
+    const info = $('[data-find-info]');
+    if (i < 0) { if (info) info.textContent = t('Nicht gefunden'); return; }
+    const count = v.split(q).length - 1;
+    const nth = v.slice(0, i).split(q).length;
+    if (info) info.textContent = t('{a} von {b}', { a: nth, b: count });
+    ta.focus();
+    ta.setSelectionRange(i, i + q.length);
+    scrollToLine(ta.value.slice(0, i).split('\n').length);
+    ideCaret();
+  }
+  function replaceOne() {
+    const ta = $('[data-ide-code]');
+    if (!ta || !edx.q) return;
+    if (ta.value.slice(ta.selectionStart, ta.selectionEnd).toLowerCase() === edx.q.toLowerCase()) { insertText(ta, edx.rep); ideInput(ta); }
+    findNext();
+  }
+  function replaceAll() {
+    const ta = $('[data-ide-code]');
+    if (!ta || !edx.q) return;
+    const re = new RegExp(edx.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    const n = (ta.value.match(re) || []).length;
+    if (!n) { toast(t('Nicht gefunden')); return; }
+    const next = ta.value.replace(re, () => edx.rep);
+    ta.setSelectionRange(0, ta.value.length);
+    insertText(ta, next);
+    ideInput(ta);
+    toast(t('{n} ersetzt', { n }));
+  }
+  function ideToolbarHtml() {
+    const f = ideFile(ide.active);
+    if (!f) return '';
+    const btn = (id, ic, label, extra = '') => `<button type="button" class="edt-btn" data-edt="${id}" aria-label="${esc(label)}" title="${esc(label)}"${extra}>${ic}</button>`;
+    return `<div class="edt" role="toolbar" aria-label="${esc(t('Werkzeuge'))}">
+      ${btn('save', icon('fi-rr-check'), t('Speichern (Strg+S)'), ide.saving ? ' disabled' : '')}
+      <span class="edt-sep"></span>
+      ${btn('undo', icon('fi-rr-undo'), t('Rückgängig (Strg+Z)'))}${btn('redo', icon('fi-rr-redo'), t('Wiederholen (Strg+Y)'))}
+      ${btn('format', '<b class="edt-t">T</b>', t('Einrücken / formatieren'))}
+      ${btn('insert', icon('fi-rr-plus'), t('Einfügen'), ` aria-expanded="${edx.tool === 'insert'}"`)}
+      ${btn('more', icon('fi-rr-menu-dots'), t('Mehr'), ` aria-expanded="${edx.tool === 'more'}"`)}
+      <span class="edt-name">${clsIcon(f.type)}<b>${esc(f.name)}</b></span>
+      ${edx.tool === 'insert' ? `<div class="edt-menu" role="menu">${[['onjoin', t('Ereignis: jemand tritt bei')], ['onmessage', t('Ereignis: neue Nachricht')], ['oncommand', t('Ereignis: Befehl')], ['if', 'if … then … end'], ['for', 'for i = 1, 10 do … end'], ['function', 'local function …'], ['embed', 'embed({ … })'], ['value', t('Wert lesen und setzen (.Value)')]]
+        .map(([id, label]) => `<button type="button" role="menuitem" data-edt-snip="${id}">${esc(label)}</button>`).join('')}<hr><button type="button" role="menuitem" data-edt-obj>${svgPlus}${t('Objekt einfügen …')}</button></div>` : ''}
+      ${edx.tool === 'more' ? `<div class="edt-menu edt-menu--r" role="menu">
+        <button type="button" role="menuitem" data-edt="find">${icon('fi-rr-search')}${t('Suchen und ersetzen')}<small>Strg+F</small></button>
+        <button type="button" role="menuitem" data-edt="comment">${icon('fi-rr-comment-alt')}${t('Zeile kommentieren')}<small>Strg+/</small></button>
+        <button type="button" role="menuitem" data-edt="goto">${icon('fi-rr-arrow-small-down')}${t('Gehe zu Zeile …')}<small>Strg+G</small></button>
+        <button type="button" role="menuitem" data-edt="test">${icon('fi-rr-play')}${t('Testen')}</button>
+        <button type="button" role="menuitem" data-edt="smaller">${icon('fi-rr-minus-small')}${t('Kleinere Schrift')}</button>
+        <button type="button" role="menuitem" data-edt="bigger">${icon('fi-rr-plus-small')}${t('Größere Schrift')}</button>
+        <a role="menuitem" href="#/luna">${svgBook}${t('Dokumentation')}</a></div>` : ''}
+    </div>
+    ${edx.find ? `<div class="edt-find" role="search">
+      <input data-find-q value="${esc(edx.q)}" placeholder="${esc(t('Suchen'))}" autocomplete="off" spellcheck="false"><span class="edt-find__info" data-find-info></span>
+      <button type="button" data-edt="prev" aria-label="${esc(t('Vorheriger Treffer'))}">${icon('fi-rr-angle-small-up')}</button><button type="button" data-edt="next" aria-label="${esc(t('Nächster Treffer'))}">${icon('fi-rr-angle-small-down')}</button>
+      <input data-find-rep value="${esc(edx.rep)}" placeholder="${esc(t('Ersetzen durch'))}" autocomplete="off" spellcheck="false">
+      <button type="button" data-edt="replace">${t('Ersetzen')}</button><button type="button" data-edt="replaceall">${t('Alle')}</button>
+      <button type="button" data-edt="findclose" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross-small')}</button></div>` : ''}`;
+  }
+  const EDT_SNIPS = {
+    onjoin: 'onjoin(username) {\n  print("Willkommen {username}!")\n}\n',
+    onmessage: 'onmessage(text, username) {\n  if text == "hallo" then\n    print("Hallo {username}!")\n  end\n}\n',
+    oncommand: 'oncommand(command, args) {\n  if command == "regeln" then\n    print("Bitte bleib freundlich.")\n  end\n}\n',
+    if: 'if bedingung then\n  \nend\n',
+    for: 'for i = 1, 10 do\n  \nend\n',
+    function: 'local function name(wert)\n  return wert\nend\n',
+    embed: 'embed({\n  title = "Titel",\n  text = "Text",\n  color = "#5865F2",\n  fields = { { name = "Feld", value = "Wert" } },\n})\n',
+    value: 'local zaehler = ../MyBot.ReplicatedStorage.IntValue\nzaehler.Value = zaehler.Value + 1\n',
+  };
+  function ideStatusHtml() {
+    const f = ideFile(ide.active);
+    const ta = $('[data-ide-code]');
+    const pos = ta ? ta.selectionStart : 0;
+    const before = f ? (f.code || '').slice(0, pos) : '';
+    const line = before.split('\n').length;
+    const col = before.length - before.lastIndexOf('\n');
+    const d = f ? ide.diag[f.id] || {} : {};
+    return f ? `<span>${d.error ? `<b class="ide-st--bad">${icon('fi-rr-cross-circle')}${t('1 Fehler')}</b>` : `<b class="ide-st--ok">${icon('fi-rr-check')}${t('Keine Fehler')}</b>`}</span><span>${t('Zeile {a}, Spalte {b}', { a: line, b: col })}</span><span>${t('Leerzeichen: 2')}</span><span>Luna ${esc((ide.luna && ide.luna.VERSION) || '')}</span><span>${esc(CLASS_INFO[f.type] ? CLASS_INFO[f.type].name : '')}</span>` : '';
+  }
+  function edtUpdateStatus() { const st = $('[data-ide-status]'); if (st) st.innerHTML = ideStatusHtml(); }
+  function edtRedraw() { const bar = $('[data-edt-box]'); if (bar) bar.innerHTML = ideToolbarHtml(); }
+  function edtAction(id) {
+    const ta = $('[data-ide-code]');
+    if (id === 'save') { edx.tool = null; ideSave(); return; }
+    if (id === 'insert' || id === 'more') { edx.tool = edx.tool === id ? null : id; edtRedraw(); return; }
+    edx.tool = null;
+    if (id === 'find') { edx.find = true; edtRedraw(); const i = $('[data-find-q]'); if (i) { if (ta && ta.selectionEnd > ta.selectionStart) { edx.q = ta.value.slice(ta.selectionStart, ta.selectionEnd); i.value = edx.q; } i.focus(); i.select(); } return; }
+    if (id === 'findclose') { edx.find = false; edtRedraw(); if (ta) ta.focus(); return; }
+    if (id === 'next' || id === 'prev') { findNext(id === 'prev'); return; }
+    if (id === 'replace') { replaceOne(); return; }
+    if (id === 'replaceall') { replaceAll(); return; }
+    if (id === 'smaller' || id === 'bigger') { edx.fs = Math.min(18, Math.max(12, edx.fs + (id === 'bigger' ? 1 : -1))); store.set('tsg-ide-fs', edx.fs); const ideBox = $('.ide'); if (ideBox) ideBox.style.setProperty('--code-fs', `${edx.fs}px`); chW = 0; edtRedraw(); return; }
+    if (id === 'test') { ide.panel = 'test'; ide.panelOpen = true; const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.add('is-open'); } edtRedraw(); return; }
+    edtRedraw();
+    if (!ta) return;
+    if (id === 'undo' || id === 'redo') { ta.focus(); try { document.execCommand(id); } catch (e) { /* nicht verfügbar */ } return; }
+    if (id === 'format') { formatCode(ta); return; }
+    if (id === 'comment') { toggleComment(ta); return; }
+    if (id === 'goto') {
+      const n = Math.round(Number(prompt(t('Zu welcher Zeile?'), String(ide.cur || 1))));
+      if (!n) return;
+      const lines = ta.value.split('\n');
+      const line = Math.max(1, Math.min(lines.length, n));
+      const at = lines.slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0);
+      ta.focus();
+      ta.setSelectionRange(at, at);
+      scrollToLine(line);
+      ideCaret();
+    }
   }
   function ideEditorHtml() {
     const f = ideFile(ide.active);
@@ -5745,7 +6073,7 @@
         <a class="ide-empty__docs" href="#/luna">${svgBook}${t('Luna lernen – zur Dokumentation')}</a>
       </div>`;
     }
-    return `${banner}${draft}<div class="code" data-ide-scroll>
+    return `${banner}${draft}<div class="edt-box" data-edt-box>${ideToolbarHtml()}</div><div class="code" data-ide-scroll>
         <div class="code__grid">
           <pre class="code__gutter" data-ide-gutter aria-hidden="true"></pre>
           <div class="code__area">
@@ -5753,9 +6081,11 @@
             <i class="code__mark" data-ide-mark hidden></i>
             <pre class="code__hl" data-ide-hl aria-hidden="true"></pre>
             <textarea class="code__input" data-ide-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Code von {name}', { name: f.name }))}">${esc(f.code || '')}</textarea>
+            <div class="ac" data-ac hidden role="listbox"></div>
           </div>
         </div>
       </div>
+      <div class="ide-status" data-ide-status>${ideStatusHtml()}</div>
       <div class="ide-keys" role="toolbar" aria-label="${esc(t('Zeichen einfügen'))}">${['⇥', '{ }', '( )', '" "', '=', '.', ':', '..', '[ ]', 'script.Parent', '--'].map((k) => `<button type="button" data-ide-key="${esc(k)}">${esc(k)}</button>`).join('')}</div>`;
   }
   function idePanelTabs() {
@@ -5834,6 +6164,7 @@
     const act = ideFile(ide.active);
     const crumbs = act ? [ide.bot.name, ...itemPath(act)] : [ide.bot.name];
     iconDefs();
+    box.style.setProperty('--code-fs', `${edx.fs}px`);
     box.innerHTML = `<header class="ide__bar">
         <button class="ide__tree-btn" type="button" data-ide-tree="1" aria-label="${esc(t('Explorer'))}">${icon('fi-rr-sidebar')}</button>
         <a class="ide__back" href="#/chat/${esc(ide.cid)}/info" aria-label="${esc(t('Zurück zum Chat'))}">${icon('fi-rr-arrow-left')}</a>
@@ -5907,6 +6238,7 @@
   function ideCaret() {
     const ta = $('[data-ide-code]');
     if (!ta) return;
+    edtUpdateStatus();
     const line = ta.value.slice(0, ta.selectionStart).split('\n').length;
     if (line === ide.cur) return;
     ide.cur = line;
@@ -5922,6 +6254,7 @@
     const f = ideFile(ide.active);
     if (!f) return;
     f.code = ta.value;
+    edtUpdateStatus();
     ide.cur = ta.value.slice(0, ta.selectionStart).split('\n').length;
     ideHighlight();
     clearTimeout(ideTimer);
@@ -5942,7 +6275,18 @@
   }
   function ideKey(e) {
     const ta = e.target;
+    if (edx.ac) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = edx.ac.items.length; edx.ac.i = (edx.ac.i + (e.key === 'ArrowDown' ? 1 : -1) + n) % n; acDraw(); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); acAccept(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); acHide(); return; }
+    }
+    const mod = e.ctrlKey || e.metaKey;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); return; }
+    if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); edtAction('find'); return; }
+    if (mod && e.key === '/') { e.preventDefault(); toggleComment(ta); return; }
+    if (mod && e.key.toLowerCase() === 'g') { e.preventDefault(); edtAction('goto'); return; }
+    if (mod && e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); formatCode(ta); return; }
+    if (mod && e.key === ' ') { e.preventDefault(); acShow(ta); return; }
     const v = ta.value;
     const pos = ta.selectionStart;
     const lineStart = v.lastIndexOf('\n', pos - 1) + 1;
@@ -6050,7 +6394,7 @@
     if (ide.saving || !ide.bot) return;
     ide.saving = true;
     renderIde();
-    const body = { files: ide.files.map((f) => ({ id: f.id, name: f.name, type: f.type, parent: f.parent, ...(isScript(f.type) ? { code: f.code || '' } : {}), ...(f.enabled === false ? { enabled: false } : {}), ...(f.url ? { url: f.url } : {}) })) };
+    const body = { files: ide.files.map((f) => ({ id: f.id, name: f.name, type: f.type, parent: f.parent, ...(isScript(f.type) ? { code: f.code || '' } : {}), ...(f.enabled === false ? { enabled: false } : {}), ...(f.url ? { url: f.url } : {}), ...(VALUE_TYPES.includes(f.type) ? { value: f.value } : {}) })) };
     const r = await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body });
     ide.saving = false;
     if (r) {
@@ -6501,7 +6845,7 @@
   const FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/webm', 'video/quicktime', 'application/pdf'];
   const FILE_LIMIT = { image: 15, video: 80, file: 20 };
   const kindOf = (type) => (type.startsWith('image/') ? 'image' : type.startsWith('video/') ? 'video' : 'file');
-  async function shrinkImage(file) {
+  async function shrinkChatImage(file) {
     const bmp = await createImageBitmap(file);
     const scale = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
     const w = Math.round(bmp.width * scale);
@@ -6524,7 +6868,7 @@
       let h = null;
       const kind = kindOf(type);
       if (kind === 'image' && type !== 'image/gif') {
-        try { ({ blob, w, h } = await shrinkImage(f)); type = 'image/jpeg'; } catch (e) { /* unverändert senden */ }
+        try { ({ blob, w, h } = await shrinkChatImage(f)); type = 'image/jpeg'; } catch (e) { /* unverändert senden */ }
       }
       if (!FILE_TYPES.includes(type)) { toast(t('„{name}“ kann man nicht senden. Erlaubt sind Fotos, Videos und PDFs.', { name: f.name })); continue; }
       if (blob.size > FILE_LIMIT[kind] * 1048576) { toast(t('„{name}“ ist zu groß (höchstens {n} MB).', { name: f.name, n: FILE_LIMIT[kind] })); continue; }
@@ -7962,7 +8306,7 @@
   }
   const chCard = (inner, cls = '') => `<article class="ch-card ${cls}">${inner}</article>`;
   const statRow = (label, value) => `<div class="ch-stat"><span>${esc(label)}</span><b>${value}</b></div>`;
-  function serverCard(c) {
+  function dashServerCard(c) {
     const place = dash.data ? dash.data.places.find((x) => x.id === c.id) : null;
     const pub = c.visibility === 'public';
     return chCard(`<div class="ch-card__top"><span class="ch-pill">${icon(pub ? 'fi-rr-unlock' : 'fi-rr-lock')}${pub ? t('Öffentlich') : t('Privat')}</span>
@@ -8005,7 +8349,7 @@
     const groups = (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group').sort((a, b) => b.updated - a.updated);
     const bots = dash.data ? dash.data.bots : [];
     return `${updates}
-      ${chSec(t('Server und Gruppen'), '#/dashboard/erstellungen', `${groups.map(serverCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="server">${icon('fi-rr-plus')}<b>${t('Server erstellen')}</b></button>`)}
+      ${chSec(t('Server und Gruppen'), '#/dashboard/erstellungen', `${groups.map(dashServerCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="server">${icon('fi-rr-plus')}<b>${t('Server erstellen')}</b></button>`)}
       ${chSec(t('Bots'), '#/dashboard/erstellungen?f=bot', `${bots.map(botCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="bot">${icon('fi-rr-plus')}<b>${t('Bot erstellen')}</b></button>`)}
       ${learn}`;
   }
@@ -8377,6 +8721,7 @@
     } else if (prof.tab === 'activity') {
       const recent = (chat.list ? chat.list.chats : []).slice().sort((a, b) => b.updated - a.updated).slice(0, 6);
       main = `${inGame ? `<div class="pf-card pf-live">${icon('fi-sr-play')}<span><b>${t('Gerade im Spiel')}</b><small>Train Sim Germany</small></span></div>` : ''}
+        <button class="pf-card pf-stats" type="button" data-open="stats">${icon('fi-rr-chart-histogram')}<span><b>${t('Meine Statistik')}</b><small>${t('Spielzeit, Fahrten, Kilometer und Pünktlichkeit aus dem Spiel')}</small></span>${icon('fi-rr-angle-small-right')}</button>
         ${recent.length ? `<div class="pf-card pf-list">${recent.map((c) => `<a href="#/chat/${esc(c.id)}">${chatImg(c, 'pf-mini')}<span><b>${esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>${icon('fi-rr-angle-small-right')}</a>`).join('')}</div>` : `<p class="shx-empty">${t('Noch keine Aktivität.')}</p>`}`;
     } else if (prof.tab === 'wish') {
       const items = [...shopItems('trains').map((x) => ['trains', x]), ...shopItems('routes').map((x) => ['routes', x])].filter(([k, x]) => shopWish().has(shopKey(k, x)));
@@ -9282,6 +9627,49 @@
     document.addEventListener('change', (e) => { if (e.target.matches('[data-prof-banner]') && e.target.files && e.target.files[0]) uploadBanner(e.target.files[0]); });
     document.addEventListener('submit', (e) => { const f = e.target.closest('form[data-prof-form]'); if (f) { e.preventDefault(); saveProfile(f); } });
 
+    // Editor-Werkzeuge: Leiste, Vorschläge, Suchen
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-edt], [data-edt-snip], [data-edt-obj], [data-ac-pick]');
+      if (!el) {
+        if (edx.tool && !e.target.closest('.edt-menu')) { edx.tool = null; edtRedraw(); }
+        if (edx.ac && !e.target.closest('[data-ac]')) acHide();
+        return;
+      }
+      const ds = el.dataset;
+      if (ds.acPick !== undefined) { acAccept(+ds.acPick); const ta = $('[data-ide-code]'); if (ta) ta.focus(); return; }
+      if (ds.edt) { edtAction(ds.edt); return; }
+      const ta = $('[data-ide-code]');
+      if (ds.edtSnip && ta) {
+        edx.tool = null;
+        edtRedraw();
+        const pos = ta.selectionStart;
+        const lineStart = ta.value.lastIndexOf('\n', pos - 1) + 1;
+        const indent = (ta.value.slice(lineStart, pos).match(/^\s*/) || [''])[0];
+        const lead = ta.value.slice(lineStart, pos).trim() ? `\n${indent}` : '';
+        ta.focus();
+        edx.skipAc = true;
+        insertText(ta, lead + EDT_SNIPS[ds.edtSnip].replace(/\n(?!$)/g, `\n${indent}`));
+        ideInput(ta);
+        return;
+      }
+      if (ds.edtObj !== undefined) {
+        edx.tool = null;
+        edtRedraw();
+        const f = ideFile(ide.active);
+        const anchor = $('[data-edt="insert"]');
+        if (f && anchor) openXpMenu('insert', f.parent, anchor);
+      }
+    });
+    document.addEventListener('input', (e) => {
+      if (e.target.matches && e.target.matches('[data-find-q]')) { edx.q = e.target.value; const i = $('[data-find-info]'); if (i) i.textContent = ''; }
+      if (e.target.matches && e.target.matches('[data-find-rep]')) edx.rep = e.target.value;
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!e.target.matches || !e.target.matches('[data-find-q], [data-find-rep]')) return;
+      if (e.key === 'Enter') { e.preventDefault(); if (e.target.matches('[data-find-rep]')) replaceOne(); else { findNext(e.shiftKey); e.target.focus(); } }
+      if (e.key === 'Escape') { e.preventDefault(); edtAction('findclose'); }
+    });
+
     // Eigene Bots und Bot-Editor
     const idePanelRedraw = () => { const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.toggle('is-open', !!ide.panelOpen); } };
     const setTree = (open) => { ide.tree = open; const body = $('.ide__body'); if (body) body.classList.toggle('is-tree', open); };
@@ -9420,7 +9808,12 @@
     document.addEventListener('pointerdown', (e) => { if (e.target.closest('[data-ide-key]')) e.preventDefault(); });
     document.addEventListener('input', (e) => {
       if (!e.target.matches) return;
-      if (e.target.matches('[data-ide-code]')) ideInput(e.target);
+      if (e.target.matches('[data-ide-code]')) {
+        ideInput(e.target);
+        // Vorschläge beim Tippen (nicht direkt nach dem Übernehmen eines Vorschlags)
+        if (edx.skipAc) edx.skipAc = false;
+        else if (e.inputType === 'insertText' || e.inputType === 'deleteContentBackward') acShow(e.target); else acHide();
+      }
       else if (e.target.matches('[data-xp-search]') && ide.menu) {
         ide.menu.q = e.target.value;
         const menu = $('.xp-menu');
@@ -9436,6 +9829,14 @@
       else if (e.target.matches('[data-pp-enabled]')) {
         const f = ideFile(ide.sel);
         if (f) { if (e.target.checked) delete f.enabled; else f.enabled = false; ideDiagnose(); ideRefreshSide(); ideInputDraft(); }
+      } else if (e.target.matches('[data-pp-value]')) {
+        // Werte-Objekte: Standardwert im Editor einstellen
+        const f = ideFile(ide.sel);
+        if (f) {
+          const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+          f.value = f.type === 'boolvalue' ? !!v : f.type === 'intvalue' ? Math.round(Number(v) || 0) : f.type === 'numbervalue' ? Number(v) || 0 : String(v).slice(0, 500);
+          ideInputDraft();
+        }
       }
     });
     document.addEventListener('focusout', (e) => {

@@ -266,6 +266,25 @@ Auf Touch-Geräten gibt es über der Tastatur eine Zeichenleiste mit \`{ }\`, \`
 
 > [!TIPP]
 > Nicht gespeicherte Änderungen gehen nicht verloren: Der Editor merkt sie sich auf deinem Gerät als Entwurf.
+
+## Werkzeugleiste und Tastenkürzel
+
+Über dem Code liegt die Werkzeugleiste: **✓** speichert, **↶** und **↷** machen rückgängig bzw. wiederholen, **T** rückt den Code ordentlich ein, **+** fügt Bausteine (Ereignisse, \`if\`, \`for\`, \`embed\` …) oder Objekte ein, **⋯** öffnet Suchen und Ersetzen, Kommentieren, „Gehe zu Zeile“, Testen und die Schriftgröße.
+
+Beim Tippen schlägt der Editor passende Wörter vor: Funktionen, Schlüsselwörter, Namen aus deinem Skript, nach einem Punkt die Kinder und Eigenschaften eines Objekts (z. B. \`script.Parent.\`), nach \`math.\` die Funktionen der Bibliothek und in Texten nach \`{\` die Platzhalter.
+
+| Kürzel | Was passiert |
+| --- | --- |
+| Strg/Cmd + S | Speichern |
+| Strg/Cmd + Leertaste | Vorschläge zeigen |
+| ↑ ↓ und Enter/Tab | Vorschlag wählen und übernehmen |
+| Strg/Cmd + F | Suchen und Ersetzen |
+| Strg/Cmd + / | Zeile kommentieren an/aus |
+| Strg/Cmd + G | Gehe zu Zeile |
+| Strg/Cmd + Umschalt + I | Code einrücken |
+| Tab / Umschalt + Tab | Einrücken / Ausrücken |
+
+Der Editor ist hell oder dunkel – genau wie unter **Einstellungen → Darstellung**.
 `,
   },
   {
@@ -305,6 +324,21 @@ Mit **Folder** sortierst du deine Objekte. Ordner ändern nichts daran, ob ein S
 ## Namen
 
 Namen bestehen aus Buchstaben, Zahlen und \`_\` und beginnen nicht mit einer Zahl – so kannst du sie im Code mit \`script.Parent.Name\` erreichen. Unter einem Parent darf jeder Name nur einmal vorkommen.
+
+## ReplicatedStorage und ServerStorage
+
+| Service | Wofür |
+| --- | --- |
+| **ReplicatedStorage** | ModuleScripts und Werte, die alle Skripte nutzen – auch ClientScripts in der App |
+| **ServerStorage** | ModuleScripts und Werte nur fürs Backend. Apps bekommen davon nichts zu sehen |
+
+\`\`\`luna
+local Texte = require(../MyBot.ReplicatedStorage.Texte)
+local geheim = ../MyBot.ServerStorage.Passwort.Value
+\`\`\`
+
+> [!TIPP]
+> Was ClientScripts nicht wissen dürfen (z. B. interne Texte oder Zähler), gehört in ServerStorage.
 `,
   },
   {
@@ -973,6 +1007,32 @@ oncommand(command) {
 | --- | --- |
 | \`require(modul)\` | ModuleScript laden |
 | \`save(name, wert)\`, \`load(name, standard)\` | Werte merken |
+
+## embed – Karten für eigene Bots
+
+Normale Nachrichten sind Text. Wenn dein Bot etwas als **Karte** zeigen soll, nimm \`embed\`. Karten gibt es in der App nur von eigenen Bots.
+
+\`\`\`luna
+oncommand(command, args) {
+  if command == "info" then
+    embed({
+      title = "Server-Info",
+      text = "Willkommen auf {server}!",
+      color = "#5865F2",
+      fields = { { name = "Mitglieder", value = tostring(members) }, { name = "Spiel", value = game } },
+      footer = "Train Sim Germany",
+    })
+  end
+}
+\`\`\`
+
+| Feld | Bedeutung |
+| --- | --- |
+| \`title\` | Überschrift (bis 256 Zeichen) |
+| \`text\` | Text (bis 2000 Zeichen, Platzhalter gehen) |
+| \`color\` | Farbe des Rands als \`#RRGGBB\` |
+| \`fields\` | Bis zu 10 Felder mit \`name\` und \`value\` |
+| \`footer\` | Kleine Zeile unten |
 `,
   },
   {
@@ -1087,6 +1147,28 @@ Wird mit \`require\` geladen und gibt seinen \`return\`-Wert zurück.
 ## Folder
 
 Ordner zum Sortieren. Hat keine eigenen Eigenschaften oder Methoden.
+
+## Werte: BoolValue, IntValue, NumberValue, StringValue
+
+Werte-Objekte speichern einen einzelnen Wert. Den Startwert stellst du im Editor unter **Eigenschaften → Value** ein. Ändert ein Skript \`.Value\`, bleibt der neue Wert gespeichert – auch beim nächsten Ereignis.
+
+| Klasse | Value ist | Beispiel |
+| --- | --- | --- |
+| \`BoolValue\` | \`true\` oder \`false\` | Bot an oder aus |
+| \`IntValue\` | ganze Zahl | Zähler für Begrüßungen |
+| \`NumberValue\` | Zahl mit Komma | Faktor, z. B. 1.5 |
+| \`StringValue\` | Text | Begrüßungstext zum Ändern ohne Code |
+
+\`\`\`luna
+onjoin(username) {
+  local zaehler = ../MyBot.ReplicatedStorage.Begruessungen
+  zaehler.Value = zaehler.Value + 1
+  print("Willkommen {username}! Du bist Nummer " .. zaehler.Value)
+}
+\`\`\`
+
+> [!HINWEIS]
+> ClientScripts dürfen Werte lesen, ändern aber nur Werte im ClientService. Werte haben keine Kinder.
 `,
   },
   {
@@ -1160,6 +1242,10 @@ Nachrichten von Bots lösen keine Bots aus – so entstehen keine Schleifen.
     md: `
 ## Luna 2.1 – November 2026
 
+- **Werte-Objekte** \`BoolValue\`, \`IntValue\`, \`NumberValue\`, \`StringValue\` mit gespeichertem \`.Value\`
+- Neue Services **ReplicatedStorage** und **ServerStorage**
+- \`embed()\` für Karten eigener Bots
+- Editor mit Werkzeugleiste, Vorschlägen beim Tippen, Suchen und Ersetzen, hell und dunkel
 - **Playground**: Luna ohne Bot ausführen, \`print()\` geht auch außerhalb von Ereignissen
 - \`runScript()\` – Luna in eigene Projekte einbetten (siehe unten)
 - Neuer Platzhalter \`{channel}\`: Kanal der Nachricht in Servern mit Kanälen

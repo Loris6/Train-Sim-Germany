@@ -150,6 +150,9 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `GET /api/chats/<id>?ch=<kanal>` · `POST …/messages { ch }` | Server: Nachrichten eines Kanals lesen bzw. dorthin schreiben |
 | `GET /api/dashboard` | Eigene Bots und Chats, die man leitet (für das Dashboard) |
 | `GET /api/luna/intern` | „Luna von innen“ – nur für den Rang Chief Engineer |
+| `PUT /api/me/profile` · `PUT/DELETE /api/me/banner` · `GET /media/banner/<id>` | Profil (Status, Pronomen, Über mich, Akzentfarbe) und Bannerbild (`profile.js`) |
+| `POST /api/chats/<id>/invite` · `GET /api/chat-invites/<code>` · `POST /api/chat-invites/<code>/join` | Einladungslinks für Gruppen und Server |
+| `POST /api/chats` mit `template` | Server mit Vorlage: `gaming`, `schule`, `lernen`, `freunde`, `creator`, `vorort` |
 | `GET/PUT/DELETE /api/chats/<id>/discord` · `POST …/discord/test` · `POST …/discord/submit` | Discord-Verbindung eines Server-Chats |
 | `GET /api/discord/requests` · `POST /api/discord/requests/<id>` | Eingereichte Discord-Verbindungen prüfen (über PRD) |
 | `GET/POST /api/chats/<id>/bots` | Bots eines Chats auflisten bzw. erstellen `{ name, mode }` |

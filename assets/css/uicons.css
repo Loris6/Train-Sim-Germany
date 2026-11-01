@@ -6,6 +6,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-angle-small-down:before{content:"\f153"}
 .fi-rr-angle-small-left:before{content:"\f154"}
 .fi-rr-angle-small-right:before{content:"\f155"}
+.fi-rr-angle-small-up:before{content:"\f156"}
 .fi-rr-apps:before{content:"\f16c"}
 .fi-rr-apps-add:before{content:"\f169"}
 .fi-rr-arrow-left:before{content:"\f197"}
@@ -40,6 +41,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-comments-question:before{content:"\f4bb"}
 .fi-rr-copy:before{content:"\f4dd"}
 .fi-rr-cross:before{content:"\f4f7"}
+.fi-rr-cross-circle:before{content:"\f4f4"}
 .fi-rr-cross-small:before{content:"\f4f6"}
 .fi-rr-crown:before{content:"\f4f9"}
 .fi-rr-dashboard:before{content:"\f523"}
@@ -78,6 +80,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-menu-burger:before{content:"\f925"}
 .fi-rr-menu-dots:before{content:"\f927"}
 .fi-rr-menu-dots-vertical:before{content:"\f926"}
+.fi-rr-minus-small:before{content:"\f94d"}
 .fi-rr-moon:before{content:"\f972"}
 .fi-rr-newspaper:before{content:"\f9a5"}
 .fi-rr-palette:before{content:"\f9ed"}
@@ -91,6 +94,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-plus-small:before{content:"\faab"}
 .fi-rr-puzzle-alt:before{content:"\fae9"}
 .fi-rr-receipt:before{content:"\fb16"}
+.fi-rr-redo:before{content:"\fb29"}
 .fi-rr-robot:before{content:"\fb61"}
 .fi-rr-rocket-lunch:before{content:"\fb63"}
 .fi-rr-route:before{content:"\fb6f"}
@@ -125,6 +129,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-trash-xmark:before{content:"\fe16"}
 .fi-rr-triangle-warning:before{content:"\fe33"}
 .fi-rr-trophy:before{content:"\fe39"}
+.fi-rr-undo:before{content:"\fe6b"}
 .fi-rr-unlock:before{content:"\fe6f"}
 .fi-rr-user:before{content:"\fea0"}
 .fi-rr-user-add:before{content:"\fe7a"}
