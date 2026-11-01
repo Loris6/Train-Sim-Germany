@@ -18,6 +18,9 @@
  * Eigener Interpreter: kein eval, kein Zugriff auf JavaScript, Grenzen für Schritte, Tiefe, Länge und Ausgaben.
  */
 
+// Version der Sprache (Playground, Dokumentation). Neue Funktionen → kleine Zahl, Änderungen, die alte Skripte brechen → große Zahl.
+export const VERSION = '2.1';
+
 export const TYPES = { server: 'ServerScript', client: 'ClientScript', module: 'ModuleScript', game: 'GameScript', connector: 'Connector', webhook: 'Webhook', folder: 'Folder' };
 export const SCRIPT_TYPES = ['server', 'client', 'module', 'game'];
 export const SERVICES = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService'];
@@ -55,7 +58,7 @@ export const DOCS = {
     ['server', 'Name des Chats bzw. privaten Servers'], ['chat', 'Name des Chats'], ['members', 'Mitglieder im Chat'],
     ['game', 'Name des Spiels'], ['gameId', 'ID des Spiels (Place-ID)'], ['serverId', 'ID des privaten Servers (GameScript)'],
     ['players', 'Spieler im privaten Server (GameScript)'], ['text', 'Text der Nachricht'], ['command', 'Befehl ohne Präfix'],
-    ['args', 'Wörter nach dem Befehl (Liste)'], ['bot', 'Name des Bots'], ['time', 'Uhrzeit, z. B. 18:42'], ['date', 'Datum, z. B. 31.10.2026'],
+    ['args', 'Wörter nach dem Befehl (Liste)'], ['channel', 'Kanal der Nachricht in Servern, z. B. allgemein'], ['bot', 'Name des Bots'], ['time', 'Uhrzeit, z. B. 18:42'], ['date', 'Datum, z. B. 31.10.2026'],
     ['script', 'Das Skript selbst (Instance) – script.Parent ist der Ordner bzw. Service darüber'],
   ],
   functions: [
@@ -726,7 +729,7 @@ class Runtime {
   output(kind, args, node, extra = null) {
     const text = args.map((x) => str(x)).join(' ').slice(0, this.limits.text);
     const label = { say: 'print()', discord: 'discord()', webhook: 'Webhook:Send()' }[kind];
-    if (this.phase !== 'event') {
+    if (this.phase !== 'event' && !this.free) {
       this.warnOnce(`${kind}-setup`, `${label} außerhalb eines Ereignisses wird ignoriert – schreib es z. B. in onjoin() { … }`, node);
       return null;
     }
@@ -1563,6 +1566,52 @@ export function runEvent({ files, type, event, vars = {}, args = [], memory = {}
     }
   }
   return { says: rt.says, discords: rt.discords, webhooks: rt.webhooks, logs: rt.logs, errors: rt.errors, memory: plain(rt.memory), memChanged: rt.memChanged, ran };
+}
+
+// ---------- Luna ohne Bot: ein einzelnes Skript ausführen (Playground, andere Projekte) ----------
+// print() schreibt hier sofort in die Ausgabe, auch außerhalb von Ereignissen. Ereignisse, die das Skript definiert
+// (onstart, onjoin …), lassen sich mit events nacheinander auslösen: [{ event: 'join', args: ['Lok_Max'] }].
+// Ergebnis: { output: [{ kind: out | log | warn | error, text, line }], says, errors, steps, ran }
+export function runScript(code, { vars = {}, events = [], limits, name = 'Skript' } = {}) {
+  const files = [{ id: 'main', name, type: 'server', parent: 'ServerScriptService', code: String(code || '') }];
+  const rt = new Runtime({ files, vars, memory: {}, limits: { steps: 50000, says: 50, logs: 150, ...(limits || {}) }, botName: 'Playground', side: 'backend' });
+  rt.free = true;
+  let inst = null;
+  rt.tree.insts.forEach((x) => { if (x.item && x.item.id === 'main') inst = x; });
+  rt.file = files[0];
+  const parsed = cached(files[0].code);
+  const done = () => ({
+    output: rt.logs.map((x) => ({ kind: x.kind, line: x.line, text: x.kind === 'out' ? x.text.replace(/^💬 /, '') : x.text })),
+    says: rt.says, errors: rt.errors, steps: rt.steps, ran,
+  });
+  let ran = 0;
+  if (parsed.error) {
+    rt.errors.push({ ...parsed.error, parse: true });
+    rt.log(`Zeile ${parsed.error.line}: ${parsed.error.message}`, 'error', parsed.error.line);
+    return done();
+  }
+  const scope = new Scope(rt.globalsFor(inst));
+  const guard = (fn) => {
+    try { fn(); return true; } catch (e) {
+      if (!(e instanceof LunaError)) throw e;
+      rt.errors.push({ message: e.message, line: e.line, col: e.col });
+      rt.log(`Zeile ${e.line}: ${e.message}`, 'error', e.line);
+      return false;
+    }
+  };
+  if (!guard(() => rt.execBlock(parsed.ast, scope, true))) return done();
+  for (const ev of events) {
+    let handler = null;
+    scope.vars.forEach((v, k) => { if (!handler && v instanceof LFunc && handlerEvent(k) === ev.event) handler = v; });
+    if (!handler) continue;
+    ran += 1;
+    rt.phase = 'event';
+    rt.depth = 0;
+    const ok = guard(() => rt.call(handler, (ev.args || []).map(fromPlain), { line: handler.body[0] ? handler.body[0].line : 0, col: 0 }, handler.name));
+    rt.phase = 'setup';
+    if (!ok) break;
+  }
+  return done();
 }
 
 // ---------- Farben im Editor ----------

@@ -1,20 +1,63 @@
 /*
- * Train Sim Germany – Dokumentation zu Luna (Seite #/luna)
- * Inhalte als kleines Markdown: ## Überschriften, Absätze, Listen, Tabellen, ```luna-Code und Hinweise (> [!TIPP]).
+ * Luna – Dokumentation (Seite #/luna)
+ *
+ * HIER BEARBEITEST DU DIE DOKUMENTATION. Jede Seite ist ein Eintrag in PAGES:
+ *   { id: 'adresse', group: 'Gruppe aus GROUPS', title: 'Titel', lead: 'Ein Satz darunter', md: `Text` }
+ *   id    → Adresse der Seite: #/luna/<id> (nur a–z, 0–9, Bindestrich; nicht ändern, wenn schon verlinkt)
+ *   group → in welcher Gruppe links im Menü (Reihenfolge der Gruppen = GROUPS, innerhalb der Gruppe = Reihenfolge hier)
+ *   md    → kleines Markdown: ## und ### Überschriften, Absätze, - Listen, 1. Listen, | Tabellen |, `code`, **fett**,
+ *           [Link](#/luna/seite), ```luna-Codeblöcke (bekommen „Kopieren“ und „Ausprobieren“) und Hinweise:
+ *             > [!TIPP]      > [!HINWEIS]      > [!WARNUNG]
+ * Achtung: In md ist alles ein JavaScript-Text in Backticks – ` und ${ müssen als \` und \${ geschrieben werden.
+ * Ein | in einer Tabellenzelle als \| schreiben. Prüfen vor dem Pushen: node tools/check-luna-docs.mjs (jeder ```luna-Block,
+ * jede Seite, jeder Link auf #/luna/…).
  * Wird erst geladen, wenn jemand die Dokumentation öffnet.
  */
-import { highlight } from '../../backend/luna.js';
+import { highlight, VERSION } from '../../backend/luna.js';
 
-export const GROUPS = ['Erste Schritte', 'Editor', 'Skripte', 'Sprache', 'Referenz', 'Beispiele'];
+export { VERSION };
+// Sprache und Standardbibliothek gelten überall, wo Luna läuft. „TSG-Bots“ beschreibt die Plattform Train Sim Germany.
+export const GROUPS = ['Erste Schritte', 'Sprache', 'Standardbibliothek', 'TSG-Bots', 'Referenz', 'Beispiele'];
 
 export const PAGES = [
   {
     id: 'einfuehrung', group: 'Erste Schritte', title: 'Einführung in Luna',
-    lead: 'Luna ist die Skriptsprache für eigene Bots in den Chats von Train Sim Germany – fast wie Luau aus Roblox, nur einfacher für Chat-Bots.',
+    lead: 'Luna ist eine kleine, einfache Programmiersprache: schnell gelernt, gut lesbar und sicher – für Chat-Bots in Train Sim Germany und für eigene Projekte.',
     md: `
 ## Was ist Luna?
 
-Mit Luna bringst du deinem Bot bei, was er in deinem Gruppen- oder Server-Chat tun soll: neue Mitglieder begrüßen, auf Befehle wie \`!regeln\` antworten, melden, wer deinen privaten Server im Spiel betritt, oder Nachrichten nach Discord schicken.
+Luna ist eine **Programmiersprache** – keine Vorlage und kein Fließtext. Du schreibst Anweisungen, Variablen, Bedingungen, Schleifen und Funktionen, und Luna führt sie Schritt für Schritt aus:
+
+\`\`\`luna
+local stationen = { "Berlin Hbf", "Spandau", "Wolfsburg" }
+
+for i, name in ipairs(stationen) do
+  print(i .. ". Halt: " .. name)
+end
+\`\`\`
+
+Luna sieht aus wie **Luau** aus Roblox und ist bewusst klein gehalten: Wer die Grundlagen kann, kann fast alles. Probier jeden Codeblock in dieser Dokumentation mit **Ausprobieren** direkt im [Playground](#/luna/playground) aus.
+
+## Drei Ideen hinter Luna
+
+| Idee | Was das heißt |
+| --- | --- |
+| **Einfach** | Wenige Schlüsselwörter, verständliche Fehlermeldungen auf Deutsch, Blöcke mit \`{ … }\` oder \`then … end\` |
+| **Sicher** | Luna läuft in einem Sandkasten: kein Zugriff auf Dateien, Netzwerk oder fremde Daten, Grenzen für Zeit und Speicher |
+| **Einbettbar** | Der Kern (Sprache und Standardbibliothek) ist von der Plattform getrennt – Luna kann in verschiedenen Projekten laufen |
+
+## Sprache und Plattform
+
+Diese Dokumentation ist in zwei Teile geteilt:
+
+- **Sprache** und **Standardbibliothek** – gelten überall, wo Luna läuft: Variablen, Operatoren, Bedingungen, Schleifen, Funktionen, Tabellen, Texte, \`math\`, \`string\`, \`table\`.
+- **TSG-Bots** – die Plattform Train Sim Germany: Bots in Servern und Gruppen, der Editor mit Explorer und Services, Ereignisse wie \`onjoin\`, Connectors und Webhooks.
+
+Eine Plattform (ein „Host“) gibt Luna ihre eigenen Ereignisse, Platzhalter und Objekte. Die Sprache selbst bleibt gleich.
+
+## Ein Bot in vier Zeilen
+
+In Train Sim Germany schreibst du mit Luna eigene Bots für deine Server und Gruppen:
 
 \`\`\`luna
 onjoin(username) {
@@ -22,38 +65,118 @@ onjoin(username) {
 }
 \`\`\`
 
-Luna läuft sicher: Skripte haben keinen Zugriff auf deinen Computer, die App oder fremde Daten. Jedes Ereignis darf nur kurz laufen und höchstens fünf Nachrichten schreiben.
-
-## Basis oder Erweitert?
-
-| Modus | Für wen | So geht's |
-| --- | --- | --- |
-| **Basis** | Schnell und ohne Programmieren | Regeln mit Vorlage, z. B. „Wenn jemand beitritt“ → „Willkommen {username}!“ |
-| **Erweitert** | Alles, was Regeln nicht können | Skripte in Luna im Bot-Editor – mit Explorer, Services, Modulen, Connectors |
-
-> [!TIPP]
-> Du kannst jederzeit wechseln. Im Editor wandelt ein Knopf deine Regeln aus dem Basis-Modus automatisch in Luna-Code um.
-
-## Fast wie Luau
-
-Wenn du schon in Roblox Studio programmiert hast, kennst du das meiste: \`local\`, \`function … end\`, \`if … then … end\`, \`script.Parent\`, \`require\`, \`:Connect\`, \`math.random\` und \`table.insert\` gibt es auch in Luna. Dazu kommen ein paar Abkürzungen, die Bots einfacher machen:
-
-- Blöcke wahlweise mit \`{ … }\` oder mit \`then\`/\`do\` … \`end\`
-- Platzhalter direkt im Text: \`"Hallo {username}"\`
-- Ereignisse als Funktionen: \`onjoin() { … }\`
-- \`../MyBot\` springt zum Anfang der Struktur
-
-Mehr dazu unter [Unterschiede zu Luau](#/luna/luau).
+\`onjoin\` ist ein **Ereignis**: Die Funktion läuft, sobald jemand beitritt. \`{username}\` und \`{server}\` sind **Platzhalter**, die die Plattform füllt.
 
 ## Wo geht's weiter?
 
-- [Dein erster Bot](#/luna/erster-bot) – Schritt für Schritt
-- [Explorer und Services](#/luna/services) – wie ein Bot aufgebaut ist
-- [Ereignisse](#/luna/ereignisse) – worauf dein Bot reagieren kann
+- [Luna auf einen Blick](#/luna/auf-einen-blick) – die ganze Sprache auf einer Seite
+- [Playground](#/luna/playground) – Code schreiben und sofort ausführen
+- [Dein erster Bot](#/luna/erster-bot) – Schritt für Schritt zum eigenen Bot
+- [Versionen](#/luna/versionen) – was sich wann geändert hat
 `,
   },
   {
-    id: 'erster-bot', group: 'Erste Schritte', title: 'Dein erster Bot',
+    id: 'playground', group: 'Erste Schritte', title: 'Playground', custom: true,
+    lead: 'Luna schreiben und sofort ausführen – ohne Bot und ohne Anmeldung.',
+    md: '',
+  },
+  {
+    id: 'auf-einen-blick', group: 'Erste Schritte', title: 'Luna auf einen Blick',
+    lead: 'Die ganze Sprache auf einer Seite – zum Nachschlagen.',
+    md: `
+## Kommentare
+
+\`\`\`luna
+-- Kommentar bis zum Zeilenende
+// geht auch
+--[[ Kommentar
+     über mehrere Zeilen ]]
+\`\`\`
+
+## Variablen und Werte
+
+\`\`\`luna
+local name = "Lok_Max"      -- Text
+local zuege = 3             -- Zahl
+local online = true         -- Wahrheitswert
+local nichts = nil          -- kein Wert
+const LINIE = "RE1"         -- Konstante
+print(typeof(zuege))        -- number
+\`\`\`
+
+## Rechnen und Vergleichen
+
+\`\`\`luna
+local summe = 2 + 3 * 4     -- 14
+local rest = 17 % 5         -- 2
+local text = "RE" .. 1      -- "RE1"
+print(summe >= 10 and rest ~= 0)
+\`\`\`
+
+## Bedingungen
+
+\`\`\`luna
+local spieler = 12
+if spieler > 10 then
+  print("Voll")
+elseif spieler > 0 then
+  print("Läuft")
+else
+  print("Leer")
+end
+\`\`\`
+
+## Schleifen
+
+\`\`\`luna
+for i = 1, 3 do
+  print("Runde " .. i)
+end
+
+local n = 0
+while n < 3 do
+  n += 1
+end
+print(n)
+\`\`\`
+
+## Funktionen
+
+\`\`\`luna
+local function gruss(name)
+  return "Hallo " .. name .. "!"
+end
+print(gruss("Mia"))
+\`\`\`
+
+## Tabellen
+
+\`\`\`luna
+local liste = { "S1", "S2", "S3" }
+table.insert(liste, "S5")
+print(#liste)
+
+local zug = { name = "ICE 4", plaetze = 918 }
+for k, v in pairs(zug) do
+  print(k .. ": " .. tostring(v))
+end
+\`\`\`
+
+## Texte und Platzhalter
+
+\`\`\`luna
+local spieler = "Mia"
+print(\`Hallo {spieler}!\`)
+print(string.upper("leise"))
+print(string.format("%d Züge", 4))
+\`\`\`
+
+> [!TIPP]
+> Blöcke gehen auch mit geschweiften Klammern: \`if spieler > 10 { print("Voll") }\`. Such dir eine Schreibweise aus und bleib dabei.
+`,
+  },
+  {
+    id: 'erster-bot', group: 'TSG-Bots', title: 'Dein erster Bot',
     lead: 'In fünf Minuten zu einem Bot, der neue Mitglieder begrüßt und auf !regeln antwortet.',
     md: `
 ## 1. Bot erstellen
@@ -97,7 +220,7 @@ Unter **Bot-Einstellungen** gibst du deinem Bot ein Bild, eine Beschreibung und 
 `,
   },
   {
-    id: 'editor', group: 'Editor', title: 'Der Bot-Editor',
+    id: 'editor', group: 'TSG-Bots', title: 'Der Bot-Editor',
     lead: 'Explorer und Eigenschaften links, Code rechts, offene Skripte als Tabs oben – wie in Roblox Studio.',
     md: `
 ## Aufbau
@@ -146,7 +269,7 @@ Auf Touch-Geräten gibt es über der Tastatur eine Zeichenleiste mit \`{ }\`, \`
 `,
   },
   {
-    id: 'services', group: 'Editor', title: 'Explorer und Services',
+    id: 'services', group: 'TSG-Bots', title: 'Explorer und Services',
     lead: 'Jeder Bot hat dieselbe Struktur: oben der Bot, darunter vier Services. Wo ein Skript liegt, entscheidet, ob und wann es läuft.',
     md: `
 ## Die Struktur
@@ -185,7 +308,7 @@ Namen bestehen aus Buchstaben, Zahlen und \`_\` und beginnen nicht mit einer Zah
 `,
   },
   {
-    id: 'skripte', group: 'Skripte', title: 'Skriptarten',
+    id: 'skripte', group: 'TSG-Bots', title: 'Skriptarten',
     lead: 'Vier Arten von Skripten – jede läuft an einem anderen Ort und reagiert auf andere Ereignisse.',
     md: `
 ## Übersicht
@@ -239,7 +362,7 @@ In den Eigenschaften kannst du Skripte mit **Enabled** aus- und einschalten, ohn
 `,
   },
   {
-    id: 'ereignisse', group: 'Skripte', title: 'Ereignisse',
+    id: 'ereignisse', group: 'TSG-Bots', title: 'Ereignisse',
     lead: 'Ereignisse sind Funktionen mit festem Namen. Luna ruft sie auf, wenn etwas passiert.',
     md: `
 ## So schreibt man ein Ereignis
@@ -292,7 +415,7 @@ Code ganz oben im Skript läuft vor jedem Ereignis – zum Vorbereiten von Werte
 `,
   },
   {
-    id: 'pfade', group: 'Skripte', title: 'Pfade: script, Parent und ../',
+    id: 'pfade', group: 'TSG-Bots', title: 'Pfade: script, Parent und ../',
     lead: 'So erreichst du jedes Objekt in der Struktur – relativ zum Skript oder vom Anfang aus.',
     md: `
 ## script
@@ -349,7 +472,7 @@ Gibt es ein Objekt nicht, meldet Luna das sofort – schon im Editor unter Skrip
 `,
   },
   {
-    id: 'module', group: 'Skripte', title: 'ModuleScripts und require',
+    id: 'module', group: 'TSG-Bots', title: 'ModuleScripts und require',
     lead: 'Mit ModuleScripts teilst du Funktionen und Texte zwischen mehreren Skripten.',
     md: `
 ## Ein ModuleScript schreiben
@@ -412,7 +535,7 @@ return Zug
 `,
   },
   {
-    id: 'connectors', group: 'Skripte', title: 'Connectors',
+    id: 'connectors', group: 'TSG-Bots', title: 'Connectors',
     lead: 'Connectors verbinden Skripte miteinander – wie BindableEvents in Roblox.',
     md: `
 ## Wozu?
@@ -452,7 +575,7 @@ onjoin(username) {
 `,
   },
   {
-    id: 'webhooks', group: 'Skripte', title: 'Webhooks',
+    id: 'webhooks', group: 'TSG-Bots', title: 'Webhooks',
     lead: 'Ein Webhook-Objekt schickt Nachrichten deines Bots in einen Discord-Kanal.',
     md: `
 ## Einrichten
@@ -786,7 +909,7 @@ print(\`Backticks wie in Luau: {username}\`)
 `,
   },
   {
-    id: 'speicher', group: 'Sprache', title: 'Werte merken',
+    id: 'speicher', group: 'TSG-Bots', title: 'Werte merken',
     lead: 'Mit save und load bleiben Werte zwischen Ereignissen erhalten.',
     md: `
 ## save und load
@@ -811,7 +934,7 @@ oncommand(command) {
 `,
   },
   {
-    id: 'globals', group: 'Referenz', title: 'Globale Funktionen',
+    id: 'globals', group: 'Standardbibliothek', title: 'Globale Funktionen',
     lead: 'Funktionen, die es in jedem Skript gibt.',
     md: `
 ## Ausgabe
@@ -853,7 +976,7 @@ oncommand(command) {
 `,
   },
   {
-    id: 'bibliotheken', group: 'Referenz', title: 'math, string, table',
+    id: 'bibliotheken', group: 'Standardbibliothek', title: 'math, string, table',
     lead: 'Die Bibliotheken aus Luau – in Luna.',
     md: `
 ## math
@@ -892,7 +1015,7 @@ oncommand(command) {
 `,
   },
   {
-    id: 'api-instance', group: 'Referenz', title: 'Instance',
+    id: 'api-instance', group: 'TSG-Bots', title: 'Instance',
     lead: 'Alle Objekte im Explorer – der Bot, die Services, Skripte, Connectors, Webhooks und Ordner – sind Instances.',
     md: `
 ## Eigenschaften
@@ -923,7 +1046,7 @@ Kinder erreichst du mit ihrem Namen: \`script.Parent.Texte\`. Gibt es keines, gi
 `,
   },
   {
-    id: 'api-klassen', group: 'Referenz', title: 'Klassen',
+    id: 'api-klassen', group: 'TSG-Bots', title: 'Klassen',
     lead: 'Was jede Klasse kann.',
     md: `
 ## Bot
@@ -1032,6 +1155,45 @@ Nachrichten von Bots lösen keine Bots aus – so entstehen keine Schleifen.
 `,
   },
   {
+    id: 'versionen', group: 'Referenz', title: 'Versionen',
+    lead: 'Was sich an Luna geändert hat – und wie es weitergeht.',
+    md: `
+## Luna 2.1 – November 2026
+
+- **Playground**: Luna ohne Bot ausführen, \`print()\` geht auch außerhalb von Ereignissen
+- \`runScript()\` – Luna in eigene Projekte einbetten (siehe unten)
+- Neuer Platzhalter \`{channel}\`: Kanal der Nachricht in Servern mit Kanälen
+- Dokumentation neu gegliedert: Sprache, Standardbibliothek und Plattform getrennt
+
+## Luna 2.0 – Oktober 2026
+
+- Fast wie Luau: \`local\`, \`then/do … end\`, \`repeat … until\`, \`~=\`, \`#\`, \`..\`
+- Explorer mit Services, \`script.Parent\`, \`../MyBot\`, ModuleScripts mit \`require\`
+- Connectors (\`:Connect\`, \`:Fire\`) und Webhooks
+
+## Luna 1.0 – Oktober 2026
+
+- Erste Version: Ereignisse wie \`onjoin() { … }\`, Platzhalter, \`print\`, \`save\` und \`load\`
+
+## Versprechen
+
+Skripte, die heute laufen, sollen auch morgen laufen. Neue Funktionen erhöhen die kleine Zahl (2.1 → 2.2). Ändert sich etwas so, dass alte Skripte brechen, steigt die große Zahl (2 → 3) – das wird vorher angekündigt.
+
+## Luna in eigenen Projekten
+
+Der Interpreter steckt in einer einzigen Datei ohne Abhängigkeiten und läuft im Browser und auf Servern:
+
+| Funktion | Wofür |
+| --- | --- |
+| \`runScript(code, { vars, events })\` | Ein Skript ausführen – Ausgabe, Fehler und Schritte kommen zurück |
+| \`parse(code)\` | Nur prüfen, ob der Code richtig geschrieben ist |
+| \`highlight(code)\` | Code einfärben (für eigene Editoren) |
+
+> [!HINWEIS]
+> Eigene Projekte können Luna eigene Ereignisse und Platzhalter geben. Die Sprache bleibt dabei gleich – so funktioniert alles aus „Sprache“ und „Standardbibliothek“ überall.
+`,
+  },
+  {
     id: 'beispiele', group: 'Beispiele', title: 'Beispiele',
     lead: 'Fertige Bausteine zum Kopieren.',
     md: `
@@ -1133,15 +1295,21 @@ onjoin(username) {
   },
 ];
 
+// Reihenfolge wie im Menü (Gruppen nach GROUPS, innerhalb der Gruppe wie oben) – für „Zurück“ und „Weiter“
+PAGES.sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group));
+
 // ---------- Darstellung ----------
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const slug = (s) => String(s).toLowerCase().replace(/[äöüß]/g, (c) => ({ ä: 'ae', ö: 'oe', ü: 'ue', ß: 'ss' }[c])).replace(/<[^>]+>/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+// Code in Backticks bleibt unverändert (kein fett, keine Links darin)
 function inline(s) {
+  const codes = [];
   return esc(s)
-    .replace(/`([^`]+)`/g, (m, c) => `<code>${c}</code>`)
+    .replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; })
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/(^|[\s(])\*([^*\s][^*]*)\*/g, '$1<i>$2</i>')
-    .replace(/\[([^\]]+)\]\((#\/luna[^)]*|https:\/\/[^)]+)\)/g, (m, text, href) => `<a href="${href}"${href.startsWith('http') ? ' target="_blank" rel="noopener"' : ''}>${text}</a>`);
+    .replace(/\[([^\]]+)\]\((#\/luna[^)]*|https:\/\/[^)]+)\)/g, (m, text, href) => `<a href="${href}"${href.startsWith('http') ? ' target="_blank" rel="noopener"' : ''}>${text}</a>`)
+    .replace(/\u0000(\d+)\u0000/g, (m, i) => `<code>${codes[+i]}</code>`);
 }
 export function codeHtml(code) {
   return highlight(code).map(([k, t]) => (k === 'ws' ? esc(t) : `<span class="tk-${k}">${esc(t)}</span>`)).join('');
@@ -1164,7 +1332,8 @@ export function render(md, pageId = '') {
       while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i += 1; }
       i += 1;
       const code = buf.join('\n');
-      out.push(`<figure class="doc-code"><figcaption><span>${lang === 'luna' ? 'Luna' : esc(lang)}</span><button type="button" data-doc-copy>Kopieren</button></figcaption><pre><code>${lang === 'luna' ? codeHtml(code) : esc(code)}</code></pre><textarea hidden data-doc-src>${esc(code)}</textarea></figure>`);
+      const tryBtn = lang === 'luna' ? '<button type="button" data-doc-try>Ausprobieren</button>' : '';
+      out.push(`<figure class="doc-code"><figcaption><span>${lang === 'luna' ? 'Luna' : esc(lang)}</span>${tryBtn}<button type="button" data-doc-copy>Kopieren</button></figcaption><pre><code>${lang === 'luna' ? codeHtml(code) : esc(code)}</code></pre><textarea hidden data-doc-src>${esc(code)}</textarea></figure>`);
       continue;
     }
     const h = line.match(/^(#{2,3})\s+(.*)$/);
@@ -1217,7 +1386,7 @@ export function render(md, pageId = '') {
 export function search(q) {
   const s = String(q || '').trim().toLowerCase();
   if (s.length < 2) return [];
-  return PAGES.map((p) => {
+  return PAGES.filter((p) => !p.custom).map((p) => {
     const hay = `${p.title}\n${p.lead}\n${p.md}`.toLowerCase();
     const at = hay.indexOf(s);
     if (at < 0) return null;

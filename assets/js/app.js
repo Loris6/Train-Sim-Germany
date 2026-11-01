@@ -3706,6 +3706,8 @@
     list: null, at: 0, staff: null, staffAt: 0, query: '', conv: {}, busy: false, timer: null, edit: false,
     pub: null, pubAt: 0, pubQuery: '', mod: null, modAt: 0, modQuery: '', modKind: '',
     pending: {}, sending: false, found: null, members: [],
+    // Server: offener Kanal je Server (bleibt gespeichert), Kanalliste auf dem Handy offen?
+    ch: store.get('tsg-ch', {}) || {}, side: false,
   };
   // Gleiche Liste wie backend/commands.js
   const CHAT_COMMANDS = [
@@ -3841,14 +3843,17 @@
     chat.busy = true;
     // Nur wer die Übersicht gerade sieht, bekommt keine Benachrichtigungen (view=1)
     const watching = state.page === 'chat' && ['mine', 'queue'].includes(state.chatView) && document.visibilityState === 'visible';
+    let ok = false;
     try {
       chat.list = await api(`/api/chats${watching ? '?view=1' : ''}`);
+      ok = true;
     } catch (e) { /* später nochmal */ } finally {
       chat.busy = false;
       chat.at = Date.now();
     }
     chatDot();
     if (state.page === 'chat' && ['mine', 'queue'].includes(state.chatView)) renderChat();
+    if (ok && state.page === 'dashboard') renderDash();
   }
   async function loadPublic(force = false) {
     if (!chatReady() || (!force && chat.pub && Date.now() - chat.pubAt < 20000)) return;
@@ -3925,7 +3930,7 @@
     const unread = l ? l.chats.filter(isUnread).length : 0;
     return `<div class="appbar">
         <div class="appbar__title"><span class="appbar__label">${t('Spieler, Gruppen und Team')}</span><h1 class="appbar__value">${t('Chat')}</h1></div>
-        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neu')}</a></div>
+        <div class="appbar__actions"><a class="btn btn--soft btn--sm" href="#/dashboard">${icon('fi-rr-apps')}${t('Dashboard')}</a><a class="btn btn--primary btn--sm" href="#/dashboard">${icon('fi-rr-plus')}${t('Neu')}</a></div>
       </div>
       <div class="head-tabs head-tabs--chat" role="tablist" aria-label="${esc(t('Chat'))}">
         ${tab('mine', '#/chat', 'fi-rr-comments', t('Gespräche'), unread)}
@@ -3979,17 +3984,17 @@
     if (gate) return gate;
     if (!chat.list) { loadChats(); return loadingHtml(); }
     const all = chat.list.chats.slice().sort((a, b) => (a.status === 'closed') - (b.status === 'closed') || b.updated - a.updated);
-    // Zwei Arten: normale Chats und Server-Chats (mit privaten Servern verbunden)
+    // Zwei Arten: normale Chats und Server (Communities mit Kanälen, auf Wunsch mit privaten Servern im Spiel verbunden)
     const servers = all.filter((c) => c.category === 'server');
     const normal = all.filter((c) => c.category !== 'server');
     const cat = chat.cat === 'server' ? 'server' : 'chats';
     const tab = (id, ic, label, list) => `<button type="button" role="tab" aria-selected="${cat === id}" data-chat-cat="${id}">${icon(ic)}<span>${label}</span><i>${list.length}</i>${list.some(isUnread) ? '<b class="cat-tabs__dot"></b>' : ''}</button>`;
-    const tabs = `<div class="cat-tabs" role="tablist" aria-label="${esc(t('Art der Gespräche'))}">${tab('chats', 'fi-rr-comments', t('Chats'), normal)}${tab('server', 'fi-rr-signal-alt-2', t('Server-Chats'), servers)}</div>`;
+    const tabs = `<div class="cat-tabs" role="tablist" aria-label="${esc(t('Art der Gespräche'))}">${tab('chats', 'fi-rr-comments', t('Chats'), normal)}${tab('server', 'fi-rr-apps', t('Server'), servers)}</div>`;
     const list = cat === 'server' ? servers : normal;
     if (!list.length) {
       return cat === 'server'
-        ? `${tabs}<div class="chat-empty">${icon('fi-rr-signal-alt-2')}<h2>${t('Noch keine Server-Chats')}</h2><p>${t('Verbinde deine privaten Server mit einem Chat: Mitglieder sehen, wer online ist, treten über die App bei, und auf Wunsch erscheinen die Nachrichten im Spiel.')}</p>
-          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu/server">${icon('fi-rr-plus')}${t('Server-Chat erstellen')}</a></div></div>`
+        ? `${tabs}<div class="chat-empty">${icon('fi-rr-apps')}<h2>${t('Noch keine Server')}</h2><p>${t('Ein Server ist eine Community wie bei Discord: Kanäle, Kategorien, Rollen und Bots – auf Wunsch mit deinen privaten Servern im Spiel verbunden.')}</p>
+          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/dashboard?neu=server">${icon('fi-rr-plus')}${t('Server erstellen')}</a></div></div>`
         : `${tabs}<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
     }
     return `${tabs}<div class="chat-tools"><span>${list.length === 1 ? t('1 Gespräch') : t('{n} Gespräche', { n: list.length })}</span>
@@ -4084,7 +4089,7 @@
   function chatNewDm() {
     const gate = chatGate();
     const f = chat.found;
-    return `${backTo('#/chat/neu', t('Neu'))}
+    return `${backTo('#/dashboard', t('Dashboard'))}
       ${gate || `<form class="find-player" data-find-player>
         <label class="f__label" for="fp-name">${icon('fi-rr-search')}${t('Wem möchtest du schreiben?')}</label>
         <div class="find-player__row"><input id="fp-name" name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name, z. B. Lokfuehrer_Max'))}">
@@ -4099,7 +4104,7 @@
     const gate = chatGate();
     const next = nextRank(state.rank);
     const nextArea = next && CHAT.areas.find((a) => a.rank === next.name);
-    return `${backTo('#/chat/neu', t('Neu'))}
+    return `${backTo('#/dashboard', t('Dashboard'))}
       ${gate || `<form class="cform chat-form" data-chat-new novalidate>
         <fieldset class="f"><legend class="f__label">${t('Worum geht es?')}</legend>
           <div class="pick-grid">${CHAT.reasons.map((r) => `<label class="pick"><input type="radio" name="reason" value="${r.id}" data-area-hint="${esc(r.area || (nextArea ? nextArea.id : 'driver'))}"><span>${icon(r.icon)}${esc(t(r.label))}</span></label>`).join('')}</div>
@@ -4149,9 +4154,9 @@
       const p = (chat.staff || []).find((x) => x.userId === withId) || (typeof chatPlayers[withId] === 'object' ? chatPlayers[withId] : null);
       if (p) chat.members.push(p); else if (!chatPlayers[withId]) loadPlayer(withId, () => { if (typeof chatPlayers[withId] === 'object') { chat.members.push(chatPlayers[withId]); const box = $('[data-member-chips]'); if (box) box.innerHTML = memberChips(); } });
     }
-    return `${backTo('#/chat/neu', t('Neu'))}
+    return `${backTo('#/dashboard', t('Dashboard'))}
       ${gate || `<form class="cform group-form" data-group-new novalidate>
-        <div class="f"><label class="f__label" for="gr-name">${t('Name der Gruppe')}</label><input id="gr-name" name="name" maxlength="60" required placeholder="${esc(t('z. B. Nachtschicht Berlin'))}"></div>
+        <div class="f"><label class="f__label" for="gr-name">${t('Name der Gruppe')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(dashDefaultName('Gruppe'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(dashDefaultName('Gruppe')) })}</small></div>
         <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Worum geht es in der Gruppe? (optional)'))}"></textarea></div>
         <fieldset class="f"><legend class="f__label">${t('Wer kann die Gruppe sehen?')}</legend>${visPick('private')}</fieldset>
         <div class="f"><span class="f__label">${t('Leute hinzufügen')}</span>
@@ -4182,9 +4187,9 @@
       ? `<div class="ps-pick">${mine.map((p) => `<label class="ps-pick__row"><input type="checkbox" name="servers" value="${esc(p.id)}"${mine.length === 1 ? ' checked' : ''}>
           <span class="ps-pick__ic">${icon('fi-rr-signal-alt-2')}</span><span class="ps-pick__text"><b>${esc(p.name)}</b><small>${psState(p)}${p.chat ? ` · ${t('jetzt mit „{name}“ verbunden', { name: esc(p.chat.name) })}` : ''}</small></span></label>`).join('')}</div>`
       : `<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Noch kein privater Server von dir bekannt. Starte deinen privaten Server einmal in Roblox – dann erscheint er hier (das Spiel meldet ihn automatisch). Den Chat kannst du schon jetzt erstellen und den Server später unter „Info“ verbinden.')}</span></p>`;
-    return `${backTo('#/chat/neu', t('Neu'))}
+    return `${backTo('#/dashboard', t('Dashboard'))}
       ${gate || `<form class="cform group-form" data-server-new novalidate>
-        <div class="f"><label class="f__label" for="gr-name">${t('Name des Server-Chats')}</label><input id="gr-name" name="name" maxlength="60" required placeholder="${esc(t('z. B. VIP-Server Nachtschicht'))}"></div>
+        <div class="f"><label class="f__label" for="gr-name">${t('Name des Servers')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(dashDefaultName('Server'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(dashDefaultName('Server')) })}</small></div>
         <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Wofür ist der Server? (optional)'))}"></textarea></div>
         <fieldset class="f"><legend class="f__label">${t('Private Server verbinden')}</legend>${pick}</fieldset>
         <fieldset class="f"><legend class="f__label">${t('Wie tritt man bei?')}</legend>${joinPick('app')}</fieldset>
@@ -4346,7 +4351,8 @@
     const many = c.kind === 'group' || (c.members || []).length > 2;
     let lastDay = '';
     let lastBy = '';
-    const local = cbots.local[c.id] || [];
+    if (c.switching) return `<li class="msg-sys">${t('Wird geladen …')}</li>`;
+    const local = (cbots.local[c.id] || []).filter((m) => !c.community || (m.ch || c.home) === c.channel);
     const all = local.length ? [...c.messages, ...local].sort((a, b) => a.at - b.at) : c.messages;
     const botMeta = (id) => (c.bots || []).find((b) => b.id === id) || null;
     return all.map((m) => {
@@ -4495,6 +4501,8 @@
     }
     if (c.status === 'closed') return `<p class="compose compose--note">${icon('fi-rr-check-circle')}${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
     if (!c.canWrite) {
+      const ch = c.community ? (c.channels || []).find((x) => x.id === c.channel) : null;
+      if (ch && ch.locked && c.me && c.me.role) return `<p class="compose compose--note">${icon('fi-rr-megaphone')}${t('In #{name} schreiben nur Inhaber, Admins und Rollen mit dem Recht „Schreiben“.', { name: esc(ch.name) })}</p>`;
       if (c.kind === 'group' && c.me && c.me.role) return `<p class="compose compose--note">${icon('fi-rr-megaphone')}${t('In dieser Gruppe schreiben nur Inhaber und Admins.')}</p>`;
       return `<p class="compose compose--note">${icon('fi-rr-lock')}${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
     }
@@ -4506,7 +4514,7 @@
         ${c.canMedia ? `<label class="compose__attach" title="${esc(t('Foto, Video oder Datei anhängen'))}"><span class="sr-only">${t('Foto, Video oder Datei anhängen')}</span>${icon('fi-rr-clip')}
           <input type="file" data-chat-file multiple accept="image/*,video/*,application/pdf"></label>` : ''}
         <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
-        <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(c.commands && c.commands.length ? t('Nachricht oder / für Befehle …') : t('Nachricht schreiben …'))}"></textarea>
+        <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(c.community ? t('Nachricht an #{name}', { name: ((c.channels || []).find((x) => x.id === c.channel) || {}).name || '' }) : c.commands && c.commands.length ? t('Nachricht oder / für Befehle …') : t('Nachricht schreiben …'))}"></textarea>
         <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button>
       </div>
     </form>`;
@@ -4519,6 +4527,14 @@
     }
     if (c.error) return { head: backTo('#/chat', t('Alle Gespräche')), body: `<p class="empty">${t('Dieses Gespräch gibt es nicht (mehr) oder du darfst es nicht sehen.')}</p>` };
     markSeen(c);
+    if (c.community) {
+      markChSeen(c);
+      return {
+        head: cmHead(c),
+        body: `<div class="cm${chat.side ? ' is-open' : ''}" data-cm>${cmSide(c)}<button class="cm-scrim" type="button" data-cm-side-close aria-label="${esc(t('Kanäle schließen'))}"></button>
+          <div class="cm-main"><ol class="msgs" data-chat-msgs>${cmIntro(c)}${chatMessages(c)}</ol><div class="compose-dock" data-chat-compose>${chatComposer(c)}</div></div></div>`,
+      };
+    }
     return {
       head: chatConvHead(c),
       body: `<ol class="msgs" data-chat-msgs>${chatIntro(c)}${chatMessages(c)}</ol><div class="compose-dock" data-chat-compose>${chatComposer(c)}</div>`,
@@ -4527,15 +4543,23 @@
   async function openConv(id, { since = 0, observe = false } = {}) {
     if (!chatReady()) { chat.conv[id] = { error: true }; renderChat(); return; }
     try {
-      const r = await api(`/api/chats/${encodeURIComponent(id)}${since ? `?since=${since}` : observe ? '?observe=1' : ''}`);
+      const q = new URLSearchParams();
+      if (chat.conv[id] && chat.conv[id].switching) since = 0;
+      if (since) q.set('since', since); else if (observe) q.set('observe', '1');
+      if (chat.ch[id]) q.set('ch', chat.ch[id]);
+      const r = await api(`/api/chats/${encodeURIComponent(id)}${q.toString() ? `?${q}` : ''}`);
+      // Inzwischen anderer Kanal gewählt: diese Antwort gehört nicht mehr dazu
+      if (r.community && chat.ch[id] && r.channel !== chat.ch[id] && (r.channels || []).some((x) => x.id === chat.ch[id])) { if (!r.unchanged) openConv(id); return; }
       if (r.unchanged) {
         const c = chat.conv[id];
         const flags = ['status', 'claimedBy', 'canWrite', 'canClaim', 'canClose'];
         if (c && flags.some((k) => JSON.stringify(c[k]) !== JSON.stringify(r[k]))) { flags.forEach((k) => { c[k] = r[k]; }); updateConv(id); }
         return;
       }
-      const before = since && chat.conv[id] && chat.conv[id].messages ? new Set(chat.conv[id].messages.map((m) => m.id)) : null;
+      const prev = chat.conv[id];
+      const before = since && prev && prev.messages && (!r.community || prev.channel === r.channel) ? new Set(prev.messages.map((m) => m.id)) : null;
       chat.conv[id] = r;
+      if (r.community) chat.ch[id] = r.channel;
       clientBotsAfterLoad(id, before);
     } catch (e) {
       chat.conv[id] = { error: true };
@@ -4555,8 +4579,17 @@
       return;
     }
     const atEnd = window.innerHeight + window.scrollY >= document.body.scrollHeight - 80;
-    $('[data-chat-head]').innerHTML = chatConvHead(c);
-    list.innerHTML = chatIntro(c) + chatMessages(c);
+    if (c.community) {
+      const side = $('[data-cm-side]');
+      if (!side) { renderChat(); return; }
+      $('[data-chat-head]').innerHTML = cmHead(c);
+      side.outerHTML = cmSide(c);
+      list.innerHTML = cmIntro(c) + chatMessages(c);
+      markChSeen(c);
+    } else {
+      $('[data-chat-head]').innerHTML = chatConvHead(c);
+      list.innerHTML = chatIntro(c) + chatMessages(c);
+    }
     const box = $('[data-chat-compose]');
     const wasForm = !!$('form', box);
     if (!wasForm || !c.canWrite) box.innerHTML = chatComposer(c);
@@ -4573,6 +4606,186 @@
       else if (['mine', 'queue'].includes(state.chatView)) loadChats(true);
       else if (state.chatView === 'mod') loadMod(true);
     }, state.chatView === 'conv' ? 4000 : 15000);
+  }
+
+  // ---------- Server (Communities): Kanäle und Kategorien wie bei Discord ----------
+  // Links die Kanalliste (auf dem Handy als Schublade), rechts der offene Kanal. Ungelesen merkt sich jedes Gerät selbst.
+  const membersText = (n) => (n === 1 ? t('1 Mitglied') : t('{n} Mitglieder', { n }));
+  const chFind = (c, id = c.channel) => (c.channels || []).find((x) => x.id === id) || null;
+  const chIcon = (x, cls = 'cm-ch__ic') => icon(x && x.kind === 'news' ? 'fi-rr-megaphone' : 'fi-rr-hastag', cls);
+  function chSeenOf(c) {
+    const all = store.get('tsg-ch-seen', {}) || {};
+    // Erster Besuch: alles bisher Geschriebene gilt als gelesen
+    if (!all[c.id]) {
+      all[c.id] = Object.fromEntries((c.channels || []).map((x) => [x.id, x.last ? x.last.at : 0]));
+      store.set('tsg-ch-seen', all);
+    }
+    return all[c.id];
+  }
+  function markChSeen(c) {
+    const ch = chFind(c);
+    if (!ch || c.switching) return;
+    const all = store.get('tsg-ch-seen', {}) || {};
+    const mine = all[c.id] || chSeenOf(c);
+    const at = Math.max(ch.last ? ch.last.at : 0, ...c.messages.map((m) => m.at || 0));
+    if ((mine[ch.id] || 0) >= at) return;
+    all[c.id] = { ...mine, [ch.id]: at };
+    store.set('tsg-ch-seen', all);
+  }
+  const chUnread = (c, x, seenMap) => !!(x.id !== c.channel && x.last && x.last.by !== meSub() && x.last.at > (seenMap[x.id] || 0));
+  const cmShut = (id) => ((store.get('tsg-cm-cats', {}) || {})[id] || []);
+  function cmSide(c) {
+    const seenMap = chSeenOf(c);
+    const shutCats = cmShut(c.id);
+    const cats = c.categories || [];
+    const row = (x) => `<div class="cm-ch-row">
+        <button type="button" class="cm-ch${x.id === c.channel ? ' is-active' : ''}${chUnread(c, x, seenMap) ? ' is-unread' : ''}" data-cm-ch="${esc(x.id)}"${x.id === c.channel ? ' aria-current="true"' : ''}>
+          ${chIcon(x)}<span class="cm-ch__name">${esc(x.name)}</span>${x.locked ? icon('fi-rr-lock', 'cm-ch__lock') : ''}</button>
+        ${c.canManage ? `<button type="button" class="cm-ch__edit" data-cm-edit="${esc(x.id)}" aria-label="${esc(t('Kanal bearbeiten'))}">${icon('fi-rr-settings')}</button>` : ''}
+      </div>`;
+    const loose = (c.channels || []).filter((x) => !x.cat || !cats.some((k) => k.id === x.cat));
+    const groups = cats.map((k) => {
+      const list = (c.channels || []).filter((x) => x.cat === k.id);
+      const shut = shutCats.includes(k.id);
+      const unread = shut && list.some((x) => chUnread(c, x, seenMap));
+      return `<div class="cm-cat${shut ? ' is-shut' : ''}">
+        <div class="cm-cat__head">
+          <button type="button" class="cm-cat__toggle" data-cm-cat="${esc(k.id)}" aria-expanded="${!shut}">${icon('fi-rr-angle-small-down', 'cm-cat__chev')}<span>${esc(k.name)}</span>${unread ? '<i class="cm-dot" aria-hidden="true"></i>' : ''}</button>
+          ${c.canManage ? `<button type="button" class="cm-cat__add" data-cm-new="${esc(k.id)}" aria-label="${esc(t('Kanal in {name} erstellen', { name: k.name }))}">${icon('fi-rr-plus-small')}</button>` : ''}
+        </div>
+        ${(shut ? list.filter((x) => x.id === c.channel) : list).map(row).join('')}
+      </div>`;
+    }).join('');
+    return `<aside class="cm-side" data-cm-side aria-label="${esc(t('Kanäle'))}">
+      <a class="cm-side__head" href="#/chat/${esc(c.id)}/info">${groupBadge(c, 'cm-side__badge')}<span class="cm-side__name"><b>${esc(c.name)}</b><small>${membersText((c.members || []).length)}</small></span>${icon('fi-rr-angle-small-right')}</a>
+      <nav class="cm-side__list">${loose.map(row).join('')}${groups}</nav>
+      ${c.canManage ? `<div class="cm-side__foot">
+        <button type="button" class="cm-side__btn" data-cm-new="">${icon('fi-rr-plus')}${t('Kanal')}</button>
+        <button type="button" class="cm-side__btn" data-cm-cat-new>${icon('fi-rr-folder')}${t('Kategorie')}</button>
+      </div>` : ''}
+    </aside>`;
+  }
+  function cmHead(c) {
+    const ch = chFind(c) || {};
+    const seenMap = chSeenOf(c);
+    const unread = (c.channels || []).some((x) => chUnread(c, x, seenMap));
+    return `<div class="conv-bar conv-bar--cm">
+        <a class="conv-bar__back" href="${chatBackHref(c)}" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-rr-arrow-left')}</a>
+        <button class="cm-toggle${unread ? ' has-unread' : ''}" type="button" data-cm-side-open aria-label="${esc(t('Kanäle'))}">${icon('fi-rr-menu-burger')}</button>
+        <a class="conv-bar__who" href="#/chat/${esc(c.id)}/info">
+          ${groupBadge(c, 'conv-bar__avatar cm-head__badge')}
+          <span class="conv-bar__text"><h1 class="cm-head__ch">${chIcon(ch, 'cm-head__ic')}<span>${esc(ch.name || '')}</span></h1><p><span>${esc(c.name)}</span>${ch.topic ? `<span class="cm-head__topic">${esc(ch.topic)}</span>` : ''}</p></span>
+        </a>
+        <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('fi-rr-info')}</a>
+      </div>`;
+  }
+  // Anfang eines Kanals (wie bei Discord); im Standardkanal dazu Beschreibung und Regeln des Servers
+  function cmIntro(c) {
+    const ch = chFind(c) || {};
+    return `<li class="cm-intro"><span class="cm-intro__ic">${chIcon(ch, '')}</span>
+        <b>${t('Willkommen in #{name}!', { name: esc(ch.name || '') })}</b>
+        <span>${ch.topic ? esc(ch.topic) : ch.id === c.home ? t('Das ist der Anfang von {name}. Hier landen auch Begrüßungen und Hinweise.', { name: `<b>${esc(c.name)}</b>` }) : t('Das ist der Anfang des Kanals #{name}.', { name: esc(ch.name || '') })}</span>
+        ${ch.kind === 'news' ? `<small>${icon('fi-rr-megaphone')}${t('Ankündigungen: schreiben dürfen Inhaber, Admins und Rollen mit dem Recht „Schreiben“.')}</small>` : ''}
+      </li>${ch.id === c.home ? chatIntro(c) : ''}`;
+  }
+  function switchChannel(id, ch) {
+    const c = chat.conv[id];
+    if (!c || c.error) return;
+    chat.ch[id] = ch;
+    store.set('tsg-ch', chat.ch);
+    chat.side = false;
+    history.replaceState(null, '', `#/chat/${id}?k=${encodeURIComponent(ch)}`);
+    if (c.channel === ch && !c.switching) { const box = $('[data-cm]'); if (box) box.classList.remove('is-open'); return; }
+    haptic('light');
+    Object.assign(c, { channel: ch, messages: [], switching: true });
+    c.canWrite = !(chFind(c) || {}).locked && c.canWrite;
+    renderChat();
+    openConv(id);
+  }
+  function toggleCategory(id, cat) {
+    const all = store.get('tsg-cm-cats', {}) || {};
+    const list = all[id] || [];
+    all[id] = list.includes(cat) ? list.filter((x) => x !== cat) : [...list, cat];
+    store.set('tsg-cm-cats', all);
+    const c = chat.conv[id];
+    const side = $('[data-cm-side]');
+    if (c && side) side.outerHTML = cmSide(c);
+  }
+  // Kanäle und Kategorien bearbeiten: immer die ganze Liste an das Backend
+  const layoutBody = (c) => ({
+    home: c.home,
+    categories: (c.categories || []).map(({ id, name }) => ({ id, name })),
+    channels: (c.channels || []).map(({ id, name, cat, kind, topic }) => ({ id, name, cat, kind, topic })),
+  });
+  async function saveLayout(id, body, okText) {
+    try {
+      const r = await api(`/api/chats/${encodeURIComponent(id)}/channels`, { method: 'PUT', body });
+      chat.conv[id] = r;
+      if (r.community) chat.ch[id] = r.channel;
+      haptic('success');
+      if (okText) toast(okText);
+      closeModal();
+      chat.at = 0;
+      if (state.page === 'chat') renderChat();
+      return r;
+    } catch (e) { toast(chatError(e)); return null; }
+  }
+  const chName = (v) => String(v || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+  function channelView(arg) {
+    const [cid, chId, catId] = String(arg).split(':');
+    const c = chat.conv[cid];
+    if (!c || !c.community) return loadingHtml();
+    const ch = chId && chId !== 'neu' ? chFind(c, chId) : null;
+    const cat = ch ? ch.cat || '' : catId || '';
+    const kind = ch ? ch.kind : 'text';
+    return `<form class="cform ch-form" data-ch-form="${esc(cid)}:${esc(ch ? ch.id : 'neu')}" novalidate>
+      <div class="f"><label class="f__label" for="ch-name">${t('Name des Kanals')}</label>
+        <div class="ch-name">${icon(kind === 'news' ? 'fi-rr-megaphone' : 'fi-rr-hastag')}<input id="ch-name" name="name" maxlength="30" value="${esc(ch ? ch.name : '')}" placeholder="${esc(t('neuer-kanal'))}" autocomplete="off" autocapitalize="off" spellcheck="false" data-ch-name></div>
+        <small class="f__hint">${t('Kleinbuchstaben, Zahlen und Bindestriche – Leerzeichen werden zu „-“.')}</small></div>
+      <fieldset class="f"><legend class="f__label">${t('Art')}</legend><div class="vis-grid">
+        <label class="vis"><input type="radio" name="kind" value="text"${kind !== 'news' ? ' checked' : ''}><span>${icon('fi-rr-hastag')}<b>${t('Text')}</b><small>${t('Alle Mitglieder schreiben')}</small></span></label>
+        <label class="vis"><input type="radio" name="kind" value="news"${kind === 'news' ? ' checked' : ''}><span>${icon('fi-rr-megaphone')}<b>${t('Ankündigungen')}</b><small>${t('Nur Inhaber, Admins und Rollen mit „Schreiben“')}</small></span></label>
+      </div></fieldset>
+      <label class="f"><span class="f__label">${t('Kategorie')}</span><select name="cat"><option value="">${t('Ohne Kategorie')}</option>${(c.categories || []).map((k) => `<option value="${esc(k.id)}"${k.id === cat ? ' selected' : ''}>${esc(k.name)}</option>`).join('')}</select></label>
+      <div class="f"><label class="f__label" for="ch-topic">${t('Thema')}</label><input id="ch-topic" name="topic" maxlength="200" value="${esc(ch ? ch.topic || '' : '')}" placeholder="${esc(t('Worum geht es hier? (optional)'))}"></div>
+      ${ch ? `<label class="toggle"><span class="toggle__text"><b>${t('Standardkanal')}</b><small>${t('Begrüßungen, Hinweise und Weitergabe ins Spiel und nach Discord')}</small></span>
+        <input type="checkbox" role="switch" name="home"${c.home === ch.id ? ' checked disabled' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
+      <div class="ch-move"><button class="btn btn--soft btn--sm" type="button" data-ch-move="-1">${icon('fi-rr-arrow-small-up')}${t('Nach oben')}</button><button class="btn btn--soft btn--sm" type="button" data-ch-move="1">${icon('fi-rr-arrow-small-down')}${t('Nach unten')}</button></div>` : ''}
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(ch ? 'fi-rr-check' : 'fi-rr-plus')}${ch ? t('Speichern') : t('Kanal erstellen')}</button>
+      ${ch && (c.channels || []).length > 1 ? `<button class="btn btn--danger btn--block" type="button" data-ch-del>${icon('fi-rr-trash')}${t('Kanal löschen')}</button>
+        <p class="f__note">${t('Beim Löschen verschwinden auch alle Nachrichten in diesem Kanal.')}</p>` : ''}
+    </form>`;
+  }
+  function categoryView(arg) {
+    const [cid, catId] = String(arg).split(':');
+    const c = chat.conv[cid];
+    if (!c || !c.community) return loadingHtml();
+    const k = catId && catId !== 'neu' ? (c.categories || []).find((x) => x.id === catId) : null;
+    return `<form class="cform" data-cat-form="${esc(cid)}:${esc(k ? k.id : 'neu')}" novalidate>
+      <div class="f"><label class="f__label" for="cat-name">${t('Name der Kategorie')}</label><input id="cat-name" name="name" maxlength="30" value="${esc(k ? k.name : '')}" placeholder="${esc(t('z. B. Spiel'))}"></div>
+      ${k ? `<div class="ch-move"><button class="btn btn--soft btn--sm" type="button" data-cat-move="-1">${icon('fi-rr-arrow-small-up')}${t('Nach oben')}</button><button class="btn btn--soft btn--sm" type="button" data-cat-move="1">${icon('fi-rr-arrow-small-down')}${t('Nach unten')}</button></div>` : ''}
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(k ? 'fi-rr-check' : 'fi-rr-plus')}${k ? t('Speichern') : t('Kategorie erstellen')}</button>
+      ${k ? `<button class="btn btn--danger btn--block" type="button" data-cat-del>${icon('fi-rr-trash')}${t('Kategorie löschen')}</button><p class="f__note">${t('Die Kanäle darin bleiben erhalten (ohne Kategorie).')}</p>` : ''}
+    </form>`;
+  }
+  // Übersicht in „Info“: alle Kanäle nach Kategorie, zum Bearbeiten antippen
+  function channelsSection(c) {
+    if (c.kind !== 'group') return '';
+    if (!c.community) {
+      return c.canManage ? `<section class="info-sec"><h3>${icon('fi-rr-hastag')}${t('Kanäle wie bei Discord')}</h3>
+        <p class="muted">${t('Mach diese Gruppe zu einem Server mit Kanälen und Kategorien – die bisherigen Nachrichten landen in #allgemein.')}</p>
+        <button class="btn btn--soft btn--block" type="button" data-cm-convert="${esc(c.id)}">${icon('fi-rr-apps-add')}${t('In einen Server umwandeln')}</button></section>` : '';
+    }
+    const cats = c.categories || [];
+    const line = (x) => `<li><button type="button" class="ch-line" ${c.canManage ? `data-cm-edit="${esc(x.id)}"` : `data-cm-go="${esc(x.id)}"`}>${chIcon(x, 'ch-line__ic')}<span><b>${esc(x.name)}</b>${x.topic ? `<small>${esc(x.topic)}</small>` : ''}</span>
+      ${x.id === c.home ? `<span class="pill">${t('Standard')}</span>` : ''}${x.kind === 'news' ? `<span class="pill pill--info">${t('Ankündigungen')}</span>` : ''}${c.canManage ? icon('fi-rr-angle-small-right', 'ch-line__chev') : ''}</button></li>`;
+    const loose = (c.channels || []).filter((x) => !x.cat || !cats.some((k) => k.id === x.cat));
+    return `<section class="info-sec"><h3>${icon('fi-rr-hastag')}${t('Kanäle')}</h3>
+      ${loose.length ? `<ul class="ch-lines">${loose.map(line).join('')}</ul>` : ''}
+      ${cats.map((k) => `<div class="ch-group"><div class="ch-group__head"><b>${esc(k.name)}</b>${c.canManage ? `<button type="button" class="link-btn" data-cm-cat-edit="${esc(k.id)}">${icon('fi-rr-pencil')}${t('Bearbeiten')}</button>` : ''}</div>
+        <ul class="ch-lines">${(c.channels || []).filter((x) => x.cat === k.id).map(line).join('') || `<li class="muted ch-lines__empty">${t('Noch keine Kanäle')}</li>`}</ul></div>`).join('')}
+      ${c.canManage ? `<div class="ch-actions"><button class="btn btn--primary btn--sm" type="button" data-cm-new="">${icon('fi-rr-plus')}${t('Kanal erstellen')}</button><button class="btn btn--soft btn--sm" type="button" data-cm-cat-new>${icon('fi-rr-folder')}${t('Kategorie erstellen')}</button></div>` : ''}
+    </section>`;
   }
 
   // ---------- Info und Einstellungen eines Gesprächs ----------
@@ -4664,7 +4877,7 @@
         ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('fi-rr-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
         ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'fi-rr-user-add' : 'fi-rr-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
       </section>` : '';
-    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${servers}${discordSection(c)}${edit}${rolesSection(c)}${botsSection(c)}${people}${cmds}${mine}
+    return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${channelsSection(c)}${servers}${discordSection(c)}${edit}${rolesSection(c)}${botsSection(c)}${people}${cmds}${mine}
       ${actions.length ? `<section class="info-sec"><div class="btn-stack">${actions.join('')}</div></section>` : ''}${mod}`;
   }
 
@@ -4804,9 +5017,12 @@
   let lunaLoad = null;
   const lunaLib = () => (lunaLoad || (lunaLoad = import(new URL('backend/luna.js', document.baseURI).href).catch((e) => { lunaLoad = null; throw e; })));
   const botPhotoUrl = (cid, b) => (b && b.avatar && apiReady() ? `${API}/media/bot/${encodeURIComponent(cid)}/${encodeURIComponent(b.id)}?v=${b.avatar}` : '');
+  // Ohne Bild: zwei Buchstaben auf einer Farbe aus dem Namen (wie bei Servern und Gruppen)
   function botAvatar(cid, b, cls = '') {
     const src = botPhotoUrl(cid, b);
-    return `<span class="bot-ava ${cls}">${src ? `<img src="${esc(src)}" alt="" loading="lazy">` : icon('fi-rr-robot')}</span>`;
+    if (src) return `<span class="bot-ava ${cls}"><img src="${esc(src)}" alt="" loading="lazy"></span>`;
+    const [a1, a2] = AVATAR_COLORS[hash(String((b && b.name) || 'Bot')) % AVATAR_COLORS.length];
+    return `<span class="bot-ava bot-ava--ini ${cls}" style="--a1:${a1};--a2:${a2}">${esc(initials(String((b && b.name) || 'Bot')))}</span>`;
   }
   const botsFull = {};
   async function loadBotFull(cid, bid) {
@@ -4835,7 +5051,7 @@
   }
   function botNewView(cid) {
     return `<form class="cform" data-bot-create="${esc(cid)}" novalidate>
-      <div class="f"><label class="f__label" for="bot-name">${t('Name des Bots')}</label><input id="bot-name" name="name" maxlength="32" placeholder="${esc(t('z. B. Fahrdienstleiter'))}"></div>
+      <div class="f"><label class="f__label" for="bot-name">${t('Name des Bots')}</label><input id="bot-name" name="name" maxlength="32" placeholder="${esc(dashDefaultName('Bot'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(dashDefaultName('Bot')) })}</small></div>
       <fieldset class="f"><legend class="f__label">${t('Wie soll dein Bot arbeiten?')}</legend><div class="vis-grid">
         <label class="vis"><input type="radio" name="mode" value="basic" checked><span>${icon('fi-rr-sparkles')}<b>${t('Basis')}</b><small>${t('Vorlagen wie „Willkommen {username}!“')}</small></span></label>
         <label class="vis"><input type="radio" name="mode" value="advanced"><span>${icon('fi-rr-square-code')}<b>${t('Erweitert')}</b><small>${t('Programmieren mit Luna im Editor')}</small></span></label>
@@ -4970,11 +5186,12 @@
         username: me.username || 'Gast', displayName: me.displayName || me.username || 'Gast', userId: String(me.userId || me.sub || ''),
         chat: c.name || '', server: c.name || '', members: (c.members || []).length, bot: b.name,
         game: 'Train Sim Germany', gameId: placeId || '', time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
-        date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()), ...extra,
+        date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()),
+        channel: c.community ? ((c.channels || []).find((x) => x.id === c.channel) || {}).name || '' : '', ...extra,
       };
       const res = luna.runEvent({ files: b.files, type: 'client', event, vars, args: args.length ? args : [vars.username], memory: store.get(key, {}) || {}, botName: b.name });
       if (res.memChanged) store.set(key, res.memory);
-      res.says.forEach((text) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text, at: Date.now(), local: true }); added += 1; });
+      res.says.forEach((text) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text, at: Date.now(), local: true, ...(c.community ? { ch: c.channel } : {}) }); added += 1; });
     }
     if (list.length > 30) list.splice(0, list.length - 30);
     if (added) updateConv(c.id);
@@ -5626,7 +5843,7 @@
     ta.focus();
     let ok = false;
     try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
-    if (!ok) { ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end'); ideInput(ta); }
+    if (!ok) { ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); }
   }
   function ideKey(e) {
     const ta = e.target;
@@ -5807,10 +6024,161 @@
   }
 
 
-  // ---------- Luna-Dokumentation (#/luna/<seite>) – aufgebaut wie die Roblox-Doku ----------
+  // ---------- Luna-Dokumentation (#/luna/<seite>) – modern, mit Startseite, Playground und „Intern“ für den CEN ----------
   let docsLoad = null;
   const docsLib = () => (docsLoad || (docsLoad = import(new URL('assets/js/luna-docs.js', document.baseURI).href).catch((e) => { docsLoad = null; throw e; })));
-  const docs = { lib: null, q: '', nav: false, spy: null };
+  const docs = { lib: null, q: '', nav: false, spy: null, intern: null, internBusy: false, pgOut: null, pgSteps: 0 };
+  const isCEN = () => state.rank === 'Chief Engineer';
+  const GROUP_INFO = {
+    'Erste Schritte': ['fi-rr-rocket-lunch', 'Was Luna ist, die ganze Sprache auf einer Seite und der Playground'],
+    Sprache: ['fi-rr-brackets-curly', 'Variablen, Operatoren, Bedingungen, Schleifen, Funktionen, Tabellen und Texte'],
+    Standardbibliothek: ['fi-rr-layers', 'Eingebaute Funktionen und die Bibliotheken math, string und table'],
+    'TSG-Bots': ['fi-rr-robot', 'Bots in Servern und Gruppen: Editor, Services, Ereignisse, Connectors, Webhooks'],
+    Referenz: ['fi-rr-book-alt', 'Grenzen, Unterschiede zu Luau und alle Versionen'],
+    Beispiele: ['fi-rr-sparkles', 'Fertige Bausteine zum Kopieren und Ausprobieren'],
+  };
+  const PG_EXAMPLES = [
+    ['Hallo Welt', 'print("Hallo Welt!")\n\nlocal name = "Lok_Max"\nprint("Hallo " .. name .. "!")\n'],
+    ['Schleifen', 'for i = 1, 5 do\n  print("Runde " .. i)\nend\n\nlocal zaehler = 3\nwhile zaehler > 0 do\n  print(zaehler .. " …")\n  zaehler -= 1\nend\nprint("Abfahrt!")\n'],
+    ['Funktionen', 'local function fahrzeit(km, tempo)\n  return math.floor(km / tempo * 60)\nend\n\nprint("Berlin – Hamburg: " .. fahrzeit(289, 230) .. " Minuten")\n'],
+    ['Tabellen', 'local linie = { name = "RE1", halte = { "Magdeburg", "Brandenburg", "Berlin" } }\n\nprint("Linie " .. linie.name)\nfor i, halt in ipairs(linie.halte) do\n  print(i .. ". " .. halt)\nend\nprint(#linie.halte .. " Halte")\n'],
+    ['Begrüßungs-Bot', '-- Mit „Ereignisse simulieren“ laufen onjoin und onmessage\nonjoin(username) {\n  print("Willkommen {username} auf {server}! 👋")\n}\n\nonmessage(text, username) {\n  if text == "hallo" {\n    print("Hallo {username}!")\n  }\n}\n'],
+  ];
+  const pgCode = () => { const v = store.get('tsg-luna-pg', null); return typeof v === 'string' ? v : PG_EXAMPLES[0][1]; };
+  function docsShell(inner, current, toc = []) {
+    const D = docs.lib;
+    const back = ide.cid && ide.bid ? `<a class="docs__back" href="#/bots/${esc(ide.cid)}/${esc(ide.bid)}">${icon('fi-rr-arrow-left')}${t('Zurück zum Editor')}</a>` : '';
+    return `<aside class="docs__nav${docs.nav ? ' is-open' : ''}" data-docs-navbox aria-label="${esc(t('Inhalt der Dokumentation'))}">
+        <div class="docs__brand"><a class="docs__home" href="#/luna">${clsIcon('module')}<span><b>Luna</b><small>${t('Dokumentation')} · ${esc(D.VERSION)}</small></span></a><button class="docs__nav-close" type="button" data-docs-nav="0" aria-label="${esc(t('Schließen'))}">${svgClose}</button></div>
+        <label class="docs__search">${icon('fi-rr-search')}<input type="search" data-docs-search value="${esc(docs.q)}" placeholder="${esc(t('Dokumentation durchsuchen …'))}" autocomplete="off" spellcheck="false"></label>
+        <div class="docs__links" data-docs-links>${docsNavHtml(current)}</div>
+        ${back}
+      </aside>
+      <button class="docs__backdrop" type="button" data-docs-nav="0" tabindex="-1" aria-hidden="true"></button>
+      <div class="docs__main">${inner}</div>
+      <aside class="docs__toc" aria-label="${esc(t('Auf dieser Seite'))}">
+        ${toc.length ? `<h6>${t('Auf dieser Seite')}</h6><nav>${toc.map((h) => `<a class="lv-${h.level}" href="#/luna/${esc(current)}?h=${esc(h.id)}" data-toc="${esc(h.id)}">${esc(h.text)}</a>`).join('')}</nav>` : ''}
+      </aside>`;
+  }
+  const docsTop = (crumbs) => `<div class="docs__top">
+      <button class="docs__menu" type="button" data-docs-nav="1">${icon('fi-rr-menu-burger')}${t('Inhalt')}</button>
+      <nav class="docs__crumbs" aria-label="${esc(t('Pfad'))}"><a href="#/luna">Luna</a>${crumbs.map((c, i) => `${svgChev}<span${i === crumbs.length - 1 ? ' aria-current="page"' : ''}>${esc(c)}</span>`).join('')}</nav>
+    </div>`;
+  // Startseite: worum es geht, ein Beispiel mit echter Ausgabe, die Bereiche
+  function docsLanding() {
+    const D = docs.lib;
+    const sample = 'local halte = { "Berlin", "Spandau", "Wolfsburg" }\n\nfor i, halt in ipairs(halte) do\n  print(i .. ". Halt: " .. halt)\nend';
+    const feat = (ic, title, text) => `<div class="dl-feat"><span>${icon(ic)}</span><b>${title}</b><p>${text}</p></div>`;
+    return `${docsTop([t('Start')])}
+      <section class="dl-hero">
+        <span class="dl-badge">${icon('fi-rr-sparkles')}Luna ${esc(D.VERSION)}</span>
+        <h1>${t('Programmieren,')} <span>${t('einfach gemacht.')}</span></h1>
+        <p>${t('Luna ist eine kleine Programmiersprache: gut lesbar, sicher im Sandkasten und überall einbettbar. Heute für Bots in Train Sim Germany – und für alles, was noch kommt.')}</p>
+        <div class="dl-cta"><a class="btn btn--primary btn--lg" href="#/luna/einfuehrung">${icon('fi-rr-rocket-lunch')}${t('Loslegen')}</a><a class="btn btn--soft btn--lg" href="#/luna/playground">${icon('fi-rr-play')}${t('Playground')}</a></div>
+      </section>
+      <section class="dl-demo">
+        <figure class="doc-code dl-demo__code"><figcaption><span>Luna</span><button type="button" data-doc-try>${t('Ausprobieren')}</button></figcaption><pre><code>${D.codeHtml(sample)}</code></pre><textarea hidden data-doc-src>${esc(sample)}</textarea></figure>
+        <div class="dl-demo__out"><small>${t('Ausgabe')}</small><ol data-dl-out><li>${t('Wird ausgeführt …')}</li></ol></div>
+      </section>
+      <section class="dl-feats">
+        ${feat('fi-rr-graduation-cap', t('Einfach'), t('Wenige Schlüsselwörter, Fehlermeldungen auf Deutsch, Blöcke mit { … } oder then … end.'))}
+        ${feat('fi-rr-shield-check', t('Sicher'), t('Ein Sandkasten ohne Zugriff auf Dateien oder Netzwerk – mit Grenzen für Zeit und Speicher.'))}
+        ${feat('fi-rr-layers', t('Einbettbar'), t('Sprache und Plattform sind getrennt. Luna läuft im Browser und auf Servern.'))}
+      </section>
+      <section class="dl-groups">
+        ${D.GROUPS.map((g) => {
+          const pages = D.PAGES.filter((x) => x.group === g);
+          const [ic, text] = GROUP_INFO[g] || ['fi-rr-document', ''];
+          return `<a class="dl-group" href="#/luna/${esc(pages[0].id)}"><span class="dl-group__ic">${icon(ic)}</span><b>${esc(t(g))}</b><p>${esc(t(text))}</p><small>${pages.length === 1 ? t('1 Seite') : t('{n} Seiten', { n: pages.length })}</small></a>`;
+        }).join('')}
+      </section>
+      ${isCEN() ? `<a class="dl-intern" href="#/luna/intern">${icon('fi-rr-shield-check')}<span><b>${t('Luna von innen')}</b><small>${t('Nur für dich als Chief Engineer: wie die Sprache funktioniert und wie du sie erweiterst')}</small></span>${svgChev}</a>` : ''}`;
+  }
+  function docsPlayground() {
+    const code = pgCode();
+    return `${docsTop([t('Erste Schritte'), 'Playground'])}
+      <article class="doc doc--pg">
+        <h1>Playground</h1>
+        <p class="doc__lead">${t('Luna schreiben und sofort ausführen – ohne Bot und ohne Anmeldung. Strg/Cmd + Enter führt aus.')}</p>
+        <div class="pg">
+          <div class="pg__bar">
+            <select data-pg-example aria-label="${esc(t('Beispiel laden'))}"><option value="">${t('Beispiel laden …')}</option>${PG_EXAMPLES.map(([n], i) => `<option value="${i}">${esc(t(n))}</option>`).join('')}</select>
+            <label class="pg__sim"><input type="checkbox" data-pg-sim${store.get('tsg-luna-pg-sim', false) ? ' checked' : ''}><span>${t('Ereignisse simulieren')}</span></label>
+            <button class="btn btn--primary btn--sm pg__run" type="button" data-pg-run>${icon('fi-rr-play')}${t('Ausführen')}</button>
+          </div>
+          <div class="pg__simbox" data-pg-simbox${store.get('tsg-luna-pg-sim', false) ? '' : ' hidden'}>
+            <label><span>{username}</span><input data-pg-user value="${esc((state.profile && state.profile.username) || 'Lok_Max')}" maxlength="20" spellcheck="false"></label>
+            <label><span>${t('Nachricht')}</span><input data-pg-text value="hallo" maxlength="200" spellcheck="false"></label>
+            <small>${t('Läuft nacheinander: onstart(), onjoin(username), onmessage(text, username)')}</small>
+          </div>
+          <div class="code pg__ed">
+            <div class="code__grid">
+              <pre class="code__gutter" data-pg-gutter aria-hidden="true"></pre>
+              <div class="code__area">
+                <pre class="code__hl" data-pg-hl aria-hidden="true"></pre>
+                <textarea class="code__input" data-pg-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Luna-Code'))}">${esc(code)}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="pg__out"><div class="pg__out-head"><b>${t('Ausgabe')}</b><small data-pg-steps></small><button class="link-btn" type="button" data-pg-clear>${t('Leeren')}</button></div><ol data-pg-out><li class="pg__hint">${t('Tippe auf „Ausführen“.')}</li></ol></div>
+        </div>
+        <aside class="doc-note doc-note--tipp"><b>${t('Tipp')}</b><p>${t('Im Playground schreibt print() sofort in die Ausgabe. In einem Bot gehört print() in ein Ereignis wie onjoin() – sonst wird es ignoriert.')}</p></aside>
+      </article>`;
+  }
+  function pgPaint() {
+    const ta = $('[data-pg-code]');
+    if (!ta || !docs.lib) return;
+    $('[data-pg-hl]').innerHTML = `${docs.lib.codeHtml(ta.value)}\n`;
+    const n = ta.value.split('\n').length;
+    let g = '';
+    for (let i = 1; i <= n; i += 1) g += `<span>${i}</span>`;
+    $('[data-pg-gutter]').innerHTML = g;
+  }
+  async function pgRun() {
+    const ta = $('[data-pg-code]');
+    const out = $('[data-pg-out]');
+    if (!ta || !out) return;
+    let luna;
+    try { luna = await lunaLib(); } catch (e) { toast(t('Luna konnte nicht geladen werden.')); return; }
+    const sim = $('[data-pg-sim]') && $('[data-pg-sim]').checked;
+    const username = ($('[data-pg-user]') || {}).value || 'Lok_Max';
+    const text = ($('[data-pg-text]') || {}).value || '';
+    const now = new Date();
+    const vars = {
+      username, displayName: username, userId: '1', server: 'Playground', chat: 'Playground', channel: 'allgemein', members: 1, bot: 'Playground',
+      game: 'Train Sim Germany', gameId: placeId || '', text, message: text,
+      time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(now), date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now),
+    };
+    const events = sim ? [{ event: 'start' }, { event: 'join', args: [username] }, { event: 'message', args: [text, username] }] : [];
+    const r = luna.runScript(ta.value, { vars, events });
+    const kindIc = { out: '›', log: '·', warn: '!', error: '×' };
+    out.innerHTML = r.output.length ? r.output.map((x) => `<li class="pg__line pg__line--${esc(x.kind)}"><i>${kindIc[x.kind] || '·'}</i><span>${esc(x.text)}</span>${x.line ? `<small>${t('Zeile {n}', { n: x.line })}</small>` : ''}</li>`).join('')
+      : `<li class="pg__hint">${sim && !r.ran ? t('Keine Ausgabe – das Skript hat kein onstart, onjoin oder onmessage.') : t('Keine Ausgabe. Mit print("…") schreibst du hierher.')}</li>`;
+    $('[data-pg-steps]').textContent = r.errors.length ? t('mit Fehler') : t('{n} Schritte', { n: fmt(r.steps) });
+    haptic(r.errors.length ? 'error' : 'light');
+  }
+  // Nur für den Chief Engineer: Inhalt kommt aus dem Backend
+  async function loadIntern() {
+    if (docs.internBusy || docs.intern) return;
+    docs.internBusy = true;
+    try { docs.intern = await api('/api/luna/intern'); } catch (e) { docs.intern = { error: e.status === 403 ? 'forbidden' : 'error' }; }
+    docs.internBusy = false;
+    if (state.page === 'luna' && state.docsArg === 'intern') renderDocs('intern', state.docsHeading);
+  }
+  function docsIntern() {
+    const top = docsTop([t('Intern'), t('Luna von innen')]);
+    const lock = (text) => `${top}<article class="doc"><h1>${t('Luna von innen')}</h1><div class="dl-lock">${icon('fi-rr-lock')}<p>${text}</p></div></article>`;
+    if (!isCEN()) return { html: lock(t('Diese Seite gibt es nur für den Chief Engineer.')), toc: [] };
+    if (!apiReady() || !sessionToken()) return { html: lock(t('Bitte melde dich an – der Inhalt kommt nach einer Prüfung deines Rangs vom App-Server.')), toc: [] };
+    if (!docs.intern) { loadIntern(); return { html: `${top}<article class="doc"><h1>${t('Luna von innen')}</h1>${loadingHtml()}</article>`, toc: [] }; }
+    if (docs.intern.error) return { html: lock(docs.intern.error === 'forbidden' ? t('Diese Seite gibt es nur für den Chief Engineer.') : t('Die Seite konnte nicht geladen werden.')), toc: [] };
+    const r = docs.lib.render(docs.intern.md, 'intern');
+    return {
+      html: `${top}<article class="doc"><span class="dl-badge dl-badge--cen">${icon('fi-rr-shield-check')}${t('Nur für den Chief Engineer')}</span><h1>${t('Luna von innen')}</h1>
+        <p class="doc__lead">${t('Persönlich für dich: was jedes Teil der Sprache macht, wo du die Dokumentation bearbeitest und wie du eigene Funktionen ergänzt.')}</p>${r.html}</article>`,
+      toc: r.toc,
+    };
+  }
   async function renderDocs(pageId, heading) {
     const box = $('[data-docs]');
     if (!box) return;
@@ -5820,25 +6188,34 @@
       if (state.page !== 'luna') return;
     }
     const D = docs.lib;
+    iconDefs();
+    box.classList.toggle('is-landing', pageId === 'start');
+    if (pageId === 'start') {
+      box.innerHTML = docsShell(docsLanding(), 'start');
+      const out = $('[data-dl-out]');
+      lunaLib().then((luna) => {
+        const r = luna.runScript($('.dl-demo [data-doc-src]').value);
+        if (out) out.innerHTML = r.output.map((x) => `<li>${esc(x.text)}</li>`).join('');
+      }).catch(() => { if (out) out.innerHTML = ''; });
+      return;
+    }
+    if (pageId === 'intern') {
+      const r = docsIntern();
+      box.innerHTML = docsShell(r.html, 'intern', r.toc);
+      docsSpy(heading);
+      return;
+    }
+    if (pageId === 'playground') {
+      box.innerHTML = docsShell(docsPlayground(), 'playground');
+      pgPaint();
+      return;
+    }
     const page = D.PAGES.find((x) => x.id === pageId) || D.PAGES[0];
     const idx = D.PAGES.indexOf(page);
     const prev = D.PAGES[idx - 1];
     const next = D.PAGES[idx + 1];
     const r = D.render(page.md, page.id);
-    const back = ide.cid && ide.bid ? `<a class="docs__back" href="#/bots/${esc(ide.cid)}/${esc(ide.bid)}">${icon('fi-rr-arrow-left')}${t('Zurück zum Editor')}</a>` : '';
-    iconDefs();
-    box.innerHTML = `<aside class="docs__nav${docs.nav ? ' is-open' : ''}" data-docs-navbox aria-label="${esc(t('Inhalt der Dokumentation'))}">
-        <div class="docs__brand">${clsIcon('module')}<span><b>Luna</b><small>${t('Dokumentation')}</small></span><button class="docs__nav-close" type="button" data-docs-nav="0" aria-label="${esc(t('Schließen'))}">${svgClose}</button></div>
-        <label class="docs__search">${icon('fi-rr-search')}<input type="search" data-docs-search value="${esc(docs.q)}" placeholder="${esc(t('Dokumentation durchsuchen …'))}" autocomplete="off" spellcheck="false"></label>
-        <div class="docs__links" data-docs-links>${docsNavHtml(page.id)}</div>
-        ${back}
-      </aside>
-      <button class="docs__backdrop" type="button" data-docs-nav="0" tabindex="-1" aria-hidden="true"></button>
-      <div class="docs__main">
-        <div class="docs__top">
-          <button class="docs__menu" type="button" data-docs-nav="1">${icon('fi-rr-menu-burger')}${t('Inhalt')}</button>
-          <nav class="docs__crumbs" aria-label="${esc(t('Pfad'))}"><a href="#/luna">Luna</a>${svgChev}<span>${esc(t(page.group))}</span>${svgChev}<span aria-current="page">${esc(t(page.title))}</span></nav>
-        </div>
+    box.innerHTML = docsShell(`${docsTop([t(page.group), t(page.title)])}
         <article class="doc">
           <h1>${esc(t(page.title))}</h1>
           <p class="doc__lead">${esc(t(page.lead))}</p>
@@ -5848,12 +6225,11 @@
         <nav class="doc__pager">
           ${prev ? `<a href="#/luna/${esc(prev.id)}"><small>${t('Zurück')}</small><b>${esc(t(prev.title))}</b></a>` : '<span></span>'}
           ${next ? `<a class="is-next" href="#/luna/${esc(next.id)}"><small>${t('Weiter')}</small><b>${esc(t(next.title))}</b></a>` : '<span></span>'}
-        </nav>
-      </div>
-      <aside class="docs__toc" aria-label="${esc(t('Auf dieser Seite'))}">
-        ${r.toc.length ? `<h6>${t('Auf dieser Seite')}</h6><nav>${r.toc.map((h) => `<a class="lv-${h.level}" href="#/luna/${esc(page.id)}?h=${esc(h.id)}" data-toc="${esc(h.id)}">${esc(h.text)}</a>`).join('')}</nav>` : ''}
-      </aside>`;
-    // Mitlaufendes „Auf dieser Seite“
+        </nav>`, page.id, r.toc);
+    docsSpy(heading);
+  }
+  // Mitlaufendes „Auf dieser Seite“ und Sprung zu einer Überschrift
+  function docsSpy(heading) {
     if (docs.spy) docs.spy.disconnect();
     if ('IntersectionObserver' in window) {
       docs.spy = new IntersectionObserver((entries) => {
@@ -5877,7 +6253,9 @@
       return hits.length ? `<div class="docs__results">${hits.map((h) => `<a href="#/luna/${esc(h.id)}"><b>${esc(t(h.title))}</b><small>${esc(t(h.group))}</small><span>${esc(h.snip)}</span></a>`).join('')}</div>`
         : `<p class="docs__none">${t('Nichts gefunden.')}</p>`;
     }
-    return D.GROUPS.map((g) => `<div class="docs__group"><h6>${esc(t(g))}</h6>${D.PAGES.filter((x) => x.group === g).map((x) => `<a href="#/luna/${esc(x.id)}"${x.id === current ? ' class="is-active" aria-current="page"' : ''}>${esc(t(x.title))}</a>`).join('')}</div>`).join('');
+    const link = (id, title, extra = '') => `<a href="#/luna/${esc(id)}"${id === current ? ' class="is-active" aria-current="page"' : ''}>${extra}${esc(title)}</a>`;
+    return `<div class="docs__group">${link('start', t('Start'))}</div>${D.GROUPS.map((g) => `<div class="docs__group"><h6>${esc(t(g))}</h6>${D.PAGES.filter((x) => x.group === g).map((x) => link(x.id, t(x.title), x.id === 'playground' ? icon('fi-rr-play', 'docs__pg-ic') : '')).join('')}</div>`).join('')}
+      ${isCEN() ? `<div class="docs__group docs__group--cen"><h6>${t('Intern · nur CEN')}</h6>${link('intern', t('Luna von innen'), icon('fi-rr-shield-check', 'docs__pg-ic'))}</div>` : ''}`;
   }
 
   // ---------- Prüfung der Discord-Verbindungen (Ränge über Public Relations Department) ----------
@@ -5988,7 +6366,8 @@
     let body;
     if ('groupNew' in form.dataset || 'serverNew' in form.dataset) {
       const name = form.elements.name.value.trim();
-      if (name.length < 2) { toast(t('Bitte gib der Gruppe einen Namen.')); form.elements.name.focus(); return; }
+      // Leer = Standardname („Name's Gruppe“ bzw. „Name's Server“)
+      if (name.length === 1) { toast(t('Der Name braucht mindestens 2 Zeichen.')); form.elements.name.focus(); return; }
       body = {
         kind: 'group', name, desc: form.elements.desc.value, rules: form.elements.rules.value, text: form.elements.text.value.trim(),
         members: chat.members.map((p) => p.userId), settings: readGroupSettings(form),
@@ -6105,7 +6484,8 @@
       const files = pending.length ? await uploadPending(id) : [];
       ta.value = '';
       ta.style.height = '';
-      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text, files } });
+      const cc = chat.conv[id];
+      chat.conv[id] = await api(`/api/chats/${encodeURIComponent(id)}/messages`, { method: 'POST', body: { text, files, ...(cc && cc.community ? { ch: cc.channel } : {}) } });
       pending.forEach((p) => { if (p.preview) URL.revokeObjectURL(p.preview); });
       chat.pending[id] = [];
       chat.sending = false;
@@ -6734,6 +7114,14 @@
       title: () => t('Verschieben nach …'),
       render: (id) => botMoveView(id),
     },
+    channel: {
+      title: (arg) => { const [cid, ch] = String(arg).split(':'); const c = chat.conv[cid]; const x = c && ch !== 'neu' ? chFind(c, ch) : null; return x ? `#${x.name}` : t('Neuer Kanal'); },
+      render: (arg) => channelView(arg),
+    },
+    category: {
+      title: (arg) => (String(arg).split(':')[1] === 'neu' ? t('Neue Kategorie') : t('Kategorie bearbeiten')),
+      render: (arg) => categoryView(arg),
+    },
     'server-players': {
       title: () => t('Alle Spieler'),
       render: (id) => serverPeopleView(id),
@@ -7192,6 +7580,344 @@
     }, 2800);
   }
 
+  // ---------- Dashboard (#/dashboard): Server, Gruppen, Bots und mehr erstellen ----------
+  // Dunkel wie eine App-Startseite: oben „Hallo, Name“, darunter „Dein Bereich“ (was du hast), Erstellen, zuletzt
+  // angesehen und zuletzt bearbeitet. ⋯ öffnet ein Aktionsblatt von unten. Ohne Namen gibt es „Name's Server“ usw.,
+  // ohne Bild zwei Buchstaben auf Farbe.
+  const dash = { data: null, at: 0, busy: false, q: '', search: false, sheet: null, file: null, preview: null };
+  const DASH_COLORS = { server: '#8B5CF6', group: '#14B8A6', bot: '#F97316', chat: '#3B82F6' };
+  async function loadDash(force = false) {
+    if (!chatReady() || dash.busy || (!force && dash.data && Date.now() - dash.at < 15000)) return;
+    dash.busy = true;
+    try { dash.data = await api('/api/dashboard'); } catch (e) { dash.data = dash.data || { bots: [], places: [] }; }
+    dash.busy = false;
+    dash.at = Date.now();
+    if (state.page === 'dashboard') renderDash();
+  }
+  const recentList = () => store.get('tsg-recent', []) || [];
+  function addRecent(k, id, cid = '') {
+    if (!id) return;
+    store.set('tsg-recent', [{ k, id, cid, at: Date.now() }, ...recentList().filter((x) => !(x.k === k && x.id === id))].slice(0, 20));
+  }
+  // Bot ohne Bild: zwei Buchstaben auf einer Farbe aus dem Namen
+  const nameColor = (name) => AVATAR_COLORS[hash(String(name || '?')) % AVATAR_COLORS.length];
+  function initialsBadge(name, cls = '', color = null) {
+    const [a1, a2] = color ? [color, color] : nameColor(name);
+    return `<span class="ini-badge ${cls}" style="--a1:${esc(a1)};--a2:${esc(a2)}" aria-hidden="true">${esc(initials(String(name || '?')))}</span>`;
+  }
+  const kindOfChat = (c) => (c.kind === 'group' ? (c.category === 'server' ? 'server' : 'group') : c.kind === 'direct' ? 'chat' : 'ticket');
+  const KIND_LABEL = { server: 'Server', group: 'Gruppe', chat: 'Chat', ticket: 'Anfrage', bot: 'Bot' };
+  function dashBadge(item, cls = 'dash-badge') {
+    if (item.k === 'bot') return item.b.avatar ? botAvatar(item.b.chat.id, item.b, cls) : initialsBadge(item.b.name, cls);
+    const c = item.c;
+    if (c.kind === 'group') return groupBadge(c, cls);
+    const other = chatOther(c);
+    if (other) return personImg(other, cls);
+    return `<span class="dash-badge__ic ${cls}">${icon(areaOf(c.area).icon)}</span>`;
+  }
+  const chatItem = (c) => ({ k: 'chat', id: c.id, c, name: chatTitle(c), kind: kindOfChat(c), at: c.updated, href: `#/chat/${c.id}` });
+  const botItem = (b) => ({ k: 'bot', id: b.id, b, name: b.name, kind: 'bot', at: b.rev || 0, href: b.mode === 'advanced' ? `#/bots/${b.chat.id}/${b.id}` : `#/chat/${b.chat.id}/info` });
+  function dashItems() {
+    const chats = (chat.list ? chat.list.chats : []).map(chatItem);
+    const bots = (dash.data ? dash.data.bots : []).map(botItem);
+    return { chats, bots, all: [...chats, ...bots] };
+  }
+  function dashMeta(item) {
+    if (item.k === 'bot') return `${t('Bot')} · ${esc(item.b.chat.name || '')}${item.b.on ? '' : ` · ${t('Aus')}`}`;
+    const c = item.c;
+    const parts = [t(KIND_LABEL[item.kind])];
+    if (c.kind === 'group') parts.push(membersText(memberCount(c)));
+    parts.push(chatAgo(c.updated));
+    return parts.map(esc).join(' · ');
+  }
+  function dashDefaultName(what) {
+    const me = state.profile || {};
+    const base = `${me.username || me.displayName || t('Spieler')}'s ${what}`;
+    const taken = new Set((what === 'Bot' ? (dash.data ? dash.data.bots : []).map((b) => b.name)
+      : (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group' && c.from && String(c.from.sub) === meSub()).map((c) => c.name)).map((x) => String(x || '').toLowerCase()));
+    for (let n = 1; n < 1000; n++) { const name = n === 1 ? base : `${base}${n}`; if (!taken.has(name.toLowerCase())) return name; }
+    return base;
+  }
+  const dashRow = (item) => `<li class="dash-row">
+      <a class="dash-row__main" href="${esc(item.href)}">${dashBadge(item)}<span class="dash-row__text"><b>${esc(item.name)}</b><small>${dashMeta(item)}</small></span>${item.k === 'chat' && isUnread(item.c) ? '<i class="dash-unread" aria-label="ungelesen"></i>' : ''}</a>
+      <button class="dash-more" type="button" data-dash-more="${item.k}:${esc(item.id)}" aria-label="${esc(t('Mehr zu {name}', { name: item.name }))}">${icon('fi-rr-menu-dots')}</button>
+    </li>`;
+  const dashTile = (item) => `<div class="dash-tile dash-tile--${item.kind}">
+      <a class="dash-tile__main" href="${esc(item.href)}">${dashBadge(item, 'dash-badge dash-badge--lg')}<b>${esc(item.name)}</b><small>${dashMeta(item)}</small></a>
+      <button class="dash-more dash-tile__more" type="button" data-dash-more="${item.k}:${esc(item.id)}" aria-label="${esc(t('Mehr zu {name}', { name: item.name }))}">${icon('fi-rr-menu-dots-vertical')}</button>
+    </div>`;
+  function renderDash() {
+    const box = $('[data-dash]');
+    if (!box) return;
+    const p = state.profile || {};
+    const ready = chatReady();
+    if (ready) { loadChats(); loadDash(); }
+    const ava = p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : esc(initials(p.displayName || p.username || 'TSG'));
+    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
+    const head = `<header class="dash-top">
+        <button class="dash-top__ava" type="button" data-open="profile" aria-label="${esc(t('Profil'))}">${ava}</button>
+        <div class="dash-top__hi"><small>${t('Dashboard')}</small><h1>${t('Hallo, {name}', { name: esc(p.displayName || p.username || t('Gast')) })}</h1></div>
+        <button class="dash-ibtn${dash.search ? ' is-on' : ''}" type="button" data-dash-search aria-label="${esc(t('Suchen'))}">${icon('fi-rr-search')}</button>
+        <a class="dash-ibtn" href="#/chat" aria-label="${esc(t('Chat'))}">${icon('fi-rr-bell')}${unread ? `<i class="dash-ibtn__n">${unread > 9 ? '9+' : unread}</i>` : ''}</a>
+      </header>`;
+    if (!ready) {
+      box.innerHTML = `<div class="dash__wrap">${head}<section class="dash-card dash-gate">${icon(apiReady() ? 'fi-rr-sign-in-alt' : 'fi-rr-cloud')}
+        <h2>${apiReady() ? t('Mit Roblox anmelden') : t('Das Dashboard startet bald')}</h2>
+        <p>${apiReady() ? t('Melde dich an, um Server, Gruppen und Bots zu erstellen.') : t('Sobald der App-Server läuft, erstellst du hier Server, Gruppen und Bots.')}</p>
+        ${apiReady() ? `<button class="dash-btn" type="button" data-open="profile">${t('Anmelden')}</button>` : ''}</section></div><div class="dsh" data-dsh hidden></div>`;
+      return;
+    }
+    const { chats, bots, all } = dashItems();
+    const n = { server: chats.filter((x) => x.kind === 'server').length, group: chats.filter((x) => x.kind === 'group').length, bot: bots.length, chat: chats.filter((x) => x.kind === 'chat' || x.kind === 'ticket').length };
+    const total = n.server + n.group + n.bot + n.chat;
+    const r = rankOf(state.rank);
+    const seg = (k) => (n[k] ? `<i style="--w:${Math.max(4, (n[k] / Math.max(1, total)) * 100)}%;--c:${DASH_COLORS[k]}"></i>` : '');
+    const legend = (k, label) => `<li><i style="--c:${DASH_COLORS[k]}"></i><span>${label}</span><b>${n[k]}</b></li>`;
+    const area = `<section class="dash-card dash-area">
+        <div class="dash-area__top"><span>${t('Dein Bereich')}</span><span class="dash-plan" style="--rc:${esc(r.color)}">${esc(r.name)}</span></div>
+        <div class="dash-area__num"><b>${total}</b><span>${total === 1 ? t('Objekt') : t('Objekte')}</span></div>
+        <div class="dash-bar" role="img" aria-label="${esc(t('{a} Server, {b} Gruppen, {c} Bots, {d} Chats', { a: n.server, b: n.group, c: n.bot, d: n.chat }))}">${total ? ['server', 'group', 'bot', 'chat'].map(seg).join('') : '<i style="--w:100%;--c:rgba(255,255,255,.08)"></i>'}</div>
+        <ul class="dash-legend">${legend('server', t('Server'))}${legend('group', t('Gruppen'))}${legend('bot', t('Bots'))}${legend('chat', t('Chats'))}</ul>
+      </section>`;
+    const tile = (kind, ic, label, sub, attrs) => `<button class="dash-new dash-new--${kind}" type="button" ${attrs}><span class="dash-new__ic">${icon(ic)}</span><b>${label}</b><small>${sub}</small></button>`;
+    const create = `<section class="dash-sec"><div class="dash-h"><h2>${t('Erstellen')}</h2></div><div class="dash-news">
+        ${tile('server', 'fi-rr-apps', t('Server'), t('Mit Kanälen'), 'data-dash-create="server"')}
+        ${tile('group', 'fi-rr-users-alt', t('Gruppe'), t('Privat oder öffentlich'), 'data-dash-create="group"')}
+        ${tile('bot', 'fi-rr-robot', t('Bot'), t('Basis oder Luna'), 'data-dash-create="bot"')}
+        ${tile('chat', 'fi-rr-comment-alt-dots', t('Chat'), t('Spieler anschreiben'), 'data-dash-go="#/chat/neu/spieler"')}
+        ${tile('ticket', 'fi-rr-comments-question', t('Anfrage'), t('An das Team'), 'data-dash-go="#/chat/neu/anfrage"')}
+        ${tile('luna', 'fi-rr-square-terminal', 'Luna', t('Code ausprobieren'), 'data-dash-go="#/luna/playground"')}
+      </div></section>`;
+    // Zuletzt angesehen: was zuletzt geöffnet wurde, sonst die neuesten Gespräche
+    const byKey = new Map(all.map((x) => [`${x.k}:${x.id}`, x]));
+    let viewed = recentList().map((x) => byKey.get(`${x.k}:${x.id}`)).filter(Boolean);
+    if (viewed.length < 4) viewed = [...viewed, ...chats.slice().sort((a, b) => b.at - a.at).filter((x) => !viewed.includes(x))];
+    viewed = viewed.slice(0, 5);
+    // Zuletzt bearbeitet: eigene Bots und Server/Gruppen, die man leitet
+    const placesSet = new Set((dash.data ? dash.data.places : []).map((x) => x.id));
+    const modified = [...bots, ...chats.filter((x) => placesSet.has(x.id))].sort((a, b) => b.at - a.at).slice(0, 6);
+    const q = dash.q.trim().toLowerCase();
+    const found = q ? all.filter((x) => x.name.toLowerCase().includes(q) || (x.k === 'bot' && x.b.chat.name.toLowerCase().includes(q))).slice(0, 20) : null;
+    const loading = !chat.list || !dash.data;
+    box.innerHTML = `<div class="dash__wrap">${head}
+      ${dash.search ? `<label class="dash-search">${icon('fi-rr-search')}<input type="search" data-dash-q value="${esc(dash.q)}" placeholder="${esc(t('Server, Gruppen, Bots, Chats …'))}" autocomplete="off"></label>` : ''}
+      ${found ? `<section class="dash-sec"><div class="dash-h"><h2>${t('Gefunden')}</h2><span>${found.length}</span></div>${found.length ? `<ul class="dash-list">${found.map(dashRow).join('')}</ul>` : `<p class="dash-empty">${t('Nichts gefunden.')}</p>`}</section>` : `
+      ${area}${create}
+      <section class="dash-sec"><div class="dash-h"><h2>${t('Zuletzt angesehen')}</h2><a href="#/chat">${t('Alle')}</a></div>
+        ${viewed.length ? `<ul class="dash-list">${viewed.map(dashRow).join('')}</ul>` : `<p class="dash-empty">${loading ? t('Wird geladen …') : t('Noch nichts angesehen – erstell oben deinen ersten Server.')}</p>`}</section>
+      <section class="dash-sec"><div class="dash-h"><h2>${t('Zuletzt bearbeitet')}</h2></div>
+        ${modified.length ? `<div class="dash-grid">${modified.map(dashTile).join('')}</div>` : `<p class="dash-empty">${loading ? t('Wird geladen …') : t('Hier erscheinen deine Bots und die Server und Gruppen, die du leitest.')}</p>`}</section>`}
+    </div><div class="dsh" data-dsh hidden></div>`;
+    if (dash.sheet) drawSheet(true);
+    if (dash.search && !found) { const input = $('[data-dash-q]'); if (input && document.activeElement !== input) input.focus(); }
+  }
+  // ---------- Blatt von unten: Aktionen (⋯) und Erstellen ----------
+  function openSheet(kind, arg) {
+    dash.sheet = { kind, arg };
+    if (kind === 'create') { dash.file = null; if (dash.preview) URL.revokeObjectURL(dash.preview); dash.preview = null; }
+    drawSheet();
+    haptic('light');
+  }
+  function closeSheet() {
+    const el = $('[data-dsh]');
+    dash.sheet = null;
+    if (!el) return;
+    el.classList.remove('is-open');
+    setTimeout(() => { if (!dash.sheet) { el.hidden = true; el.innerHTML = ''; } }, reducedMotion() ? 0 : 220);
+  }
+  function findItem(key) {
+    const [k, id] = key.split(':');
+    return dashItems().all.find((x) => x.k === k && x.id === id) || null;
+  }
+  function sheetActions(item) {
+    const a = (act, ic, label, extra = '') => `<button class="dsh-act" type="button" data-dsh-act="${act}" ${extra}>${icon(ic)}<span>${label}</span></button>`;
+    const out = [];
+    if (item.k === 'chat') {
+      const c = item.c;
+      out.push(a('open', 'fi-rr-comments', t('Öffnen')), a('info', 'fi-rr-info', t('Info und Einstellungen')));
+      if (c.kind === 'group' && c.admin) {
+        out.push(a('bot', 'fi-rr-robot', t('Bot hinzufügen')));
+        out.push(a('rename', 'fi-rr-pencil', t('Umbenennen')));
+        out.push(`<label class="dsh-act">${icon('fi-rr-picture')}<span>${c.photo ? t('Bild ändern') : t('Bild hinzufügen')}</span><input type="file" accept="image/*" data-dsh-photo="chat:${esc(c.id)}"></label>`);
+      }
+      out.push(a('copy', 'fi-rr-link', t('Link kopieren')), a('hide', 'fi-rr-eye-crossed', t('Für mich ausblenden')));
+      if (c.kind === 'group') out.push('<hr>', a('leave', 'fi-rr-sign-out-alt', t('Verlassen'), 'data-danger'));
+    } else {
+      const b = item.b;
+      out.push(b.mode === 'advanced' ? a('editor', 'fi-rr-square-code', t('Im Editor öffnen')) : a('settings', 'fi-rr-settings', t('Einstellungen')));
+      if (b.mode === 'advanced') out.push(a('settings', 'fi-rr-settings', t('Einstellungen')));
+      out.push(a('rename', 'fi-rr-pencil', t('Umbenennen')),
+        `<label class="dsh-act">${icon('fi-rr-picture')}<span>${b.avatar ? t('Bild ändern') : t('Bild hinzufügen')}</span><input type="file" accept="image/*" data-dsh-photo="bot:${esc(b.chat.id)}:${esc(b.id)}"></label>`,
+        a('toggle', b.on ? 'fi-rr-pause' : 'fi-rr-play', b.on ? t('Ausschalten') : t('Einschalten')),
+        a('place', b.chat.category === 'server' ? 'fi-rr-apps' : 'fi-rr-users-alt', t('{name} öffnen', { name: b.chat.name })),
+        '<hr>', a('delete', 'fi-rr-trash', t('Bot löschen'), 'data-danger'));
+    }
+    return out.join('');
+  }
+  function createForm(kind, preset = '') {
+    const what = kind === 'bot' ? 'Bot' : kind === 'server' ? 'Server' : t('Gruppe');
+    const def = dashDefaultName(kind === 'bot' ? 'Bot' : kind === 'server' ? 'Server' : 'Gruppe');
+    const places = dash.data ? dash.data.places : [];
+    const color = kind === 'bot' ? null : GROUP_COLORS[hash(def) % (GROUP_COLORS.length - 1)];
+    const prev = dash.preview ? `<span class="dash-badge dash-badge--xl has-photo"><img src="${esc(dash.preview)}" alt=""></span>` : initialsBadge(def, 'dash-badge dash-badge--xl', color);
+    const hint = { server: t('Ein Server ist eine Community wie bei Discord – mit Kategorien und Kanälen.'), group: t('Eine Gruppe ist ein gemeinsamer Chat ohne Kanäle.'), bot: t('Bots laufen direkt in deinem Server oder deiner Gruppe – Discord ist nicht nötig.') }[kind];
+    return `<form class="dsh-form" data-dsh-create-form="${kind}" novalidate>
+      <div class="dsh-form__top"><label class="dsh-pick" title="${esc(t('Bild wählen'))}"><span data-dsh-preview>${prev}</span><span class="dsh-pick__cam">${icon('fi-rr-camera')}</span><input type="file" accept="image/*" data-dsh-file></label>
+        <div><h2>${t('Neuer {what}', { what })}</h2><p>${hint}</p></div></div>
+      <label class="dsh-field"><span>${t('Name')}</span><input name="name" maxlength="${kind === 'bot' ? 32 : 60}" placeholder="${esc(def)}" data-dsh-name autocomplete="off"><small>${t('Leer lassen für „{name}“', { name: esc(def) })}</small></label>
+      ${kind !== 'bot' ? `<fieldset class="dsh-field"><legend>${t('Farbe ohne Bild')}</legend><div class="dsh-colors">${GROUP_COLORS.map((col) => `<label style="--c:${col}"><input type="radio" name="color" value="${col}"${col === color ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
+        <div class="dsh-seg" role="radiogroup" aria-label="${esc(t('Sichtbarkeit'))}"><label><input type="radio" name="visibility" value="private" checked><span>${icon('fi-rr-lock')}${t('Privat')}</span></label><label><input type="radio" name="visibility" value="public"><span>${icon('fi-rr-globe')}${t('Öffentlich')}</span></label></div>` : `
+        ${places.length ? `<label class="dsh-field"><span>${t('Wo soll der Bot laufen?')}</span><select name="place">${places.map((x) => `<option value="${esc(x.id)}"${x.id === preset ? ' selected' : ''}${x.bots >= (dash.data.maxBots || 5) ? ' disabled' : ''}>${esc(x.name)}${x.bots >= (dash.data.maxBots || 5) ? ` (${t('voll')})` : ''}</option>`).join('')}</select></label>`
+          : `<p class="dsh-note">${icon('fi-rr-info')}<span>${t('Bots laufen in einem Server oder einer Gruppe, die du leitest. Erstell zuerst einen Server.')}</span></p>`}
+        <div class="dsh-seg" role="radiogroup" aria-label="${esc(t('Modus'))}"><label><input type="radio" name="mode" value="basic" checked><span>${icon('fi-rr-sparkles')}${t('Basis')}</span></label><label><input type="radio" name="mode" value="advanced"><span>${icon('fi-rr-square-code')}${t('Luna')}</span></label></div>`}
+      ${kind === 'server' ? `<div class="dsh-chips"><small>${t('Startet mit diesen Kanälen')}</small><span>${['willkommen', 'ankündigungen', 'allgemein', 'medien', 'befehle'].map((x) => `<i>#${x}</i>`).join('')}</span></div>` : ''}
+      ${kind === 'bot' && !places.length ? `<button class="dash-btn" type="button" data-dash-create="server">${icon('fi-rr-apps')}${t('Server erstellen')}</button>`
+        : `<button class="dash-btn" type="submit">${icon('fi-rr-plus')}${t('{what} erstellen', { what })}</button>`}
+      ${kind !== 'bot' ? `<a class="dsh-link" href="#/chat/neu/${kind === 'server' ? 'server' : 'gruppe'}">${t('Mehr Optionen: Leute, Regeln, Rechte{extra}', { extra: kind === 'server' ? t(', private Server') : '' })}</a>` : ''}
+    </form>`;
+  }
+  function drawSheet(keep = false) {
+    const el = $('[data-dsh]');
+    if (!el || !dash.sheet) return;
+    const { kind, arg } = dash.sheet;
+    let body = '';
+    if (kind === 'more') {
+      const item = findItem(arg);
+      if (!item) { closeSheet(); return; }
+      body = `<div class="dsh-head">${dashBadge(item, 'dash-badge dash-badge--lg')}<span><b>${esc(item.name)}</b><small>${dashMeta(item)}</small></span></div><div class="dsh-acts">${sheetActions(item)}</div>`;
+    } else if (kind === 'create') body = createForm(arg.split(':')[0], arg.split(':')[1] || '');
+    else if (kind === 'rename') {
+      const item = findItem(arg);
+      if (!item) { closeSheet(); return; }
+      body = `<form class="dsh-form" data-dsh-rename="${esc(arg)}" novalidate><div class="dsh-head">${dashBadge(item, 'dash-badge dash-badge--lg')}<span><b>${t('Umbenennen')}</b><small>${esc(item.name)}</small></span></div>
+        <label class="dsh-field"><span>${t('Neuer Name')}</span><input name="name" maxlength="${item.k === 'bot' ? 32 : 60}" value="${esc(item.name)}" autocomplete="off"></label>
+        <button class="dash-btn" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button></form>`;
+    }
+    el.innerHTML = `<button class="dsh__scrim" type="button" data-dsh-close aria-label="${esc(t('Schließen'))}"></button>
+      <div class="dsh__panel" role="dialog" aria-modal="true"><span class="dsh__grip" aria-hidden="true"></span>${body}
+      <button class="dsh-cancel" type="button" data-dsh-close>${t('Abbrechen')}</button></div>`;
+    el.hidden = false;
+    if (keep) el.classList.add('is-open');
+    else requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-open')));
+  }
+  function updatePreview(form) {
+    const box = $('[data-dsh-preview]', form);
+    if (!box) return;
+    if (dash.preview) { box.innerHTML = `<span class="dash-badge dash-badge--xl has-photo"><img src="${esc(dash.preview)}" alt=""></span>`; return; }
+    const input = form.elements.name;
+    const name = input.value.trim() || input.placeholder;
+    const col = form.querySelector('input[name="color"]:checked');
+    box.innerHTML = initialsBadge(name, 'dash-badge dash-badge--xl', col ? col.value : null);
+  }
+  async function dashCreate(form) {
+    const kind = form.dataset.dshCreateForm;
+    const btn = $('button[type="submit"]', form);
+    const name = form.elements.name.value.replace(/\s+/g, ' ').trim();
+    if (name.length === 1) { toast(t('Der Name braucht mindestens 2 Zeichen.')); return; }
+    btn.disabled = true;
+    try {
+      if (kind === 'bot') {
+        const cid = form.elements.place.value;
+        const mode = (form.querySelector('input[name="mode"]:checked') || {}).value || 'basic';
+        const b = await api(`/api/chats/${encodeURIComponent(cid)}/bots`, { method: 'POST', body: { name, mode } });
+        if (dash.file) { try { await api(`/api/chats/${encodeURIComponent(cid)}/bots/${encodeURIComponent(b.id)}/photo`, { method: 'PUT', raw: await squareJpeg(dash.file), type: 'image/jpeg' }); } catch (e) { toast(t('Bot erstellt, das Bild ließ sich aber nicht speichern.')); } }
+        delete botsFull[b.id];
+        haptic('success');
+        toast(t('{name} ist da', { name: b.name }));
+        closeSheet();
+        dash.at = 0;
+        chat.at = 0;
+        addRecent('bot', b.id, cid);
+        if (mode === 'advanced') location.hash = `#/bots/${cid}/${b.id}`;
+        else { location.hash = `#/chat/${cid}/info`; setTimeout(() => openModal('bot', `${cid}:${b.id}`), 120); }
+        return;
+      }
+      const visibility = (form.querySelector('input[name="visibility"]:checked') || {}).value || 'private';
+      const c = await api('/api/chats', { method: 'POST', body: { kind: 'group', ...(kind === 'server' ? { category: 'server', servers: [] } : {}), name, color: (form.querySelector('input[name="color"]:checked') || {}).value, settings: { ...GROUP_DEFAULTS, visibility } } });
+      if (dash.file) {
+        try { await api(`/api/chats/${encodeURIComponent(c.id)}/photo`, { method: 'PUT', raw: await squareJpeg(dash.file), type: 'image/jpeg' }); c.photo = Date.now(); } catch (e) { toast(t('Erstellt, das Bild ließ sich aber nicht speichern.')); }
+      }
+      chat.conv[c.id] = c;
+      if (c.community) chat.ch[c.id] = c.channel;
+      haptic('success');
+      toast(kind === 'server' ? t('Server „{name}“ erstellt', { name: c.name }) : t('Gruppe „{name}“ erstellt', { name: c.name }));
+      closeSheet();
+      chat.at = 0;
+      dash.at = 0;
+      if (dash.file) delete chat.conv[c.id];
+      location.hash = `#/chat/${c.id}`;
+    } catch (e) {
+      toast(chatError(e));
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  async function dashAction(act) {
+    const item = dash.sheet && findItem(dash.sheet.arg);
+    if (!item) return;
+    const go = (href) => { closeSheet(); location.hash = href; };
+    if (item.k === 'chat') {
+      const c = item.c;
+      if (act === 'open') go(`#/chat/${c.id}`);
+      else if (act === 'info') go(`#/chat/${c.id}/info`);
+      else if (act === 'bot') openSheet('create', `bot:${c.id}`);
+      else if (act === 'rename') openSheet('rename', `chat:${c.id}`);
+      else if (act === 'copy') {
+        const url = `${location.origin}${location.pathname}#/chat/${c.id}`;
+        try { await navigator.clipboard.writeText(url); toast(t('Link kopiert')); } catch (e) { toast(url); }
+        closeSheet();
+      } else if (act === 'hide') {
+        try { await api(`/api/chats/${encodeURIComponent(c.id)}/hide`, { method: 'POST' }); toast(t('Ausgeblendet')); chat.at = 0; closeSheet(); await loadChats(true); renderDash(); } catch (e) { toast(chatError(e)); }
+      } else if (act === 'leave') {
+        if (!confirm(t('„{name}“ verlassen?', { name: c.name }))) return;
+        try { await api(`/api/chats/${encodeURIComponent(c.id)}/leave`, { method: 'POST' }); toast(t('Verlassen')); closeSheet(); chat.at = 0; dash.at = 0; await loadChats(true); loadDash(true); } catch (e) { toast(chatError(e)); }
+      }
+      return;
+    }
+    const b = item.b;
+    const cid = b.chat.id;
+    if (act === 'editor') go(`#/bots/${cid}/${b.id}`);
+    else if (act === 'settings') { closeSheet(); delete botsFull[b.id]; openModal('bot', `${cid}:${b.id}`); }
+    else if (act === 'place') go(`#/chat/${cid}`);
+    else if (act === 'rename') openSheet('rename', `bot:${b.id}`);
+    else if (act === 'toggle') {
+      const r = await botCall(cid, `/${encodeURIComponent(b.id)}`, { method: 'PUT', body: { on: !b.on } });
+      if (r) { toast(r.on ? t('Eingeschaltet') : t('Ausgeschaltet')); closeSheet(); loadDash(true); }
+    } else if (act === 'delete') {
+      if (!confirm(t('Bot „{name}“ löschen? Seine Regeln, Skripte und sein Speicher gehen verloren.', { name: b.name }))) return;
+      if (await botCall(cid, `/${encodeURIComponent(b.id)}`, { method: 'DELETE' })) { toast(t('Bot gelöscht')); closeSheet(); loadDash(true); }
+    }
+  }
+  async function dashRename(form) {
+    const key = form.dataset.dshRename;
+    const item = findItem(key);
+    const name = form.elements.name.value.replace(/\s+/g, ' ').trim();
+    if (!item || name.length < 2) { toast(t('Der Name braucht mindestens 2 Zeichen.')); return; }
+    try {
+      if (item.k === 'bot') await api(`/api/chats/${encodeURIComponent(item.b.chat.id)}/bots/${encodeURIComponent(item.id)}`, { method: 'PUT', body: { name } });
+      else await api(`/api/chats/${encodeURIComponent(item.id)}`, { method: 'PUT', body: { name } });
+      haptic('success');
+      toast(t('Gespeichert'));
+      closeSheet();
+      chat.at = 0;
+      await Promise.all([loadChats(true), loadDash(true)]);
+      renderDash();
+    } catch (e) { toast(chatError(e)); }
+  }
+  async function dashPhoto(arg, file) {
+    const [k, a, b] = arg.split(':');
+    try {
+      const raw = await squareJpeg(file);
+      if (k === 'bot') await api(`/api/chats/${encodeURIComponent(a)}/bots/${encodeURIComponent(b)}/photo`, { method: 'PUT', raw, type: 'image/jpeg' });
+      else await api(`/api/chats/${encodeURIComponent(a)}/photo`, { method: 'PUT', raw, type: 'image/jpeg' });
+      toast(t('Bild gespeichert'));
+      closeSheet();
+      chat.at = 0;
+      await Promise.all([loadChats(true), loadDash(true)]);
+      renderDash();
+    } catch (e) { toast(e && e.status ? chatError(e) : t('Dieses Bild lässt sich nicht verwenden.')); }
+  }
+
   // ---------- Bindings ----------
   function bind() {
     const s = D.stats;
@@ -7204,7 +7930,7 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots', 'luna'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots', 'luna', 'dashboard'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
@@ -7230,6 +7956,7 @@
     einstellungen() { renderSettings(); },
     bots() { openIde(state.botsArg[0], state.botsArg[1]); },
     luna() { renderDocs(state.docsArg, state.docsHeading); },
+    dashboard() { renderDash(); },
   };
 
   function route() {
@@ -7246,10 +7973,30 @@
     const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', server: 'new-server', anfrage: 'new-ticket' };
     let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', discord: 'discord', neu: 'new', an: 'direct' }[chatSub] || 'conv';
     if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
+    // „Neu“ im Chat führt jetzt zum Dashboard
+    if (chatView === 'new') { location.replace('#/dashboard'); return; }
+    // Dashboard: #/dashboard?neu=server|gruppe|bot öffnet gleich das Erstellen
+    if (page === 'dashboard') {
+      const want = new URLSearchParams(query || '').get('neu');
+      if (want) {
+        history.replaceState(null, '', '#/dashboard');
+        const kind = { gruppe: 'group', group: 'group', server: 'server', bot: 'bot' }[want];
+        if (kind) setTimeout(() => { if (state.page === 'dashboard') openSheet('create', kind); }, 60);
+      }
+    }
     if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
     const chatArg = chatView === 'direct' ? (sub2 || '') : ['conv', 'info'].includes(chatView) ? chatSub : null;
+    // Server: #/chat/<id>?k=<kanal> öffnet den Kanal (z. B. aus einer Benachrichtigung)
+    const kParam = chatView === 'conv' ? new URLSearchParams(query || '').get('k') : null;
+    if (kParam && /^[\w-]{1,30}$/.test(kParam) && chat.ch[chatArg] !== kParam) {
+      chat.ch[chatArg] = kParam;
+      store.set('tsg-ch', chat.ch);
+      const cc = chat.conv[chatArg];
+      if (cc && !cc.error && cc.community) { Object.assign(cc, { channel: kParam, messages: [], switching: true }); if (state.chatArg === chatArg && state.chatView === 'conv') { renderChat(); openConv(chatArg); } }
+    }
+    if (chatView !== state.chatView || chatArg !== state.chatArg) chat.side = false;
     const botsArg = page === 'bots' ? [sub || '', sub2 || ''] : null;
-    const docsArg = page === 'luna' ? (sub || 'einfuehrung') : null;
+    const docsArg = page === 'luna' ? (sub || 'start') : null;
     const docsHeading = page === 'luna' ? new URLSearchParams(query || '').get('h') : null;
     // Nur zu einer Überschrift springen: Seite nicht neu aufbauen
     if (page === 'luna' && state.page === 'luna' && docsArg === state.docsArg && docsHeading) {
@@ -7295,6 +8042,9 @@
     }
     document.body.dataset.page = page;
     document.body.dataset.chatView = chatView || '';
+    if (changed && chatView === 'conv' && chatArg) addRecent('chat', chatArg);
+    if (changed && page === 'bots') addRecent('bot', botsArg[1], botsArg[0]);
+    if (page !== 'dashboard') dash.sheet = null;
     const view = serverId ? 'server-detail' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
@@ -7681,6 +8431,208 @@
       }
     });
 
+    // Server: Kanäle wechseln, bearbeiten, Kategorien
+    document.addEventListener('click', async (e) => {
+      const el = e.target.closest('[data-cm-ch], [data-cm-edit], [data-cm-new], [data-cm-cat-new], [data-cm-cat-edit], [data-cm-cat], [data-cm-side-open], [data-cm-side-close], [data-cm-convert], [data-cm-go], [data-ch-move], [data-ch-del], [data-cat-move], [data-cat-del]');
+      if (!el) return;
+      const ds = el.dataset;
+      const id = state.chatArg;
+      const c = id && chat.conv[id];
+      if (ds.cmConvert !== undefined) {
+        if (confirm(t('Diese Gruppe in einen Server mit Kanälen umwandeln? Das lässt sich nicht rückgängig machen.'))) await saveLayout(ds.cmConvert, { convert: true }, t('Jetzt ein Server mit Kanälen'));
+        return;
+      }
+      if (!c || c.error) return;
+      if (ds.cmSideOpen !== undefined || ds.cmSideClose !== undefined) {
+        chat.side = ds.cmSideOpen !== undefined;
+        const box = $('[data-cm]');
+        if (box) box.classList.toggle('is-open', chat.side);
+        if (chat.side) haptic('light');
+        return;
+      }
+      if (ds.cmCh) { switchChannel(id, ds.cmCh); return; }
+      if (ds.cmGo) { location.hash = `#/chat/${id}?k=${encodeURIComponent(ds.cmGo)}`; return; }
+      if (ds.cmCat) { toggleCategory(id, ds.cmCat); return; }
+      if (ds.cmEdit) { openModal('channel', `${id}:${ds.cmEdit}`); return; }
+      if (ds.cmNew !== undefined) { openModal('channel', `${id}:neu:${ds.cmNew}`); return; }
+      if (ds.cmCatNew !== undefined) { openModal('category', `${id}:neu`); return; }
+      if (ds.cmCatEdit) { openModal('category', `${id}:${ds.cmCatEdit}`); return; }
+      const form = el.closest('form');
+      if (!form) return;
+      const body = layoutBody(c);
+      if (ds.chMove || ds.chDel !== undefined) {
+        const chId = form.dataset.chForm.split(':')[1];
+        const i = body.channels.findIndex((x) => x.id === chId);
+        if (i < 0) return;
+        if (ds.chDel !== undefined) {
+          if (!confirm(t('Kanal #{name} mit allen Nachrichten löschen?', { name: body.channels[i].name }))) return;
+          body.channels.splice(i, 1);
+          if (body.home === chId) body.home = '';
+          await saveLayout(id, body, t('Kanal gelöscht'));
+          return;
+        }
+        // Verschieben innerhalb der eigenen Kategorie
+        const cat = body.channels[i].cat || null;
+        const same = body.channels.map((x, n) => [x, n]).filter(([x]) => (x.cat || null) === cat).map(([, n]) => n);
+        const pos = same.indexOf(i) + Number(ds.chMove);
+        if (pos < 0 || pos >= same.length) return;
+        const j = same[pos];
+        [body.channels[i], body.channels[j]] = [body.channels[j], body.channels[i]];
+        await saveLayout(id, body);
+        openModal('channel', `${id}:${chId}`);
+        return;
+      }
+      if (ds.catMove || ds.catDel !== undefined) {
+        const catId = form.dataset.catForm.split(':')[1];
+        const i = body.categories.findIndex((x) => x.id === catId);
+        if (i < 0) return;
+        if (ds.catDel !== undefined) {
+          if (!confirm(t('Kategorie „{name}“ löschen? Die Kanäle bleiben erhalten.', { name: body.categories[i].name }))) return;
+          body.categories.splice(i, 1);
+          body.channels.forEach((x) => { if (x.cat === catId) x.cat = null; });
+          await saveLayout(id, body, t('Kategorie gelöscht'));
+          return;
+        }
+        const j = i + Number(ds.catMove);
+        if (j < 0 || j >= body.categories.length) return;
+        [body.categories[i], body.categories[j]] = [body.categories[j], body.categories[i]];
+        await saveLayout(id, body);
+        openModal('category', `${id}:${catId}`);
+      }
+    });
+    document.addEventListener('input', (e) => {
+      // Kanalname wie bei Discord: klein, Leerzeichen werden zu „-“
+      if (e.target.matches('[data-ch-name]')) {
+        const v = e.target.value;
+        const next = v.toLowerCase().replace(/\s/g, '-');
+        if (next !== v) { const pos = e.target.selectionStart; e.target.value = next; e.target.setSelectionRange(pos, pos); }
+      }
+    });
+    document.addEventListener('change', (e) => {
+      const f = e.target.closest('form[data-ch-form]');
+      if (f && e.target.name === 'kind') { const ic = $('.ch-name .ic', f); if (ic) ic.outerHTML = icon(e.target.value === 'news' ? 'fi-rr-megaphone' : 'fi-rr-hastag'); }
+    });
+    document.addEventListener('submit', async (e) => {
+      const chf = e.target.closest('form[data-ch-form]');
+      const catf = e.target.closest('form[data-cat-form]');
+      if (!chf && !catf) return;
+      e.preventDefault();
+      const [id, which] = (chf ? chf.dataset.chForm : catf.dataset.catForm).split(':');
+      const c = chat.conv[id];
+      if (!c || c.error) return;
+      const body = layoutBody(c);
+      const btn = $('button[type="submit"]', e.target);
+      if (chf) {
+        const f = chf.elements;
+        const name = chName(f.name.value);
+        if (!name) { toast(t('Bitte gib dem Kanal einen Namen.')); f.name.focus(); return; }
+        const next = { name, kind: (chf.querySelector('input[name="kind"]:checked') || {}).value || 'text', cat: f.cat.value || null, topic: f.topic.value.trim() };
+        if (which === 'neu') body.channels.push({ id: 'neu-1', ...next });
+        else Object.assign(body.channels.find((x) => x.id === which) || {}, next);
+        if (f.home && f.home.checked && which !== 'neu') body.home = which;
+        btn.disabled = true;
+        const r = await saveLayout(id, body, which === 'neu' ? t('Kanal #{name} erstellt', { name }) : t('Gespeichert'));
+        btn.disabled = false;
+        // Neuer Kanal: gleich öffnen
+        if (r && which === 'neu') { const made = (r.channels || []).find((x) => x.name === name && !body.channels.some((y) => y.id === x.id && y.id !== 'neu-1')); if (made) switchChannel(id, made.id); }
+        return;
+      }
+      const name = catf.elements.name.value.replace(/\s+/g, ' ').trim();
+      if (!name) { toast(t('Bitte gib der Kategorie einen Namen.')); return; }
+      if (which === 'neu') body.categories.push({ id: 'neu-k', name });
+      else Object.assign(body.categories.find((x) => x.id === which) || {}, { name });
+      btn.disabled = true;
+      await saveLayout(id, body, which === 'neu' ? t('Kategorie erstellt') : t('Gespeichert'));
+      btn.disabled = false;
+    });
+
+    // Dashboard: Suchen, Erstellen, ⋯-Aktionen
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-dash-search], [data-dash-create], [data-dash-go], [data-dash-more], [data-dsh-close], [data-dsh-act]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.dashSearch !== undefined) { dash.search = !dash.search; if (!dash.search) dash.q = ''; renderDash(); return; }
+      if (ds.dashCreate) { openSheet('create', ds.dashCreate); return; }
+      if (ds.dashGo) { location.hash = ds.dashGo; return; }
+      if (ds.dashMore) { openSheet('more', ds.dashMore); return; }
+      if (ds.dshClose !== undefined) { closeSheet(); return; }
+      if (ds.dshAct) dashAction(ds.dshAct);
+    });
+    document.addEventListener('input', (e) => {
+      if (e.target.matches('[data-dash-q]')) {
+        dash.q = e.target.value;
+        const pos = e.target.selectionStart;
+        renderDash();
+        const input = $('[data-dash-q]');
+        if (input) { input.focus(); input.setSelectionRange(pos, pos); }
+      }
+      if (e.target.matches('[data-dsh-name]')) updatePreview(e.target.form);
+    });
+    document.addEventListener('change', (e) => {
+      const form = e.target.closest('form[data-dsh-create-form]');
+      if (form && e.target.matches('[data-dsh-file]') && e.target.files && e.target.files[0]) {
+        if (dash.preview) URL.revokeObjectURL(dash.preview);
+        dash.file = e.target.files[0];
+        dash.preview = URL.createObjectURL(dash.file);
+        updatePreview(form);
+      } else if (form && e.target.name === 'color') updatePreview(form);
+      if (e.target.matches('[data-dsh-photo]') && e.target.files && e.target.files[0]) dashPhoto(e.target.dataset.dshPhoto, e.target.files[0]);
+    });
+    document.addEventListener('submit', (e) => {
+      const cf = e.target.closest('form[data-dsh-create-form]');
+      const rf = e.target.closest('form[data-dsh-rename]');
+      if (!cf && !rf) return;
+      e.preventDefault();
+      if (cf) dashCreate(cf); else dashRename(rf);
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dash.sheet) closeSheet(); });
+
+    // Doku: „Ausprobieren“ öffnet den Codeblock im Playground; Playground: Ausführen, Beispiele, Simulation
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-doc-try], [data-pg-run], [data-pg-clear]');
+      if (!el) return;
+      if ('docTry' in el.dataset) {
+        const src = $('[data-doc-src]', el.closest('.doc-code'));
+        if (!src) return;
+        store.set('tsg-luna-pg', src.value.endsWith('\n') ? src.value : `${src.value}\n`);
+        // Codeblöcke mit Ereignissen (onjoin …) gleich mit Simulation
+        store.set('tsg-luna-pg-sim', /\bon(start|join|leave|message|command|open)\s*\(/.test(src.value));
+        if (state.page === 'luna' && state.docsArg === 'playground') renderDocs('playground'); else location.hash = '#/luna/playground';
+        setTimeout(() => { if (state.docsArg === 'playground') pgRun(); }, 250);
+        return;
+      }
+      if ('pgRun' in el.dataset) { pgRun(); return; }
+      if ('pgClear' in el.dataset) { const out = $('[data-pg-out]'); if (out) out.innerHTML = ''; const st = $('[data-pg-steps]'); if (st) st.textContent = ''; }
+    });
+    document.addEventListener('input', (e) => {
+      if (!e.target.matches('[data-pg-code]')) return;
+      pgPaint();
+      store.set('tsg-luna-pg', e.target.value);
+    });
+    document.addEventListener('change', (e) => {
+      if (e.target.matches('[data-pg-example]') && e.target.value !== '') {
+        const ex = PG_EXAMPLES[+e.target.value];
+        const ta = $('[data-pg-code]');
+        if (!ex || !ta) return;
+        ta.value = ex[1];
+        store.set('tsg-luna-pg', ex[1]);
+        const sim = /\bon(start|join|message)\s*\(/.test(ex[1]);
+        const box = $('[data-pg-sim]');
+        if (box) box.checked = sim;
+        store.set('tsg-luna-pg-sim', sim);
+        $('[data-pg-simbox]').hidden = !sim;
+        e.target.value = '';
+        pgPaint();
+        pgRun();
+      }
+      if (e.target.matches('[data-pg-sim]')) { store.set('tsg-luna-pg-sim', e.target.checked); $('[data-pg-simbox]').hidden = !e.target.checked; }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (!e.target.matches('[data-pg-code]')) return;
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); pgRun(); return; }
+      if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); insertText(e.target, '  '); }
+    });
+
     // Eigene Bots und Bot-Editor
     const idePanelRedraw = () => { const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.toggle('is-open', !!ide.panelOpen); } };
     const setTree = (open) => { ide.tree = open; const body = $('.ide__body'); if (body) body.classList.toggle('is-tree', open); };
@@ -7883,7 +8835,7 @@
         const cid = bc.dataset.botCreate;
         const name = bc.elements.name.value.trim();
         const mode = (bc.querySelector('input[name="mode"]:checked') || {}).value || 'basic';
-        if (name.length < 2) { toast(t('Bitte gib deinem Bot einen Namen (2–32 Zeichen).')); return; }
+        if (name.length === 1) { toast(t('Der Name braucht mindestens 2 Zeichen.')); return; }
         const btn = $('button[type="submit"]', bc);
         btn.disabled = true;
         const r = await botCall(cid, '', { method: 'POST', body: { name, mode } });

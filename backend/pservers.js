@@ -15,6 +15,7 @@
  *   pserver:<id>     → Server mit Einstellungen und letztem Stand
  *   pservers:index   → IDs aller bekannten privaten Server
  */
+import { homeOf } from './channels.js';
 import { clip } from './lib.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
@@ -164,7 +165,9 @@ export async function privateServerSync(store, sv, online, ownerName) {
   if (sv.closing) return null;
   const c = p.chat ? await store.get(`chat:${p.chat}`) : null;
   const since = Math.max(+sv.relaySince || 0, t - 10 * 60000);
-  const relay = c && p.relay ? c.messages.filter((m) => m.at > since && m.by !== 'system' && m.kind !== 'bot' && !m.only && !m.deleted && m.text && !m.text.startsWith('/'))
+  // Server mit Kanälen: nur der Standardkanal kommt ins Spiel
+  const home = c ? homeOf(c) : null;
+  const relay = c && p.relay ? c.messages.filter((m) => m.at > since && m.by !== 'system' && m.kind !== 'bot' && !m.only && !m.deleted && m.text && !m.text.startsWith('/') && (!home || (m.ch || home) === home))
     .slice(-20).map((m) => ({ id: m.id, by: m.by, name: m.name || '?', text: clip(m.text, 200), at: m.at })) : [];
   return {
     privateId: id, name: p.name, chat: c ? c.name : null,

@@ -16,6 +16,7 @@
  *   bot:<chatId>:<botId>      → { …, rules, files, memory, logs, stats }
  *   botphoto:<chatId>:<botId> → Bild (JPEG, 256 × 256)
  *
+ * In Servern mit Kanälen antworten Bots im Kanal der Nachricht; Beitreten, Verlassen, onstart und das Spiel landen im Standardkanal.
  * Bot-Nachrichten lösen keine Bots aus (keine Schleifen) und schicken keine Benachrichtigungen.
  * Grenzen: 5 Bots je Chat, 40 Objekte je Bot, 12 000 Zeichen je Skript, 5 Nachrichten je Ereignis, 20 je Minute und Bot.
  * Webhooks senden erst, wenn die Discord-Verbindung des Server-Chats vom Team angenommen ist.
@@ -23,6 +24,7 @@
 import { clip, randomKey } from './lib.js';
 import { runEvent, analyze, renderTemplate, TYPES, SERVICES, DEFAULT_PARENT, SCRIPT_TYPES } from './luna.js';
 import { sendToDiscord, checkWebhook } from './discord.js';
+import { homeOf, pickChannel } from './channels.js';
 
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 const MAX_BOTS = 5;
@@ -35,7 +37,8 @@ const KEEP = 180 * 86400;
 export const RULE_TRIGGERS = ['join', 'leave', 'game_join', 'game_leave', 'command'];
 const TARGETS = ['chat', 'discord', 'both'];
 const FILE_TYPES = Object.keys(TYPES);
-const NAME = /^[\p{L}\p{N} _.\-]{2,32}$/u;
+// Auch mit Apostroph: „Lorthien's Bot“
+const NAME = /^[\p{L}\p{N} _.'’\-]{2,32}$/u;
 // Namen wie in Luna nutzbar: script.Parent.Texte
 const FILE_NAME = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]{0,31}$/;
 
@@ -272,15 +275,15 @@ function baseVars(env, c, b) {
 }
 const personVars = (p) => (p ? { username: p.username || p.name || '', displayName: p.displayName || p.dn || p.username || p.name || '', userId: String(p.sub || p.id || '') } : {});
 
-function botMessage(c, b, text) {
-  c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', botId: b.id, title: b.name, text: clip(text, 1900), at: Date.now(), rows: [], buttons: [] });
+function botMessage(c, b, text, ch) {
+  c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', botId: b.id, title: b.name, text: clip(text, 1900), at: Date.now(), rows: [], buttons: [], ...(ch ? { ch } : {}) });
 }
-async function say(store, env, c, b, texts, discords) {
+async function say(store, env, c, b, texts, discords, ch = null) {
   let posted = false;
   for (const text of texts) {
     if (!allowed(b.id)) break;
     recent.get(b.id).push(Date.now());
-    botMessage(c, b, text);
+    botMessage(c, b, text, ch);
     posted = true;
   }
   const d = c.discord;
@@ -302,7 +305,7 @@ function remember(b, res, event) {
   b.stats = { runs: ((b.stats && b.stats.runs) || 0) + (res.ran ? 1 : 0), lastRun: res.ran ? t : (b.stats && b.stats.lastRun) || null, lastError: errors.length ? { at: t, text: errors[0].message, file: errors[0].file, line: errors[0].line } : (b.stats && b.stats.lastError) || null };
   if (res.memChanged) b.memory = res.memory;
 }
-async function runAdvanced(store, env, c, b, type, event, vars, args) {
+async function runAdvanced(store, env, c, b, type, event, vars, args, ch = homeOf(c)) {
   const files = migrateFiles(b.files);
   if (!files.some((f) => f.type === type)) return false;
   const res = runEvent({ files, type, event, vars, args, memory: b.memory || {}, botName: b.name });
@@ -318,15 +321,15 @@ async function runAdvanced(store, env, c, b, type, event, vars, args) {
     await sendToDiscord(env, store, { mode: 'webhook', hook: item.hook }, { username: b.name, avatar, content: w.text });
   }
   remember(b, res, event);
-  return say(store, env, c, b, res.says, res.discords);
+  return say(store, env, c, b, res.says, res.discords, ch);
 }
-async function runBasic(store, env, c, b, trigger, vars, command = '') {
+async function runBasic(store, env, c, b, trigger, vars, command = '', ch = homeOf(c)) {
   let posted = false;
   const d = c.discord;
   for (const r of b.rules || []) {
     if (!r.on || r.trigger !== trigger || (trigger === 'command' && r.command !== command)) continue;
     const text = renderTemplate(r.template, vars);
-    if (r.target !== 'discord') posted = (await say(store, env, c, b, [text], [])) || posted;
+    if (r.target !== 'discord') posted = (await say(store, env, c, b, [text], [], ch)) || posted;
     if (r.target !== 'chat' && d && d.status === 'active') await say(store, env, c, b, [], [text]);
   }
   return posted;
@@ -334,7 +337,7 @@ async function runBasic(store, env, c, b, trigger, vars, command = '') {
 
 // Ein Ereignis an alle eingeschalteten Bots eines Chats geben. true = es kam eine Nachricht in den Chat.
 //   kind: join | leave | message | game_join | game_leave
-//   ctx:  { person, text, players, serverName, serverId }
+//   ctx:  { person, text, players, serverName, serverId, ch (Kanal der Nachricht in Servern) }
 export async function botsEvent(store, env, c, kind, ctx = {}) {
   if (c.kind !== 'group') return false;
   if (await migrateAutomations(store, c)) await store.put(`chat:${c.id}`, c, { ttl: KEEP });
@@ -344,7 +347,9 @@ export async function botsEvent(store, env, c, kind, ctx = {}) {
   for (const meta of metas) {
     const b = await loadBot(store, c.id, meta.id);
     if (!b || b.on === false) continue;
-    const vars = { ...baseVars(env, c, b), ...personVars(ctx.person) };
+    const channel = pickChannel(c, ctx.ch && ctx.ch.id);
+    const ch = channel ? channel.id : null;
+    const vars = { ...baseVars(env, c, b), ...personVars(ctx.person), channel: channel ? channel.name : '' };
     if (kind.startsWith('game_')) Object.assign(vars, { server: ctx.serverName || vars.server, serverId: String(ctx.serverId || ''), players: ctx.players || 0 });
     const before = JSON.stringify([b.logs, b.memory, b.stats]);
     if (kind === 'message') {
@@ -355,10 +360,10 @@ export async function botsEvent(store, env, c, kind, ctx = {}) {
       const command = (words.shift() || '').toLowerCase();
       Object.assign(vars, { text, message: text });
       if (b.mode === 'advanced') {
-        posted = (await runAdvanced(store, env, c, b, 'server', 'message', vars, [text, vars.username])) || posted;
-        if (isCmd && command) posted = (await runAdvanced(store, env, c, b, 'server', 'command', { ...vars, command, args: words, argtext: words.join(' ') }, [command, words])) || posted;
+        posted = (await runAdvanced(store, env, c, b, 'server', 'message', vars, [text, vars.username], ch)) || posted;
+        if (isCmd && command) posted = (await runAdvanced(store, env, c, b, 'server', 'command', { ...vars, command, args: words, argtext: words.join(' ') }, [command, words], ch)) || posted;
       } else if (isCmd && command) {
-        posted = (await runBasic(store, env, c, b, 'command', { ...vars, command, args: words.join(' ') }, command)) || posted;
+        posted = (await runBasic(store, env, c, b, 'command', { ...vars, command, args: words.join(' ') }, command, ch)) || posted;
       }
     } else if (b.mode === 'advanced') {
       const type = kind.startsWith('game_') ? 'game' : 'server';

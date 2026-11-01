@@ -18,7 +18,9 @@
  * Benachrichtigung antworten (signierter Link, 7 Tage gültig).
  *
  * Gruppen haben wie Discord eigene Rollen (Name, Farbe, Rechte) und eigene Bots (bots.js, Skripte in Luna).
- * Server-Chats lassen sich nach Prüfung durch das Team mit Discord verbinden (siehe discord.js).
+ * Server (Gruppen mit category: 'server', „Communities“) haben dazu Kanäle und Kategorien wie Discord (channels.js)
+ * und lassen sich nach Prüfung durch das Team mit Discord verbinden (siehe discord.js).
+ * Ohne Namen heißen neue Server und Gruppen „Name's Server“, „Name's Server2“ …, Bots „Name's Bot“, „Name's Bot2“ …
  *
  *   chat:<id>       → Gespräch mit Nachrichten (die letzten 500)
  *   chats:index     → Übersicht aller Gespräche (eigene, Anfragen, öffentliche Gruppen, Moderation)
@@ -37,6 +39,7 @@ import { findPlayer, groupRole } from './roblox.js';
 import { startUpload, attachFiles, deleteFiles, fileLinks } from './files.js';
 import { serversOfChat, linkChat, cleanLink } from './pservers.js';
 import { COMMANDS, COMMAND_IDS, FIRST_COMMANDS, parseCommand, runCommand } from './commands.js';
+import { isCommunity, defaultLayout, layoutOf, homeOf, channelOf, pickChannel, cleanLayout, pruneMessages } from './channels.js';
 
 export { findPlayer };
 
@@ -178,7 +181,8 @@ const SYSTEM_TEXT = {
   mod: (m) => `${m.name} (Moderation) ist beigetreten`, settings: (m) => `${m.name} hat die Gruppe bearbeitet`,
   role: (m) => `${m.target} ist jetzt ${m.role === 'owner' ? 'Inhaber' : m.role === 'admin' ? 'Admin' : 'Mitglied'}`,
   photo: (m) => `${m.name} hat das Gruppenbild geändert`, servers: (m) => `${m.name} hat die verbundenen Server geändert`,
-  roles: (m) => `${m.name} hat die Rollen geändert`,
+  roles: (m) => `${m.name} hat die Rollen geändert`, channels: (m) => `${m.name} hat die Kanäle geändert`,
+  community: (m) => `${m.name} hat die Gruppe in einen Server mit Kanälen umgewandelt`,
   bot: (m) => (m.action === 'deleted' ? `${m.name} hat den Bot ${m.target} entfernt` : `${m.name} hat den Bot ${m.target} erstellt`),
   discord: (m) => ({ pending: `${m.name} hat die Discord-Verbindung zur Prüfung eingereicht`, accepted: 'Die Discord-Verbindung wurde angenommen', denied: 'Die Discord-Verbindung wurde abgelehnt', removed: `${m.name} hat die Discord-Verbindung entfernt` }[m.target] || ''),
 };
@@ -239,11 +243,9 @@ async function addTo(store, sub, id) {
   if (!list.includes(id)) await store.put(key, [id, ...list].slice(0, 100));
 }
 async function save(store, c) {
-  // Nur die letzten 500 Nachrichten bleiben, Dateien älterer Nachrichten werden gelöscht
-  if (c.messages.length > MAX_MESSAGES) {
-    const gone = c.messages.splice(0, c.messages.length - MAX_MESSAGES);
-    await deleteFiles(store, gone.flatMap((m) => m.files || []));
-  }
+  // Nur die letzten 500 Nachrichten bleiben (Server: 200 je Kanal, 1500 insgesamt), Dateien älterer Nachrichten werden gelöscht
+  const gone = pruneMessages(c, MAX_MESSAGES);
+  if (gone.length) await deleteFiles(store, gone.flatMap((m) => m.files || []));
   await store.put(`chat:${c.id}`, c, { ttl: KEEP });
   await saveIndex(store, c);
 }
@@ -274,7 +276,24 @@ function mentionsIn(c, text, author, everyone) {
   const all = everyone && (names.has('alle') || names.has('everyone'));
   return Object.values(c.members || {}).filter((p) => p.sub !== author && (all || names.has(String(p.username || '').toLowerCase()))).map((p) => p.sub);
 }
-const messageTitle = (c, p) => (c.kind === 'group' ? `${nameOf(p)} · ${c.name}` : nameOf(p));
+const messageTitle = (c, p, ch = null) => (c.kind === 'group' ? `${nameOf(p)} · ${c.name}${ch ? ` #${ch.name}` : ''}` : nameOf(p));
+
+// ---------- Standardnamen: „Lorthien's Server“, „Lorthien's Server2“ … ----------
+export function defaultName(user, what, taken = []) {
+  const base = `${user.username || user.displayName || 'Spieler'}'s ${what}`;
+  const used = new Set(taken.map((x) => String(x || '').toLowerCase()));
+  for (let n = 1; n < 1000; n++) {
+    const name = n === 1 ? base : `${base}${n}`;
+    if (!used.has(name.toLowerCase())) return name;
+  }
+  return `${base}${Date.now() % 100000}`;
+}
+// Welchen Kanal hat jemand zuletzt offen? (nur im Speicher – Antworten auf Aktionen zeigen denselben Kanal)
+const lastChannel = new Map();
+const rememberChannel = (sub, chatId, ch) => {
+  if (lastChannel.size > 5000) lastChannel.clear();
+  if (ch) lastChannel.set(`${sub}:${chatId}`, ch);
+};
 
 // ---------- Personen finden (Team zuerst, dann Roblox) ----------
 async function resolvePerson(store, env, query) {
@@ -300,11 +319,20 @@ export async function getChat(store, user, id) {
   return c;
 }
 
-async function view(env, store, c, user) {
+// Darf jemand in diesen Kanal schreiben? Ankündigungen: Inhaber, Admins, Moderation und Rollen mit „Schreiben“
+const canPostIn = (c, user, ch) => !ch || ch.kind !== 'news' || isManager(roleOf(c, user.sub)) || hasPerm(c, user.sub, 'write');
+
+async function view(env, store, c, user, { ch: wantCh } = {}) {
   const a = access(c, user);
   const st = settingsOf(c);
   const link = await fileLinks(env, store, c.id);
-  const messages = c.messages.filter((m) => !m.only || m.only === user.sub)
+  const layout = layoutOf(c);
+  // Server: nur die Nachrichten des offenen Kanals, dazu je Kanal die letzte Nachricht (für „ungelesen“)
+  const channel = layout ? pickChannel(c, wantCh || lastChannel.get(`${user.sub}:${c.id}`)) : null;
+  const visible = c.messages.filter((m) => !m.only || m.only === user.sub);
+  const lastIn = {};
+  if (layout) visible.forEach((m) => { if (m.by !== 'system' && !m.deleted) lastIn[channelOf(c, m)] = { at: m.at, by: m.by }; });
+  const messages = (channel ? visible.filter((m) => channelOf(c, m) === channel.id) : visible)
     .map((m) => (m.files ? { ...m, files: m.files.map((f) => ({ ...f, url: link(f.id) })) } : m));
   const order = { owner: 0, mod: 1, admin: 2, member: 3 };
   const members = Object.values(people(c)).map((p) => ({ ...p, role: p.role || 'member' }))
@@ -317,7 +345,11 @@ async function view(env, store, c, user) {
     from: c.from, to: c.to || null, claimedBy: c.claimedBy || null, created: c.created, updated: c.updated,
     settings: c.kind === 'group' ? st : null, members, messages, roles: c.kind === 'group' ? c.roles || [] : [],
     me: { sub: user.sub, role: a.role, observe: a.observe, muted: !!(c.muted && c.muted[user.sub]) },
-    canWrite: a.write,
+    canWrite: a.write && canPostIn(c, user, channel),
+    ...(layout ? {
+      community: true, channel: channel.id, home: layout.home, categories: layout.categories,
+      channels: layout.channels.map((x) => ({ ...x, last: lastIn[x.id] || null, locked: !canPostIn(c, user, x) })),
+    } : {}),
     canClaim: c.kind === 'ticket' && c.status === 'open' && c.from.sub !== user.sub && canHandle(user.rank, c.area),
     canClose: c.kind !== 'group' && c.status !== 'closed' && !!a.role,
     canInvite: canInvite(c, a.role, user.sub),
@@ -388,10 +420,11 @@ export async function moderationChats(store, user, query = '', kind = '') {
   };
 }
 
-export async function readChat(store, env, user, id, { since = 0, observe = false } = {}) {
+export async function readChat(store, env, user, id, { since = 0, observe = false, ch = '' } = {}) {
   const c = await getChat(store, user, id);
   const a = access(c, user);
   if (a.role) seen(user.sub, c.id);
+  if (isCommunity(c) && ch) rememberChannel(user.sub, c.id, ch);
   // Unsichtbares Beobachten wird intern vermerkt (höchstens alle 6 Stunden je Person)
   if (a.observe && observe) {
     const log = c.modlog || [];
@@ -404,7 +437,7 @@ export async function readChat(store, env, user, id, { since = 0, observe = fals
     const v = await view(env, store, c, user);
     return { id: c.id, updated: c.updated, unchanged: true, status: c.status, claimedBy: c.claimedBy || null, canWrite: v.canWrite, canClaim: v.canClaim, canClose: v.canClose };
   }
-  return view(env, store, c, user);
+  return view(env, store, c, user, { ch });
 }
 
 // ---------- Neues Gespräch ----------
@@ -445,14 +478,20 @@ export async function createChat(store, env, user, body) {
   }
 
   if (kind === 'group') {
-    const name = cleanText(body.name, 60).replace(/\n/g, ' ');
+    const server = body.category === 'server';
+    let name = cleanText(body.name, 60).replace(/\n/g, ' ');
+    // Ohne Namen: „Lorthien's Server“, „Lorthien's Server2“ … (bzw. „… Gruppe“)
+    if (!name) {
+      const own = (await loadIndex(store)).filter((x) => x.kind === 'group' && x.from && x.from.sub === user.sub).map((x) => x.name);
+      name = defaultName(user, server ? 'Server' : 'Gruppe', own);
+    }
     if (name.length < 2) throw bad('bad_name');
     await rateLimit(store, user, team ? 40 : 8);
     const c = {
       id: randomKey(9), kind, status: 'open', from: me, owner: user.sub, name, desc: cleanText(body.desc, 300), rules: cleanText(body.rules, 1500),
       color: COLORS.includes(body.color) ? body.color : COLORS[Math.floor(Math.random() * COLORS.length)],
       settings: cleanSettings(body.settings || {}), members: { [user.sub]: { ...me, role: 'owner', joined: t } }, created: t, updated: t, messages: [],
-      ...(body.category === 'server' ? { category: 'server', servers: [] } : {}),
+      ...(server ? { category: 'server', servers: [], ...defaultLayout() } : {}),
     };
     sys(c, 'created', user.username);
     const added = [];
@@ -461,7 +500,7 @@ export async function createChat(store, env, user, body) {
       if (p && !c.members[p.sub] && Object.keys(c.members).length < MAX_MEMBERS) { c.members[p.sub] = { ...p, role: 'member', joined: t }; added.push(p); }
     }
     if (added.length) sys(c, 'added', user.username, { target: added.map(nameOf).join(', ') });
-    if (text) c.messages.push({ id: randomKey(6), by: user.sub, name: nameOf(me), text, at: t + 1 });
+    if (text) c.messages.push({ id: randomKey(6), by: user.sub, name: nameOf(me), text, at: t + 1, ...(server ? { ch: homeOf(c) } : {}) });
     await save(store, c);
     // Server-Chat: eigene private Server verbinden und gleich einstellen
     if (c.category === 'server') {
@@ -497,6 +536,11 @@ export async function postMessage(store, env, user, id, body) {
   const a = access(c, user);
   if (!a.write) throw bad('forbidden', 403);
   const st = settingsOf(c);
+  // Server: Nachricht in den gewählten Kanal (Ankündigungen nur mit Recht)
+  const channel = isCommunity(c) ? pickChannel(c, String(body.ch || '')) : null;
+  if (channel && !canPostIn(c, user, channel)) throw bad('channel_locked', 403);
+  if (channel) rememberChannel(user.sub, c.id, channel.id);
+  const inCh = channel ? { ch: channel.id } : {};
   const text = cleanText(body.text);
   const fileIds = Array.isArray(body.files) ? body.files : [];
   if (!text && !fileIds.length) throw bad('empty');
@@ -505,7 +549,7 @@ export async function postMessage(store, env, user, id, body) {
   if (c.kind === 'group' && st.slow && !a.admin && t - ((c.lastPost || {})[user.sub] || 0) < st.slow * 1000) throw bad('slow', 429);
   const files = fileIds.length ? await attachFiles(store, user, c.id, fileIds) : null;
   const me = { ...person(user), ...(people(c)[user.sub] || {}) };
-  c.messages.push({ id: randomKey(6), by: user.sub, name: nameOf(me), text, at: t, ...(files ? { files } : {}) });
+  c.messages.push({ id: randomKey(6), by: user.sub, name: nameOf(me), text, at: t, ...inCh, ...(files ? { files } : {}) });
   // Befehl? Antwort vom TSG-Bot (persönliche Antworten und Fehler sieht nur der Absender)
   const cmd = text && !files && st.cmd !== 'off' ? parseCommand(text) : null;
   if (cmd) {
@@ -517,19 +561,19 @@ export async function postMessage(store, env, user, id, body) {
     } catch (e) {
       r = { title: 'Gerade nicht verfügbar', text: 'Die Daten konnten nicht geladen werden. Bitte versuch es gleich noch einmal.', only: user.sub };
     }
-    c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: t + 1, title: r.title, text: r.text || '', rows: r.rows || [], buttons: (r.buttons || []).slice(0, 6), avatar: r.avatar || null, ...(r.only ? { only: r.only } : {}) });
+    c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', at: t + 1, title: r.title, text: r.text || '', rows: r.rows || [], buttons: (r.buttons || []).slice(0, 6), avatar: r.avatar || null, ...inCh, ...(r.only ? { only: r.only } : {}) });
   }
   // Eigene Bots des Chats: onmessage, Befehle mit ihrem Präfix (z. B. !regeln)
-  const botPosted = !cmd && text && c.kind === 'group' ? await botsEvent(store, env, c, 'message', { person: me, text }) : false;
+  const botPosted = !cmd && text && c.kind === 'group' ? await botsEvent(store, env, c, 'message', { person: me, text, ch: channel }) : false;
   c.updated = Math.max(t + (cmd ? 1 : 0), botPosted ? Date.now() : 0);
   if (c.kind === 'group') c.lastPost = { ...(c.lastPost || {}), [user.sub]: t };
   await save(store, c);
   const shown = text || (files[0].kind === 'image' ? '📷 Foto' : files[0].kind === 'video' ? '🎬 Video' : `📎 ${files[0].name}`);
   const mentioned = text ? mentionsIn(c, text, user.sub, hasPerm(c, user.sub, 'mention')) : [];
-  await notifyOthers(store, env, c, user.sub, fromPerson(me, shown, messageTitle(c, me)), { mentioned });
-  // Server-Chat mit Discord: Nachricht auch dort zeigen (Befehle bleiben in der App)
-  if (!cmd) await toDiscord(store, env, c, { username: nameOf(me), avatar: me.avatar, content: shown });
-  return view(env, store, c, user);
+  await notifyOthers(store, env, c, user.sub, { ...fromPerson(me, shown, messageTitle(c, me, channel)), ...(channel ? { url: `./#/chat/${c.id}?k=${channel.id}` } : {}) }, { mentioned });
+  // Server-Chat mit Discord: Nachricht auch dort zeigen (Befehle bleiben in der App; bei Servern nur der Standardkanal)
+  if (!cmd && (!channel || channel.id === homeOf(c))) await toDiscord(store, env, c, { username: nameOf(me), avatar: me.avatar, content: shown });
+  return view(env, store, c, user, { ch: channel && channel.id });
 }
 
 // Antwort direkt aus der Benachrichtigung (ohne Anmeldung, mit signiertem Link aus der Benachrichtigung)
@@ -853,6 +897,59 @@ export async function setChatRoles(store, env, user, id, body) {
   return view(env, store, c, user);
 }
 
+// ---------- Server: Kanäle und Kategorien (wie Discord) ----------
+// { categories: [{ id, name }], channels: [{ id, name, cat, kind, topic }], home } – die ganze Liste, neue Einträge mit vorläufiger ID.
+// Gelöschte Kanäle verlieren ihre Nachrichten. Eine Gruppe wird mit { convert: true } zum Server mit den Standardkanälen.
+export async function setChannels(store, env, user, id, body) {
+  const c = await getChat(store, user, id);
+  const a = access(c, user);
+  if (c.kind !== 'group' || !(a.manage || a.mod)) throw bad('forbidden', 403);
+  const t = Date.now();
+  if (!isCommunity(c)) {
+    if (body.convert !== true) throw bad('not_server', 409);
+    Object.assign(c, { category: 'server', servers: c.servers || [] }, defaultLayout());
+    c.messages.forEach((m) => { if (!m.ch) m.ch = c.home; });
+    c.updated = t;
+    sys(c, 'community', user.username, { ch: c.home });
+    await save(store, c);
+    return view(env, store, c, user);
+  }
+  const old = layoutOf(c);
+  const next = cleanLayout(body, old);
+  // Nachrichten ohne Kanal gehören zum bisherigen Standardkanal – das bleibt so, auch wenn sich der Standard ändert
+  c.messages.forEach((m) => { if (!m.ch) m.ch = old.home; });
+  const ids = new Set(next.channels.map((x) => x.id));
+  const gone = c.messages.filter((m) => !ids.has(m.ch));
+  if (gone.length) {
+    await deleteFiles(store, gone.flatMap((m) => m.files || []));
+    c.messages = c.messages.filter((m) => ids.has(m.ch));
+  }
+  Object.assign(c, next);
+  c.updated = t;
+  sys(c, 'channels', user.username, { ch: c.home });
+  await save(store, c);
+  return view(env, store, c, user);
+}
+
+// ---------- Dashboard: eigene Server, Gruppen und Bots auf einen Blick ----------
+// Bots stehen in den Chats, die man leitet (Inhaber, Admin) – höchstens 25 Chats werden dafür gelesen.
+async function managedChats(store, user) {
+  const idx = await loadIndex(store);
+  const list = idx.filter((x) => x.kind === 'group' && (x.admins || []).includes(user.sub)).slice(0, 25);
+  const out = [];
+  for (const x of list) { const c = await store.get(`chat:${x.id}`); if (c) out.push(c); }
+  return out;
+}
+const placeOf = (c) => ({ id: c.id, name: c.name, color: c.color || null, photo: c.photo || null, category: c.category || null });
+export async function dashboard(store, user) {
+  const chats = await managedChats(store, user);
+  const bots = chats.flatMap((c) => (c.bots || []).map((b) => ({ ...botMeta(b), chat: placeOf(c) }))).sort((x, y) => (y.rev || 0) - (x.rev || 0));
+  return {
+    bots, places: chats.map((c) => ({ ...placeOf(c), bots: (c.bots || []).length, members: Object.keys(c.members || {}).length, updated: c.updated })),
+    maxBots: 5,
+  };
+}
+
 // ---------- Discord: Nachrichten weitergeben, Automationen ----------
 async function toDiscord(store, env, c, msg) {
   const d = c.discord;
@@ -907,6 +1004,11 @@ export async function botGet(store, user, id, botId) {
 }
 export async function botCreate(store, env, user, id, body) {
   const { c } = await botChat(store, user, id);
+  // Ohne Namen: „Lorthien's Bot“, „Lorthien's Bot2“ … (gezählt über alle Bots in Chats, die man leitet)
+  if (!String(body.name || '').trim()) {
+    const taken = [c, ...(await managedChats(store, user)).filter((x) => x.id !== c.id)].flatMap((x) => (x.bots || []).map((b) => b.name));
+    body = { ...body, name: defaultName(user, 'Bot', taken) };
+  }
   const b = await createBot(store, c, body);
   sys(c, 'bot', user.username, { target: b.name, action: 'created' });
   c.updated = Date.now();
