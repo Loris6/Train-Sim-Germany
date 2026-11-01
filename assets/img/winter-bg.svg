@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMax slice">
+  <!-- Winter-Theme: Abendhimmel, verschneite Hügel, Tannen und ein Zug -->
+  <defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0e2347"/><stop offset=".6" stop-color="#2a4f86"/><stop offset="1" stop-color="#8fb3e0"/></linearGradient></defs>
+  <rect width="1440" height="900" fill="url(#s)"/>
+  <g fill="#fff" opacity=".8"><circle cx="140" cy="100" r="1.6"/><circle cx="420" cy="70" r="1.3"/><circle cx="700" cy="140" r="1.5"/><circle cx="980" cy="60" r="1.2"/><circle cx="1260" cy="120" r="1.7"/></g>
+  <path d="M0 690c200-50 380-60 560-20s360 40 520-10 260-40 360-10v250H0z" fill="#dce9f8"/>
+  <path d="M0 760c220-30 420-30 600 10s380 20 560-10 200-20 280-10v150H0z" fill="#f4f8fd"/>
+  <g fill="#1d3b2c"><path d="M210 700l40-120 40 120z"/><path d="M220 650l30-90 30 90z"/><path d="M1180 690l34-100 34 100z"/><path d="M1240 700l28-80 28 80z"/></g>
+  <g fill="#fff"><path d="M230 640l20-60 20 60c-12-6-28-6-40 0z"/><path d="M1195 640l19-50 19 50c-12-6-26-6-38 0z"/></g>
+  <g transform="translate(560 650)"><rect width="260" height="34" rx="10" fill="#c50014"/><rect x="20" y="8" width="160" height="12" rx="4" fill="#ffe7a3"/><rect y="34" width="260" height="6" fill="#1b1f27"/></g>
+</svg>

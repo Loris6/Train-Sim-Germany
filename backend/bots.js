@@ -22,7 +22,7 @@
  * Webhooks senden erst, wenn die Discord-Verbindung des Server-Chats vom Team angenommen ist.
  */
 import { clip, randomKey } from './lib.js';
-import { runEvent, analyze, renderTemplate, TYPES, SERVICES, DEFAULT_PARENT, SCRIPT_TYPES } from './luna.js';
+import { runEvent, analyze, renderTemplate, TYPES, SERVICES, DEFAULT_PARENT, SCRIPT_TYPES, VALUE_TYPES, valueOf } from './luna.js';
 import { sendToDiscord, checkWebhook } from './discord.js';
 import { homeOf, pickChannel } from './channels.js';
 
@@ -98,11 +98,12 @@ async function cleanFiles(env, store, list, old = []) {
       if (item.code.length > MAX_CODE) throw bad('file_too_large', 413);
       if (f && f.enabled === false) item.enabled = false;
     }
+    if (VALUE_TYPES.includes(type)) item.value = valueOf(type, f && f.value);
     if (type === 'webhook') {
       if (f && typeof f.url === 'string' && f.url.trim()) Object.assign(item, await checkWebhook(env, store, f.url));
       else if (prev && prev.type === 'webhook' && prev.hook) Object.assign(item, { hook: prev.hook, hint: prev.hint, info: prev.info });
     }
-    if (prev && prev.name === name && prev.code === item.code && prev.parent === parent && prev.type === type) item.updated = prev.updated;
+    if (prev && prev.name === name && prev.code === item.code && prev.parent === parent && prev.type === type && prev.value === item.value) item.updated = prev.updated;
     return item;
   }));
   // Platz im Baum: keine Kreise, Connectors und Webhooks haben keine Kinder, Namen unter einem Parent eindeutig
@@ -115,7 +116,7 @@ async function cleanFiles(env, store, list, old = []) {
       seen.add(p);
     }
     const parent = byId.get(x.parent);
-    if (parent && (parent.type === 'connector' || parent.type === 'webhook')) throw bad('bad_parent');
+    if (parent && (parent.type === 'connector' || parent.type === 'webhook' || VALUE_TYPES.includes(parent.type))) throw bad('bad_parent');
     const key = `${x.parent}|${x.name.toLowerCase()}`;
     if (names.has(key)) throw bad('duplicate_file');
     names.add(key);
@@ -252,7 +253,11 @@ export async function clientBundle(store, c) {
     const b = await loadBot(store, c.id, meta.id);
     const files = migrateFiles(b && b.files);
     if (!files.some((f) => f.type === 'client')) continue;
-    out.push({ ...metaOf(b), files: files.map(({ id, name, type, parent, code, enabled }) => ({ id, name, type, parent, ...(enabled === false ? { enabled } : {}), ...(type === 'client' || type === 'module' ? { code } : {}) })) });
+    // Was in ServerStorage liegt, bleibt im Backend (kein Code, keine Werte)
+    const byId = new Map(files.map((f) => [f.id, f]));
+    const inServerStorage = (f) => { for (let x = f, i = 0; x && i < 64; x = byId.get(x.parent), i += 1) if (x.parent === 'ServerStorage') return true; return false; };
+    out.push({ ...metaOf(b), files: files.map(({ id, name, type, parent, code, enabled, value }) => ({ id, name, type, parent, ...(enabled === false ? { enabled } : {}),
+      ...((type === 'client' || type === 'module') && !inServerStorage({ id, parent }) ? { code } : {}), ...(VALUE_TYPES.includes(type) && !inServerStorage({ id, parent }) ? { value } : {}) })) });
   }
   return out;
 }
@@ -275,8 +280,11 @@ function baseVars(env, c, b) {
 }
 const personVars = (p) => (p ? { username: p.username || p.name || '', displayName: p.displayName || p.dn || p.username || p.name || '', userId: String(p.sub || p.id || '') } : {});
 
-function botMessage(c, b, text, ch) {
-  c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', botId: b.id, title: b.name, text: clip(text, 1900), at: Date.now(), rows: [], buttons: [], ...(ch ? { ch } : {}) });
+// Nachricht eines eigenen Bots – Text oder (nur hier erlaubt) eine Karte aus embed()
+function botMessage(c, b, out, ch) {
+  const card = out && typeof out === 'object' ? out.embed : null;
+  const text = card ? '' : out;
+  c.messages.push({ id: randomKey(6), by: 'bot', kind: 'bot', botId: b.id, title: b.name, text: clip(text, 1900), at: Date.now(), rows: [], buttons: [], ...(card ? { embed: card } : {}), ...(ch ? { ch } : {}) });
 }
 async function say(store, env, c, b, texts, discords, ch = null) {
   let posted = false;

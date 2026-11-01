@@ -22,6 +22,47 @@ export const KINDS = ['text', 'news'];
 const bad = (msg = 'bad_request', status = 400) => Object.assign(new Error(msg), { status });
 export const isCommunity = (c) => !!c && c.kind === 'group' && c.category === 'server';
 
+// Vorlagen beim Erstellen (wie „Mit einer Vorlage starten“): Kategorien und Kanäle, Kanalnamen mit Emoji
+const ch = (id, name, cat, kind = 'text', topic = '') => ({ id, name, cat, kind, topic });
+export const TEMPLATES = {
+  gaming: () => ({
+    categories: [{ id: 'info', name: 'Information' }, { id: 'talk', name: 'Textkanäle' }, { id: 'game', name: 'Im Spiel' }],
+    channels: [ch('willkommen', '👋-·-willkommen', 'info', 'news'), ch('ankuendigungen', '📣-·-ankündigungen', 'info', 'news'), ch('allgemein', '💬-·-allgemein', 'talk'),
+      ch('clips', '🎬-·-clips-und-highlights', 'talk'), ch('mitspieler', '🎮-·-mitspieler-suche', 'game', 'text', 'Wer fährt mit?'), ch('fahrten', '🚆-·-fahrten', 'game')],
+    home: 'allgemein',
+  }),
+  schule: () => ({
+    categories: [{ id: 'info', name: 'Information' }, { id: 'talk', name: 'Klub' }],
+    channels: [ch('willkommen', '👋-·-willkommen', 'info', 'news'), ch('ankuendigungen', '📣-·-ankündigungen', 'info', 'news'), ch('termine', '📅-·-termine', 'info', 'news'),
+      ch('allgemein', '💬-·-allgemein', 'talk'), ch('projekte', '🛠️-·-projekte', 'talk'), ch('hilfe', '🙋-·-hilfe', 'talk')],
+    home: 'allgemein',
+  }),
+  lernen: () => ({
+    categories: [{ id: 'info', name: 'Information' }, { id: 'learn', name: 'Lernen' }],
+    channels: [ch('willkommen', '👋-·-willkommen', 'info', 'news'), ch('ankuendigungen', '📣-·-ankündigungen', 'info', 'news'), ch('allgemein', '💬-·-allgemein', 'learn'),
+      ch('notizen', '📝-·-notizen', 'learn'), ch('fragen', '❓-·-fragen', 'learn'), ch('material', '📚-·-material', 'learn')],
+    home: 'allgemein',
+  }),
+  freunde: () => ({
+    categories: [{ id: 'talk', name: 'Textkanäle' }],
+    channels: [ch('allgemein', '💬-·-allgemein', 'talk'), ch('memes', '😂-·-memes', 'talk'), ch('fotos', '📸-·-fotos', 'talk'), ch('plaene', '🗓️-·-pläne', 'talk')],
+    home: 'allgemein',
+  }),
+  creator: () => ({
+    categories: [{ id: 'info', name: 'Information' }, { id: 'create', name: 'Kreativ' }],
+    channels: [ch('willkommen', '👋-·-willkommen', 'info', 'news'), ch('ankuendigungen', '📣-·-ankündigungen', 'info', 'news'), ch('allgemein', '💬-·-allgemein', 'create'),
+      ch('showcase', '🎨-·-showcase', 'create'), ch('feedback', '🗳️-·-feedback', 'create'), ch('ideen', '💡-·-ideen', 'create')],
+    home: 'allgemein',
+  }),
+  vorort: () => ({
+    categories: [{ id: 'info', name: 'Information' }, { id: 'talk', name: 'Textkanäle' }],
+    channels: [ch('willkommen', '👋-·-willkommen', 'info', 'news'), ch('ankuendigungen', '📣-·-ankündigungen', 'info', 'news'), ch('events', '📅-·-events', 'info', 'news'),
+      ch('allgemein', '💬-·-allgemein', 'talk'), ch('vorstellen', '🙋-·-vorstellen', 'talk'), ch('treffen', '📍-·-treffen', 'talk')],
+    home: 'allgemein',
+  }),
+};
+export const layoutFor = (template) => (TEMPLATES[template] ? TEMPLATES[template]() : defaultLayout());
+
 // Neue Server starten mit diesen Kanälen
 export function defaultLayout() {
   return {
@@ -59,10 +100,10 @@ export function pickChannel(c, id) {
   return l.channels.find((x) => x.id === id) || l.channels.find((x) => x.id === l.home);
 }
 
-// Kanalname wie bei Discord: klein, Bindestriche statt Leerzeichen
+// Kanalname wie bei Discord: klein, Bindestriche statt Leerzeichen, Emojis und „·“ erlaubt (z. B. „📄-·-hub“)
 export function cleanChannelName(v) {
-  return clip(String(v || ''), 60).toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '')
-    .replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+  return [...clip(String(v || ''), 80).toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_\-·\p{Extended_Pictographic}\u200d\ufe0f]/gu, '')
+    .replace(/-{3,}/g, '--').replace(/^-+|-+$/g, '')].slice(0, 32).join('');
 }
 const cleanCatName = (v) => clip(String(v || ''), 30).replace(/\s+/g, ' ').trim();
 

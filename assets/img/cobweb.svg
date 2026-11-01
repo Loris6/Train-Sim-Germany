@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" stroke="#ffffff" stroke-linecap="round">
+  <!-- Spinnweben für die Ecke oben links (für rechts gespiegelt) -->
+  <g stroke-width="1.4" opacity=".9">
+    <path d="M0 0L200 70M0 0L170 140M0 0L120 190M0 0L60 200M0 0L200 20"/>
+    <path d="M38 13c-1 10-4 17-9 23-3 6-8 9-14 12-5 1-9 2-15 4"/>
+    <path d="M78 27c-2 18-7 33-18 46-8 12-20 21-34 26-9 3-18 4-26 6"/>
+    <path d="M120 42c-3 26-11 50-27 69-12 18-30 33-52 41-14 5-28 8-41 10"/>
+    <path d="M162 57c-4 36-15 68-36 94-16 24-40 43-68 55"/>
+    <path d="M194 12c-14 2-29 4-42 9" opacity=".7"/>
+  </g>
+  <g stroke-width="1"><path d="M150 0v96"/></g>
+  <g fill="#1a0d29" stroke="#ffffff" stroke-width="1.6"><ellipse cx="150" cy="104" rx="7" ry="9"/><path d="M143 100l-9-6M143 105l-10 1M143 110l-8 7M157 100l9-6M157 105l10 1M157 110l8 7"/></g>
+</svg>

@@ -2711,6 +2711,9 @@
   // Hinweis im Profil- und Statistik-Dialog
   const visibilityNote = (on, onText, offText) => `<p class="vis-note">${icon(on ? 'fi-rr-eye' : 'fi-rr-lock')}<span>${on ? onText : offText}</span><a href="#/einstellungen">${t('Ändern')}</a></p>`;
   function renderSettings() {
+    renderSettingsNav();
+    renderSkinPicker();
+    renderIconPicker();
     renderLangPicker();
     renderPrivacy();
     renderFxSettings();
@@ -2943,6 +2946,7 @@
   }
   function applyMe(me) {
     if (me.privacy) store.set('tsg-privacy', me.privacy);
+    if (me.profile) { prof.me = me.profile; store.set('tsg-me-profile', me.profile); if (state.page === 'profil') renderProfile(); }
     // Rang aus der Gruppe, vom Backend geprüft
     if (me.rank && state.profile && state.profile.oauth) {
       store.set('tsg-group', { userId: state.profile.userId, role: me.groupRole || null, rank: me.rank, at: Date.now() });
@@ -3371,7 +3375,7 @@
 
   // ---------- Shop: Coins, Züge und Strecken ----------
   // Mit Backend kommen Katalog, Coins und Besitz vom Server (Stand aus dem Spiel); ohne Backend ist es eine Demo.
-  const shop = { data: null, at: 0, tab: 'trains', filter: 'all', cat: 'all', sort: 'price', loading: false };
+  const shop = { data: null, at: 0, tab: 'trains', filter: 'all', cat: 'all', sort: 'price', loading: false, view: 'home', menu: false };
   const ART = Object.fromEntries(D.shop.trains.map((x) => [x.id, x.art]));
   let artN = 0;
   const coins = (n) => `<span class="coins">${icon('fi-sr-coins')}${fmt(n)}</span>`;
@@ -3553,60 +3557,126 @@
       <span class="sx-history__main"><b>${esc(name(x))}</b><small>${x.wait ? t('Wartet auf das Spiel') : x.ok ? t('Im Spiel freigeschaltet') : t('Abgelehnt – Coins zurück')} · ${fmtWhen(x.doneAt || x.at)}</small></span>
       <span class="sx-history__price">${coins(x.price)}</span></li>`).join('')}</ul></section>`;
   }
+  // ---------- Shop wie eine moderne Store-App ----------
+  // Kopf: ×, „Shop“, Coins, Herz (Wunschliste), Menü. Darunter ein großes Banner, Sammlungen zum Wischen mit
+  // „Alle kaufen“ und „Finde deinen Stil“ als Raster. Herz = auf die Wunschliste (auf allen Geräten).
+  const shopWish = () => new Set(store.get('tsg-wish', []) || []);
+  function toggleWish(key) {
+    const w = shopWish();
+    if (w.has(key)) w.delete(key); else w.add(key);
+    store.set('tsg-wish', [...w]);
+    settingsChanged();
+    haptic('select');
+    return w.has(key);
+  }
+  const shopName = (kind, x) => (kind === 'routes' ? t(x.route.title) : x.name);
+  const shopKey = (kind, x) => `${kind}:${x.id}`;
+  function shxBadge(kind, x) {
+    const st = itemStatus(kind, x);
+    if (st === 'owned') return `<span class="shx-badge shx-badge--own">${icon('fi-sr-check-circle')}${t('Im Besitz')}</span>`;
+    if (st === 'pending') return `<span class="shx-badge">${icon('fi-rr-time-fast')}${t('Im Spiel')}</span>`;
+    if (!x.price) return `<span class="shx-badge">${t('Gratis')}</span>`;
+    if (st === 'short') return `<span class="shx-badge">${t('Noch {n}', { n: compact(x.price - ((shop.data && shop.data.wallet && shop.data.wallet.available) || 0)) })}</span>`;
+    return '';
+  }
+  function shxArt(kind, x) {
+    if (kind === 'routes') return `<img src="assets/img/${esc(x.route.img)}" alt="" loading="lazy"><span class="route-no">${esc(x.route.no)}</span>`;
+    return `<span class="shx-train sx-stage--${esc(x.cat)}">${trainArt(x.id)}</span>`;
+  }
+  function shxCard(kind, x, { wide = false } = {}) {
+    const st = itemStatus(kind, x);
+    const wished = shopWish().has(shopKey(kind, x));
+    return `<article class="shx-card${wide ? ' shx-card--grid' : ''} is-${st}">
+      <button class="shx-card__open" type="button" data-shop-item="${kind}:${esc(x.id)}" aria-label="${esc(t('{name} ansehen', { name: shopName(kind, x) }))}"></button>
+      <div class="shx-card__art">${shxArt(kind, x)}${shxBadge(kind, x)}
+        <button class="shx-heart${wished ? ' is-on' : ''}" type="button" data-shop-wish="${kind}:${esc(x.id)}" aria-pressed="${wished}" aria-label="${esc(t('Auf die Wunschliste'))}">${icon(wished ? 'fi-sr-heart' : 'fi-rr-heart')}</button></div>
+      <div class="shx-card__body"><b>${esc(shopName(kind, x))}</b>
+        <span class="shx-price">${st === 'owned' ? `<span class="shx-owned">${t('Gehört dir')}</span>` : `${icon('fi-sr-coins')}${x.price ? fmt(x.price) : t('Gratis')}`}<small>${esc(kind === 'routes' ? `${x.route.no} · ${fmt(x.route.km)} km` : `${x.series} · ${x.vmax} km/h`)}</small></span></div>
+    </article>`;
+  }
+  // „Alle kaufen“: alles aus der Sammlung, was man noch nicht hat
+  const buyable = (kind, list) => list.filter((x) => itemStatus(kind, x) === 'buy' || itemStatus(kind, x) === 'short');
+  function shxSection(id, title, kind, list) {
+    if (!list.length) return '';
+    const open = buyable(kind, list);
+    return `<section class="shx-sec"><div class="shx-sec__head"><h2>${esc(title)}</h2>${open.length ? `<button class="shx-all" type="button" data-shop-all="${id}">${t('Alle kaufen')}</button>` : ''}</div>
+      <div class="shx-row">${list.map((x) => shxCard(kind, x)).join('')}</div></section>`;
+  }
+  function shopSections() {
+    const trains = shopItems('trains');
+    const routes = shopItems('routes');
+    return {
+      fern: { title: t('Fernverkehr'), kind: 'trains', list: trains.filter((x) => ['ice', 'ic', 'ec'].includes(x.cat)) },
+      regio: { title: t('Regional & S-Bahn'), kind: 'trains', list: trains.filter((x) => ['re', 'rb', 's'].includes(x.cat)) },
+      strecken: { title: t('Strecken'), kind: 'routes', list: routes },
+    };
+  }
+  async function buyAll(id) {
+    const sec = shopSections()[id];
+    if (!sec || !shop.data || !shop.data.wallet) return;
+    const open = buyable(sec.kind, sec.list);
+    const sum = open.reduce((n, x) => n + x.price, 0);
+    if (!open.length) return;
+    if (sum > shop.data.wallet.available) { haptic('error'); toast(t('Für alle zusammen fehlen dir {n} Coins.', { n: fmt(sum - shop.data.wallet.available) })); return; }
+    if (!confirm(t('{n} Artikel aus „{name}“ für zusammen {sum} Coins kaufen?', { n: open.length, name: sec.title, sum: fmt(sum) }))) return;
+    let ok = 0;
+    for (const x of open) {
+      try {
+        if (shop.data.demo) {
+          const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
+          w.coins -= x.price;
+          w[sec.kind === 'routes' ? 'routes' : 'trains'] = [...w[sec.kind === 'routes' ? 'routes' : 'trains'], x.id];
+          store.set('tsg-wallet', w);
+          shop.data.wallet = demoWallet();
+        } else shop.data.wallet = await api('/api/shop/buy', { method: 'POST', body: { kind: sec.kind === 'routes' ? 'route' : 'train', id: x.id } });
+        ok += 1;
+      } catch (e) { break; }
+    }
+    haptic(ok === open.length ? 'success' : 'warn');
+    toast(ok === open.length ? t('{n} Artikel gekauft', { n: ok }) : t('{a} von {b} gekauft – der Rest ging gerade nicht.', { a: ok, b: open.length }));
+    renderShop();
+  }
   function renderShop() {
     if (!shop.data) loadShop();
     const d = shop.data;
     const w = d && d.wallet;
-    const kind = shop.tab;
-    const all = shopItems(kind);
-    const trainsAll = shopItems('trains');
-    const routesAll = shopItems('routes');
-    const owned = (k, list) => list.filter((x) => ['owned', 'pending'].includes(itemStatus(k, x))).length;
-    const reserved = w ? w.coins - w.available : 0;
-    const min = w && w.syncedAt ? Math.max(0, Math.round((Date.now() - w.syncedAt) / 60000)) : null;
-    const nOwned = owned('trains', trainsAll) + owned('routes', routesAll);
-    const nAll = trainsAll.length + routesAll.length;
-    $('[data-shop-head]').innerHTML = `<div class="wallet">
-        <div class="wallet__top"><span class="wallet__label">${icon('fi-rr-wallet')}${t('Deine Coins')}</span>
-          <span class="wallet__sync">${!d ? t('Wird geladen …') : d.demo ? t('Demo') : !w ? t('Nicht angemeldet') : min === null ? t('Noch kein Stand aus dem Spiel') : `${icon('fi-rr-check')}${min < 1 ? t('Stand aus dem Spiel: gerade eben') : t('Stand aus dem Spiel: vor {n} Min.', { n: min })}`}</span></div>
-        <div class="wallet__coins"><span class="wallet__coin" aria-hidden="true">${icon('fi-sr-coins')}</span>${countHtml(w ? w.coins : 0, 'fmt', 'wallet')}</div>
-        ${reserved > 0 ? `<p class="wallet__reserved">${t('{n} Coins reserviert für offene Käufe', { n: fmt(reserved) })}</p>` : ''}
-        <div class="wallet__stats">
-          <span><b>${owned('trains', trainsAll)}</b>/${trainsAll.length} ${t('Züge')}</span>
-          <span><b>${owned('routes', routesAll)}</b>/${routesAll.length} ${t('Strecken')}</span>
-          <span class="wallet__collection"><span class="wallet__bar"><i style="width:${nAll ? (nOwned / nAll) * 100 : 0}%"></i></span><small>${t('Sammlung {n}', { n: pct(nAll ? (nOwned / nAll) * 100 : 0) })}</small></span>
-        </div>
+    const view = shop.view || 'home';
+    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
+    $('[data-shop-head]').innerHTML = `<div class="shx-top">
+        <a class="shx-x" href="#/" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross')}${unread ? `<i>${unread > 99 ? '99' : unread}</i>` : ''}</a>
+        <h1>${view === 'wish' ? t('Wunschliste') : view === 'owned' ? t('Im Besitz') : view === 'trains' ? t('Alle Züge') : view === 'routes' ? t('Alle Strecken') : t('Shop')}</h1>
+        <span class="shx-coins" title="${esc(t('Deine Coins'))}">${icon('fi-sr-coins')}${countHtml(w ? w.coins : 0, 'fmt', 'wallet')}</span>
+        <button class="shx-ibtn${view === 'wish' ? ' is-on' : ''}" type="button" data-shop-view="${view === 'wish' ? 'home' : 'wish'}" aria-label="${esc(t('Wunschliste'))}">${icon(view === 'wish' ? 'fi-sr-heart' : 'fi-sr-heart')}</button>
+        <button class="shx-ibtn" type="button" data-shop-menu aria-label="${esc(t('Menü'))}" aria-expanded="${!!shop.menu}">${icon('fi-rr-menu-burger')}</button>
       </div>
-      <div class="segmented segmented--shop" role="tablist" aria-label="${esc(t('Shop'))}" style="--i:${kind === 'routes' ? 1 : 0}">
-        <span class="segmented__thumb" aria-hidden="true"></span>
-        <button type="button" role="tab" aria-selected="${kind === 'trains'}" data-shop-tab="trains">${icon('fi-rr-train-side')}${t('Züge')}</button>
-        <button type="button" role="tab" aria-selected="${kind === 'routes'}" data-shop-tab="routes">${icon('fi-rr-route')}${t('Strecken')}</button>
-      </div>`;
+      ${shop.menu ? `<div class="shx-menu" role="menu">${[['home', 'fi-rr-shop', t('Startseite')], ['trains', 'fi-rr-train-side', t('Alle Züge')], ['routes', 'fi-rr-route', t('Alle Strecken')], ['owned', 'fi-sr-check-circle', t('Im Besitz')], ['wish', 'fi-rr-heart', t('Wunschliste')], ['history', 'fi-rr-time-past', t('Kaufverlauf')]]
+        .map(([id, ic, label]) => `<button type="button" role="menuitem" data-shop-view="${id}"${view === id ? ' aria-current="true"' : ''}>${icon(ic)}${label}</button>`).join('')}</div>` : ''}`;
     countUp($('[data-shop-head]'));
-
-    const cats = kind === 'trains' ? SHOP_CATS.filter(([c]) => all.some((x) => x.cat === c)) : SHOP_CATS.filter(([c]) => all.some((x) => x.route.cat === c));
-    if (shop.cat !== 'all' && !cats.some(([c]) => c === shop.cat)) shop.cat = 'all';
-    const catOf = (x) => (kind === 'routes' ? x.route.cat : x.cat);
-    const list = all.filter((x) => {
-      const st = itemStatus(kind, x);
-      if (shop.cat !== 'all' && catOf(x) !== shop.cat) return false;
-      return shop.filter === 'all' || (shop.filter === 'owned' ? st === 'owned' || st === 'pending' : st === 'buy' || st === 'short' || st === 'locked');
-    }).sort((a, b) => (shop.sort === 'price-down' ? b.price - a.price : shop.sort === 'speed' && kind === 'trains' ? b.vmax - a.vmax : shop.sort === 'km' && kind === 'routes' ? b.route.km - a.route.km : a.price - b.price));
-    const n = (f) => all.filter((x) => { const st = itemStatus(kind, x); return f === 'owned' ? st === 'owned' || st === 'pending' : st !== 'owned' && st !== 'pending'; }).length;
-    const chip = (attr, id, cur, label) => `<button class="chip${cur === id ? ' is-active' : ''}" type="button" ${attr}="${id}">${label}</button>`;
-    const sorts = kind === 'trains' ? [['price', t('Preis aufsteigend')], ['price-down', t('Preis absteigend')], ['speed', t('Schnellste zuerst')]]
-      : [['price', t('Preis aufsteigend')], ['price-down', t('Preis absteigend')], ['km', t('Längste zuerst')]];
-    if (!sorts.some(([id]) => id === shop.sort)) shop.sort = 'price';
-    $('[data-shop]').innerHTML = `${shopNote()}
-      ${shop.filter === 'all' && shop.cat === 'all' ? nextUp(kind, all) : ''}
-      <div class="sx-tools">
-        <div class="chips chips--scroll">${chip('data-shop-filter', 'all', shop.filter, `${t('Alle')} · ${all.length}`)}${chip('data-shop-filter', 'owned', shop.filter, `${t('Im Besitz')} · ${n('owned')}`)}${chip('data-shop-filter', 'buy', shop.filter, `${t('Noch offen')} · ${n('buy')}`)}</div>
-        <label class="sx-sort">${icon('fi-rr-sort-amount-down')}<span class="sr-only">${t('Sortieren')}</span><select data-shop-sort>${sorts.map(([id, label]) => `<option value="${id}"${shop.sort === id ? ' selected' : ''}>${label}</option>`).join('')}</select></label>
-      </div>
-      ${cats.length > 1 ? `<div class="chips chips--scroll chips--block sx-cats">${chip('data-shop-cat', 'all', shop.cat, t('Alle Gattungen'))}${cats.map(([c, label]) => `<button class="chip chip--cat${shop.cat === c ? ' is-active' : ''}" type="button" data-shop-cat="${c}"><span class="line line--${c}">${label}</span></button>`).join('')}</div>` : ''}
-      <div class="${kind === 'routes' ? 'rt-grid' : 'sx-grid'}" data-reveal>${list.length ? list.map((x) => (kind === 'routes' ? shopRouteCard(x) : shopTrainCard(x))).join('') : `<p class="empty">${t('Hier ist gerade nichts.')}</p>`}</div>
-      ${shopHistory()}`;
-    reveal($('[data-reveal]', $('[data-shop]')));
+    const trains = shopItems('trains');
+    const routes = shopItems('routes');
+    const all = [...trains.map((x) => ['trains', x]), ...routes.map((x) => ['routes', x])];
+    const grid = (items) => (items.length ? `<div class="shx-grid">${items.map(([k, x]) => shxCard(k, x, { wide: true })).join('')}</div>` : `<p class="shx-empty">${view === 'wish' ? t('Tippe bei einem Zug oder einer Strecke auf das Herz – dann landet er hier.') : t('Hier ist gerade nichts.')}</p>`);
+    let body = '';
+    if (view === 'wish') body = grid(all.filter(([k, x]) => shopWish().has(shopKey(k, x))));
+    else if (view === 'owned') body = grid(all.filter(([k, x]) => ['owned', 'pending'].includes(itemStatus(k, x))));
+    else if (view === 'trains') body = grid(trains.map((x) => ['trains', x]));
+    else if (view === 'routes') body = grid(routes.map((x) => ['routes', x]));
+    else if (view === 'history') body = shopHistory() || `<p class="shx-empty">${t('Noch keine Käufe.')}</p>`;
+    else {
+      // Großes Banner: das Highlight, das man noch nicht hat
+      const hero = trains.filter((x) => !['owned', 'pending'].includes(itemStatus('trains', x))).sort((a, b) => b.price - a.price)[0] || trains[trains.length - 1];
+      const secs = shopSections();
+      const style = all.filter(([k, x]) => !['owned', 'pending'].includes(itemStatus(k, x))).sort((a, b) => a[1].price - b[1].price);
+      body = `${hero ? `<button class="shx-hero sx-stage--${esc(hero.cat)}" type="button" data-shop-item="trains:${esc(hero.id)}">
+          <span class="shx-hero__text"><small>${t('Highlight')}</small><b>${esc(hero.name)}</b><span>${esc(hero.series)} · ${hero.vmax} km/h</span>
+            <span class="shx-hero__price">${itemStatus('trains', hero) === 'owned' ? t('Gehört dir') : `${icon('fi-sr-coins')}${fmt(hero.price)}`}</span></span>
+          <span class="shx-hero__art">${trainArt(hero.id)}</span></button>` : ''}
+        ${shxSection('fern', secs.fern.title, 'trains', secs.fern.list)}
+        ${shxSection('regio', secs.regio.title, 'trains', secs.regio.list)}
+        ${shxSection('strecken', secs.strecken.title, 'routes', secs.strecken.list)}
+        ${style.length ? `<section class="shx-sec"><div class="shx-sec__head"><h2>${t('Finde deinen Stil')}</h2><button class="shx-info" type="button" data-shop-view="trains" aria-label="${esc(t('Alle ansehen'))}">${icon('fi-rr-info')}</button></div>${grid(style.slice(0, 8))}</section>` : ''}`;
+    }
+    $('[data-shop]').innerHTML = `${shopNote()}${body}`;
   }
   // Detailansicht eines Artikels
   function itemView(arg) {
@@ -3854,6 +3924,8 @@
     chatDot();
     if (state.page === 'chat' && ['mine', 'queue'].includes(state.chatView)) renderChat();
     if (ok && state.page === 'dashboard') renderDash();
+    // Server offen: Leiste mit allen Servern auf neuen Stand
+    if (ok && state.page === 'chat' && state.chatView === 'conv') { const cc = chat.conv[state.chatArg]; const side = $('[data-cm-side]'); if (cc && cc.community && side) side.outerHTML = cmSide(cc); }
   }
   async function loadPublic(force = false) {
     if (!chatReady() || (!force && chat.pub && Date.now() - chat.pubAt < 20000)) return;
@@ -4345,6 +4417,13 @@
     const mine = String((state.profile && state.profile.username) || '').toLowerCase();
     return esc(text).replace(/@([A-Za-z0-9_]{2,20})/g, (all, n) => `<span class="mention${[mine, 'alle', 'everyone'].includes(n.toLowerCase()) ? ' is-me' : ''}">@${n}</span>`);
   }
+  // Karte eines eigenen Bots (embed() in Luna) – die einzige Stelle mit Karten im Chat
+  function botEmbed(e) {
+    return `<div class="bembed" style="--ec:${esc(/^#[0-9A-Fa-f]{6}$/.test(e.color || '') ? e.color : '#5865F2')}">
+      ${e.title ? `<b class="bembed__title">${esc(e.title)}</b>` : ''}${e.text ? `<p>${mentionHtml(e.text)}</p>` : ''}
+      ${(e.fields || []).length ? `<dl class="bembed__fields">${e.fields.map((f) => `<div><dt>${esc(f.name)}</dt><dd>${esc(f.value)}</dd></div>`).join('')}</dl>` : ''}
+      ${e.footer ? `<small class="bembed__foot">${esc(e.footer)}</small>` : ''}</div>`;
+  }
   function chatMessages(c) {
     const me = meSub();
     const people = peopleOf(c);
@@ -4372,40 +4451,24 @@
         const meta = botMeta(m.botId) || { id: m.botId, name: m.title };
         return `${sep}<li class="msg msg--bot${first ? ' is-first' : ''}${m.local ? ' is-local' : ''}">
           ${first ? botAvatar(c.id, meta, 'bot-ava--sm') : '<span class="msg__gap"></span>'}
-          <div class="msg__col"><div class="msg__bubble">${first ? `<b class="msg__name">${esc(meta.name || m.title || 'Bot')} <span class="bot-tag">BOT</span>${m.local ? `<small class="bot-only">${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}<p>${mentionHtml(m.text || '')}</p><time>${time}</time></div></div>
+          <div class="msg__col"><div class="msg__bubble">${first ? `<b class="msg__name">${esc(meta.name || m.title || 'Bot')} <span class="bot-tag">BOT</span>${m.local ? `<small class="bot-only">${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}${m.embed ? botEmbed(m.embed) : `<p>${mentionHtml(m.text || '')}</p>`}<time>${time}</time></div></div>
         </li>`;
       }
-      // Antwort vom TSG-Bot auf einen Befehl
+      // Antwort vom TSG-Bot auf einen Befehl: eine normale Nachricht (Karten/Embeds gibt es nur bei eigenen Bots)
       if (m.kind === 'bot') {
-        lastBy = '';
-        return `${sep}<li class="msg-bot${m.only ? ' is-private' : ''}">
-          <span class="msg-bot__ic">${icon('fi-rr-terminal')}</span>
-          <div class="msg-bot__card">
-            <span class="msg-bot__name">TSG-Bot${m.only ? `<small>${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</span>
-            <span class="msg-bot__title">${m.avatar ? `<img src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer">` : ''}<b>${esc(m.title || '')}</b></span>
-            ${m.text ? `<p>${esc(m.text)}</p>` : ''}
-            ${(m.rows || []).length ? `<dl class="msg-bot__rows">${m.rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-            ${(m.buttons || []).length ? `<div class="msg-bot__btns">${botButtons(m)}</div>` : ''}
-            <time>${time}</time>
-          </div>
+        const key = 'bot:tsg';
+        const firstB = key !== lastBy || sep;
+        lastBy = key;
+        const lines = [m.text || '', ...(m.rows || []).map(([k, v]) => `${k}: ${v}`)].filter(Boolean).join('\n');
+        return `${sep}<li class="msg msg--bot msg--tsg${firstB ? ' is-first' : ''}${m.only ? ' is-local' : ''}">
+          ${firstB ? `<span class="bot-ava bot-ava--sm bot-ava--tsg">${icon('fi-rr-terminal')}</span>` : '<span class="msg__gap"></span>'}
+          <div class="msg__col"><div class="msg__bubble">${firstB ? `<b class="msg__name">TSG-Bot <span class="bot-tag">BOT</span>${m.only ? `<small class="bot-only">${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}
+            ${m.title ? `<p><b>${esc(m.title)}</b></p>` : ''}${lines ? `<p>${esc(lines)}</p>` : ''}
+            ${(m.buttons || []).length ? `<span class="msg__links">${botButtons(m)}</span>` : ''}<time>${time}</time></div></div>
         </li>`;
       }
       const mine = m.by === me;
       const p = people[m.by] || { username: m.name || '?', displayName: m.name || '?' };
-      // Ergebnis einer Bewerbung: [✅/❌ PASSED/FAILED] als eigene Karte
-      if (m.kind === 'result') {
-        lastBy = '';
-        const ok = m.status === 'passed';
-        const pctv = m.total ? Math.round((m.score / m.total) * 100) : null;
-        return `${sep}<li class="msg-result msg-result--${ok ? 'ok' : 'bad'}">
-          <span class="msg-result__tag">${ok ? '✅ PASSED' : '❌ FAILED'}${m.corrected ? ` · ${t('Korrektur')}` : ''}</span>
-          <b class="msg-result__title">${t('Bewerbung als {job}', { job: esc(m.job) })}</b>
-          <span class="msg-result__by">${personImg(p, 'avatar--sm')}${t('Ausgewertet von {name}', { name: `<b>${esc(m.reviewer || p.username)}</b>` })}</span>
-          ${pctv !== null ? `<span class="msg-result__score">${t('Wissensfragen: {a} von {b} richtig ({p} %)', { a: m.score, b: m.total, p: pctv })}</span>` : ''}
-          <p>${ok ? t('Herzlichen Glückwunsch! Wir melden uns hier mit allem Weiteren.') : t('Danke für deine Bewerbung. Du kannst dich später gern noch einmal bewerben.')}</p>
-          <time>${time}</time>
-        </li>`;
-      }
       const first = m.by !== lastBy || sep;
       lastBy = m.by;
       const canDel = !m.deleted && (mine || c.canModerate);
@@ -4514,7 +4577,7 @@
         ${c.canMedia ? `<label class="compose__attach" title="${esc(t('Foto, Video oder Datei anhängen'))}"><span class="sr-only">${t('Foto, Video oder Datei anhängen')}</span>${icon('fi-rr-clip')}
           <input type="file" data-chat-file multiple accept="image/*,video/*,application/pdf"></label>` : ''}
         <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
-        <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(c.community ? t('Nachricht an #{name}', { name: ((c.channels || []).find((x) => x.id === c.channel) || {}).name || '' }) : c.commands && c.commands.length ? t('Nachricht oder / für Befehle …') : t('Nachricht schreiben …'))}"></textarea>
+        <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(c.community ? t('Nachricht an #{name}', { name: chLabel(((c.channels || []).find((x) => x.id === c.channel) || {}).name || '') }) : c.commands && c.commands.length ? t('Nachricht oder / für Befehle …') : t('Nachricht schreiben …'))}"></textarea>
         <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rr-paper-plane')}</button>
       </div>
     </form>`;
@@ -4529,6 +4592,8 @@
     markSeen(c);
     if (c.community) {
       markChSeen(c);
+      if (!chat.list || Date.now() - chat.at > 10000) loadChats();
+      if (chat.sideAuto === c.id) { chat.sideAuto = null; if (window.innerWidth < 900) chat.side = true; }
       return {
         head: cmHead(c),
         body: `<div class="cm${chat.side ? ' is-open' : ''}" data-cm>${cmSide(c)}<button class="cm-scrim" type="button" data-cm-side-close aria-label="${esc(t('Kanäle schließen'))}"></button>
@@ -4611,6 +4676,8 @@
   // ---------- Server (Communities): Kanäle und Kategorien wie bei Discord ----------
   // Links die Kanalliste (auf dem Handy als Schublade), rechts der offene Kanal. Ungelesen merkt sich jedes Gerät selbst.
   const membersText = (n) => (n === 1 ? t('1 Mitglied') : t('{n} Mitglieder', { n }));
+  // „📄-·-hub“ → „📄 · hub“
+  const chLabel = (name) => String(name || '').replace(/-·-/g, ' · ');
   const chFind = (c, id = c.channel) => (c.channels || []).find((x) => x.id === id) || null;
   const chIcon = (x, cls = 'cm-ch__ic') => icon(x && x.kind === 'news' ? 'fi-rr-megaphone' : 'fi-rr-hastag', cls);
   function chSeenOf(c) {
@@ -4636,33 +4703,61 @@
   const cmShut = (id) => ((store.get('tsg-cm-cats', {}) || {})[id] || []);
   function cmSide(c) {
     const seenMap = chSeenOf(c);
-    const shutCats = cmShut(c.id);
+    const shutCats = chat.cmq ? [] : cmShut(c.id);
     const cats = c.categories || [];
-    const row = (x) => `<div class="cm-ch-row">
+    const q = (chat.cmq || '').trim().toLowerCase();
+    const match = (x) => !q || chLabel(x.name).toLowerCase().includes(q);
+    const row = (x) => (match(x) ? `<div class="cm-ch-row">
         <button type="button" class="cm-ch${x.id === c.channel ? ' is-active' : ''}${chUnread(c, x, seenMap) ? ' is-unread' : ''}" data-cm-ch="${esc(x.id)}"${x.id === c.channel ? ' aria-current="true"' : ''}>
-          ${chIcon(x)}<span class="cm-ch__name">${esc(x.name)}</span>${x.locked ? icon('fi-rr-lock', 'cm-ch__lock') : ''}</button>
+          ${chIcon(x)}<span class="cm-ch__name">${esc(chLabel(x.name))}</span></button>
         ${c.canManage ? `<button type="button" class="cm-ch__edit" data-cm-edit="${esc(x.id)}" aria-label="${esc(t('Kanal bearbeiten'))}">${icon('fi-rr-settings')}</button>` : ''}
-      </div>`;
+      </div>` : '');
     const loose = (c.channels || []).filter((x) => !x.cat || !cats.some((k) => k.id === x.cat));
     const groups = cats.map((k) => {
       const list = (c.channels || []).filter((x) => x.cat === k.id);
+      if (q && !list.some(match)) return '';
       const shut = shutCats.includes(k.id);
       const unread = shut && list.some((x) => chUnread(c, x, seenMap));
       return `<div class="cm-cat${shut ? ' is-shut' : ''}">
         <div class="cm-cat__head">
-          <button type="button" class="cm-cat__toggle" data-cm-cat="${esc(k.id)}" aria-expanded="${!shut}">${icon('fi-rr-angle-small-down', 'cm-cat__chev')}<span>${esc(k.name)}</span>${unread ? '<i class="cm-dot" aria-hidden="true"></i>' : ''}</button>
+          <button type="button" class="cm-cat__toggle" data-cm-cat="${esc(k.id)}" aria-expanded="${!shut}"><span>${esc(k.name)}</span>${icon('fi-rr-angle-small-down', 'cm-cat__chev')}${unread ? '<i class="cm-dot" aria-hidden="true"></i>' : ''}</button>
           ${c.canManage ? `<button type="button" class="cm-cat__add" data-cm-new="${esc(k.id)}" aria-label="${esc(t('Kanal in {name} erstellen', { name: k.name }))}">${icon('fi-rr-plus-small')}</button>` : ''}
         </div>
         ${(shut ? list.filter((x) => x.id === c.channel) : list).map(row).join('')}
       </div>`;
     }).join('');
+    // Leiste ganz links: alle eigenen Gruppen-Chats und Server
+    const rail = (chat.list ? chat.list.chats : []).filter((x) => x.kind === 'group').sort((a, b) => (b.category === 'server') - (a.category === 'server') || b.updated - a.updated);
+    const p = state.profile;
+    const me = prof.me || {};
+    const unreadAll = chat.list ? chat.list.chats.filter(isUnread).length : 0;
     return `<aside class="cm-side" data-cm-side aria-label="${esc(t('Kanäle'))}">
-      <a class="cm-side__head" href="#/chat/${esc(c.id)}/info">${groupBadge(c, 'cm-side__badge')}<span class="cm-side__name"><b>${esc(c.name)}</b><small>${membersText((c.members || []).length)}</small></span>${icon('fi-rr-angle-small-right')}</a>
-      <nav class="cm-side__list">${loose.map(row).join('')}${groups}</nav>
-      ${c.canManage ? `<div class="cm-side__foot">
-        <button type="button" class="cm-side__btn" data-cm-new="">${icon('fi-rr-plus')}${t('Kanal')}</button>
-        <button type="button" class="cm-side__btn" data-cm-cat-new>${icon('fi-rr-folder')}${t('Kategorie')}</button>
-      </div>` : ''}
+      <nav class="cm-rail" aria-label="${esc(t('Server'))}">
+        <a class="cm-rail__dm" href="#/chat" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-sr-comments')}</a><i class="cm-rail__sep"></i>
+        ${rail.map((x) => `<a class="cm-rail__srv${x.id === c.id ? ' is-active' : ''}" href="#/chat/${esc(x.id)}" title="${esc(x.name)}">${groupBadge(x, 'cm-rail__img')}${isUnread(x) && x.id !== c.id ? '<i class="cm-rail__dot"></i>' : ''}</a>`).join('')}
+        <a class="cm-rail__add" href="#/dashboard?neu=server" aria-label="${esc(t('Server erstellen'))}">${icon('fi-rr-plus')}</a>
+      </nav>
+      <div class="cm-panel">
+        <div class="cm-panel__head">
+          <a class="cm-panel__name" href="#/chat/${esc(c.id)}/info"><b>${esc(c.name)}</b>${c.canManage ? icon('fi-sr-settings', 'cm-panel__gear') : ''}${icon('fi-rr-angle-small-right', 'cm-panel__chev')}</a>
+          <small>${membersText((c.members || []).length)} • ${t('Community')}</small>
+        </div>
+        <div class="cm-tools">
+          <label class="cm-search">${icon('fi-rr-search')}<input type="search" data-cm-q value="${esc(chat.cmq || '')}" placeholder="${esc(t('Suche'))}" autocomplete="off"></label>
+          ${c.me && c.me.role ? `<button class="cm-tool" type="button" data-cm-invite-id="${esc(c.id)}" aria-label="${esc(t('Leute einladen'))}">${icon('fi-rr-user-add')}</button>` : ''}
+          <a class="cm-tool" href="#/trainings" aria-label="${esc(t('Events'))}">${icon('fi-sr-calendar')}</a>
+        </div>
+        <div class="cm-links">
+          <button type="button" data-cm-browse>${icon('fi-rr-list-check')}<span>${t('Kanäle durchstöbern')}</span></button>
+          <a href="#/chat/${esc(c.id)}/info">${icon('fi-rr-settings-sliders')}<span>${c.canManage ? t('Server-Einstellungen') : t('Server-Info')}</span></a>
+        </div>
+        <nav class="cm-side__list">${loose.map(row).join('')}${groups}${c.canManage ? `<div class="cm-side__foot"><button type="button" class="cm-side__btn" data-cm-new="">${icon('fi-rr-plus')}${t('Kanal')}</button><button type="button" class="cm-side__btn" data-cm-cat-new>${icon('fi-rr-folder')}${t('Kategorie')}</button></div>` : ''}</nav>
+        <div class="cm-user">
+          <a class="cm-user__me" href="#/profil">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(p ? p.username : 'G'))}</b>`}<i class="cm-user__dot"></i></a>
+          <a class="cm-user__text" href="#/profil"><span><b>${esc(p ? p.displayName || p.username : t('Gast'))}</b><span class="cm-user__tag">${icon('fi-sr-heart')}${esc(rankOf(state.rank).prefix)}</span></span><small>${me.status ? `${icon('fi-sr-check-circle')}${esc(me.status)}` : `@${esc(p ? p.username : '')}`}</small></a>
+          <a class="cm-user__bell" href="#/chat" aria-label="${esc(t('Benachrichtigungen'))}">${icon('fi-sr-bell')}${unreadAll ? `<i>${unreadAll > 9 ? '9+' : unreadAll}</i>` : ''}</a>
+        </div>
+      </div>
     </aside>`;
   }
   function cmHead(c) {
@@ -4674,7 +4769,7 @@
         <button class="cm-toggle${unread ? ' has-unread' : ''}" type="button" data-cm-side-open aria-label="${esc(t('Kanäle'))}">${icon('fi-rr-menu-burger')}</button>
         <a class="conv-bar__who" href="#/chat/${esc(c.id)}/info">
           ${groupBadge(c, 'conv-bar__avatar cm-head__badge')}
-          <span class="conv-bar__text"><h1 class="cm-head__ch">${chIcon(ch, 'cm-head__ic')}<span>${esc(ch.name || '')}</span></h1><p><span>${esc(c.name)}</span>${ch.topic ? `<span class="cm-head__topic">${esc(ch.topic)}</span>` : ''}</p></span>
+          <span class="conv-bar__text"><h1 class="cm-head__ch">${chIcon(ch, 'cm-head__ic')}<span>${esc(chLabel(ch.name))}</span></h1><p><span>${esc(c.name)}</span>${ch.topic ? `<span class="cm-head__topic">${esc(ch.topic)}</span>` : ''}</p></span>
         </a>
         <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('fi-rr-info')}</a>
       </div>`;
@@ -4683,8 +4778,8 @@
   function cmIntro(c) {
     const ch = chFind(c) || {};
     return `<li class="cm-intro"><span class="cm-intro__ic">${chIcon(ch, '')}</span>
-        <b>${t('Willkommen in #{name}!', { name: esc(ch.name || '') })}</b>
-        <span>${ch.topic ? esc(ch.topic) : ch.id === c.home ? t('Das ist der Anfang von {name}. Hier landen auch Begrüßungen und Hinweise.', { name: `<b>${esc(c.name)}</b>` }) : t('Das ist der Anfang des Kanals #{name}.', { name: esc(ch.name || '') })}</span>
+        <b>${t('Willkommen in #{name}!', { name: esc(chLabel(ch.name)) })}</b>
+        <span>${ch.topic ? esc(ch.topic) : ch.id === c.home ? t('Das ist der Anfang von {name}. Hier landen auch Begrüßungen und Hinweise.', { name: `<b>${esc(c.name)}</b>` }) : t('Das ist der Anfang des Kanals #{name}.', { name: esc(chLabel(ch.name)) })}</span>
         ${ch.kind === 'news' ? `<small>${icon('fi-rr-megaphone')}${t('Ankündigungen: schreiben dürfen Inhaber, Admins und Rollen mit dem Recht „Schreiben“.')}</small>` : ''}
       </li>${ch.id === c.home ? chatIntro(c) : ''}`;
   }
@@ -4730,7 +4825,7 @@
       return r;
     } catch (e) { toast(chatError(e)); return null; }
   }
-  const chName = (v) => String(v || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+  const chName = (v) => [...String(v || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_\-·\p{Extended_Pictographic}\u200d\ufe0f]/gu, '').replace(/-{3,}/g, '--').replace(/^-+|-+$/g, '')].slice(0, 32).join('');
   function channelView(arg) {
     const [cid, chId, catId] = String(arg).split(':');
     const c = chat.conv[cid];
@@ -5191,7 +5286,7 @@
       };
       const res = luna.runEvent({ files: b.files, type: 'client', event, vars, args: args.length ? args : [vars.username], memory: store.get(key, {}) || {}, botName: b.name });
       if (res.memChanged) store.set(key, res.memory);
-      res.says.forEach((text) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text, at: Date.now(), local: true, ...(c.community ? { ch: c.channel } : {}) }); added += 1; });
+      res.says.forEach((out) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text: typeof out === 'string' ? out : '', ...(out && out.embed ? { embed: out.embed } : {}), at: Date.now(), local: true, ...(c.community ? { ch: c.channel } : {}) }); added += 1; });
     }
     if (list.length > 30) list.splice(0, list.length - 30);
     if (added) updateConv(c.id);
@@ -6853,8 +6948,12 @@
       '<svg viewBox="0 0 24 30"><ellipse cx="12" cy="16" rx="10" ry="13" fill="#FCE38A"/><circle cx="8" cy="12" r="2" fill="#9AB8F0"/><circle cx="15" cy="17" r="2" fill="#9AB8F0"/><circle cx="9" cy="21" r="2" fill="#9AB8F0"/></svg>'],
   };
   function applySeason() {
-    const s = fx.season ? seasonNow() : null;
     const root = document.documentElement;
+    const skin = typeof activeSkin === 'function' ? activeSkin() : null;
+    if (skin) root.dataset.skin = skin; else delete root.dataset.skin;
+    // Fallende Fledermäuse, Schnee …: zum Theme, sonst zur Saison
+    const now = fx.season ? seasonNow() : null;
+    const s = skin ? { id: skin === 'winter' ? 'christmas' : 'halloween' } : now;
     const old = $('[data-season-fx]');
     if (!s) { delete root.dataset.season; if (old) old.remove(); return; }
     if (root.dataset.season === s.id && old) return;
@@ -6895,6 +6994,176 @@
           <small class="toggle__note">${icon('fi-rr-info')}${t('Halloween, Weihnachten, Neujahr und Ostern – automatisch zur passenden Zeit.')}</small></span>
         <input type="checkbox" role="switch" data-season-toggle${fx.season ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span>
       </label>`;
+  }
+
+  // ---------- Einstellungen: Hauptliste und Unterseiten (#/einstellungen/<bereich>) ----------
+  // Jede Zeile öffnet eine eigene Seite mit allem, was zu ihr gehört – z. B. „Privatsphäre“ → alle Schalter dazu.
+  const SET_PAGES = [
+    { group: 'Konto', items: [
+      { id: 'profil', ic: 'fi-rr-user', label: 'Mein Profil', href: '#/profil' },
+      { id: 'konto', ic: 'fi-rr-link-alt', label: 'Roblox-Konto' },
+      { id: 'privacy', ic: 'fi-rr-shield-check', label: 'Privatsphäre' },
+      { id: 'benachrichtigungen', ic: 'fi-rr-bell', label: 'Benachrichtigungen' },
+    ] },
+    { group: 'App', items: [
+      { id: 'darstellung', ic: 'fi-rr-palette', label: 'Darstellung' },
+      { id: 'themes', ic: 'fi-rr-sparkles', label: 'Themes' },
+      { id: 'app-symbol', ic: 'fi-rr-apps', label: 'App-Symbol' },
+      { id: 'bewegung', ic: 'fi-rr-play', label: 'Bewegung & Haptik' },
+      { id: 'sprache', ic: 'fi-rr-globe', label: 'Sprache' },
+      { id: 'app', ic: 'fi-rr-download', label: 'App installieren' },
+    ] },
+    { group: 'Info', items: [
+      { id: 'rechtliches', ic: 'fi-rr-document', label: 'Rechtliches' },
+    ] },
+  ];
+  const setPage = (id) => SET_PAGES.flatMap((g) => g.items).find((x) => x.id === id) || null;
+  function setValue(id) {
+    if (id === 'darstellung') return { system: t('Wie das Gerät'), light: t('Hell'), dark: t('Dunkel') }[themeMode()];
+    if (id === 'themes') return t(SKINS.find((x) => x.id === fx.skin).name);
+    if (id === 'app-symbol') return t((APP_ICONS.find((x) => x.id === fx.icon) || APP_ICONS[0]).name);
+    if (id === 'sprache') { const l = langSetting(); return l === 'auto' ? t('Automatisch') : l.toUpperCase(); }
+    if (id === 'konto') return state.profile ? `@${state.profile.username}` : t('Nicht verbunden');
+    return '';
+  }
+  function renderSettingsNav() {
+    const sub = state.settingsSub;
+    const page = sub ? setPage(sub) : null;
+    const box = $('[data-settings]');
+    if (!box) return;
+    box.dataset.sub = page ? sub : '';
+    $$('[data-set-sec]', box).forEach((sec) => { sec.hidden = !page || sec.dataset.setSec !== sub; });
+    const head = $('[data-settings-head]');
+    if (head) {
+      head.innerHTML = page
+        ? `<a class="set-back" href="#/einstellungen" aria-label="${esc(t('Zurück zu den Einstellungen'))}">${icon('fi-rr-arrow-left')}</a><div class="appbar__title"><span class="appbar__label">${t('Einstellungen')}</span><h1 class="appbar__value">${esc(t(page.label))}</h1></div>`
+        : `<div class="appbar__title"><span class="appbar__label">App</span><h1 class="appbar__value">${t('Einstellungen')}</h1></div>`;
+    }
+    const menu = $('[data-settings-menu]');
+    menu.hidden = !!page;
+    if (page) return;
+    const p = state.profile;
+    const r = rankOf(state.rank);
+    menu.innerHTML = `<a class="set-me" href="#/profil">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${p ? esc(p.displayName || p.username) : t('Gast')}</b><small>${p ? `@${esc(p.username)}` : t('Mit Roblox anmelden')}</small></span>${rankPill(r)}${icon('fi-rr-angle-small-right', 'set-row__chev')}</a>
+      ${SET_PAGES.map((g) => `<div class="set-group"><h2>${esc(t(g.group))}</h2><div class="set-list">${g.items.map((x) => `<a class="set-row" href="${x.href || `#/einstellungen/${x.id}`}">
+        <span class="set-row__ic">${icon(x.ic)}</span><span class="set-row__label">${esc(t(x.label))}</span><span class="set-row__val">${esc(setValue(x.id) || '')}</span>${icon('fi-rr-angle-small-right', 'set-row__chev')}</a>`).join('')}</div></div>`).join('')}`;
+  }
+
+  // ---------- Themes: ganzes Design statt nur Hell/Dunkel ----------
+  // auto = zur Saison (Halloween, Weihnachten), sonst Standard. Halloween: Nachthimmel, Mond, Spinnweben, Fledermäuse,
+  // Kürbis-Farben und eine kleine Animation bei jedem Tippen auf einen Knopf.
+  const SKINS = [
+    { id: 'auto', name: 'Automatisch', desc: 'Zur Saison das passende Theme, sonst Standard' },
+    { id: 'standard', name: 'Standard', desc: 'Hell oder dunkel wie unter „Darstellung“' },
+    { id: 'halloween', name: 'Halloween', desc: 'Nachthimmel, Spinnweben, Fledermäuse und Kürbisse' },
+    { id: 'winter', name: 'Winter', desc: 'Verschneit, mit Lichterkette und Schneeflocken' },
+  ];
+  fx.skin = SKINS.some((x) => x.id === store.get('tsg-skin', 'auto')) ? store.get('tsg-skin', 'auto') : 'auto';
+  function activeSkin() {
+    if (fx.skin === 'standard') return null;
+    if (fx.skin !== 'auto') return fx.skin;
+    const s = fx.season ? seasonNow() : null;
+    return s && s.id === 'halloween' ? 'halloween' : s && s.id === 'christmas' ? 'winter' : null;
+  }
+  function setSkin(id, { quiet = false } = {}) {
+    if (!SKINS.some((x) => x.id === id)) return;
+    fx.skin = id;
+    store.set('tsg-skin', id);
+    applySeason();
+    if (!quiet) { settingsChanged(); haptic('select'); toast(t('Theme: {name}', { name: t(SKINS.find((x) => x.id === id).name) })); }
+    if (state.page === 'einstellungen') renderSettings();
+  }
+  function renderSkinPicker() {
+    const box = $('[data-skin-picker]');
+    if (!box) return;
+    const now = activeSkin();
+    box.innerHTML = SKINS.map((x) => `<button type="button" class="skin-card skin-card--${x.id}" data-skin-set="${x.id}" aria-pressed="${fx.skin === x.id}">
+        <span class="skin-card__preview" aria-hidden="true"><i></i><i></i><i></i><b></b></span>
+        <span class="skin-card__text"><b>${esc(t(x.name))}${x.id === 'auto' && now ? ` · ${esc(t(SKINS.find((k) => k.id === now).name))}` : ''}</b><small>${esc(t(x.desc))}</small></span>
+      </button>`).join('');
+  }
+  // Kleine Animation beim Tippen (nur mit Theme und Animationen an)
+  const SKIN_POP = {
+    halloween: ['🦇', '🎃', '👻', '🕸️', '🍬'],
+    winter: ['❄️', '✨', '❄️', '⭐'],
+  };
+  document.addEventListener('pointerdown', (e) => {
+    const skin = document.documentElement.dataset.skin;
+    if (!skin || !SKIN_POP[skin] || reducedMotion()) return;
+    const btn = e.target.closest('button, .btn, a.btn, [role="tab"], .dash-new, .set-row');
+    if (!btn) return;
+    const list = SKIN_POP[skin];
+    for (let i = 0; i < 5; i++) {
+      const el = document.createElement('span');
+      el.className = 'skin-pop';
+      el.textContent = list[(Math.random() * list.length) | 0];
+      el.style.left = `${e.clientX}px`;
+      el.style.top = `${e.clientY}px`;
+      el.style.setProperty('--dx', `${Math.round((Math.random() - 0.5) * 140)}px`);
+      el.style.setProperty('--dy', `${Math.round(-40 - Math.random() * 90)}px`);
+      el.style.setProperty('--rot', `${Math.round((Math.random() - 0.5) * 120)}deg`);
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 900);
+    }
+  }, { passive: true });
+
+  // ---------- App-Symbol: Varianten des Zeichens, als Favicon und für „Zum Home-Bildschirm“ ----------
+  const APP_ICONS = [
+    { id: 'standard', name: 'Standard', bg: '#FFFFFF', body: '#E3001B', win: '#1B1F27', s1: '#1B1F27', s2: '#FFC400', rail: '#8A909A' },
+    { id: 'dunkel', name: 'Dunkel', bg: '#0F1217', body: '#E3001B', win: '#2A2F3A', s1: '#2A2F3A', s2: '#FFC400', rail: '#555B66' },
+    { id: 'rot', name: 'Rot', bg: '#E3001B', body: '#FFFFFF', win: '#1B1F27', s1: '#1B1F27', s2: '#FFC400', rail: '#FFFFFF' },
+    { id: 'nacht', name: 'Nacht', bg: '#0C1A3A', body: '#4F8CFF', win: '#0C1A3A', s1: '#0C1A3A', s2: '#FFFFFF', rail: '#6E83B5' },
+    { id: 'halloween', name: 'Halloween', bg: '#1A0F2A', body: '#FF7A1A', win: '#2B1740', s1: '#2B1740', s2: '#A6FF4D', rail: '#8C6BB5' },
+    { id: 'winter', name: 'Winter', bg: '#EAF4FF', body: '#2E6FD8', win: '#13294B', s1: '#13294B', s2: '#FFFFFF', rail: '#9DB8D8' },
+    { id: 'gold', name: 'Gold', bg: '#111111', body: '#E2B33C', win: '#111111', s1: '#111111', s2: '#FFF3C4', rail: '#8A7A4A' },
+    { id: 'gruen', name: 'Grün', bg: '#FFFFFF', body: '#408335', win: '#1B1F27', s1: '#1B1F27', s2: '#FFC400', rail: '#8A909A' },
+  ];
+  fx.icon = APP_ICONS.some((x) => x.id === store.get('tsg-appicon', 'standard')) ? store.get('tsg-appicon', 'standard') : 'standard';
+  const appIconSvg = (v, rx = 0) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="${rx}" fill="${v.bg}"/><g transform="translate(66 168.6) scale(.95)"><defs><clipPath id="c${v.id}"><path d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z"/></clipPath></defs><path d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z" fill="${v.body}"/><g clip-path="url(#c${v.id})"><path d="M68 54H262C304 56 340 78 362 110H68C61 110 56 105 56 98V66C56 59 61 54 68 54Z" fill="${v.win}"/><rect x="0" y="126" width="400" height="12" fill="${v.s1}"/><rect x="0" y="144" width="400" height="12" fill="${v.s2}"/></g><rect x="34" y="188" width="362" height="11" rx="5.5" fill="${v.rail}"/><rect x="2" y="188" width="20" height="11" rx="5.5" fill="${v.rail}"/></g></svg>`;
+  async function iconPng(v, size) {
+    const img = new Image();
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(appIconSvg(v))}`;
+    await img.decode();
+    const cv = document.createElement('canvas');
+    cv.width = size;
+    cv.height = size;
+    cv.getContext('2d').drawImage(img, 0, 0, size, size);
+    return cv.toDataURL('image/png');
+  }
+  async function applyAppIcon() {
+    const v = APP_ICONS.find((x) => x.id === fx.icon) || APP_ICONS[0];
+    const touch = $('link[data-app-icon]');
+    const fav = $('link[data-app-favicon]');
+    if (v.id === 'standard') {
+      if (touch) touch.href = 'assets/icons/apple-touch-icon.png';
+      if (fav) fav.href = 'assets/icons/favicon-32.png';
+      const svgFav = $('link[rel="icon"][type="image/svg+xml"]');
+      if (svgFav) svgFav.href = 'assets/img/favicon.svg';
+      return;
+    }
+    try {
+      if (touch) touch.href = await iconPng(v, 180);
+      if (fav) fav.href = await iconPng(v, 64);
+      const svgFav = $('link[rel="icon"][type="image/svg+xml"]');
+      if (svgFav) svgFav.href = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(appIconSvg(v, 112))}`;
+    } catch (e) { /* Symbol bleibt */ }
+  }
+  function setAppIcon(id) {
+    if (!APP_ICONS.some((x) => x.id === id)) return;
+    fx.icon = id;
+    store.set('tsg-appicon', id);
+    applyAppIcon();
+    settingsChanged();
+    haptic('select');
+    toast(t('App-Symbol: {name}', { name: t(APP_ICONS.find((x) => x.id === id).name) }));
+    if (state.page === 'einstellungen') renderSettings();
+  }
+  function renderIconPicker() {
+    const box = $('[data-icon-picker]');
+    if (!box) return;
+    box.innerHTML = `<div class="icon-grid">${APP_ICONS.map((v) => `<button type="button" class="icon-opt" data-icon-set="${v.id}" aria-pressed="${fx.icon === v.id}">
+        <span class="icon-opt__img">${appIconSvg(v, 112)}</span><span>${esc(t(v.name))}</span></button>`).join('')}</div>
+      <p class="set-note">${icon('fi-rr-info')}<span>${t('Das Symbol gilt sofort im Browser-Tab. Auf dem Home-Bildschirm übernimmt das Gerät es, wenn du die App neu hinzufügst (iPhone/iPad: Teilen → „Zum Home-Bildschirm“). Installierte Android-Apps behalten ihr Symbol, bis sie neu installiert werden.')}</span></p>`;
   }
 
   // ---------- Echte Zahlen: Gruppe, Spiel, Discord ----------
@@ -6947,7 +7216,7 @@
   const settingsAt = () => store.get('tsg-settings-at', 0);
   const currentSettings = () => ({
     theme: themeMode(), lang: langSetting(), bell: state.bell, remind: [...remind.ids], remindOff: [...remind.off], favs: [...state.favs],
-    track: pl.track, haptics: fx.haptics, motion: fx.motion, season: fx.season, updatedAt: settingsAt(),
+    track: pl.track, haptics: fx.haptics, motion: fx.motion, season: fx.season, skin: fx.skin, icon: fx.icon, wish: [...shopWish()], updatedAt: settingsAt(),
   });
   let settingsTimer = null;
   let applyingSettings = false;
@@ -6977,6 +7246,9 @@
       if (typeof s.haptics === 'boolean') setHaptics(s.haptics, { quiet: true });
       if (typeof s.motion === 'boolean') setMotion(s.motion, { quiet: true });
       if (typeof s.season === 'boolean') setSeason(s.season, { quiet: true });
+      if (s.skin && s.skin !== fx.skin) setSkin(s.skin, { quiet: true });
+      if (s.icon && s.icon !== fx.icon) { fx.icon = s.icon; store.set('tsg-appicon', s.icon); applyAppIcon(); }
+      if (Array.isArray(s.wish)) store.set('tsg-wish', s.wish);
       if (s.lang && s.lang !== langSetting()) await setLanguage(s.lang);
     } finally {
       applyingSettings = false;
@@ -6987,6 +7259,10 @@
   const modal = $('[data-modal]');
   let modalView = null;
   const VIEWS = {
+    'profile-edit': {
+      title: () => t('Profil bearbeiten'),
+      render: () => profileEditView(),
+    },
     profile: {
       title: () => t('Profil'),
       render: () => {
@@ -7646,77 +7922,213 @@
       <a class="dash-tile__main" href="${esc(item.href)}">${dashBadge(item, 'dash-badge dash-badge--lg')}<b>${esc(item.name)}</b><small>${dashMeta(item)}</small></a>
       <button class="dash-more dash-tile__more" type="button" data-dash-more="${item.k}:${esc(item.id)}" aria-label="${esc(t('Mehr zu {name}', { name: item.name }))}">${icon('fi-rr-menu-dots-vertical')}</button>
     </div>`;
+  // ---------- Dashboard wie ein Creator-Hub ----------
+  // Oben „≡ Home“ mit Suche, Glocke und Profilbild, darunter der Umschalter „Name ▾“: ich selbst oder einer meiner
+  // Gruppen-Chats bzw. Server. Danach Updates, Server, Bots und Lernen als Karten zum Wischen. ≡ öffnet die Seitenleiste,
+  // „Alle Tools“ zeigt alles auf einen Blick (links die Symbolleiste).
+  const DASH_NAV = [
+    [['home', 'fi-rr-home', 'Home', '#/dashboard'], ['erstellungen', 'fi-rr-folder', 'Erstellungen', '#/dashboard/erstellungen'], ['lernen', 'fi-rr-book-alt', 'Lernen', '#/luna'],
+      ['shop', 'fi-rr-shopping-bag', 'Shop', '#/shop'], ['forum', 'fi-rr-comment-alt', 'Forum', '#/chat/gruppen'], ['updates', 'fi-rr-megaphone', 'Updates', '#/news']],
+    [['coins', 'fi-rr-coins', 'Coins', '#/shop'], ['stats', 'fi-rr-chart-histogram', 'Statistiken', '#/statistiken'], ['trainings', 'fi-rr-calendar-lines', 'Trainings', '#/trainings']],
+    [['tools', 'fi-rr-menu-dots', 'Alle Tools', '#/dashboard/tools']],
+  ];
+  const DASH_TOOLS = [
+    ['Erstellungen', [['Server', '#/dashboard/erstellungen?f=server'], ['Gruppen', '#/dashboard/erstellungen?f=group'], ['Bots', '#/dashboard/erstellungen?f=bot'], ['Einladungslinks', '#/dashboard?beitreten=1']]],
+    ['Luna', [['Playground', '#/luna/playground'], ['Dokumentation', '#/luna'], ['Beispiele', '#/luna/beispiele']]],
+    ['Shop', [['Züge', '#/shop?v=trains'], ['Strecken', '#/shop?v=routes'], ['Wunschliste', '#/shop?v=wish']]],
+    ['Spiel', [['Live-Server', '#/server'], ['Spieler', '#/spieler'], ['Private Server', '#/server']]],
+    ['Team', [['Trainings', '#/trainings'], ['Karriere', '#/karriere'], ['Statistiken', '#/statistiken']]],
+    ['Konto', [['Profil', '#/profil'], ['Aufgaben', '#/aufgaben'], ['Einstellungen', '#/einstellungen']]],
+  ];
+  dash.ctx = store.get('tsg-dash-ctx', '') || '';
+  const dashCtxChat = () => (dash.ctx && chat.list ? chat.list.chats.find((c) => c.id === dash.ctx) : null);
+  function dashCtxBadge(cls = 'ch-ctx__img') {
+    const c = dashCtxChat();
+    if (c) return groupBadge(c, cls);
+    const p = state.profile;
+    return p && p.avatar ? `<span class="avatar ${cls}"><img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(p ? p.username : 'TSG', cls);
+  }
+  const dashCtxName = () => { const c = dashCtxChat(); return c ? c.name : state.profile ? state.profile.username : t('Gast'); };
+  function dashNavHtml(active, { rail = false } = {}) {
+    return DASH_NAV.map((grp) => `<div class="${rail ? 'ch-rail__grp' : 'ch-nav__grp'}">${grp.map(([id, ic, label, href]) => `<a href="${href}" class="${id === active ? 'is-active' : ''}"${id === active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${esc(t(label))}</span></a>`).join('')}</div>`).join('');
+  }
+  function dashCtxMenu() {
+    if (!dash.ctxOpen) return '';
+    const groups = (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group');
+    const p = state.profile;
+    const row = (id, img, name, sub) => `<button type="button" class="ch-ctxrow${dash.ctx === id ? ' is-on' : ''}" data-dash-ctx-set="${esc(id)}">${img}<span><b>${esc(name)}</b><small>${esc(sub)}</small></span>${dash.ctx === id ? icon('fi-rr-check') : ''}</button>`;
+    return `<div class="ch-ctxmenu" role="listbox">${row('', p && p.avatar ? `<span class="avatar ch-ctxrow__img"><img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(p ? p.username : 'G', 'ch-ctxrow__img'), p ? p.username : t('Gast'), t('Ich'))}
+      ${groups.length ? `<small class="ch-ctxmenu__h">${t('Gruppen-Chats und Server')}</small>${groups.map((c) => row(c.id, groupBadge(c, 'ch-ctxrow__img'), c.name, c.category === 'server' ? t('Server') : t('Gruppe'))).join('')}` : `<p class="ch-ctxmenu__none">${t('Noch keine Gruppen-Chats.')}</p>`}</div>`;
+  }
+  const chCard = (inner, cls = '') => `<article class="ch-card ${cls}">${inner}</article>`;
+  const statRow = (label, value) => `<div class="ch-stat"><span>${esc(label)}</span><b>${value}</b></div>`;
+  function serverCard(c) {
+    const place = dash.data ? dash.data.places.find((x) => x.id === c.id) : null;
+    const pub = c.visibility === 'public';
+    return chCard(`<div class="ch-card__top"><span class="ch-pill">${icon(pub ? 'fi-rr-unlock' : 'fi-rr-lock')}${pub ? t('Öffentlich') : t('Privat')}</span>
+        <button class="ch-dots" type="button" data-dash-more="chat:${esc(c.id)}" aria-label="${esc(t('Mehr'))}">${icon('fi-rr-menu-dots-vertical')}</button></div>
+      <a class="ch-card__title" href="#/chat/${esc(c.id)}">${groupBadge(c, 'ch-card__img')}<b>${esc(c.name)}</b></a>
+      <div class="ch-card__big"><small>${t('Mitglieder')}</small><b>${fmt(memberCount(c))}</b></div>
+      <div class="ch-stats">${statRow(t('Art'), c.category === 'server' ? t('Server') : t('Gruppe'))}${statRow(t('Bots'), place ? place.bots : '–')}${statRow(t('Ungelesen'), isUnread(c) ? t('Ja') : t('Nein'))}${statRow(t('Aktiv'), chatAgo(c.updated))}</div>`, 'ch-card--srv');
+  }
+  function botCard(b) {
+    return chCard(`<div class="ch-card__top"><span class="ch-pill${b.on ? ' is-ok' : ''}">${icon(b.on ? 'fi-sr-check-circle' : 'fi-rr-pause')}${b.on ? t('An') : t('Aus')}</span>
+        <button class="ch-dots" type="button" data-dash-more="bot:${esc(b.id)}" aria-label="${esc(t('Mehr'))}">${icon('fi-rr-menu-dots-vertical')}</button></div>
+      <a class="ch-card__title" href="${b.mode === 'advanced' ? `#/bots/${esc(b.chat.id)}/${esc(b.id)}` : `#/chat/${esc(b.chat.id)}/info`}">${b.avatar ? botAvatar(b.chat.id, b, 'ch-card__img') : initialsBadge(b.name, 'ch-card__img')}<b>${esc(b.name)}</b></a>
+      <div class="ch-card__big"><small>${t('Läuft in')}</small><b class="ch-card__place">${esc(b.chat.name)}</b></div>
+      <div class="ch-stats">${statRow(t('Modus'), b.mode === 'advanced' ? 'Luna' : t('Basis'))}${statRow(t('Präfix'), esc(b.prefix || '!'))}${statRow(t('Geändert'), b.rev ? chatAgo(b.rev) : '–')}</div>`, 'ch-card--bot');
+  }
+  const LEARN = [
+    ['einfuehrung', 'Einführung in Luna', 'fi-rr-rocket-lunch', 'linear-gradient(135deg,#6366f1,#a855f7)'],
+    ['playground', 'Luna-Playground', 'fi-rr-play', 'linear-gradient(135deg,#0ea5e9,#22c55e)'],
+    ['erster-bot', 'Dein erster Bot', 'fi-rr-robot', 'linear-gradient(135deg,#f97316,#ec4899)'],
+    ['beispiele', 'Beispiele zum Kopieren', 'fi-rr-sparkles', 'linear-gradient(135deg,#e11d48,#f59e0b)'],
+  ];
+  const chSec = (title, href, inner) => `<section class="ch-sec"><div class="ch-sec__head"><h2>${href ? `<a href="${href}">${esc(title)}${icon('fi-rr-angle-small-right')}</a>` : esc(title)}</h2></div><div class="ch-row">${inner}</div></section>`;
+  function dashHome() {
+    const ctx = dashCtxChat();
+    const news = newsItems().slice(0, 6);
+    const updates = news.length ? chSec(t('Updates'), '', news.map((n) => `<button type="button" class="ch-card ch-card--upd" data-news-open="${esc(n.id)}"><b>${esc(t(n.title))}</b><small>${icon('fi-rr-calendar-lines')}${newsDate(n)}</small></button>`).join('')).replace('<div class="ch-sec__head"><h2>', `<div class="ch-sec__head"><a class="ch-viewall" href="#/news">${t('Alle ansehen')}</a><h2>`) : '';
+    const learn = chSec(t('Lernen'), '#/luna', LEARN.map(([id, title, ic, bg]) => `<a class="ch-card ch-card--learn" href="#/luna/${id}" style="--bg:${bg}"><span class="ch-learn__art">${icon(ic)}</span><b>${esc(t(title))}</b></a>`).join(''));
+    if (ctx) {
+      const c = chat.conv[ctx.id];
+      if (!c) openConv(ctx.id);
+      const bots = (dash.data ? dash.data.bots : []).filter((b) => b.chat.id === ctx.id);
+      const chans = c && c.community ? c.channels : [];
+      return `<section class="ch-sec"><div class="ch-hero">${groupBadge(ctx, 'ch-hero__img')}<span><b>${esc(ctx.name)}</b><small>${ctx.category === 'server' ? t('Server') : t('Gruppe')} · ${membersText(memberCount(ctx))}</small></span>
+          <a class="ch-btn" href="#/chat/${esc(ctx.id)}">${t('Öffnen')}</a></div>
+        <div class="ch-quick"><button type="button" data-cm-invite-id="${esc(ctx.id)}">${icon('fi-rr-user-add')}<span>${t('Einladen')}</span></button><a href="#/chat/${esc(ctx.id)}/info">${icon('fi-rr-settings')}<span>${t('Info')}</span></a><button type="button" data-dash-create="bot:${esc(ctx.id)}">${icon('fi-rr-robot')}<span>${t('Bot')}</span></button><a href="#/chat/${esc(ctx.id)}/info">${icon('fi-rr-id-badge')}<span>${t('Rollen')}</span></a></div></section>
+        ${chans.length ? chSec(t('Kanäle'), `#/chat/${esc(ctx.id)}`, chans.map((x) => chCard(`<a class="ch-card__title" href="#/chat/${esc(ctx.id)}?k=${esc(x.id)}">${chIcon(x, 'ch-chan__ic')}<b>${esc(chLabel(x.name))}</b></a><p class="ch-card__txt">${esc(x.topic || (x.kind === 'news' ? t('Ankündigungen') : t('Textkanal')))}</p>${statRow(t('Zuletzt'), x.last ? chatAgo(x.last.at) : '–')}`, 'ch-card--chan')).join('')) : ''}
+        ${chSec(t('Bots'), '', `${bots.map(botCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="bot:${esc(ctx.id)}">${icon('fi-rr-plus')}<b>${t('Bot erstellen')}</b></button>`)}
+        ${updates}${learn}`;
+    }
+    const groups = (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group').sort((a, b) => b.updated - a.updated);
+    const bots = dash.data ? dash.data.bots : [];
+    return `${updates}
+      ${chSec(t('Server und Gruppen'), '#/dashboard/erstellungen', `${groups.map(serverCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="server">${icon('fi-rr-plus')}<b>${t('Server erstellen')}</b></button>`)}
+      ${chSec(t('Bots'), '#/dashboard/erstellungen?f=bot', `${bots.map(botCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="bot">${icon('fi-rr-plus')}<b>${t('Bot erstellen')}</b></button>`)}
+      ${learn}`;
+  }
+  function dashCreations() {
+    const f = ['server', 'group', 'bot'].includes(dash.filter) ? dash.filter : 'server';
+    const list = f === 'bot' ? (dash.data ? dash.data.bots : []).map(botItem) : (chat.list ? chat.list.chats : []).filter((c) => kindOfChat(c) === f).map(chatItem);
+    const tab = (id, label) => `<a role="tab" href="#/dashboard/erstellungen?f=${id}" aria-selected="${f === id}">${esc(label)}</a>`;
+    return `<div class="ch-tabs" role="tablist">${tab('server', t('Server'))}${tab('group', t('Gruppen'))}${tab('bot', t('Bots'))}</div>
+      <div class="ch-list">${list.length ? list.map(dashRow).join('') : `<p class="ch-none">${t('Hier ist noch nichts.')}</p>`}</div>
+      <button class="ch-fab" type="button" data-dash-create="${f === 'group' ? 'group' : f}">${icon('fi-rr-plus')}${f === 'bot' ? t('Bot erstellen') : f === 'group' ? t('Gruppe erstellen') : t('Server erstellen')}</button>`;
+  }
+  function dashTools() {
+    return `<div class="ch-tools">
+      <nav class="ch-rail ch-rail--tools" aria-label="${esc(t('Bereiche'))}"><a class="ch-rail__logo" href="#/">${clsIcon('module')}</a>${dashCtxBadge('ch-rail__me')}${dashNavHtml('tools', { rail: true })}<a class="ch-rail__tsg" href="#/">${icon('fi-sr-train-side')}<span>TSG</span></a></nav>
+      <div class="ch-toollist">${DASH_TOOLS.map(([g, items]) => `<div class="ch-toolgrp"><h3>${esc(t(g))}</h3>${items.map(([label, href]) => `<a href="${href}">${esc(t(label))}</a>`).join('')}</div>`).join('')}</div>
+    </div>`;
+  }
   function renderDash() {
     const box = $('[data-dash]');
     if (!box) return;
-    const p = state.profile || {};
+    const p = state.profile;
     const ready = chatReady();
     if (ready) { loadChats(); loadDash(); }
-    const ava = p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : esc(initials(p.displayName || p.username || 'TSG'));
+    const view = state.dashView || '';
     const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
-    const head = `<header class="dash-top">
-        <button class="dash-top__ava" type="button" data-open="profile" aria-label="${esc(t('Profil'))}">${ava}</button>
-        <div class="dash-top__hi"><small>${t('Dashboard')}</small><h1>${t('Hallo, {name}', { name: esc(p.displayName || p.username || t('Gast')) })}</h1></div>
-        <button class="dash-ibtn${dash.search ? ' is-on' : ''}" type="button" data-dash-search aria-label="${esc(t('Suchen'))}">${icon('fi-rr-search')}</button>
-        <a class="dash-ibtn" href="#/chat" aria-label="${esc(t('Chat'))}">${icon('fi-rr-bell')}${unread ? `<i class="dash-ibtn__n">${unread > 9 ? '9+' : unread}</i>` : ''}</a>
-      </header>`;
-    if (!ready) {
-      box.innerHTML = `<div class="dash__wrap">${head}<section class="dash-card dash-gate">${icon(apiReady() ? 'fi-rr-sign-in-alt' : 'fi-rr-cloud')}
-        <h2>${apiReady() ? t('Mit Roblox anmelden') : t('Das Dashboard startet bald')}</h2>
-        <p>${apiReady() ? t('Melde dich an, um Server, Gruppen und Bots zu erstellen.') : t('Sobald der App-Server läuft, erstellst du hier Server, Gruppen und Bots.')}</p>
-        ${apiReady() ? `<button class="dash-btn" type="button" data-open="profile">${t('Anmelden')}</button>` : ''}</section></div><div class="dsh" data-dsh hidden></div>`;
-      return;
-    }
-    const { chats, bots, all } = dashItems();
-    const n = { server: chats.filter((x) => x.kind === 'server').length, group: chats.filter((x) => x.kind === 'group').length, bot: bots.length, chat: chats.filter((x) => x.kind === 'chat' || x.kind === 'ticket').length };
-    const total = n.server + n.group + n.bot + n.chat;
-    const r = rankOf(state.rank);
-    const seg = (k) => (n[k] ? `<i style="--w:${Math.max(4, (n[k] / Math.max(1, total)) * 100)}%;--c:${DASH_COLORS[k]}"></i>` : '');
-    const legend = (k, label) => `<li><i style="--c:${DASH_COLORS[k]}"></i><span>${label}</span><b>${n[k]}</b></li>`;
-    const area = `<section class="dash-card dash-area">
-        <div class="dash-area__top"><span>${t('Dein Bereich')}</span><span class="dash-plan" style="--rc:${esc(r.color)}">${esc(r.name)}</span></div>
-        <div class="dash-area__num"><b>${total}</b><span>${total === 1 ? t('Objekt') : t('Objekte')}</span></div>
-        <div class="dash-bar" role="img" aria-label="${esc(t('{a} Server, {b} Gruppen, {c} Bots, {d} Chats', { a: n.server, b: n.group, c: n.bot, d: n.chat }))}">${total ? ['server', 'group', 'bot', 'chat'].map(seg).join('') : '<i style="--w:100%;--c:rgba(255,255,255,.08)"></i>'}</div>
-        <ul class="dash-legend">${legend('server', t('Server'))}${legend('group', t('Gruppen'))}${legend('bot', t('Bots'))}${legend('chat', t('Chats'))}</ul>
-      </section>`;
-    const tile = (kind, ic, label, sub, attrs) => `<button class="dash-new dash-new--${kind}" type="button" ${attrs}><span class="dash-new__ic">${icon(ic)}</span><b>${label}</b><small>${sub}</small></button>`;
-    const create = `<section class="dash-sec"><div class="dash-h"><h2>${t('Erstellen')}</h2></div><div class="dash-news">
-        ${tile('server', 'fi-rr-apps', t('Server'), t('Mit Kanälen'), 'data-dash-create="server"')}
-        ${tile('group', 'fi-rr-users-alt', t('Gruppe'), t('Privat oder öffentlich'), 'data-dash-create="group"')}
-        ${tile('bot', 'fi-rr-robot', t('Bot'), t('Basis oder Luna'), 'data-dash-create="bot"')}
-        ${tile('chat', 'fi-rr-comment-alt-dots', t('Chat'), t('Spieler anschreiben'), 'data-dash-go="#/chat/neu/spieler"')}
-        ${tile('ticket', 'fi-rr-comments-question', t('Anfrage'), t('An das Team'), 'data-dash-go="#/chat/neu/anfrage"')}
-        ${tile('luna', 'fi-rr-square-terminal', 'Luna', t('Code ausprobieren'), 'data-dash-go="#/luna/playground"')}
-      </div></section>`;
-    // Zuletzt angesehen: was zuletzt geöffnet wurde, sonst die neuesten Gespräche
-    const byKey = new Map(all.map((x) => [`${x.k}:${x.id}`, x]));
-    let viewed = recentList().map((x) => byKey.get(`${x.k}:${x.id}`)).filter(Boolean);
-    if (viewed.length < 4) viewed = [...viewed, ...chats.slice().sort((a, b) => b.at - a.at).filter((x) => !viewed.includes(x))];
-    viewed = viewed.slice(0, 5);
-    // Zuletzt bearbeitet: eigene Bots und Server/Gruppen, die man leitet
-    const placesSet = new Set((dash.data ? dash.data.places : []).map((x) => x.id));
-    const modified = [...bots, ...chats.filter((x) => placesSet.has(x.id))].sort((a, b) => b.at - a.at).slice(0, 6);
+    const title = { erstellungen: t('Erstellungen'), tools: t('Alle Tools') }[view] || t('Home');
     const q = dash.q.trim().toLowerCase();
-    const found = q ? all.filter((x) => x.name.toLowerCase().includes(q) || (x.k === 'bot' && x.b.chat.name.toLowerCase().includes(q))).slice(0, 20) : null;
-    const loading = !chat.list || !dash.data;
-    box.innerHTML = `<div class="dash__wrap">${head}
-      ${dash.search ? `<label class="dash-search">${icon('fi-rr-search')}<input type="search" data-dash-q value="${esc(dash.q)}" placeholder="${esc(t('Server, Gruppen, Bots, Chats …'))}" autocomplete="off"></label>` : ''}
-      ${found ? `<section class="dash-sec"><div class="dash-h"><h2>${t('Gefunden')}</h2><span>${found.length}</span></div>${found.length ? `<ul class="dash-list">${found.map(dashRow).join('')}</ul>` : `<p class="dash-empty">${t('Nichts gefunden.')}</p>`}</section>` : `
-      ${area}${create}
-      <section class="dash-sec"><div class="dash-h"><h2>${t('Zuletzt angesehen')}</h2><a href="#/chat">${t('Alle')}</a></div>
-        ${viewed.length ? `<ul class="dash-list">${viewed.map(dashRow).join('')}</ul>` : `<p class="dash-empty">${loading ? t('Wird geladen …') : t('Noch nichts angesehen – erstell oben deinen ersten Server.')}</p>`}</section>
-      <section class="dash-sec"><div class="dash-h"><h2>${t('Zuletzt bearbeitet')}</h2></div>
-        ${modified.length ? `<div class="dash-grid">${modified.map(dashTile).join('')}</div>` : `<p class="dash-empty">${loading ? t('Wird geladen …') : t('Hier erscheinen deine Bots und die Server und Gruppen, die du leitest.')}</p>`}</section>`}
+    const found = dash.search && q ? dashItems().all.filter((x) => x.name.toLowerCase().includes(q)).slice(0, 20) : null;
+    const content = !ready ? `<section class="ch-card ch-gate">${icon(apiReady() ? 'fi-rr-sign-in-alt' : 'fi-rr-cloud')}<b>${apiReady() ? t('Mit Roblox anmelden') : t('Das Dashboard startet bald')}</b><p>${apiReady() ? t('Melde dich an, um Server, Gruppen und Bots zu erstellen.') : t('Sobald der App-Server läuft, erstellst du hier Server, Gruppen und Bots.')}</p>${apiReady() ? `<button class="ch-btn" type="button" data-open="profile">${t('Anmelden')}</button>` : ''}</section>`
+      : found ? `<div class="ch-list">${found.length ? found.map(dashRow).join('') : `<p class="ch-none">${t('Nichts gefunden.')}</p>`}</div>`
+        : view === 'erstellungen' ? dashCreations() : view === 'tools' ? dashTools() : dashHome();
+    box.innerHTML = `<div class="ch${dash.nav ? ' is-nav' : ''}">
+      <nav class="ch-rail ch-rail--side" aria-label="${esc(t('Dashboard'))}">${dashNavHtml(view === 'tools' ? 'tools' : view === 'erstellungen' ? 'erstellungen' : 'home', { rail: true })}</nav>
+      <div class="ch-main">
+        <header class="ch-top">
+          <button class="ch-ibtn ch-menu" type="button" data-dash-nav aria-label="${esc(t('Menü'))}">${icon('fi-rr-menu-burger')}</button>
+          <h1>${esc(title)}</h1>
+          <button class="ch-ibtn${dash.search ? ' is-on' : ''}" type="button" data-dash-search aria-label="${esc(t('Suchen'))}">${icon('fi-rr-search')}</button>
+          <a class="ch-ibtn" href="#/chat" aria-label="${esc(t('Benachrichtigungen'))}">${icon('fi-rr-bell')}${unread ? `<i class="ch-ibtn__n">${unread > 9 ? '9+' : unread}</i>` : ''}</a>
+          <a class="ch-me" href="#/profil" aria-label="${esc(t('Profil'))}">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : esc(initials(p ? p.username : 'G'))}</a>
+        </header>
+        ${dash.search ? `<label class="ch-search">${icon('fi-rr-search')}<input type="search" data-dash-q value="${esc(dash.q)}" placeholder="${esc(t('Server, Gruppen, Bots …'))}" autocomplete="off"></label>` : ''}
+        ${ready && view !== 'tools' ? `<div class="ch-ctxwrap"><button class="ch-ctx" type="button" data-dash-ctx aria-expanded="${!!dash.ctxOpen}">${dashCtxBadge()}<span>${esc(dashCtxName())}</span>${icon('fi-sr-caret-down')}</button>${dashCtxMenu()}
+          <button class="ch-create" type="button" data-dash-create="chooser">${icon('fi-rr-plus')}${t('Erstellen')}</button></div>` : ''}
+        ${content}
+      </div>
+      <button class="ch-scrim" type="button" data-dash-nav aria-label="${esc(t('Schließen'))}"></button>
+      <aside class="ch-drawer" aria-label="${esc(t('Dashboard-Menü'))}">
+        <a class="ch-brand" href="#/dashboard">${clsIcon('module')}<b>DASHBOARD</b></a>
+        <button class="ch-drawer__me" type="button" data-dash-ctx>${dashCtxBadge('ch-drawer__img')}<span>${esc(dashCtxName())}</span>${icon('fi-rr-angle-small-down')}</button>
+        <nav class="ch-nav">${dashNavHtml(view === 'tools' ? 'tools' : view === 'erstellungen' ? 'erstellungen' : 'home')}</nav>
+        <a class="ch-brand ch-brand--foot" href="#/">${icon('fi-sr-train-side')}<b>Train Sim Germany</b></a>
+      </aside>
     </div><div class="dsh" data-dsh hidden></div>`;
     if (dash.sheet) drawSheet(true);
     if (dash.search && !found) { const input = $('[data-dash-q]'); if (input && document.activeElement !== input) input.focus(); }
   }
+  // Server erstellen wie in Messenger-Apps: „Selbst erstellen“ oder mit Vorlage, unten „Tritt einem Server bei“
+  const SERVER_TEMPLATES = [['gaming', '🎮', 'Gaming'], ['schule', '📘', 'Schulklub'], ['lernen', '🍎', 'Lerngruppe'], ['freunde', '💗', 'Freunde'], ['creator', '🎨', 'Künstler & Creator'], ['vorort', '🍃', 'Community vor Ort']];
+  function serverStartView() {
+    return `<div class="srvx"><h2>${t('Deinen Server erstellen')}</h2><p>${t('Dein Server ist der Ort, wo du und deine Freunde abhängen. Erstelle jetzt deinen eigenen und rede drauflos.')}</p>
+      <button class="srvx-row srvx-row--own" type="button" data-srv-template="">${'<span class="srvx-emoji">🧑‍💻</span>'}<b>${t('Selbst erstellen')}</b>${icon('fi-rr-angle-small-right')}</button>
+      <small class="srvx-h">${t('Mit einer Vorlage starten')}</small>
+      <div class="srvx-list">${SERVER_TEMPLATES.map(([id, emo, label]) => `<button class="srvx-row" type="button" data-srv-template="${id}"><span class="srvx-emoji">${emo}</span><b>${esc(t(label))}</b>${icon('fi-rr-angle-small-right')}</button>`).join('')}</div>
+      <div class="srvx-join"><b>${t('Hast du schon eine Einladung?')}</b><button class="srvx-joinbtn" type="button" data-srv-join>${t('Tritt einem Server bei')}</button></div></div>`;
+  }
+  function joinView() {
+    const pv = dash.invitePreview;
+    return `<form class="dsh-form" data-srv-join-form novalidate><div class="srvx"><h2>${t('Einem Server beitreten')}</h2><p>${t('Gib unten einen Einladungslink oder Code ein.')}</p></div>
+      <label class="dsh-field"><span>${t('Einladungslink oder Code')}</span><input name="code" value="${esc(dash.inviteCode || '')}" placeholder="${esc(`${location.origin}${location.pathname}#/einladung/aB3dE5fG`)}" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+      ${pv ? `<div class="srvx-preview">${groupBadge(pv, 'dash-badge dash-badge--lg')}<span><b>${esc(pv.name)}</b><small>${membersText(pv.members)}${pv.desc ? ` · ${esc(pv.desc)}` : ''}</small></span></div>` : ''}
+      <button class="dash-btn" type="submit">${pv ? (pv.joined ? t('Öffnen') : t('Beitreten')) : t('Weiter')}</button>
+      <a class="dsh-link" href="#/chat/gruppen">${t('Oder öffentliche Server und Gruppen entdecken')}</a></form>`;
+  }
+  function chooserView() {
+    const tile = (kind, ic, label, sub, attrs) => `<button class="dash-new dash-new--${kind}" type="button" ${attrs}><span class="dash-new__ic">${icon(ic)}</span><b>${label}</b><small>${sub}</small></button>`;
+    return `<div class="srvx"><h2>${t('Erstellen')}</h2></div><div class="dash-news">
+      ${tile('server', 'fi-rr-apps', t('Server'), t('Mit Kanälen'), 'data-dash-create="server"')}
+      ${tile('group', 'fi-rr-users-alt', t('Gruppe'), t('Privat oder öffentlich'), 'data-dash-create="group"')}
+      ${tile('bot', 'fi-rr-robot', t('Bot'), t('Basis oder Luna'), 'data-dash-create="bot"')}
+      ${tile('chat', 'fi-rr-comment-alt-dots', t('Chat'), t('Spieler anschreiben'), 'data-dash-go="#/chat/neu/spieler"')}
+      ${tile('ticket', 'fi-rr-comments-question', t('Anfrage'), t('An das Team'), 'data-dash-go="#/chat/neu/anfrage"')}
+      ${tile('luna', 'fi-rr-square-terminal', 'Luna', t('Code ausprobieren'), 'data-dash-go="#/luna/playground"')}</div>`;
+  }
+  const inviteCodeOf = (v) => { const m = String(v || '').trim().match(/(?:einladung\/)?([\w-]{6,12})\s*$/); return m ? m[1] : ''; };
+  async function joinSubmit(form) {
+    const code = inviteCodeOf(form.elements.code.value);
+    if (!code) { toast(t('Das ist kein gültiger Einladungslink.')); return; }
+    const pv = dash.invitePreview;
+    try {
+      if (pv && dash.inviteCode === code) {
+        if (pv.joined) { closeSheet(); location.hash = `#/chat/${pv.id}`; return; }
+        const r = await api(`/api/chat-invites/${encodeURIComponent(code)}/join`, { method: 'POST' });
+        chat.conv[r.id] = r;
+        chat.at = 0;
+        haptic('success');
+        toast(t('Willkommen in {name}!', { name: r.name }));
+        closeSheet();
+        location.hash = `#/chat/${r.id}`;
+        return;
+      }
+      dash.inviteCode = code;
+      dash.invitePreview = await api(`/api/chat-invites/${encodeURIComponent(code)}`);
+      if (dash.invitePreview.banned) { toast(t('Du kannst diesem Server nicht beitreten.')); dash.invitePreview = null; }
+      drawSheet(true);
+    } catch (e) { toast(e.status === 404 ? t('Diese Einladung gibt es nicht (mehr).') : chatError(e)); }
+  }
+  async function shareInvite(id) {
+    try {
+      const r = await api(`/api/chats/${encodeURIComponent(id)}/invite`, { method: 'POST' });
+      const url = `${location.origin}${location.pathname}#/einladung/${r.code}`;
+      try { await navigator.clipboard.writeText(url); toast(t('Einladungslink kopiert')); } catch (e) { prompt(t('Einladungslink'), url); }
+      haptic('success');
+    } catch (e) { toast(chatError(e)); }
+  }
   // ---------- Blatt von unten: Aktionen (⋯) und Erstellen ----------
   function openSheet(kind, arg) {
     dash.sheet = { kind, arg };
+    if (kind === 'create' && arg === 'server') dash.template = null;
+    if (kind === 'join') { dash.invitePreview = null; }
     if (kind === 'create') { dash.file = null; if (dash.preview) URL.revokeObjectURL(dash.preview); dash.preview = null; }
     drawSheet();
-    haptic('light');
+    if (Date.now() - lastInput < 1500) haptic('light');
   }
   function closeSheet() {
     const el = $('[data-dsh]');
@@ -7770,7 +8182,7 @@
         ${places.length ? `<label class="dsh-field"><span>${t('Wo soll der Bot laufen?')}</span><select name="place">${places.map((x) => `<option value="${esc(x.id)}"${x.id === preset ? ' selected' : ''}${x.bots >= (dash.data.maxBots || 5) ? ' disabled' : ''}>${esc(x.name)}${x.bots >= (dash.data.maxBots || 5) ? ` (${t('voll')})` : ''}</option>`).join('')}</select></label>`
           : `<p class="dsh-note">${icon('fi-rr-info')}<span>${t('Bots laufen in einem Server oder einer Gruppe, die du leitest. Erstell zuerst einen Server.')}</span></p>`}
         <div class="dsh-seg" role="radiogroup" aria-label="${esc(t('Modus'))}"><label><input type="radio" name="mode" value="basic" checked><span>${icon('fi-rr-sparkles')}${t('Basis')}</span></label><label><input type="radio" name="mode" value="advanced"><span>${icon('fi-rr-square-code')}${t('Luna')}</span></label></div>`}
-      ${kind === 'server' ? `<div class="dsh-chips"><small>${t('Startet mit diesen Kanälen')}</small><span>${['willkommen', 'ankündigungen', 'allgemein', 'medien', 'befehle'].map((x) => `<i>#${x}</i>`).join('')}</span></div>` : ''}
+      ${kind === 'server' ? `<div class="dsh-chips"><small>${dash.template ? t('Vorlage: {name}', { name: t((SERVER_TEMPLATES.find((x) => x[0] === dash.template) || ['', '', ''])[2]) }) : t('Startet mit diesen Kanälen')}</small>${dash.template ? '' : `<span>${['willkommen', 'ankündigungen', 'allgemein', 'medien', 'befehle'].map((x) => `<i>#${x}</i>`).join('')}</span>`}</div>` : ''}
       ${kind === 'bot' && !places.length ? `<button class="dash-btn" type="button" data-dash-create="server">${icon('fi-rr-apps')}${t('Server erstellen')}</button>`
         : `<button class="dash-btn" type="submit">${icon('fi-rr-plus')}${t('{what} erstellen', { what })}</button>`}
       ${kind !== 'bot' ? `<a class="dsh-link" href="#/chat/neu/${kind === 'server' ? 'server' : 'gruppe'}">${t('Mehr Optionen: Leute, Regeln, Rechte{extra}', { extra: kind === 'server' ? t(', private Server') : '' })}</a>` : ''}
@@ -7785,7 +8197,10 @@
       const item = findItem(arg);
       if (!item) { closeSheet(); return; }
       body = `<div class="dsh-head">${dashBadge(item, 'dash-badge dash-badge--lg')}<span><b>${esc(item.name)}</b><small>${dashMeta(item)}</small></span></div><div class="dsh-acts">${sheetActions(item)}</div>`;
-    } else if (kind === 'create') body = createForm(arg.split(':')[0], arg.split(':')[1] || '');
+    } else if (kind === 'create' && arg === 'chooser') body = chooserView();
+    else if (kind === 'create' && arg === 'server' && dash.template === null) body = serverStartView();
+    else if (kind === 'create') body = createForm(arg.split(':')[0], arg.split(':')[1] || '');
+    else if (kind === 'join') body = joinView();
     else if (kind === 'rename') {
       const item = findItem(arg);
       if (!item) { closeSheet(); return; }
@@ -7833,7 +8248,7 @@
         return;
       }
       const visibility = (form.querySelector('input[name="visibility"]:checked') || {}).value || 'private';
-      const c = await api('/api/chats', { method: 'POST', body: { kind: 'group', ...(kind === 'server' ? { category: 'server', servers: [] } : {}), name, color: (form.querySelector('input[name="color"]:checked') || {}).value, settings: { ...GROUP_DEFAULTS, visibility } } });
+      const c = await api('/api/chats', { method: 'POST', body: { kind: 'group', ...(kind === 'server' ? { category: 'server', servers: [], template: dash.template || '' } : {}), name, color: (form.querySelector('input[name="color"]:checked') || {}).value, settings: { ...GROUP_DEFAULTS, visibility } } });
       if (dash.file) {
         try { await api(`/api/chats/${encodeURIComponent(c.id)}/photo`, { method: 'PUT', raw: await squareJpeg(dash.file), type: 'image/jpeg' }); c.photo = Date.now(); } catch (e) { toast(t('Erstellt, das Bild ließ sich aber nicht speichern.')); }
       }
@@ -7918,6 +8333,172 @@
     } catch (e) { toast(e && e.status ? chatError(e) : t('Dieses Bild lässt sich nicht verwenden.')); }
   }
 
+  // ---------- Profil (#/profil) wie in Messenger-Apps ----------
+  // Banner, Profilbild mit Status, Name, @Name • Pronomen, Rang, Abzeichen, „Profil bearbeiten“, Reiter
+  // (Hauptprofil, Board, Aktivität, Wunschliste), Coins, Über mich, Mitglied seit, Verknüpfungen, Freunde.
+  // Unten schwebt eine eigene Leiste: Aufgaben, Shop, Einstellungen.
+  const prof = { me: store.get('tsg-me-profile', null), tab: 'main', busy: false };
+  const bannerSrc = (p) => (p && p.banner && apiReady() && state.profile ? `${API}/media/banner/${encodeURIComponent(state.profile.userId)}?v=${p.banner}` : '');
+  function profBadges() {
+    const r = rankOf(state.rank);
+    const out = [{ ic: 'fi-sr-train-side', title: r.name, color: r.color }];
+    if (isTeam('Junior Supervisor')) out.push({ ic: 'fi-sr-shield-check', title: t('Team'), color: '#1455C0' });
+    const mine = chat.list ? chat.list.chats : [];
+    if (mine.some((c) => c.category === 'server' && c.admin)) out.push({ ic: 'fi-sr-apps', title: t('Server-Gründer'), color: '#8B5CF6' });
+    if (dash.data && dash.data.bots.length) out.push({ ic: 'fi-sr-robot', title: t('Bot-Entwickler'), color: '#F97316' });
+    const w = shop.data && shop.data.wallet;
+    if (w && (w.trains || []).length >= 5) out.push({ ic: 'fi-sr-star', title: t('Sammler'), color: '#E2B33C' });
+    if (store.get('tsg-luna-pg', null)) out.push({ ic: 'fi-sr-square-terminal', title: t('Luna-Programmierer'), color: '#6366F1' });
+    return out;
+  }
+  // Über mich: Zeilen, **fett**, → bleibt wie geschrieben
+  const bioHtml = (s) => esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
+  function renderProfile() {
+    const box = $('[data-profile]');
+    if (!box) return;
+    const p = state.profile;
+    const me = prof.me || {};
+    const r = rankOf(state.rank);
+    if (apiReady() && sessionToken()) { loadChats(); loadDash(); if (!shop.data) loadShop(); if (!pl.friends) loadFriends(); }
+    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
+    const banner = bannerSrc(me);
+    const accent = me.accent || r.color;
+    const inGame = p && pl.data[p.userId] && pl.data[p.userId].inGame;
+    const w = shop.data && shop.data.wallet;
+    const friends = pl.friends ? pl.friends.ids.map((id) => pl.data[id]).filter(Boolean) : [];
+    const since = me.since ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(me.since * (me.since < 1e12 ? 1000 : 1))) : null;
+    const tab = (id, label) => `<button type="button" role="tab" aria-selected="${prof.tab === id}" data-prof-tab="${id}">${label}</button>`;
+    let main = '';
+    if (!p) {
+      main = `<div class="pf-card pf-empty">${icon('fi-rr-sign-in-alt')}<p>${t('Melde dich mit Roblox an – dann gehört dieses Profil dir.')}</p><button class="btn btn--primary" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
+    } else if (prof.tab === 'board') {
+      const own = shopItems('trains').filter((x) => itemStatus('trains', x) === 'owned');
+      main = own.length ? `<div class="shx-grid">${own.map((x) => shxCard('trains', x, { wide: true })).join('')}</div>` : `<p class="shx-empty">${t('Noch keine Züge – im Shop findest du alle.')}</p>`;
+    } else if (prof.tab === 'activity') {
+      const recent = (chat.list ? chat.list.chats : []).slice().sort((a, b) => b.updated - a.updated).slice(0, 6);
+      main = `${inGame ? `<div class="pf-card pf-live">${icon('fi-sr-play')}<span><b>${t('Gerade im Spiel')}</b><small>Train Sim Germany</small></span></div>` : ''}
+        ${recent.length ? `<div class="pf-card pf-list">${recent.map((c) => `<a href="#/chat/${esc(c.id)}">${chatImg(c, 'pf-mini')}<span><b>${esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>${icon('fi-rr-angle-small-right')}</a>`).join('')}</div>` : `<p class="shx-empty">${t('Noch keine Aktivität.')}</p>`}`;
+    } else if (prof.tab === 'wish') {
+      const items = [...shopItems('trains').map((x) => ['trains', x]), ...shopItems('routes').map((x) => ['routes', x])].filter(([k, x]) => shopWish().has(shopKey(k, x)));
+      main = items.length ? `<div class="shx-grid">${items.map(([k, x]) => shxCard(k, x, { wide: true })).join('')}</div>` : `<p class="shx-empty">${t('Deine Wunschliste ist leer. Im Shop tippst du dafür auf das Herz.')}</p>`;
+    } else {
+      main = `${store.get('tsg-prof-tip', true) ? `<div class="pf-tip">${icon('fi-rr-info')}<p>${(store.get('tsg-privacy', {}) || {}).profile ? t('Dein Profil ist öffentlich – andere Spieler sehen es in der App.') : t('Dein Profil sehen gerade nur du und das Team.')} <a href="#/einstellungen/privacy">${t('Privatsphäre-Einstellungen')}</a></p><button type="button" data-prof-tip aria-label="${esc(t('Ausblenden'))}">${icon('fi-rr-cross-small')}</button></div>` : ''}
+        <a class="pf-card pf-coins" href="#/shop"><b>${t('Coins-Guthaben')}</b><span class="pf-pill">${icon('fi-sr-coins')}${w ? fmt(w.coins) : '–'}</span></a>
+        <section class="pf-sec"><h3>${t('Über mich')}</h3>${me.bio ? `<p class="pf-bio">${bioHtml(me.bio)}</p>` : `<button class="pf-add" type="button" data-prof-edit>${icon('fi-rr-plus')}${t('Etwas über dich schreiben')}</button>`}</section>
+        ${since ? `<section class="pf-sec"><h3>${t('Mitglied seit')}</h3><p class="pf-since">${icon('fi-sr-train-side')}${since}</p></section>` : ''}
+        <hr class="pf-hr">
+        <section class="pf-sec"><h3>${t('Verknüpfungen')}</h3>
+          <a class="pf-card pf-conn" href="https://www.roblox.com/users/${esc(p.userId || '')}/profile" target="_blank" rel="noopener"><span class="pf-conn__logo" aria-hidden="true"><i></i></span><b>${esc(p.username)}</b>${p.oauth ? `<span class="pf-verified" title="${esc(t('Bestätigt'))}">${icon('fi-sr-badge-check')}</span>` : ''}${icon('fi-rr-arrow-up-right', 'pf-conn__go')}</a></section>
+        <a class="pf-card pf-friends" href="#/spieler"><b>${t('Freunde')}</b><span class="pf-stack">${friends.slice(0, 5).map((f) => (f.avatar ? `<img src="${esc(f.avatar)}" alt="" referrerpolicy="no-referrer">` : `<i>${esc(initials(f.username || '?'))}</i>`)).join('')}</span>${icon('fi-rr-angle-small-right')}</a>`;
+    }
+    box.innerHTML = `<div class="pf" style="--acc:${esc(accent)}">
+      <div class="pf-banner"${banner ? ` style="background-image:url('${esc(banner)}')"` : ''}>
+        <a class="pf-x" href="#/" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross')}${unread ? `<i>${unread > 99 ? '99+' : unread}</i>` : ''}</a>
+      </div>
+      <div class="pf-body">
+        <div class="pf-head">
+          <span class="pf-ava">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(p ? p.username : 'G'))}</b>`}<i class="pf-dot${inGame ? ' is-on' : ''}" title="${esc(inGame ? t('Im Spiel') : t('Abwesend'))}">${inGame ? '' : '☾'}</i></span>
+          ${p ? `<button class="pf-status" type="button" data-prof-edit="status">${me.status ? `${icon('fi-sr-check-circle', 'pf-status__ic')}<span>${esc(me.status)}</span>` : `${icon('fi-rr-smile', 'pf-status__ic')}<span class="pf-status__ph">${t('Status festlegen')}</span>`}</button>` : ''}
+        </div>
+        <div class="pf-name"><h1>${esc(p ? p.displayName || p.username : t('Gast'))}</h1>${p ? `<button type="button" data-prof-more aria-label="${esc(t('Mehr'))}">${icon('fi-rr-angle-small-down')}</button>` : ''}</div>
+        ${p ? `<div class="pf-handle"><span>${esc(p.username)}${me.pronouns ? ` • ${esc(me.pronouns)}` : ''}</span><span class="pf-tag" style="--rc:${esc(r.color)}">${icon('fi-sr-heart')}${esc(r.prefix)}</span></div>
+        <div class="pf-badges">${profBadges().map((b) => `<span title="${esc(b.title)}" style="--bc:${esc(b.color)}">${icon(b.ic)}</span>`).join('')}</div>
+        <button class="pf-editbtn" type="button" data-prof-edit>${icon('fi-sr-pencil')}${t('Profil bearbeiten')}</button>
+        <div class="pf-tabs" role="tablist">${tab('main', t('Hauptprofil'))}${tab('board', t('Board'))}${tab('activity', t('Aktivität'))}${tab('wish', t('Wunschliste'))}</div>` : ''}
+        <div class="pf-main">${main}</div>
+      </div>
+    </div>
+    <nav class="pf-dock" aria-label="${esc(t('Profil'))}">
+      <a href="#/aufgaben">${icon('fi-rr-puzzle-alt')}${questsOpen() ? '<i class="pf-dock__dot"></i>' : ''}<span>${t('Aufgaben')}</span></a>
+      <a href="#/shop">${icon('fi-sr-shop')}<span>${t('Shop')}</span></a>
+      <a href="#/einstellungen">${icon('fi-sr-settings')}<span>${t('Einstellungen')}</span></a>
+    </nav>`;
+  }
+  function profileEditView() {
+    const me = prof.me || {};
+    const banner = bannerSrc(me);
+    return `<form class="cform pf-form" data-prof-form novalidate>
+      <div class="f"><span class="f__label">${t('Banner')}</span>
+        <div class="pf-bannerpick"${banner ? ` style="background-image:url('${esc(banner)}')"` : ''}><label class="btn btn--soft btn--sm">${icon('fi-rr-picture')}${banner ? t('Ändern') : t('Bild wählen')}<input type="file" accept="image/*" data-prof-banner hidden></label>${banner ? `<button class="btn btn--soft btn--sm" type="button" data-prof-banner-del>${icon('fi-rr-trash')}${t('Entfernen')}</button>` : ''}</div></div>
+      <div class="f"><label class="f__label" for="pf-status">${t('Status')}</label><input id="pf-status" name="status" maxlength="80" value="${esc(me.status || '')}" placeholder="${esc(t('z. B. ICE 4 / Strecke Berlin – Hamburg'))}"></div>
+      <div class="f"><label class="f__label" for="pf-pron">${t('Pronomen')}</label><input id="pf-pron" name="pronouns" maxlength="30" value="${esc(me.pronouns || '')}" placeholder="${esc(t('z. B. er/ihn'))}"></div>
+      <div class="f"><label class="f__label" for="pf-bio">${t('Über mich')}</label><textarea id="pf-bio" name="bio" rows="6" maxlength="600" placeholder="${esc(t('→ Lokführer seit 2024\n→ Lieblingszug: ICE 4'))}">${esc(me.bio || '')}</textarea><small class="f__hint">${t('**Text** wird fett. Höchstens 600 Zeichen.')}</small></div>
+      <fieldset class="f"><legend class="f__label">${t('Akzentfarbe')}</legend><div class="swatches">${['', ...GROUP_COLORS].map((c) => `<label class="swatch" style="--gc:${c || rankOf(state.rank).color}"><input type="radio" name="accent" value="${c}"${(me.accent || '') === c ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
+    </form>`;
+  }
+  async function saveProfile(form) {
+    const f = form.elements;
+    const btn = $('button[type="submit"]', form);
+    btn.disabled = true;
+    try {
+      const r = await api('/api/me/profile', { method: 'PUT', body: { status: f.status.value, pronouns: f.pronouns.value, bio: f.bio.value, accent: (form.querySelector('input[name="accent"]:checked') || {}).value || '' } });
+      prof.me = r.profile;
+      store.set('tsg-me-profile', prof.me);
+      haptic('success');
+      toast(t('Profil gespeichert'));
+      closeModal();
+      renderProfile();
+    } catch (e) { btn.disabled = false; toast(errorText(e)); }
+  }
+  async function uploadBanner(file) {
+    try {
+      const bmp = await createImageBitmap(file);
+      const W = 1200;
+      const H = 480;
+      const scale = Math.max(W / bmp.width, H / bmp.height);
+      const cv = document.createElement('canvas');
+      cv.width = W;
+      cv.height = H;
+      const w = bmp.width * scale;
+      const h = bmp.height * scale;
+      cv.getContext('2d').drawImage(bmp, (W - w) / 2, (H - h) / 2, w, h);
+      if (bmp.close) bmp.close();
+      const blob = await new Promise((ok, fail) => cv.toBlob((b) => (b ? ok(b) : fail(new Error('blob'))), 'image/jpeg', 0.84));
+      const r = await api('/api/me/banner', { method: 'PUT', raw: blob, type: 'image/jpeg' });
+      prof.me = r.profile;
+      store.set('tsg-me-profile', prof.me);
+      toast(t('Banner gespeichert'));
+      refreshModal();
+      renderProfile();
+    } catch (e) { toast(e && e.status ? errorText(e) : t('Dieses Bild lässt sich nicht verwenden.')); }
+  }
+
+  // ---------- Aufgaben (#/aufgaben): kleine Ziele mit Fortschritt ----------
+  function quests() {
+    const p = state.profile;
+    const me = prof.me || {};
+    const mine = chat.list ? chat.list.chats : [];
+    const w = shop.data && shop.data.wallet;
+    const q = (id, ic, title, text, done, href, act) => ({ id, ic, title, text, done: !!done, href, act });
+    return [
+      q('login', 'fi-rr-sign-in-alt', t('Mit Roblox anmelden'), t('Name, Profilbild und Rang aus der Gruppe'), p && p.oauth, '#/profil', t('Anmelden')),
+      q('profile', 'fi-rr-user-pen', t('Profil vervollständigen'), t('Status und „Über mich“ ausfüllen'), me.status && me.bio, '#/profil', t('Bearbeiten')),
+      q('server', 'fi-rr-apps', t('Eigenen Server erstellen'), t('Mit Kanälen wie #allgemein'), mine.some((c) => c.category === 'server' && c.admin), '#/dashboard?neu=server', t('Erstellen')),
+      q('bot', 'fi-rr-robot', t('Ersten Bot bauen'), t('Basis oder mit Luna'), dash.data && dash.data.bots.length, '#/dashboard?neu=bot', t('Erstellen')),
+      q('luna', 'fi-rr-square-terminal', t('Luna ausprobieren'), t('Ein Skript im Playground ausführen'), store.get('tsg-luna-pg', null), '#/luna/playground', t('Öffnen')),
+      q('track', 'fi-rr-user-add', t('Einem Spieler folgen'), t('Sehen, wann er im Spiel ist'), pl.track.length, '#/spieler', t('Spieler')),
+      q('notify', 'fi-rr-bell', t('Benachrichtigungen einschalten'), t('Nichts mehr verpassen'), notifyState().on, '#/einstellungen/benachrichtigungen', t('Einschalten')),
+      q('train', 'fi-rr-train-side', t('Einen Zug kaufen'), t('Im Shop mit deinen Coins'), w && (w.trains || []).length > 1, '#/shop', t('Shop')),
+      q('remind', 'fi-rr-calendar', t('Ein Training merken'), t('Mit Erinnerung vorher'), remind.ids.size, '#/trainings', t('Trainings')),
+      q('skin', 'fi-rr-sparkles', t('Ein Theme wählen'), t('Zum Beispiel Halloween'), fx.skin !== 'auto', '#/einstellungen/themes', t('Themes')),
+    ];
+  }
+  const questsOpen = () => quests().some((x) => !x.done);
+  function renderQuests() {
+    const box = $('[data-quests]');
+    if (!box) return;
+    if (apiReady() && sessionToken()) { loadChats(); loadDash(); if (!shop.data) loadShop(); }
+    const list = quests();
+    const done = list.filter((x) => x.done).length;
+    const pctDone = Math.round((done / list.length) * 100);
+    box.innerHTML = `<div class="qs">
+      <div class="qs-head"><a class="pf-x pf-x--plain" href="#/profil" aria-label="${esc(t('Zurück'))}">${icon('fi-rr-arrow-left')}</a><h1>${t('Aufgaben')}</h1></div>
+      <div class="qs-hero"><span class="qs-ring" style="--p:${pctDone}"><b>${done}/${list.length}</b></span><span><b>${done === list.length ? t('Alles erledigt!') : t('Noch {n} Aufgaben', { n: list.length - done })}</b><small>${t('Kleine Ziele, um alles in der App kennenzulernen.')}</small></span></div>
+      <div class="qs-list">${list.map((x) => `<a class="qs-item${x.done ? ' is-done' : ''}" href="${x.href}"><span class="qs-item__ic">${icon(x.done ? 'fi-sr-check-circle' : x.ic)}</span><span class="qs-item__text"><b>${esc(x.title)}</b><small>${esc(x.text)}</small></span><span class="qs-item__act">${x.done ? t('Erledigt') : esc(x.act)}</span></a>`).join('')}</div>
+    </div>`;
+  }
+
   // ---------- Bindings ----------
   function bind() {
     const s = D.stats;
@@ -7930,7 +8511,7 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots', 'luna', 'dashboard'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots', 'luna', 'dashboard', 'profil', 'aufgaben'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
@@ -7957,12 +8538,16 @@
     bots() { openIde(state.botsArg[0], state.botsArg[1]); },
     luna() { renderDocs(state.docsArg, state.docsHeading); },
     dashboard() { renderDash(); },
+    profil() { renderProfile(); },
+    aufgaben() { renderQuests(); },
   };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, '');
     const [path, query] = raw.split('?');
     const [first, sub, sub2] = path.split('/');
+    // Einladungslink: #/einladung/<code> → Dashboard mit „Beitreten“
+    if (first === 'einladung' && sub) { location.replace(`#/dashboard?code=${encodeURIComponent(sub)}`); return; }
     const page = PAGES.includes(first) ? first : 'home';
     const jobId = page === 'karriere' ? (sub || null) : null;
     const jobApply = !!jobId && sub2 === 'bewerben';
@@ -7975,9 +8560,18 @@
     if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
     // „Neu“ im Chat führt jetzt zum Dashboard
     if (chatView === 'new') { location.replace('#/dashboard'); return; }
-    // Dashboard: #/dashboard?neu=server|gruppe|bot öffnet gleich das Erstellen
+    // Dashboard: #/dashboard?neu=server|gruppe|bot öffnet gleich das Erstellen, ?code=… bzw. ?beitreten=1 das Beitreten
     if (page === 'dashboard') {
-      const want = new URLSearchParams(query || '').get('neu');
+      const qp = new URLSearchParams(query || '');
+      state.dashView = ['erstellungen', 'tools'].includes(sub) ? sub : '';
+      if (qp.get('f')) dash.filter = qp.get('f');
+      dash.nav = false;
+      const code = qp.get('code');
+      if (code || qp.get('beitreten')) {
+        history.replaceState(null, '', '#/dashboard');
+        setTimeout(() => { if (state.page !== 'dashboard') return; dash.inviteCode = code || ''; openSheet('join'); const f = $('form[data-srv-join-form]'); if (f && code) joinSubmit(f); }, 80);
+      }
+      const want = qp.get('neu');
       if (want) {
         history.replaceState(null, '', '#/dashboard');
         const kind = { gruppe: 'group', group: 'group', server: 'server', bot: 'bot' }[want];
@@ -7994,9 +8588,10 @@
       const cc = chat.conv[chatArg];
       if (cc && !cc.error && cc.community) { Object.assign(cc, { channel: kParam, messages: [], switching: true }); if (state.chatArg === chatArg && state.chatView === 'conv') { renderChat(); openConv(chatArg); } }
     }
-    if (chatView !== state.chatView || chatArg !== state.chatArg) chat.side = false;
+    if (chatView !== state.chatView || chatArg !== state.chatArg) { chat.side = false; chat.cmq = ''; chat.sideAuto = chatView === 'conv' && !kParam ? chatArg : null; }
     const botsArg = page === 'bots' ? [sub || '', sub2 || ''] : null;
     const docsArg = page === 'luna' ? (sub || 'start') : null;
+    const settingsSub = page === 'einstellungen' ? (sub || '') : '';
     const docsHeading = page === 'luna' ? new URLSearchParams(query || '').get('h') : null;
     // Nur zu einer Überschrift springen: Seite nicht neu aufbauen
     if (page === 'luna' && state.page === 'luna' && docsArg === state.docsArg && docsHeading) {
@@ -8009,7 +8604,7 @@
     if (state.page === 'bots' && page !== 'bots' && ideDirty()) toast(t('Nicht gespeicherte Änderungen im Bot-Editor bleiben als Entwurf erhalten.'));
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
-      || String(botsArg) !== String(state.botsArg) || docsArg !== state.docsArg;
+      || String(botsArg) !== String(state.botsArg) || docsArg !== state.docsArg || settingsSub !== (state.settingsSub || '') || (page === 'dashboard' && (sub || '') !== (state.dashSub || ''));
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
     if (chatView === 'public' && state.chatView !== 'public') chat.pubAt = 0;
     if (chatView === 'mod' && state.chatView !== 'mod') chat.modAt = 0;
@@ -8034,7 +8629,10 @@
     state.botsArg = botsArg;
     state.docsArg = docsArg;
     state.docsHeading = docsHeading;
+    state.settingsSub = settingsSub;
+    state.dashSub = page === 'dashboard' ? (sub || '') : '';
     if (page === 'luna') docs.nav = false;
+    if (page === 'shop') { const v = new URLSearchParams(query || '').get('v'); if (v) shop.view = v; }
     // Gespräch aus dem Speicher: gleich auf neuen Stand bringen (und onopen() der ClientScripts)
     if (chatView === 'conv' && chat.conv[chatArg] && !chat.conv[chatArg].error && changed) {
       clientBotsAfterLoad(chatArg, null);
@@ -8137,9 +8735,13 @@
 
     // Klicks, die überall vorkommen (Seiten und Sheets)
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-open], [data-detail], [data-remind], [data-bell], [data-day], [data-pick-day], [data-rank], [data-fav], [data-theme-set], [data-lang-set]');
+      const el = e.target.closest('[data-open], [data-detail], [data-remind], [data-bell], [data-day], [data-pick-day], [data-rank], [data-fav], [data-theme-set], [data-lang-set], [data-skin-set], [data-icon-set]');
       if (!el) return;
       const ds = el.dataset;
+      if (ds.skinSet) { setSkin(ds.skinSet); return; }
+      // Angemeldet: Profilbild oben bzw. in der Leiste öffnet die Profilseite
+      if (ds.open === 'profile' && state.profile && state.profile.oauth && el.closest('.tabbar, .topbar, .drawer') && !el.closest('[data-modal]')) { closeMenu(); location.hash = '#/profil'; return; }
+      if (ds.iconSet) { setAppIcon(ds.iconSet); return; }
       if (ds.open) openModal(ds.open);
       else if (ds.detail) openModal('training', ds.detail);
       else if (ds.remind) toggleReminder(ds.remind);
@@ -8433,7 +9035,7 @@
 
     // Server: Kanäle wechseln, bearbeiten, Kategorien
     document.addEventListener('click', async (e) => {
-      const el = e.target.closest('[data-cm-ch], [data-cm-edit], [data-cm-new], [data-cm-cat-new], [data-cm-cat-edit], [data-cm-cat], [data-cm-side-open], [data-cm-side-close], [data-cm-convert], [data-cm-go], [data-ch-move], [data-ch-del], [data-cat-move], [data-cat-del]');
+      const el = e.target.closest('[data-cm-browse], [data-cm-ch], [data-cm-edit], [data-cm-new], [data-cm-cat-new], [data-cm-cat-edit], [data-cm-cat], [data-cm-side-open], [data-cm-side-close], [data-cm-convert], [data-cm-go], [data-ch-move], [data-ch-del], [data-cat-move], [data-cat-del]');
       if (!el) return;
       const ds = el.dataset;
       const id = state.chatArg;
@@ -8451,6 +9053,16 @@
         return;
       }
       if (ds.cmCh) { switchChannel(id, ds.cmCh); return; }
+      if (ds.cmBrowse !== undefined) {
+        const all = store.get('tsg-cm-cats', {}) || {};
+        delete all[id];
+        store.set('tsg-cm-cats', all);
+        const side = $('[data-cm-side]');
+        if (side) side.outerHTML = cmSide(c);
+        const input = $('[data-cm-q]');
+        if (input) input.focus();
+        return;
+      }
       if (ds.cmGo) { location.hash = `#/chat/${id}?k=${encodeURIComponent(ds.cmGo)}`; return; }
       if (ds.cmCat) { toggleCategory(id, ds.cmCat); return; }
       if (ds.cmEdit) { openModal('channel', `${id}:${ds.cmEdit}`); return; }
@@ -8501,6 +9113,19 @@
       }
     });
     document.addEventListener('input', (e) => {
+      // Kanäle suchen
+      if (e.target.matches('[data-cm-q]')) {
+        chat.cmq = e.target.value;
+        const c = chat.conv[state.chatArg];
+        const side = $('[data-cm-side]');
+        if (c && side) {
+          const pos = e.target.selectionStart;
+          side.outerHTML = cmSide(c);
+          const input = $('[data-cm-q]');
+          if (input) { input.focus(); input.setSelectionRange(pos, pos); }
+        }
+        return;
+      }
       // Kanalname wie bei Discord: klein, Leerzeichen werden zu „-“
       if (e.target.matches('[data-ch-name]')) {
         const v = e.target.value;
@@ -8548,9 +9173,15 @@
 
     // Dashboard: Suchen, Erstellen, ⋯-Aktionen
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-dash-search], [data-dash-create], [data-dash-go], [data-dash-more], [data-dsh-close], [data-dsh-act]');
-      if (!el) return;
+      const el = e.target.closest('[data-dash-search], [data-dash-create], [data-dash-go], [data-dash-more], [data-dsh-close], [data-dsh-act], [data-dash-nav], [data-dash-ctx], [data-dash-ctx-set], [data-srv-template], [data-srv-join], [data-cm-invite-id]');
+      if (!el) { if (dash.ctxOpen && !e.target.closest('.ch-ctxmenu')) { dash.ctxOpen = false; if (state.page === 'dashboard') renderDash(); } return; }
       const ds = el.dataset;
+      if (ds.dashNav !== undefined) { dash.nav = !dash.nav; const r = $('.ch'); if (r) r.classList.toggle('is-nav', dash.nav); return; }
+      if (ds.dashCtx !== undefined) { dash.ctxOpen = !dash.ctxOpen; dash.nav = false; renderDash(); return; }
+      if (ds.dashCtxSet !== undefined) { dash.ctx = ds.dashCtxSet; store.set('tsg-dash-ctx', dash.ctx); dash.ctxOpen = false; haptic('select'); if (state.dashView) location.hash = '#/dashboard'; else renderDash(); return; }
+      if (ds.srvTemplate !== undefined) { dash.template = ds.srvTemplate; drawSheet(true); return; }
+      if (ds.srvJoin !== undefined) { dash.inviteCode = ''; openSheet('join'); return; }
+      if (ds.cmInviteId) { shareInvite(ds.cmInviteId); return; }
       if (ds.dashSearch !== undefined) { dash.search = !dash.search; if (!dash.search) dash.q = ''; renderDash(); return; }
       if (ds.dashCreate) { openSheet('create', ds.dashCreate); return; }
       if (ds.dashGo) { location.hash = ds.dashGo; return; }
@@ -8581,6 +9212,8 @@
     document.addEventListener('submit', (e) => {
       const cf = e.target.closest('form[data-dsh-create-form]');
       const rf = e.target.closest('form[data-dsh-rename]');
+      const jf = e.target.closest('form[data-srv-join-form]');
+      if (jf) { e.preventDefault(); joinSubmit(jf); return; }
       if (!cf && !rf) return;
       e.preventDefault();
       if (cf) dashCreate(cf); else dashRename(rf);
@@ -8632,6 +9265,22 @@
       if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); pgRun(); return; }
       if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); insertText(e.target, '  '); }
     });
+
+    // Profil und Aufgaben
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-prof-tab], [data-prof-edit], [data-prof-tip], [data-prof-more], [data-prof-banner-del]');
+      if (!el) return;
+      const ds = el.dataset;
+      if (ds.profTab) { prof.tab = ds.profTab; renderProfile(); return; }
+      if (ds.profEdit !== undefined) { openModal('profile-edit'); if (ds.profEdit === 'status') setTimeout(() => { const i = $('#pf-status'); if (i) i.focus(); }, 60); return; }
+      if (ds.profTip !== undefined) { store.set('tsg-prof-tip', false); renderProfile(); return; }
+      if (ds.profMore !== undefined) { openModal('profile'); return; }
+      if (ds.profBannerDel !== undefined) {
+        api('/api/me/banner', { method: 'DELETE' }).then((r) => { prof.me = r.profile; store.set('tsg-me-profile', prof.me); refreshModal(); renderProfile(); toast(t('Banner entfernt')); }).catch((err) => toast(errorText(err)));
+      }
+    });
+    document.addEventListener('change', (e) => { if (e.target.matches('[data-prof-banner]') && e.target.files && e.target.files[0]) uploadBanner(e.target.files[0]); });
+    document.addEventListener('submit', (e) => { const f = e.target.closest('form[data-prof-form]'); if (f) { e.preventDefault(); saveProfile(f); } });
 
     // Eigene Bots und Bot-Editor
     const idePanelRedraw = () => { const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.toggle('is-open', !!ide.panelOpen); } };
@@ -9062,9 +9711,19 @@
     });
     // Shop
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-shop-cat], [data-shop-item], [data-buy], [data-buy-confirm]');
-      if (!el) return;
+      const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-shop-cat], [data-shop-item], [data-buy], [data-buy-confirm], [data-shop-wish], [data-shop-view], [data-shop-menu], [data-shop-all]');
+      if (!el) { if (shop.menu && !e.target.closest('.shx-menu')) { shop.menu = false; if (state.page === 'shop') renderShop(); } return; }
       const ds = el.dataset;
+      if (ds.shopWish) {
+        const on = toggleWish(ds.shopWish);
+        toast(on ? t('Auf der Wunschliste') : t('Von der Wunschliste entfernt'));
+        if (state.page === 'shop') renderShop();
+        if (state.page === 'profil') renderProfile();
+        return;
+      }
+      if (ds.shopMenu !== undefined) { shop.menu = !shop.menu; renderShop(); return; }
+      if (ds.shopView) { shop.view = ds.shopView; shop.menu = false; renderShop(); window.scrollTo({ top: 0, behavior: 'instant' }); return; }
+      if (ds.shopAll) { buyAll(ds.shopAll); return; }
       if (ds.shopTab) { if (shop.tab !== ds.shopTab) { shop.tab = ds.shopTab; shop.filter = 'all'; shop.cat = 'all'; renderShop(); } }
       else if (ds.shopFilter) { shop.filter = ds.shopFilter; renderShop(); }
       else if (ds.shopCat) { shop.cat = ds.shopCat; renderShop(); }
@@ -9298,6 +9957,7 @@
     // Zurück in die App (z. B. auf einem anderen Gerät etwas geändert): gleich abgleichen
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastSync > 15000) sync(); });
     applySeason();
+    applyAppIcon();
     tick();
     lastMinute = berlinNow().abs;
     setInterval(tick, 1000);

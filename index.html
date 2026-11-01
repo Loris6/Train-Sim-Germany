@@ -18,8 +18,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" data-app-favicon>
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" data-app-icon>
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/uicons-regular-rounded.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/uicons.css">
@@ -387,6 +387,14 @@
       <div class="ide" data-ide></div>
     </section>
 
+    <!-- ===================== PROFIL ===================== -->
+    <section class="page page--profile" data-page="profil" aria-label="Profil" hidden>
+      <div data-profile></div>
+    </section>
+    <section class="page page--quests" data-page="aufgaben" aria-label="Aufgaben" hidden>
+      <div data-quests></div>
+    </section>
+
     <!-- ===================== DASHBOARD ===================== -->
     <section class="page page--dash" data-page="dashboard" aria-label="Dashboard" hidden>
       <div class="dash" data-dash></div>
@@ -408,7 +416,7 @@
     <section class="page" data-page="einstellungen" aria-label="Einstellungen" hidden>
       <div class="page-head">
         <div class="container container--narrow">
-          <div class="appbar">
+          <div class="appbar" data-settings-head>
             <div class="appbar__title">
               <span class="appbar__label">App</span>
               <h1 class="appbar__value">Einstellungen</h1>
@@ -417,8 +425,9 @@
         </div>
       </div>
       <div class="sheet">
-        <div class="container container--narrow settings">
-          <section class="card set-card" aria-labelledby="h-theme">
+        <div class="container container--narrow settings" data-settings>
+          <nav class="set-menu" data-settings-menu aria-label="Einstellungen"></nav>
+          <section class="card set-card" aria-labelledby="h-theme" data-set-sec="darstellung">
             <h2 class="card__title" id="h-theme">Darstellung</h2>
             <p class="card__sub">So sieht Train Sim Germany bei dir aus.</p>
             <div class="theme-picker" role="group" aria-label="Farbschema">
@@ -435,39 +444,51 @@
                 <span class="theme-picker__text"><span class="theme-picker__label"><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i>Mit Gerät synchronisieren</span><small>Hell oder dunkel – genau wie dein Gerät eingestellt ist</small></span>
               </button>
             </div>
+          </section>
+
+          <section class="card set-card" aria-labelledby="h-skin" data-set-sec="themes">
+            <h2 class="card__title" id="h-skin">Themes</h2>
+            <p class="card__sub">Ein ganzes Design für die App – mit Hintergrund, Farben und Effekten.</p>
+            <div class="skin-picker" data-skin-picker></div>
             <div class="toggles toggles--season" data-season-set></div>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-fx">
+          <section class="card set-card" aria-labelledby="h-icon" data-set-sec="app-symbol">
+            <h2 class="card__title" id="h-icon">App-Symbol</h2>
+            <p class="card__sub">Such dir aus, wie Train Sim Germany auf deinem Gerät aussieht.</p>
+            <div class="icon-picker" data-icon-picker></div>
+          </section>
+
+          <section class="card set-card" aria-labelledby="h-fx" data-set-sec="bewegung">
             <h2 class="card__title" id="h-fx">Bewegung &amp; Haptik</h2>
             <p class="card__sub">Wie sich Train Sim Germany anfühlt.</p>
             <div class="toggles" data-fx></div>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-lang">
+          <section class="card set-card" aria-labelledby="h-lang" data-set-sec="sprache">
             <h2 class="card__title" id="h-lang">Sprache</h2>
             <p class="card__sub">In welcher Sprache möchtest du Train Sim Germany nutzen?</p>
             <div class="dropdown" data-lang-picker></div>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-notify">
+          <section class="card set-card" aria-labelledby="h-notify" data-set-sec="benachrichtigungen">
             <h2 class="card__title" id="h-notify">Benachrichtigungen</h2>
             <p class="card__sub">Chat, Bewerbungen und Trainings – als echte Benachrichtigung, auch wenn die App zu ist.</p>
             <div class="toggles" data-notify></div>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-privacy">
+          <section class="card set-card" aria-labelledby="h-privacy" data-set-sec="privacy">
             <h2 class="card__title" id="h-privacy">Privatsphäre</h2>
             <p class="card__sub">Lege fest, was andere Spieler von dir sehen.</p>
             <div class="toggles" data-privacy></div>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-account">
+          <section class="card set-card" aria-labelledby="h-account" data-set-sec="konto">
             <h2 class="card__title" id="h-account">Roblox-Konto</h2>
             <div class="set-account" data-settings-account></div>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-app">
+          <section class="card set-card" aria-labelledby="h-app" data-set-sec="app">
             <h2 class="card__title" id="h-app">App</h2>
             <p class="card__sub">Train Sim Germany lässt sich wie eine App installieren und funktioniert dann auch offline.</p>
             <div class="btn-row set-actions">
@@ -476,7 +497,7 @@
             <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
           </section>
 
-          <section class="card set-card" aria-labelledby="h-legal">
+          <section class="card set-card" aria-labelledby="h-legal" data-set-sec="rechtliches">
             <h2 class="card__title" id="h-legal">Rechtliches</h2>
             <div class="set-links">
               <a href="privacy.html"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i><span>Datenschutzerklärung</span><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></a>
@@ -604,5 +625,6 @@
   <script src="assets/js/config.js"></script>
   <script src="assets/js/data.js"></script>
   <script src="assets/js/app.js"></script>
+  <div class="skin-deco" aria-hidden="true"><i class="skin-deco__web skin-deco__web--l"></i><i class="skin-deco__web skin-deco__web--r"></i><i class="skin-deco__spider"></i></div>
 </body>
 </html>

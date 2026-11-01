@@ -39,7 +39,7 @@ import { findPlayer, groupRole } from './roblox.js';
 import { startUpload, attachFiles, deleteFiles, fileLinks } from './files.js';
 import { serversOfChat, linkChat, cleanLink } from './pservers.js';
 import { COMMANDS, COMMAND_IDS, FIRST_COMMANDS, parseCommand, runCommand } from './commands.js';
-import { isCommunity, defaultLayout, layoutOf, homeOf, channelOf, pickChannel, cleanLayout, pruneMessages } from './channels.js';
+import { isCommunity, defaultLayout, layoutFor, layoutOf, homeOf, channelOf, pickChannel, cleanLayout, pruneMessages } from './channels.js';
 
 export { findPlayer };
 
@@ -189,7 +189,7 @@ const SYSTEM_TEXT = {
 function previewOf(m) {
   if (m.deleted) return 'Nachricht gelöscht';
   if (m.by === 'system') return (SYSTEM_TEXT[m.text] || (() => ''))(m);
-  if (m.kind === 'bot') return m.botId ? m.text || '' : `🤖 ${m.title || ''}`;
+  if (m.kind === 'bot') return m.botId ? m.text || (m.embed ? m.embed.title || m.embed.text || '' : '') : `🤖 ${m.title || ''}`;
   if (m.text) return m.text;
   const f = (m.files || [])[0];
   return f ? (f.kind === 'image' ? '📷 Foto' : f.kind === 'video' ? '🎬 Video' : `📎 ${f.name}`) : '';
@@ -491,7 +491,7 @@ export async function createChat(store, env, user, body) {
       id: randomKey(9), kind, status: 'open', from: me, owner: user.sub, name, desc: cleanText(body.desc, 300), rules: cleanText(body.rules, 1500),
       color: COLORS.includes(body.color) ? body.color : COLORS[Math.floor(Math.random() * COLORS.length)],
       settings: cleanSettings(body.settings || {}), members: { [user.sub]: { ...me, role: 'owner', joined: t } }, created: t, updated: t, messages: [],
-      ...(server ? { category: 'server', servers: [], ...defaultLayout() } : {}),
+      ...(server ? { category: 'server', servers: [], ...layoutFor(String(body.template || '')) } : {}),
     };
     sys(c, 'created', user.username);
     const added = [];
@@ -928,6 +928,48 @@ export async function setChannels(store, env, user, id, body) {
   c.updated = t;
   sys(c, 'channels', user.username, { ch: c.home });
   await save(store, c);
+  return view(env, store, c, user);
+}
+
+// ---------- Einladungslinks für Gruppen und Server: #/einladung/<code> ----------
+const INVITE = /^[\w-]{6,12}$/;
+export async function chatInvite(store, user, id) {
+  const c = await getChat(store, user, id);
+  const a = access(c, user);
+  if (c.kind !== 'group' || !(canInvite(c, a.role, user.sub) || a.mod)) throw bad('forbidden', 403);
+  if (!c.invite) {
+    c.invite = randomKey(6);
+    await store.put(`chatinvite:${c.invite}`, c.id, { ttl: KEEP });
+    await store.put(`chat:${c.id}`, c, { ttl: KEEP });
+  }
+  return { code: c.invite };
+}
+async function inviteChat(store, code) {
+  const id = INVITE.test(String(code)) ? await store.get(`chatinvite:${code}`) : null;
+  const c = id ? await store.get(`chat:${id}`) : null;
+  if (!c || c.invite !== code) throw bad('not_found', 404);
+  return c;
+}
+export async function invitePreview(store, user, code) {
+  const c = await inviteChat(store, code);
+  return {
+    id: c.id, name: c.name, desc: c.desc ? clip(c.desc, 200) : '', color: c.color || null, photo: c.photo || null, category: c.category || null,
+    members: Object.keys(c.members || {}).length, joined: !!(c.members || {})[user.sub], banned: (c.banned || []).includes(user.sub),
+  };
+}
+export async function inviteJoin(store, env, user, code) {
+  const c = await inviteChat(store, code);
+  if ((c.banned || []).includes(user.sub)) throw bad('forbidden', 403);
+  if (!c.members[user.sub]) {
+    if (Object.keys(c.members).length >= MAX_MEMBERS) throw bad('full', 409);
+    const t = Date.now();
+    c.members[user.sub] = { ...person(user), role: 'member', joined: t };
+    sys(c, 'joined', user.username);
+    await chatEvent(store, env, c, 'join', person(user));
+    c.updated = t;
+    await save(store, c);
+    await addTo(store, user.sub, c.id);
+  }
   return view(env, store, c, user);
 }
 

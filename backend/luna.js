@@ -21,12 +21,28 @@
 // Version der Sprache (Playground, Dokumentation). Neue Funktionen → kleine Zahl, Änderungen, die alte Skripte brechen → große Zahl.
 export const VERSION = '2.1';
 
-export const TYPES = { server: 'ServerScript', client: 'ClientScript', module: 'ModuleScript', game: 'GameScript', connector: 'Connector', webhook: 'Webhook', folder: 'Folder' };
+export const TYPES = {
+  server: 'ServerScript', client: 'ClientScript', module: 'ModuleScript', game: 'GameScript', connector: 'Connector', webhook: 'Webhook', folder: 'Folder',
+  boolvalue: 'BoolValue', intvalue: 'IntValue', numbervalue: 'NumberValue', stringvalue: 'StringValue',
+};
 export const SCRIPT_TYPES = ['server', 'client', 'module', 'game'];
-export const SERVICES = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService'];
+// Werte-Objekte wie in Roblox: .Value lesen und setzen – Änderungen aus Skripten bleiben gespeichert
+export const VALUE_TYPES = ['boolvalue', 'intvalue', 'numbervalue', 'stringvalue'];
+// ReplicatedStorage: Module und Werte für Server- und ClientScripts · ServerStorage: nur für Server- und GameScripts
+export const SERVICES = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService', 'ReplicatedStorage', 'ServerStorage'];
+// Standardwert und Umwandlung eines Werte-Objekts
+export function valueOf(type, v) {
+  if (type === 'boolvalue') return v === true || v === 'true';
+  if (type === 'intvalue') { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(-2147483648, Math.min(2147483647, n)) : 0; }
+  if (type === 'numbervalue') { const n = Number(v); return Number.isFinite(n) ? n : 0; }
+  return String(v ?? '').slice(0, 500);
+}
 // Wo welche Skripte laufen (ModuleScripts laufen nur, wenn sie geladen werden)
 export const RUNS_IN = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService' };
-export const DEFAULT_PARENT = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService', module: 'ServerScriptService', connector: 'ConnectorService', webhook: 'ConnectorService', folder: 'ServerScriptService' };
+export const DEFAULT_PARENT = {
+  server: 'ServerScriptService', client: 'ClientService', game: 'GameService', module: 'ServerScriptService', connector: 'ConnectorService', webhook: 'ConnectorService', folder: 'ServerScriptService',
+  boolvalue: 'ReplicatedStorage', intvalue: 'ReplicatedStorage', numbervalue: 'ReplicatedStorage', stringvalue: 'ReplicatedStorage',
+};
 export const EVENTS = {
   server: ['start', 'join', 'leave', 'message', 'command'],
   game: ['start', 'join', 'leave'],
@@ -636,7 +652,9 @@ function clock(opts) {
 }
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9À-ɏ]/g, '');
 const SCRIPT_CLASSES = new Set(['ServerScript', 'ClientScript', 'ModuleScript', 'GameScript']);
-const INST_PROPS = new Set(['Name', 'ClassName', 'Parent', 'Enabled', 'Event']);
+const INST_PROPS = new Set(['Name', 'ClassName', 'Parent', 'Enabled', 'Event', 'Value']);
+const VALUE_CLASSES = new Set(['BoolValue', 'IntValue', 'NumberValue', 'StringValue']);
+const valueKey = (o) => `__v:${o.item.id}`;
 const INST_METHOD_NAMES = new Set(['GetChildren', 'GetDescendants', 'FindFirstChild', 'FindFirstChildOfClass', 'WaitForChild', 'IsA', 'GetFullName', 'Fire', 'Connect', 'Send', 'Post']);
 
 // Baum wie im Explorer aus den gespeicherten Objekten { id, name, type, parent }
@@ -726,7 +744,7 @@ class Runtime {
     return l;
   }
   // print → Chat, discord → Discord-Verbindung, webhook → Webhook-Objekt
-  output(kind, args, node, extra = null) {
+  output(kind, args, node, extra = null, card = null) {
     const text = args.map((x) => str(x)).join(' ').slice(0, this.limits.text);
     const label = { say: 'print()', discord: 'discord()', webhook: 'Webhook:Send()' }[kind];
     if (this.phase !== 'event' && !this.free) {
@@ -739,7 +757,7 @@ class Runtime {
       this.warnOnce(`${kind}-max`, `Höchstens ${this.limits.says} Nachrichten pro Ereignis`, node);
       return null;
     }
-    list.push(kind === 'webhook' ? { ...extra, text } : text);
+    list.push(kind === 'webhook' ? { ...extra, text } : card ? { text, embed: card } : text);
     this.log(`${kind === 'say' ? '💬' : kind === 'discord' ? '🎮 Discord:' : `🔗 ${extra.name}:`} ${text}`, 'out', node ? node.line : 0);
     return null;
   }
@@ -768,6 +786,19 @@ class Runtime {
       return lo + Math.floor(Math.random() * (hi - lo + 1));
     };
     def('print', (a, n) => rt.output('say', a, n));
+    // Karte (Embed) nur für eigene Bots: embed({ title = "…", text = "…", color = "#5865F2", fields = { { name = "…", value = "…" } }, footer = "…" })
+    def('embed', ([o], n) => {
+      if (!isObj(o)) rt.fail('embed() braucht eine Tabelle, z. B. embed({ title = "Hallo", text = "Willkommen!" })', n);
+      const s2 = (v, max) => (v === null || v === undefined ? '' : str(v).slice(0, max));
+      const rawFields = o.fields === undefined ? [] : Array.isArray(o.fields) ? o.fields : isObj(o.fields) ? Object.keys(o.fields).sort((x, y) => Number(x) - Number(y)).map((k) => o.fields[k]) : [];
+      const card = {
+        title: s2(o.title, 256), text: s2(o.text ?? o.description, 2000), footer: s2(o.footer, 200),
+        color: /^#[0-9a-fA-F]{6}$/.test(str(o.color || '')) ? str(o.color).toUpperCase() : '#5865F2',
+        fields: rawFields.filter(isObj).slice(0, 10).map((f) => ({ name: s2(f.name, 120), value: s2(f.value, 600) })).filter((f) => f.name || f.value),
+      };
+      if (!card.title && !card.text && !card.fields.length) rt.fail('embed() braucht mindestens title, text oder fields', n);
+      return rt.output('say', [card.title || card.text], n, null, card);
+    });
     def('say', (a, n) => rt.output('say', a, n));
     def('reply', (a, n) => rt.output('say', a, n));
     def('discord', (a, n) => {
@@ -984,6 +1015,7 @@ class Runtime {
       case 'Parent': return o.Parent || null;
       case 'Enabled': if (SCRIPT_CLASSES.has(o.ClassName)) return !(o.item && o.item.enabled === false); break;
       case 'Event': if (o.ClassName === 'Connector') return o; break;
+      case 'Value': if (VALUE_CLASSES.has(o.ClassName)) return hasOwn(this.memory, valueKey(o)) ? this.memory[valueKey(o)] : valueOf(o.item.type, o.item.value); break;
       default: break;
     }
     const m = (fn) => new LNative(name, fn);
@@ -1136,6 +1168,17 @@ class Runtime {
       return;
     }
     const obj = this.eval(t.obj, scope);
+    // Werte-Objekte: script.Parent.Zaehler.Value = 5 (bleibt gespeichert)
+    if (isInst(obj) && t.k === 'member' && t.name === 'Value' && VALUE_CLASSES.has(obj.ClassName)) {
+      const cur = this.instMember(obj, 'Value', s);
+      const v = compute(cur);
+      const want = { BoolValue: 'boolean', IntValue: 'number', NumberValue: 'number', StringValue: 'string' }[obj.ClassName];
+      if (typeof v !== want) this.fail(`${obj.ClassName}.Value braucht ${want === 'boolean' ? 'true/false' : want === 'number' ? 'eine Zahl' : 'einen Text'}, nicht ${typeOf(v)}`, s);
+      if (this.side === 'client' && serviceOf(obj) !== 'ClientService') this.fail('ClientScripts können nur Werte im ClientService ändern', s);
+      this.memory[valueKey(obj)] = valueOf(obj.item.type, v);
+      this.memChanged = true;
+      return;
+    }
     if (isInst(obj)) this.fail(`Eigenschaften von „${obj.Name}“ stellt man im Editor ein, nicht im Skript`, s);
     if (t.k === 'member') {
       if (Array.isArray(obj)) this.fail(`.${t.name} = … geht nicht bei Listen – nimm ein Objekt {} oder table.insert`, s);

@@ -12,6 +12,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-arrow-small-down:before{content:"\f19c"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-arrow-small-up:before{content:"\f19f"}
+.fi-rr-arrow-up-right:before{content:"\f1b4"}
 .fi-rr-arrow-up-right-from-square:before{content:"\f1b3"}
 .fi-rr-badge-check:before{content:"\f1eb"}
 .fi-rr-ban:before{content:"\f205"}
@@ -22,7 +23,9 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-briefcase:before{content:"\f2e9"}
 .fi-rr-bug:before{content:"\f2fc"}
 .fi-rr-calendar:before{content:"\f339"}
+.fi-rr-calendar-lines:before{content:"\f32e"}
 .fi-rr-camera:before{content:"\f348"}
+.fi-rr-chart-histogram:before{content:"\f3a2"}
 .fi-rr-chart-line-up:before{content:"\f3a5"}
 .fi-rr-check:before{content:"\f3c8"}
 .fi-rr-check-circle:before{content:"\f3c4"}
@@ -31,10 +34,12 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-clock-three:before{content:"\f453"}
 .fi-rr-cloud:before{content:"\f479"}
 .fi-rr-coins:before{content:"\f494"}
+.fi-rr-comment-alt:before{content:"\f4a1"}
 .fi-rr-comment-alt-dots:before{content:"\f49a"}
 .fi-rr-comments:before{content:"\f4bc"}
 .fi-rr-comments-question:before{content:"\f4bb"}
 .fi-rr-copy:before{content:"\f4dd"}
+.fi-rr-cross:before{content:"\f4f7"}
 .fi-rr-cross-small:before{content:"\f4f6"}
 .fi-rr-crown:before{content:"\f4f9"}
 .fi-rr-dashboard:before{content:"\f523"}
@@ -66,6 +71,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-layers:before{content:"\f87c"}
 .fi-rr-link:before{content:"\f8ba"}
 .fi-rr-link-alt:before{content:"\f8b5"}
+.fi-rr-list-check:before{content:"\f8c0"}
 .fi-rr-lock:before{content:"\f8d5"}
 .fi-rr-marker:before{content:"\f8fd"}
 .fi-rr-megaphone:before{content:"\f917"}
@@ -74,6 +80,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-menu-dots-vertical:before{content:"\f926"}
 .fi-rr-moon:before{content:"\f972"}
 .fi-rr-newspaper:before{content:"\f9a5"}
+.fi-rr-palette:before{content:"\f9ed"}
 .fi-rr-paper-plane:before{content:"\f9f7"}
 .fi-rr-paper-plane-top:before{content:"\f9f6"}
 .fi-rr-pause:before{content:"\fa0c"}
@@ -82,6 +89,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-play:before{content:"\fa9e"}
 .fi-rr-plus:before{content:"\faac"}
 .fi-rr-plus-small:before{content:"\faab"}
+.fi-rr-puzzle-alt:before{content:"\fae9"}
 .fi-rr-receipt:before{content:"\fb16"}
 .fi-rr-robot:before{content:"\fb61"}
 .fi-rr-rocket-lunch:before{content:"\fb63"}
@@ -91,13 +99,15 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-settings:before{content:"\fbd2"}
 .fi-rr-settings-sliders:before{content:"\fbd1"}
 .fi-rr-shield-check:before{content:"\fbdb"}
+.fi-rr-shop:before{content:"\fbf5"}
+.fi-rr-shopping-bag:before{content:"\fbf7"}
 .fi-rr-shopping-cart:before{content:"\fbfc"}
 .fi-rr-sidebar:before{content:"\fc08"}
 .fi-rr-sign-in-alt:before{content:"\fc0b"}
 .fi-rr-sign-out-alt:before{content:"\fc0c"}
 .fi-rr-signal-alt-2:before{content:"\fc11"}
 .fi-rr-smartphone:before{content:"\fc44"}
-.fi-rr-sort-amount-down:before{content:"\fc6b"}
+.fi-rr-smile:before{content:"\fc48"}
 .fi-rr-sparkles:before{content:"\fc84"}
 .fi-rr-spinner:before{content:"\fc8f"}
 .fi-rr-square-code:before{content:"\fca8"}
@@ -107,6 +117,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-terminal:before{content:"\fd78"}
 .fi-rr-ticket:before{content:"\fd9d"}
 .fi-rr-time-fast:before{content:"\fda4"}
+.fi-rr-time-past:before{content:"\fdaa"}
 .fi-rr-traffic-light:before{content:"\fddc"}
 .fi-rr-train-side:before{content:"\fddf"}
 .fi-rr-train-station:before{content:"\fde1"}
@@ -114,20 +125,24 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-trash-xmark:before{content:"\fe16"}
 .fi-rr-triangle-warning:before{content:"\fe33"}
 .fi-rr-trophy:before{content:"\fe39"}
+.fi-rr-unlock:before{content:"\fe6f"}
 .fi-rr-user:before{content:"\fea0"}
 .fi-rr-user-add:before{content:"\fe7a"}
+.fi-rr-user-pen:before{content:"\fe90"}
 .fi-rr-user-slash:before{content:"\fe99"}
 .fi-rr-users:before{content:"\fea6"}
 .fi-rr-users-alt:before{content:"\fea1"}
 .fi-rr-video-camera:before{content:"\febe"}
-.fi-rr-wallet:before{content:"\fedc"}
 .fi-rr-whistle:before{content:"\ff01"}
 
 @font-face{font-family:uicons-solid-rounded;src:url(../fonts/uicons-solid-rounded.woff2) format("woff2");font-display:block}
 i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,span[class*=fi-sr-]:before{font-family:uicons-solid-rounded!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.fi-sr-apps:before{content:"\f16d"}
+.fi-sr-badge-check:before{content:"\f1eb"}
 .fi-sr-bell:before{content:"\f237"}
 .fi-sr-bell-ring:before{content:"\f233"}
 .fi-sr-calendar:before{content:"\f336"}
+.fi-sr-caret-down:before{content:"\f373"}
 .fi-sr-check:before{content:"\f3c0"}
 .fi-sr-check-circle:before{content:"\f3bc"}
 .fi-sr-coins:before{content:"\f48c"}
@@ -137,9 +152,17 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 .fi-sr-id-badge:before{content:"\f7eb"}
 .fi-sr-marker:before{content:"\f8ef"}
 .fi-sr-newspaper:before{content:"\f994"}
+.fi-sr-pencil:before{content:"\fa17"}
 .fi-sr-play:before{content:"\fa7f"}
+.fi-sr-robot:before{content:"\fb3e"}
+.fi-sr-settings:before{content:"\fbac"}
+.fi-sr-shield-check:before{content:"\fbb5"}
+.fi-sr-shop:before{content:"\fbcf"}
 .fi-sr-shopping-cart:before{content:"\fbd6"}
 .fi-sr-signal-alt-2:before{content:"\fbeb"}
+.fi-sr-square-terminal:before{content:"\fca4"}
+.fi-sr-star:before{content:"\fcc1"}
+.fi-sr-train-side:before{content:"\fdb7"}
 .fi-sr-user:before{content:"\fe78"}
 
 @font-face{font-family:uicons-brands;src:url(../fonts/uicons-brands.woff2) format("woff2");font-display:block}
