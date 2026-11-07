@@ -17,7 +17,7 @@
  * mit @Name). Titel „[TSG] Name“, darunter die Nachricht; wo der Browser es kann, lässt sich direkt in der
  * Benachrichtigung antworten (signierter Link, 7 Tage gültig).
  *
- * Gruppen haben wie Discord eigene Rollen (Name, Farbe, Rechte) und eigene Bots (bots.js, Skripte in Luna).
+ * Gruppen haben wie Discord eigene Rollen (Name, Farbe, Rechte) und eigene Bots (bots.js, Regeln mit Vorlagen).
  * Server (Gruppen mit category: 'server', „Communities“) haben dazu Kanäle und Kategorien wie Discord (channels.js)
  * und lassen sich nach Prüfung durch das Team mit Discord verbinden (siehe discord.js).
  * Ohne Namen heißen neue Server und Gruppen „Name's Server“, „Name's Server2“ …, Bots „Name's Bot“, „Name's Bot2“ …
@@ -34,7 +34,7 @@ import { level, atLeast, matchRank } from './ranks.js';
 import { notifyUser, notifyStaff } from './webpush.js';
 import { sign, verify } from './secret.js';
 import { REVIEW_RANK, updateConfig, requirements, publicView, sendToDiscord } from './discord.js';
-import { metaOf as botMeta, listBots, getBot, createBot, updateBot, deleteBot, setBotPhoto, clientBundle, botsEvent } from './bots.js';
+import { metaOf as botMeta, listBots, getBot, createBot, updateBot, deleteBot, setBotPhoto, botsEvent } from './bots.js';
 import { findPlayer, groupRole } from './roblox.js';
 import { startUpload, attachFiles, deleteFiles, fileLinks } from './files.js';
 import { serversOfChat, linkChat, cleanLink } from './pservers.js';
@@ -189,7 +189,7 @@ const SYSTEM_TEXT = {
 function previewOf(m) {
   if (m.deleted) return 'Nachricht gelöscht';
   if (m.by === 'system') return (SYSTEM_TEXT[m.text] || (() => ''))(m);
-  if (m.kind === 'bot') return m.botId ? m.text || (m.embed ? m.embed.title || m.embed.text || '' : '') : `🤖 ${m.title || ''}`;
+  if (m.kind === 'bot') return m.botId ? m.text || '' : `🤖 ${m.title || ''}`;
   if (m.text) return m.text;
   const f = (m.files || [])[0];
   return f ? (f.kind === 'image' ? '📷 Foto' : f.kind === 'video' ? '🎬 Video' : `📎 ${f.name}`) : '';
@@ -358,7 +358,6 @@ async function view(env, store, c, user, { ch: wantCh } = {}) {
     discord: c.kind !== 'group' ? null : (a.manage || a.mod) ? publicView(c) : c.discord && c.discord.status === 'active' ? { status: 'active' } : null,
     canPhoto: canPhoto(c, a.role),
     bots: c.kind === 'group' ? (c.bots || []).map(botMeta) : [],
-    botsClient: c.kind === 'group' && a.role ? Math.max(0, ...(c.bots || []).filter((b) => b.on !== false && b.mode === 'advanced').map((b) => b.rev || 0)) : 0,
     canBots: c.kind === 'group' && (!!a.manage || a.mod),
     canModerate: a.moderate,
     canJoin: c.kind === 'group' && !a.role && a.pub,
@@ -973,23 +972,13 @@ export async function inviteJoin(store, env, user, code) {
   return view(env, store, c, user);
 }
 
-// ---------- Dashboard: eigene Server, Gruppen und Bots auf einen Blick ----------
-// Bots stehen in den Chats, die man leitet (Inhaber, Admin) – höchstens 25 Chats werden dafür gelesen.
+// Chats, die man leitet (Inhaber, Admin) – höchstens 25 werden gelesen (für Standardnamen neuer Bots)
 async function managedChats(store, user) {
   const idx = await loadIndex(store);
   const list = idx.filter((x) => x.kind === 'group' && (x.admins || []).includes(user.sub)).slice(0, 25);
   const out = [];
   for (const x of list) { const c = await store.get(`chat:${x.id}`); if (c) out.push(c); }
   return out;
-}
-const placeOf = (c) => ({ id: c.id, name: c.name, color: c.color || null, photo: c.photo || null, category: c.category || null });
-export async function dashboard(store, user) {
-  const chats = await managedChats(store, user);
-  const bots = chats.flatMap((c) => (c.bots || []).map((b) => ({ ...botMeta(b), chat: placeOf(c) }))).sort((x, y) => (y.rev || 0) - (x.rev || 0));
-  return {
-    bots, places: chats.map((c) => ({ ...placeOf(c), bots: (c.bots || []).length, members: Object.keys(c.members || {}).length, updated: c.updated })),
-    maxBots: 5,
-  };
 }
 
 // ---------- Discord: Nachrichten weitergeben, Automationen ----------
@@ -1036,10 +1025,6 @@ export async function botsList(store, user, id) {
   const { c, a } = await botChat(store, user, id, false);
   return listBots(store, c, !!(a.manage || a.mod));
 }
-export async function botsClient(store, user, id) {
-  const { c } = await botChat(store, user, id, false);
-  return { bots: await clientBundle(store, c) };
-}
 export async function botGet(store, user, id, botId) {
   const { c } = await botChat(store, user, id);
   return getBot(store, c, botId);
@@ -1060,7 +1045,7 @@ export async function botCreate(store, env, user, id, body) {
 export async function botUpdate(store, env, user, id, botId, body) {
   const { c } = await botChat(store, user, id);
   const r = await updateBot(store, env, c, botId, body);
-  // Neuer Stand für alle offenen Apps (ClientScripts, Name, Bild)
+  // Neuer Stand für alle offenen Apps (Name, Bild)
   c.updated = Date.now();
   await save(store, c);
   return r.bot;

@@ -2,7 +2,7 @@
  * Train Sim Germany – Inhalte aus der App: Trainings, Neuigkeiten, Bilder, Stellen (offen/geschlossen)
  *
  *   content:trainings  → [{ id, type, title, start, dur, server, slots, text, host, hostName, hostAvatar, hostId }]
- *   content:news       → [{ id, date, cat, tag, title, text, media, buttons, author, authorId }]
+ *   content:news       → [{ id, date, edited, cat, tag, title, text, media, buttons, author, authorId }]   cat: siehe NEWS_CATS
  *   content:jobs       → { <stelle>: { open, from, to, limit, received, note, urgent, closedAt, openedAt, updatedBy, log } }
  *   media:<id>         → { type, data }   (Bilder für Neuigkeiten, als Base64)
  */
@@ -67,13 +67,16 @@ export async function deleteTraining(store, user, id) {
 }
 
 // ---------- Neuigkeiten (ab Public Relations Department) ----------
+// Kategorien wie in der App (assets/js/app.js → NEWS_CATS)
+export const NEWS_CATS = ['update', 'event', 'community', 'strecke', 'fahrzeug', 'training', 'team', 'wartung', 'gewinnspiel', 'hinweis'];
 const BUTTON_TYPES = ['discord', 'youtube', 'roblox', 'link'];
 const isYouTube = (u) => /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))[\w-]{11}/.test(u);
-export async function addNews(store, user, body) {
+// Titel, Text, Kategorie, Tag, Foto/Video und Buttons prüfen (für Neu und Bearbeiten)
+function newsFields(body) {
   const title = clip(body.title, 120).trim();
   const text = clip(body.text, 4000).trim();
   if (!title || !text) throw bad('missing');
-  const cat = ['update', 'event', 'community'].includes(body.cat) ? body.cat : 'update';
+  const cat = NEWS_CATS.includes(body.cat) ? body.cat : 'update';
   const m = body.media || {};
   if (!['image', 'video'].includes(m.type)) throw bad('media_type');
   const media = { type: m.type, url: safeUrl(m.url) };
@@ -84,13 +87,26 @@ export async function addNews(store, user, body) {
     if (!BUTTON_TYPES.includes(b.type)) throw bad('button_type');
     return { type: b.type, label: clip(b.label, 40).trim(), url: safeUrl(b.url) };
   });
-  const item = {
-    id: randomKey(9), date: new Date().toISOString(), cat, tag: clip(body.tag, 30).trim(), title, text, media, buttons,
-    author: user.username, authorId: user.sub,
-  };
+  return { cat, tag: clip(body.tag, 30).trim(), title, text, media, buttons };
+}
+export async function addNews(store, user, body) {
+  const item = { id: randomKey(9), date: new Date().toISOString(), ...newsFields(body), author: user.username, authorId: user.sub };
   const list = (await store.get('content:news')) || [];
   list.unshift(item);
   await store.put('content:news', list.slice(0, 100));
+  return item;
+}
+// Eigene Neuigkeit bearbeiten: Datum bleibt, „bearbeitet“ kommt dazu; ein ersetztes hochgeladenes Foto wird gelöscht
+export async function updateNews(store, user, id, body) {
+  const list = (await store.get('content:news')) || [];
+  const i = list.findIndex((x) => x.id === id);
+  if (i < 0) throw notFound();
+  const old = list[i];
+  if (old.authorId !== user.sub) throw forbidden();
+  const item = { ...old, ...newsFields(body), edited: new Date().toISOString() };
+  if (old.media && old.media.mediaId && old.media.mediaId !== (item.media && item.media.mediaId)) await store.delete(`media:${old.media.mediaId}`);
+  list[i] = item;
+  await store.put('content:news', list);
   return item;
 }
 export async function deleteNews(store, user, id) {

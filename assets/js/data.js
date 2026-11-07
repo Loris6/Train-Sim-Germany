@@ -239,7 +239,7 @@ window.TSG = {
   },
 
   // Demo-Neuigkeiten (ohne Backend). Mit Backend schreibt das Public Relations Department sie in der App.
-  // cat: update | event | community
+  // cat: update | event | community | strecke | fahrzeug | training | team | wartung | gewinnspiel | hinweis
   // video (optional): eigene Datei (assets/video/…mp4) oder ein YouTube-Link; poster = Vorschaubild
   news: [
     { id: 'n1', date: '2026-10-15', cat: 'update', tag: 'Update 2.5', video: 'assets/video/rheinstrecke.mp4', poster: 'assets/video/rheinstrecke.jpg', title: 'Berlin – Warschau jetzt in der Beta', text: '573 km über Frankfurt (Oder) und Poznań bis Warszawa Centralna – teste die neue Strecke auf dem Beta-Server. Neu sind außerdem 9 Bahnhöfe in Polen, das Stellwerk Frankfurt (Oder) und der EC „Berlin-Warszawa-Express“.', img: 'route-coast.svg' },

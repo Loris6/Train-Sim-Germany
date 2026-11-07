@@ -8,6 +8,10 @@
     • meldet den Server (Spieler, Plätze, Version) – für die Server-Seite der App und /GetServers, /GetOnline, /GetUser im Chat
     • meldet, was jeder Spieler gerade macht: Rolle (Team), Zug, Linie, Ziel, Bahnhof (siehe Activity.read) –
       daraus zeigt die App die Rollen je Server, die Züge und unter „Spieler“, wo jemand gerade ist
+    • meldet alle Teams aus dem Teams-Service, die das Attribut „Extern“ haben (Wert egal), mit ihrer Farbe
+      (TeamColor, z. B. Driver rot → in der App rot) und ihrer Zahl für die Reihenfolge (1, 2, 3 … – das zweite
+      Attribut am Team, siehe CONFIG.TeamOrderAttribute). Die App zeigt die Teams in dieser Reihenfolge, auch leere.
+      Das Team mit der Zahl 2 fertigt ab: seine Spieler erscheinen in der App oben mit ihrem Bahnhof (TSG_Station).
     • meldet beendete Fahrten für die Statistik (siehe „Fahrten melden“ unten). Ohne Meldung bleibt die Statistik bei 0.
     • private Server: meldet ID und Besitzer und setzt die Einstellungen aus der App um
         – „Nur Mitglieder des Server-Chats“: wer nicht im verbundenen App-Chat ist, wird freundlich abgewiesen
@@ -43,11 +47,18 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local TextService = game:GetService("TextService")
+local Teams = game:GetService("Teams")
 
 local CONFIG = {
 	Backend = "https://tsg-backend.lorismziray01.workers.dev",
 	SecretName = "tsg_game_key",
 	Interval = 30,
+	-- Teams mit diesem Attribut erscheinen in der App (Wert egal)
+	TeamShowAttribute = "Extern",
+	-- Attribut am Team mit der Zahl für die Reihenfolge (1 zuerst). nil = automatisch: eines der Namen in
+	-- TeamOrderNames, sonst das erste Attribut mit einer Zahl, sonst „Extern“ selbst, wenn es eine Zahl ist.
+	TeamOrderAttribute = nil,
+	TeamOrderNames = { "Order", "Reihenfolge", "Position", "Pos", "Index", "Sort", "Nummer", "Number", "Nr", "Prio", "Priority", "Rang", "Rank", "Layer", "Level", "Id", "ID" },
 }
 
 -- ===== Anpassen: so speichert euer Spiel Coins und Besitz =====
@@ -132,6 +143,47 @@ function Activity.read(player)
 	}
 end
 -- ===== Ende Anpassen =====
+
+-- Teams für die App: Name, Farbe (#RRGGBB aus TeamColor) und Zahl für die Reihenfolge
+local function teamOrder(team)
+	if CONFIG.TeamOrderAttribute then
+		return tonumber(team:GetAttribute(CONFIG.TeamOrderAttribute))
+	end
+	for _, name in ipairs(CONFIG.TeamOrderNames) do
+		local value = tonumber(team:GetAttribute(name))
+		if value then
+			return value
+		end
+	end
+	local attrs = team:GetAttributes()
+	local names = {}
+	for name, value in pairs(attrs) do
+		if name ~= CONFIG.TeamShowAttribute and type(value) == "number" then
+			table.insert(names, name)
+		end
+	end
+	table.sort(names)
+	if names[1] then
+		return attrs[names[1]]
+	end
+	return tonumber(team:GetAttribute(CONFIG.TeamShowAttribute))
+end
+local function teamList()
+	local list = {}
+	for _, team in ipairs(Teams:GetTeams()) do
+		if team:GetAttribute(CONFIG.TeamShowAttribute) ~= nil then
+			local ok, hex = pcall(function()
+				return team.TeamColor.Color:ToHex()
+			end)
+			table.insert(list, {
+				name = team.Name,
+				color = ok and hex or nil,
+				order = teamOrder(team),
+			})
+		end
+	end
+	return list
+end
 
 local RunService = game:GetService("RunService")
 
@@ -379,6 +431,7 @@ local function sync(extra, closing)
 				done = sending,
 				server = serverInfo(closing),
 				activity = doing,
+				teams = teamList(),
 				trips = sendingTrips,
 			}),
 		})
@@ -429,7 +482,21 @@ local function run()
 	busy = false
 end
 
+-- Rollenwechsel (anderes Team): die App bald auf neuen Stand bringen, damit der Spieler unter seinem Team erscheint
+local soon = false
+local function syncSoon()
+	if soon then
+		return
+	end
+	soon = true
+	task.delay(3, function()
+		soon = false
+		run()
+	end)
+end
+
 Players.PlayerAdded:Connect(function(player)
+	player:GetPropertyChangedSignal("Team"):Connect(syncSoon)
 	if appConfig and not checkAccess(player) then
 		return
 	end

@@ -4,10 +4,12 @@
  * Das Spiel (game/TSGAppSync.server.lua) meldet bei jedem Abgleich zusätzlich:
  *   activity: [{ userId, name, displayName, role, line, train, destination, nextStop, vehicle, station }]
  *             Rolle = Team im Spiel, der Rest kommt aus Attributen am Spieler (TSG_Line, TSG_Train, …)
+ *   teams:    [{ name, color, order }]   Teams mit dem Attribut „Extern“ (Farbe = TeamColor, order = Zahl für die Reihenfolge)
+ *             – so zeigt die App jede Rolle mit ihrer Farbe aus dem Spiel, auch leere Teams. Team mit order 2 = Abfertigung.
  *   trips:    [{ userId, route, vehicle, cat, km, delay }]   beendete Fahrten
  * Daraus entstehen die Server-Seite, „Spieler“ und die Statistik. Was das Spiel nicht meldet, bleibt bei 0.
  *
- *   game:servers     → { <jobId>: { at, since, players, max, version, private, privateId, online, who, acc, flushed } }
+ *   game:servers     → { <jobId>: { at, since, players, max, version, private, privateId, online, who, teams, acc, flushed } }
  *   pstats:<userId>  → eigene Statistik { minutes, trips, km, punctual, routes, vehicles, days, first, last }
  *   gstats:<Tag>     → ein Tag (Berlin) { trips, km, punctual, cats, routes: { R001: { n, ok, km } } }
  *   gstats:total     → { trips, km, punctual }
@@ -37,6 +39,25 @@ export function gameRole(team) {
   const hit = ROLE_WORDS.find(([, re]) => re.test(s));
   return hit ? hit[0] : 'Passenger';
 }
+// Teams aus dem Spiel: Name, Farbe (#RRGGBB) und Zahl für die Reihenfolge (1 zuerst, ohne Zahl ans Ende); null = keine
+export function cleanTeams(list) {
+  if (!Array.isArray(list)) return null;
+  const seen = new Set();
+  const out = [];
+  for (const x of list.slice(0, 40)) {
+    const name = txt(x && x.name, 40);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    const hex = String((x && x.color) || '').replace(/^#/, '');
+    const order = Number(x && x.order);
+    out.push({ name, color: /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toUpperCase()}` : null, order: Number.isFinite(order) ? Math.max(-999, Math.min(999, order)) : null });
+  }
+  // Noch kein Team mit „Extern“: wie bisher feste Rollen
+  if (!out.length) return null;
+  return out.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || a.name.localeCompare(b.name));
+}
+// Team, dessen Spieler Bahnhöfe abfertigen (Attribut mit der Zahl 2)
+export const DISPATCH_ORDER = 2;
 const CATS = ['ice', 'ec', 'ic', 'ire', 're', 'rb', 's', 'g'];
 const txt = (v, n) => clip(v, n).replace(/[\u0000-\u001f]/g, '').trim() || null;
 const round1 = (n) => Math.round(n * 10) / 10;
@@ -50,7 +71,7 @@ export function cleanWho(list, online) {
     const id = String((a && a.userId) || '');
     if (!ok.has(id) || out.has(id)) continue;
     out.set(id, {
-      id, name: /^[A-Za-z0-9_]{2,20}$/.test(a.name || '') ? a.name : null, dn: txt(a.displayName, 32), role: gameRole(a.role),
+      id, name: /^[A-Za-z0-9_]{2,20}$/.test(a.name || '') ? a.name : null, dn: txt(a.displayName, 32), role: gameRole(a.role), team: txt(a.role, 40),
       line: txt(a.line, 14), train: txt(a.train, 20), dest: txt(a.destination, 48), next: txt(a.nextStop, 48),
       veh: txt(a.vehicle, 32), at: txt(a.station, 48),
     });
@@ -151,7 +172,7 @@ export async function recordServer(store, servers, jobId, sv, body, online, cata
     servers[jobId] = {
       at: t, since: (prev && prev.since) || t, players: Math.max(0, Math.round(+sv.players || online.length)), max: Math.max(0, Math.round(+sv.max || 0)),
       version: Math.round(+sv.version) || null, private: sv.private === true, privateId: sv.privateId ? clip(sv.privateId, 64) : null,
-      online, who: cleanWho(body.activity, online), acc, flushed,
+      online, who: cleanWho(body.activity, online), teams: cleanTeams(body.teams), acc, flushed,
     };
   }
   await recordTrips(store, cleanTrips(body.trips, catalog), t);
@@ -252,25 +273,37 @@ function roleCounts(who) {
 }
 // Team zuerst (Supervisor … Passenger), sonst in der Reihenfolge des Spiels
 const byRole = (who) => [...who].sort((a, b) => GAME_ROLES.indexOf(b.role) - GAME_ROLES.indexOf(a.role));
-const person = (x) => ({ id: x.id, name: x.name || null, dn: x.dn || null, role: x.role, line: x.line || null, train: x.train || null, dest: x.dest || null, next: x.next || null, veh: x.veh || null, at: x.at || null });
+const person = (x) => ({ id: x.id, name: x.name || null, dn: x.dn || null, role: x.role, team: x.team || null, line: x.line || null, train: x.train || null, dest: x.dest || null, next: x.next || null, veh: x.veh || null, at: x.at || null });
 // Züge auf dem Server: alles, was Fahrer mit Linie oder Zugnummer melden
 function trainsOf(who) {
   const map = new Map();
   who.filter((x) => x.line || x.train).forEach((x) => {
     const key = x.train || `${x.line}>${x.dest || ''}`;
     if (!map.has(key)) map.set(key, { key, line: x.line, train: x.train, dest: x.dest, next: x.next, veh: x.veh, crew: [] });
-    map.get(key).crew.push({ id: x.id, role: x.role });
+    map.get(key).crew.push({ id: x.id, role: x.role, team: x.team || null });
   });
   return [...map.values()];
 }
 const pserverLite = (p) => (p ? { id: p.id, name: p.name, ownerName: p.ownerName, mine: p.mine, member: p.member, canJoin: p.canJoin, link: p.link, join: p.join, access: p.access } : null);
 
+// Teams des Servers mit Spielerzahl (null = das Spiel meldet noch keine Teams, dann gelten die festen Rollen)
+const sameTeam = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+function teamsOf(s, who) {
+  if (!Array.isArray(s.teams)) return null;
+  return s.teams.map((x) => ({ ...x, n: who.filter((w) => sameTeam(w.team, x.name)).length }));
+}
+// Reihenfolge der Teams: wer in einem gemeldeten Team ist, steht in dessen Reihenfolge, die anderen danach
+function byTeam(who, teams) {
+  const rank = (w) => { const i = teams.findIndex((x) => sameTeam(x.name, w.team)); return i < 0 ? 1e6 : i; };
+  return [...who].sort((a, b) => rank(a) - rank(b));
+}
 function serverOut(jobId, s, p, full) {
   const who = s.who || (s.online || []).map((id) => ({ id, role: 'Passenger' }));
-  const people = byRole(who);
+  const teams = teamsOf(s, who);
+  const people = teams ? byTeam(who, teams) : byRole(who);
   return {
     id: jobId, private: !!s.private, players: s.players, max: s.max, version: s.version, since: s.since || s.at, at: s.at,
-    roles: roleCounts(who), trains: trainsOf(who).length, people: (full ? people : people.slice(0, 3)).map(person),
+    roles: roleCounts(who), teams, trains: trainsOf(who).length, people: (full ? people : people.slice(0, 3)).map(person),
     ...(full ? { trainList: trainsOf(who) } : {}),
     ...(s.private ? { pserver: pserverLite(p) } : {}),
   };
@@ -299,13 +332,37 @@ export async function serverOf(store, viewer, sub) {
   return null;
 }
 
+// Alle Teams über alle laufenden Server: Farbe und Reihenfolge vom zuletzt gemeldeten Server, Spieler zusammengezählt
+function allTeams(list) {
+  const map = new Map();
+  for (const s of [...list].sort((a, b) => a.at - b.at)) {
+    const who = s.who || [];
+    for (const x of s.teams || []) {
+      const k = x.name.toLowerCase();
+      const old = map.get(k);
+      map.set(k, { name: x.name, color: x.color, order: x.order, n: (old ? old.n : 0) + who.filter((w) => sameTeam(w.team, x.name)).length });
+    }
+  }
+  return [...map.values()].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || a.name.localeCompare(b.name));
+}
+// Spieler je Rolle über alle Server (feste Rollen, aus dem Teamnamen abgeleitet) und je Teamname
+function liveRoles(list) {
+  const roles = Object.fromEntries(GAME_ROLES.map((r) => [r, 0]));
+  const teams = {};
+  list.forEach((s) => (s.who || []).forEach((w) => {
+    roles[w.role] = (roles[w.role] || 0) + 1;
+    if (w.team) teams[w.team] = (teams[w.team] || 0) + 1;
+  }));
+  return { roles, byTeam: teams };
+}
+
 // GET /api/servers – alle laufenden Server, die man sehen darf
 export async function serversView(store, env, user) {
   const list = await visibleServers(store, user);
   const shown = list.filter((x) => !x.hidden).map((x) => serverOut(x.jobId, x.s, x.p, false))
     .sort((a, b) => a.private - b.private || b.players - a.players);
   const avatars = await avatarsOf(store, env, shown.flatMap((s) => s.people.map((x) => x.id)));
-  return { servers: shown, avatars, online: list.reduce((n, x) => n + (x.s.players || 0), 0), hidden: list.filter((x) => x.hidden).length, at: Date.now() };
+  return { servers: shown, avatars, teams: allTeams(list.map((x) => x.s)), online: list.reduce((n, x) => n + (x.s.players || 0), 0), hidden: list.filter((x) => x.hidden).length, at: Date.now() };
 }
 
 // GET /api/servers/<jobId> – ein Server mit allen Spielern und Zügen
@@ -336,7 +393,8 @@ export async function playersStatus(store, env, user, body) {
     else if (hit) {
       const sv = serverOut(hit.jobId, hit.s, hit.p, false);
       item.server = { id: sv.id, private: sv.private, players: sv.players, max: sv.max, pserver: sv.pserver || null };
-      item.activity = person(hit.w);
+      const tm = (hit.s.teams || []).find((x) => sameTeam(x.name, hit.w.team));
+      item.activity = { ...person(hit.w), teamColor: tm ? tm.color : null };
     }
     out.push(item);
   }
@@ -378,7 +436,10 @@ export async function gameStats(store) {
     today: today || { trips: 0, km: 0, punctual: 0, cats: {}, routes: {} },
     week, total: (await store.get('gstats:total')) || { trips: 0, km: 0, punctual: 0 },
     hours: (await store.get('hist:online')) || [],
-    live: { servers: live.length, players: live.reduce((n, [, s]) => n + (s.players || 0), 0), trains: trainsOf(who).length },
+    live: {
+      servers: live.length, players: live.reduce((n, [, s]) => n + (s.players || 0), 0), trains: trainsOf(who).length,
+      ...liveRoles(live.map(([, s]) => s)), teams: allTeams(live.map(([, s]) => s)),
+    },
     at: t,
   };
 }

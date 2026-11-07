@@ -24,13 +24,11 @@
  *   GET    /api/me                       Profil, Rang, Privatsphäre, Einstellungen, eigene Bewerbungen
  *   PUT    /api/me/privacy               { profile, stats }
  *   PUT    /api/me/settings              Einstellungen für alle Geräte (Darstellung, Sprache, Glocken …)
- *   PUT    /api/me/profile               Profil { status, pronouns, bio, accent } · PUT/DELETE /api/me/banner Bannerbild (JPEG)
- *   GET    /media/banner/<id>            Bannerbild eines Profils
  *   GET    /api/players/<id>             Öffentliches Profil (nur wenn freigegeben)
  *   POST   /api/trainings                Training anbieten (ab Supervisor)
  *   DELETE /api/trainings/<id>           Eigenes Training löschen
  *   POST   /api/news                     Neuigkeit schreiben (ab PRD)
- *   DELETE /api/news/<id>                Eigene Neuigkeit löschen
+ *   PUT    /api/news/<id>                Eigene Neuigkeit bearbeiten · DELETE löscht sie
  *   POST   /api/media                    Bild hochladen (ab PRD, höchstens 1 MB)
  *   PUT    /api/jobs/<id>                Stelle öffnen/schließen, Zeitraum (ab PRD)
  *   POST   /api/applications             Bewerbung senden (angemeldet)
@@ -54,9 +52,7 @@
  *   DELETE /api/chats/<id>               Für alle löschen (Inhaber der Gruppe, Moderation)
  *   POST   /api/chats/<id>/messages      { text, files: [id], ch } – Text mit „/“ = Befehl (siehe commands.js), ch = Kanal eines Servers
  *   PUT    /api/chats/<id>/channels      Server: Kanäle und Kategorien { categories, channels, home } · { convert: true } macht eine Gruppe zum Server
- *   GET    /api/dashboard                Eigene Bots und Chats, die man leitet (für das Dashboard)
  *   POST   /api/chats/<id>/invite        Einladungslink { code } · GET /api/chat-invites/<code> Vorschau · POST …/<code>/join beitreten
- *   GET    /api/luna/intern              Luna von innen erklärt (nur Chief Engineer, Inhalt in luna-intern.js)
  *   DELETE /api/chats/<id>/messages/<m>  Nachricht löschen (eigene; Admins und Moderation alle)
  *   POST   /api/chats/<id>/files         Datei anmelden { name, type, size } → in Stücken hochladen (siehe files.js)
  *   PUT    /api/files/<id>/<n>           Stück n einer Datei
@@ -83,10 +79,9 @@
  *   PUT    /api/chats/<id>/roles         Eigene Rollen der Gruppe { roles: [{ id, name, color, perms }] }
  *   GET    /api/chats/<id>/discord       Discord-Verbindung eines Server-Chats (ohne Zugangsdaten)
  *   PUT    /api/chats/<id>/discord       { mode, webhook | token + channel, botName, events }
- *   GET    /api/chats/<id>/bots          Eigene Bots des Chats · POST erstellt { name, mode: basic | advanced }
- *   GET    /api/chats/<id>/bots/client   ClientScripts für die App (Mitglieder)
- *   GET    /api/chats/<id>/bots/<bot>    Bot mit Regeln, Dateien, Prüfung, Protokoll (wer den Chat verwaltet)
- *   PUT    /api/chats/<id>/bots/<bot>    { name, desc, on, mode, prefix, rules, files, clearMemory, clearLogs } · DELETE entfernt
+ *   GET    /api/chats/<id>/bots          Eigene Bots des Chats · POST erstellt { name }
+ *   GET    /api/chats/<id>/bots/<bot>    Bot mit Regeln (wer den Chat verwaltet)
+ *   PUT    /api/chats/<id>/bots/<bot>    { name, desc, on, prefix, rules } · DELETE entfernt
  *   PUT    /api/chats/<id>/bots/<bot>/photo  Bild des Bots (JPEG) · DELETE · GET /media/bot/<chat>/<bot> zeigt es
  *   POST   /api/chats/<id>/discord/test  Testnachricht nach Discord · /discord/submit zur Prüfung einreichen · DELETE entfernen
  *   GET    /api/discord/requests         Eingereichte Discord-Verbindungen (über PRD)
@@ -102,15 +97,15 @@ import { enc, b64u, fromB64u, now, clip, jsonPart } from './lib.js';
 import { hmacKey } from './secret.js';
 import { vapidKeys, saveReminders, sendDue, subscribeUser, unsubscribeUser, notifyUser } from './webpush.js';
 import { matchRank, atLeast } from './ranks.js';
-import { getContent, addTraining, deleteTraining, addNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
+import { getContent, addTraining, deleteTraining, addNews, updateNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
 import { submitApplication, listApplications, getApplication, setStatus, announce, ownView } from './applications.js';
 import { liveStats } from './stats.js';
 import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
 import {
   listChats, publicChats, moderationChats, createChat, readChat, postMessage, deleteMessage, claimChat, closeChat, updateChat, addMembers,
   joinChat, leaveChat, removeMember, setRole, muteChat, hideChat, deleteChat, reportChat, startChatUpload, staffList, findPlayer,
-  setChatPhoto, chatPhotoResponse, chatServers, reindexChat, replyFromPush, setChatRoles, gameEvents, setChannels, dashboard, chatInvite, invitePreview, inviteJoin,
-  botsList, botsClient, botGet, botCreate, botUpdate, botDelete, botPhoto,
+  setChatPhoto, chatPhotoResponse, chatServers, reindexChat, replyFromPush, setChatRoles, gameEvents, setChannels, chatInvite, invitePreview, inviteJoin,
+  botsList, botGet, botCreate, botUpdate, botDelete, botPhoto,
   discordGet, discordPut, discordTest, discordSubmit, discordRemove, discordRequests, discordReview,
 } from './chat.js';
 import { createInvite, getInvite, answerInvite } from './invites.js';
@@ -118,8 +113,6 @@ import { listPrivateServers, updatePrivateServer } from './pservers.js';
 import { serversView, serverDetail, playersStatus, friendsStatus, gameStats, playerStats, recordOnline, liveOnline, dropStale } from './game.js';
 import { putChunk, fileResponse } from './files.js';
 import { botPhotoResponse } from './bots.js';
-import { profileOf, updateProfile, setBanner, bannerResponse } from './profile.js';
-import { LUNA_INTERN, LUNA_INTERN_DATE } from './luna-intern.js';
 import { mailReady } from './mail.js';
 
 export { sendDue, matchRank };
@@ -263,7 +256,7 @@ async function createSession(req, env, store) {
   await refreshUser(env, user);
   await store.put(`user:${user.sub}`, user);
   const session = await seal(env, store, { sub: user.sub, ver: user.ver, iat: now(), exp: now() + SESSION_DAYS * 86400 });
-  return json(req, env, { session, ...publicUser(user), profile: profileOf(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
+  return json(req, env, { session, ...publicUser(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
 }
 
 // Angemeldeter Nutzer aus „Authorization: Bearer <sitzung>“
@@ -349,8 +342,6 @@ export async function handle(req, env, store) {
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
     const photo = path.match(/^\/media\/chat\/([\w-]+)$/);
     if (photo && m === 'GET') return await chatPhotoResponse(store, photo[1], cors(req, env));
-    const banner = path.match(/^\/media\/banner\/(\d{1,20})$/);
-    if (banner && m === 'GET') return await bannerResponse(store, banner[1], cors(req, env));
     const botImg = path.match(/^\/media\/bot\/([\w-]+)\/([\w-]+)$/);
     if (botImg && m === 'GET') return await botPhotoResponse(store, botImg[1], botImg[2], cors(req, env));
     const media = path.match(/^\/media\/([\w-]+)$/);
@@ -381,7 +372,7 @@ export async function handle(req, env, store) {
     if (player && m === 'GET') {
       const user = await store.get(`user:${player[1]}`);
       if (!user || !user.privacy || !user.privacy.profile) return json(req, env, { error: 'not_found' }, 404);
-      return json(req, env, { ...publicUser(user), profile: profileOf(user), statsPublic: !!user.privacy.stats, stats: user.privacy.stats ? await playerStats(store, user.sub) : null });
+      return json(req, env, { ...publicUser(user), statsPublic: !!user.privacy.stats, stats: user.privacy.stats ? await playerStats(store, user.sub) : null });
     }
     // Spieler auf Roblox suchen (öffentliche Daten)
     if (path === '/api/players/find' && m === 'GET') {
@@ -415,17 +406,10 @@ export async function handle(req, env, store) {
     if (path === '/api/chats/public' && m === 'GET') return json(req, env, await publicChats(store, user, url.searchParams.get('q') || ''));
     if (path === '/api/chats/moderation' && m === 'GET') return json(req, env, await moderationChats(store, await freshUser(env, store, user), url.searchParams.get('q') || '', url.searchParams.get('kind') || ''));
     if (path === '/api/chats' && m === 'POST') return json(req, env, await createChat(store, env, await freshUser(env, store, user), await readJson(req, 20000)), 201);
-    if (path === '/api/dashboard' && m === 'GET') return json(req, env, await dashboard(store, user));
     // Einladungslinks für Gruppen und Server
     const cinv = path.match(/^\/api\/chat-invites\/([\w-]{6,12})(\/join)?$/);
     if (cinv && !cinv[2] && m === 'GET') return json(req, env, await invitePreview(store, user, cinv[1]));
     if (cinv && cinv[2] && m === 'POST') return json(req, env, await inviteJoin(store, env, await freshUser(env, store, user), cinv[1]));
-    // Luna intern: Erklärung der Sprache nur für den Chief Engineer
-    if (path === '/api/luna/intern' && m === 'GET') {
-      const u = await freshUser(env, store, user);
-      if (u.rank !== 'Chief Engineer') return json(req, env, { error: 'forbidden' }, 403);
-      return json(req, env, { md: LUNA_INTERN, updated: LUNA_INTERN_DATE });
-    }
     // Einladungen ins Spiel
     if (path === '/api/invites' && m === 'POST') return json(req, env, await createInvite(store, env, await freshUser(env, store, user), await readJson(req, 2000)), 201);
     const invite = path.match(/^\/api\/invites\/([\w-]{6,20})$/);
@@ -439,7 +423,6 @@ export async function handle(req, env, store) {
       const [, id, bid, part] = botRoute;
       if (!bid && m === 'GET') return json(req, env, await botsList(store, user, id));
       if (!bid && m === 'POST') return json(req, env, await botCreate(store, env, await freshUser(env, store, user), id, await readJson(req, 3000)), 201);
-      if (bid === 'client' && !part && m === 'GET') return json(req, env, await botsClient(store, user, id));
       if (bid && !part && m === 'GET') return json(req, env, await botGet(store, await freshUser(env, store, user), id, bid));
       if (bid && !part && m === 'PUT') return json(req, env, await botUpdate(store, env, await freshUser(env, store, user), id, bid, await readJson(req, 160000)));
       if (bid && !part && m === 'DELETE') return json(req, env, await botDelete(store, await freshUser(env, store, user), id, bid));
@@ -500,17 +483,7 @@ export async function handle(req, env, store) {
 
     if (path === '/api/me' && m === 'GET') {
       await freshUser(env, store, user);
-      return json(req, env, { ...publicUser(user), profile: profileOf(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
-    }
-    if (path === '/api/me/profile' && m === 'PUT') {
-      const r = updateProfile(user, await readJson(req, 4000));
-      await store.put(`user:${user.sub}`, user);
-      return json(req, env, { profile: r });
-    }
-    if (path === '/api/me/banner' && (m === 'PUT' || m === 'DELETE')) {
-      const r = await setBanner(store, user, req);
-      await store.put(`user:${user.sub}`, user);
-      return json(req, env, { profile: r });
+      return json(req, env, { ...publicUser(user), privacy: user.privacy, settings: user.settings || null, applications: await myApplications(store, user) });
     }
     if (path === '/api/me/stats' && m === 'GET') return json(req, env, await playerStats(store, user.sub));
     if (path === '/api/me/privacy' && m === 'PUT') {
@@ -546,6 +519,10 @@ export async function handle(req, env, store) {
       return json(req, env, await addNews(store, user, await readJson(req, 20000)), 201);
     }
     const news = path.match(/^\/api\/news\/([\w-]+)$/);
+    if (news && m === 'PUT') {
+      need(await freshUser(env, store, user), 'Public Relations Department');
+      return json(req, env, await updateNews(store, user, news[1], await readJson(req, 20000)));
+    }
     if (news && m === 'DELETE') {
       await deleteNews(store, user, news[1]);
       return json(req, env, { ok: true });

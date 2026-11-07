@@ -334,7 +334,7 @@
     game.busy = false;
     game.at = Date.now();
     if (state.page === 'statistiken') RENDER.statistiken();
-    if (state.page === 'home') renderHomeKpis();
+    if (state.page === 'home') { renderHomeKpis(); renderRoles(); }
   }
   const punctualPct = (x) => (x && x.trips ? (x.punctual / x.trips) * 100 : 0);
   // Spieler je Stunde, fehlende Stunden = 0; die laufende Stunde mindestens mit der Zahl von jetzt
@@ -356,7 +356,8 @@
     return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path d="${d}"/><circle cx="${x(last).toFixed(1)}" cy="${y(values[last]).toFixed(1)}" r="4"/></svg>`;
   }
   // Zahl, die beim Erscheinen hochzählt (siehe countUp)
-  const FORMATS = { fmt: (n) => fmt(Math.round(n)), compact: (n) => compact(Math.round(n)), pct: (n) => pct(n, 1), km: (n) => compact(Math.round(n)) };
+  // exact: genaue Zahl wie bei Roblox (ab 10 Millionen kurz)
+  const FORMATS = { fmt: (n) => fmt(Math.round(n)), exact: (n) => (n >= 1e7 ? compact(Math.round(n)) : fmt(Math.round(n))), compact: (n) => compact(Math.round(n)), pct: (n) => pct(n, 1), km: (n) => compact(Math.round(n)) };
   const countHtml = (n, format = 'fmt', key = '') => `<span data-count="${+n || 0}" data-fmt="${format}" data-count-key="${esc(key)}">${FORMATS[format](+n || 0)}</span>`;
   function kpi({ label, num, format = 'fmt', ic, live = false, spark = null, note = '', key = '', bindKey = '' }) {
     const value = bindKey ? `<span data-bind="${bindKey}">${FORMATS[format](num)}</span>` : countHtml(num, format, key || label);
@@ -390,8 +391,8 @@
     }
     const box = $('[data-kpis="stats"]');
     box.innerHTML = [
-      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'compact', live: L, ic: 'fi-rr-gamepad', key: 'st-visits' }),
-      kpi({ label: t('Favoriten'), num: s.favorites, format: 'compact', live: L, ic: 'fi-rr-star', key: 'st-favs' }),
+      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L, ic: 'fi-rr-gamepad', key: 'st-visits' }),
+      kpi({ label: t('Favoriten'), num: s.favorites, format: 'exact', live: L, ic: 'fi-rr-star', key: 'st-favs' }),
       kpi({ label: t('Gruppenmitglieder'), num: s.groupMembers, format: 'compact', live: L, ic: 'fi-rr-users-alt', key: 'st-group' }),
       kpi({ label: 'Discord', num: s.discordMembers, format: 'compact', live: L, ic: 'fi-brands-discord', key: 'st-discord' }),
       kpi({ label: t('Gefahrene km'), num: g.total.km, format: 'km', note: t('gesamt'), ic: 'fi-rr-route', key: 'st-km' }),
@@ -543,15 +544,42 @@
         </div>
       </div>
     </article>`;
-    $('[data-roles]').innerHTML = start + D.roleCards.map((c) => `<article class="role-card">
+    $('[data-roles]').innerHTML = start + D.roleCards.map((c) => {
+      const x = inGameRole(c.rank);
+      return `<article class="role-card">
       <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy"></div>
       <div class="role-card__body">
         <h3>${fill(c.title, c.rank)}</h3>
         <p>${fill(c.text, c.rank)}</p>
-        <span class="count-pill">${icon('fi-rr-users-alt')}${t('<b>{n}</b> Spieler als {rank}', { n: fmt(rankOf(c.rank).members), rank: esc(c.rank) })}</span>
+        <span class="count-pill count-pill--live" style="--rc:${esc(x.color)}"><i class="count-pill__dot" aria-hidden="true"></i>${t('<b>{n}</b> gerade im Spiel als {rank}', { n: fmt(x.n), rank: esc(x.name) })}</span>
       </div>
-    </article>`).join('');
+    </article>`;
+    }).join('');
   }
+  // Wie viele gerade im Spiel diese Rolle haben: Team mit dem Namen der Rolle (Farbe aus dem Spiel), sonst aus dem
+  // Teamnamen abgeleitet (z. B. „Driver“ → Qualified Driver). Ohne Backend: die Demo-Server.
+  function inGameRole(rank) {
+    const fallback = { name: rank, color: rankOf(rank).color };
+    if (!liveMode()) {
+      const n = D.servers.reduce((sum, sv) => sum + serverModel(sv).players.filter((p) => p.role === rank).length, 0);
+      return { ...fallback, n };
+    }
+    const L = G().live || {};
+    const teams = (live.data && live.data.teams) || L.teams || [];
+    const team = teams.find((x) => sameTeam(x.name, rank));
+    if (team) return { name: team.name, color: teamColor(team), n: team.n || 0 };
+    // Teams, deren Name zur Rolle passt (z. B. „Driver“ → Qualified Driver): Farbe aus dem Spiel, Spieler zusammen
+    const near = teams.filter((x) => roleOfTeam(x.name) === rank);
+    if (near.length) return { name: rank, color: teamColor(near[0]), n: near.reduce((n, x) => n + (x.n || 0), 0) };
+    return { ...fallback, n: (L.roles && L.roles[rank]) || 0 };
+  }
+  // Wie backend/game.js → gameRole: Teamname aus dem Spiel → feste Rolle
+  const ROLE_WORDS = [
+    ['Supervisor', /supervisor|aufsicht|manager|director|engineer|public relations|moderat|admin/], ['Signaller', /signal|stellwerk|fahrdienst|dispatch/],
+    ['Conductor', /conductor|zugbegleit|schaffner|guard/], ['Platform Staff', /platform|bahnsteig/], ['Learning Driver', /learning|trainee|azubi|ausbildung/],
+    ['Qualified Driver', /driver|lokf|fahrer/],
+  ];
+  const roleOfTeam = (name) => { const v = String(name || '').toLowerCase(); const hit = ROLE_WORDS.find(([, re]) => re.test(v)); return hit ? hit[0] : 'Passenger'; };
 
   function renderRoutes() {
     $('[data-routes]').innerHTML = D.routes.map((r) => {
@@ -796,13 +824,29 @@
   const liveMode = () => apiReady();
   // Rollen im Spiel von Passenger bis Supervisor (wie backend/game.js)
   const GAME_ROLES = ['Passenger', 'Learning Driver', 'Qualified Driver', 'Platform Staff', 'Conductor', 'Signaller', 'Supervisor'];
+  // Teams aus dem Spiel (Attribut „Extern“): Name, Farbe und Reihenfolge wie im Teams-Service. Team mit der Zahl 2 fertigt ab.
+  const DISPATCH_ORDER = 2;
+  const sameTeam = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
+  const teamColor = (x) => (x && x.color) || '#878C96';
+  // Gruppen für Listen: alle Teams in ihrer Reihenfolge (auch leere), wer in keinem ist, kommt unter „Weitere Spieler“.
+  // Ohne Teams aus dem Spiel: die festen Rollen von Supervisor bis Passenger (nur mit Spielern).
+  function teamGroups(people, teams) {
+    if (Array.isArray(teams) && teams.length) {
+      const groups = teams.map((x) => ({ key: x.name, name: x.name, color: teamColor(x), sub: '', list: people.filter((p) => sameTeam(p.team, x.name)), team: x }));
+      const rest = people.filter((p) => !teams.some((x) => sameTeam(p.team, x.name)));
+      if (rest.length) groups.push({ key: '_rest', name: t('Weitere Spieler'), color: '#878C96', sub: t('ohne Team aus der App'), list: rest });
+      return groups;
+    }
+    return [...GAME_ROLES].reverse().map((r) => ({ key: r, name: r, color: roleRank(r).color, sub: t(ROLE_LABEL[r]), list: people.filter((p) => p.role === r) })).filter((g) => g.list.length);
+  }
+  const dispatchTeam = (teams) => (Array.isArray(teams) ? teams.find((x) => Number(x.order) === DISPATCH_ORDER) || null : null);
   async function loadLive(force = false) {
     if (!liveMode() || live.busy || (!force && live.data && Date.now() - live.at < 25000)) return;
     live.busy = true;
     try { live.data = await api('/api/servers'); } catch (e) { live.data = live.data || { servers: [], avatars: {}, online: 0, error: true }; } finally { live.busy = false; live.at = Date.now(); }
     D.stats.servers = live.data.servers.length;
     if (state.page === 'server' && !state.serverId && modal.hidden) renderServers();
-    if (state.page === 'home') renderHomeKpis();
+    if (state.page === 'home') { renderHomeKpis(); renderRoles(); }
     if (modalView && modalView.name === 'server-players') refreshModal();
     bind();
   }
@@ -852,7 +896,7 @@
       live: true, id: s.id, private: s.private, type: s.private ? 'private' : 'public', players: s.players, max: s.max,
       title: s.private ? (p ? p.name : t('Privater Server')) : t('Öffentlicher Server'),
       sub: `${t('seit {time}', { time: uptime(Math.max(1, Math.round((Date.now() - s.since) / 60000))) })}${s.version ? ` · v${s.version}` : ''}`,
-      roles: s.roles, people: s.people, avatars: (live.data && live.data.avatars) || {}, pserver: p,
+      roles: s.roles, teams: s.teams || null, people: s.people, avatars: (live.data && live.data.avatars) || {}, pserver: p,
     };
   }
   function serverCard(s) {
@@ -866,20 +910,21 @@
       <header class="svc__head">
         <span class="svc__ic">${icon(ic)}</span>
         <div class="svc__title">
-          <h3>${esc(c.title)}</h3>
-          <button class="svc__id" type="button" data-copy="${esc(c.id)}" aria-label="${esc(t('Server-ID kopieren'))}"><span>ID</span><code>${esc(shortId(c.id))}</code>${icon('fi-rr-copy')}</button>
+          <div class="svc__name"><h3>${esc(c.title)}</h3><button class="svc__copy" type="button" data-copy="${esc(c.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('fi-rr-copy')}</button></div>
+          ${c.sub ? `<small class="svc__sub">${esc(c.sub)}</small>` : ''}
         </div>
         <div class="svc__count"><b>${countHtml(c.players, 'fmt', `sv-${c.id}`)}</b><small>/${fmt(c.max)} ${t('Spieler')}</small></div>
       </header>
       <div class="svc__bar bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
-      <ul class="svc__roles" aria-label="${esc(t('Rollen'))}">${GAME_ROLES.map((r) => `<li class="${c.roles[r] ? '' : 'is-zero'}" style="--rc:${roleRank(r).color}"><i></i><span>${esc(r)}</span><b>${fmt(c.roles[r] || 0)}</b></li>`).join('')}</ul>
+      <ul class="svc__roles" aria-label="${esc(t('Rollen'))}">${(c.teams && c.teams.length ? c.teams.map((x) => [x.name, teamColor(x), x.n || 0]) : GAME_ROLES.map((r) => [r, roleRank(r).color, c.roles[r] || 0]))
+        .map(([name, color, n]) => `<li class="${n ? '' : 'is-zero'}" style="--rc:${esc(color)}"><i></i><span>${esc(name)}</span><b>${fmt(n)}</b></li>`).join('')}</ul>
       <footer class="svc__foot">
         <button class="svc__people" type="button" data-server-people="${esc(c.id)}"${c.players ? '' : ' disabled'} aria-label="${esc(t('Alle Spieler ansehen'))}">
           <span class="avatars">${shown.map((p) => personPic(p, c.avatars)).join('')}${more ? `<span class="avatar avatar--more">+${more > 99 ? '99' : more}</span>` : ''}</span>
           <small>${c.players ? t('Alle ansehen') : t('Noch leer')}</small>
         </button>
         <span class="svc__btns">${c.pserver && c.pserver.mine ? `<button class="server__details" type="button" data-pserver-edit="${esc(c.pserver.id)}" aria-label="${esc(t('Einstellungen'))}">${icon('fi-rr-settings')}</button>` : ''}
-        <a class="server__details" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('fi-rr-angle-small-right')}</a></span>
+        <a class="server__details server__details--go" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('fi-rr-angle-small-right')}</a></span>
       </footer>
     </article>`;
   }
@@ -1023,6 +1068,7 @@
   // Alle Spieler eines Servers (Sheet)
   function serverPeopleView(id) {
     let people = null;
+    let teams = null;
     let avatars = {};
     let title = '';
     if (liveMode()) {
@@ -1030,6 +1076,7 @@
       if (!d) { loadLiveDetail(id); return `<div class="sheet-loading">${icon('fi-rr-spinner')}<span>${t('Wird geladen …')}</span></div>`; }
       if (d.error) return `<p class="muted">${t('Dieser Server ist nicht mehr online.')}</p>`;
       people = d.server.people;
+      teams = d.server.teams;
       avatars = d.avatars || {};
       title = d.server.private && d.server.pserver ? d.server.pserver.name : t('Öffentlicher Server');
     } else {
@@ -1038,11 +1085,12 @@
       people = serverModel(s).players.map((p) => ({ name: p.name, role: p.role, line: p.train ? p.train.line.name : null, dest: p.train ? p.train.to : null, at: p.station ? p.station.name : null }));
       title = t(s.name);
     }
-    const groups = GAME_ROLES.map((r) => [r, people.filter((p) => p.role === r)]).filter(([, l]) => l.length);
+    const groups = teamGroups(people, teams);
     return `<p class="sp-head">${icon('fi-rr-users-alt')}<span><b>${esc(title)}</b> · ${t('{n} Spieler', { n: fmt(people.length) })}</span></p>
-      ${groups.map(([r, l]) => `<section class="sp-group">
-        <h3 class="pgroup__title"><i style="--rc:${roleRank(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${l.length}</small></h3>
-        <ul class="sp-list">${l.map((p) => `<li>${p.id ? `<button class="sp-row" type="button" data-player="${esc(p.id)}">` : '<div class="sp-row">'}
+      ${groups.map((g) => `<section class="sp-group">
+        <h3 class="pgroup__title"><i style="--rc:${esc(g.color)}"></i>${esc(g.name)}<small>${g.sub ? `${esc(g.sub)} · ` : ''}${g.list.length}</small></h3>
+        ${g.list.length ? '' : `<p class="team-empty">${t('Noch niemand in diesem Team')}</p>`}
+        <ul class="sp-list">${g.list.map((p) => `<li>${p.id ? `<button class="sp-row" type="button" data-player="${esc(p.id)}">` : '<div class="sp-row">'}
           ${personPic(p, avatars)}<span class="sp-row__main"><b>${personName(p)}</b><span class="sp-row__doing">${doingHtml(p)}</span></span>
           ${p.id ? icon('fi-rr-angle-small-right', 'sp-row__chev') : ''}${p.id ? '</button>' : '</div>'}</li>`).join('')}</ul>
       </section>`).join('')}`;
@@ -1084,50 +1132,48 @@
     const avatars = d.avatars || {};
     const full = s.max && s.players >= s.max;
     const joinHref = s.private ? (p && p.canJoin && p.link ? p.link : null) : joinUrl({ id: s.id });
-    const tab = state.sdTab === 'trains' ? 'trains' : 'players';
-    const tabBtn = (tid, ic, label, n) => `<button type="button" role="tab" aria-selected="${tab === tid}" data-sd-tab="${tid}">${icon(ic)}${label}<span class="head-tabs__n">${n}</span></button>`;
     const title = s.private ? (p ? p.name : t('Privater Server')) : t('Öffentlicher Server');
     head.innerHTML = `${back}
       <div class="appbar">
         <div class="appbar__title">
           <span class="appbar__label"><span class="live-dot"></span>${t('Live')}${s.version ? ` · v${esc(s.version)}` : ''} · ${s.private ? t('Privat') : t('Öffentlich')}</span>
-          <h1 class="appbar__value">${esc(title)}</h1>
+          <h1 class="appbar__value">${esc(title)}<button class="sd-copy" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('fi-rr-copy')}</button></h1>
         </div>
         <div class="appbar__actions">${full ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
           : joinHref ? `<a class="btn btn--primary btn--sm" href="${esc(joinHref)}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`
             : `<span class="ps-note">${icon('fi-rr-lock')}${t('Beitreten nur über Roblox')}</span>`}</div>
       </div>
-      ${p && p.ownerName ? `<p class="sd-net">${icon('fi-rr-user')}${t('Privater Server von {name}', { name: esc(p.ownerName) })}</p>` : ''}
-      <button class="sd-id" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}">
-        <span>${t('Server-ID')}</span><code>${esc(s.id)}</code>${icon('fi-rr-copy')}
-      </button>
-      <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Ansicht'))}">
-        ${tabBtn('players', 'fi-rr-users-alt', t('Spieler'), s.people.length)}
-        ${tabBtn('trains', 'fi-rr-train-side', t('Züge'), s.trainList.length)}
-      </div>`;
+      ${p && p.ownerName ? `<p class="sd-net">${icon('fi-rr-user')}${t('Privater Server von {name}', { name: esc(p.ownerName) })}</p>` : ''}`;
     const stats = `<div class="stat-row stat-row--4">
       <div class="stat"><span>${t('Spieler')}</span><b>${s.players}/${s.max}</b></div>
       <div class="stat"><span>${t('Züge unterwegs')}</span><b>${s.trainList.length}</b></div>
       <div class="stat"><span>${t('Laufzeit')}</span><b>${uptime(Math.max(1, Math.round((Date.now() - s.since) / 60000)))}</b></div>
       <div class="stat"><span>${t('Version')}</span><b>${s.version ? `v${esc(s.version)}` : '–'}</b></div>
     </div>`;
-    let content;
-    if (tab === 'players') {
-      const roles = GAME_ROLES.map((r) => [r, s.people.filter((x) => x.role === r).length]).filter(([, n]) => n);
-      if (!roles.some(([r]) => r === state.sdRole)) state.sdRole = 'all';
-      const groups = roles.filter(([r]) => state.sdRole === 'all' || r === state.sdRole);
-      content = !s.people.length ? `<p class="empty">${t('Gerade ist niemand auf diesem Server.')}</p>` : `<div class="chips chips--scroll chips--block" role="group" aria-label="${esc(t('Rolle'))}">
-          <button class="chip${state.sdRole === 'all' ? ' is-active' : ''}" type="button" data-sd-role="all">${t('Alle')} · ${s.people.length}</button>
-          ${roles.map(([r, n]) => `<button class="chip${state.sdRole === r ? ' is-active' : ''}" type="button" data-sd-role="${esc(r)}">${esc(r)} · ${n}</button>`).join('')}
-        </div>
-        <div data-reveal>${groups.map(([r, n]) => `<section class="pgroup">
-          <h2 class="pgroup__title"><i style="--rc:${roleRank(r).color}"></i>${esc(r)}<small>${esc(t(ROLE_LABEL[r]))} · ${n}</small></h2>
-          <ul class="sp-list sp-list--card">${s.people.filter((x) => x.role === r).map((x) => `<li><button class="sp-row" type="button" data-player="${esc(x.id)}">
-            ${personPic(x, avatars)}<span class="sp-row__main"><b>${personName(x)}</b><span class="sp-row__doing">${doingHtml(x)}</span></span>${icon('fi-rr-angle-small-right', 'sp-row__chev')}</button></li>`).join('')}</ul>
-        </section>`).join('')}</div>`;
-    } else {
-      const byId = new Map(s.people.map((x) => [x.id, x]));
-      content = s.trainList.length ? `<div class="train-grid" data-reveal>${s.trainList.map((tr) => {
+    const row = (x) => `<li><button class="sp-row" type="button" data-player="${esc(x.id)}">
+      ${personPic(x, avatars)}<span class="sp-row__main"><b>${personName(x)}</b><span class="sp-row__doing">${doingHtml(x)}</span></span>${icon('fi-rr-angle-small-right', 'sp-row__chev')}</button></li>`;
+    const secHead = (ic, label, n, color = '') => `<h2 class="sd-sec__title">${color ? `<i class="sd-sec__dot" style="--rc:${esc(color)}"></i>` : icon(ic)}<span>${label}</span>${n ? `<small>${n}</small>` : ''}</h2>`;
+    // 1. Abfertigung: Bahnhöfe, an denen gerade jemand aus dem Team mit der Zahl 2 abfertigt (ohne Teams: Bahnsteigpersonal)
+    const dt = dispatchTeam(s.teams);
+    const staff = s.people.filter((x) => (dt ? sameTeam(x.team, dt.name) : !s.teams && x.role === 'Platform Staff'));
+    const stations = new Map();
+    staff.forEach((x) => { const k = x.at || ''; if (!stations.has(k)) stations.set(k, []); stations.get(k).push(x); });
+    const nextAt = (name) => s.trainList.filter((tr) => name && tr.next === name);
+    const lineTag = (tr) => (tr.line ? `<span class="line line--${(lineByName(tr.line) || {}).cat || catOfTrain(tr.veh) || 're'}">${esc(tr.line)}</span>` : '');
+    const dispatch = `<section class="sd-sec">
+      ${secHead('fi-rr-flag', dt ? t('Abfertigung · {team}', { team: esc(dt.name) }) : t('Abfertigung'), stations.size ? t('{n} Bahnhöfe', { n: stations.size }) : '', dt ? teamColor(dt) : '')}
+      ${stations.size ? `<div class="disp-grid" data-reveal>${[...stations].map(([name, list]) => `<article class="disp" style="--rc:${esc(dt ? teamColor(dt) : roleRank('Platform Staff').color)}">
+          <header class="disp__head"><span class="disp__ic">${icon('fi-rr-marker')}</span><div><h3>${name ? esc(name) : t('Bahnhof nicht gemeldet')}</h3><small>${list.length === 1 ? t('1 Person fertigt ab') : t('{n} Personen fertigen ab', { n: list.length })}</small></div></header>
+          ${nextAt(name).length ? `<p class="disp__next">${icon('fi-rr-train-side')}<span>${nextAt(name).map((tr) => `${lineTag(tr)} ${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || '')}`).join(' · ')}</span></p>` : ''}
+          <ul class="sp-list">${list.map(row).join('')}</ul>
+        </article>`).join('')}</div>`
+        : `<p class="team-empty">${dt || !s.teams ? t('Gerade fertigt niemand ab.') : t('Kein Team hat die Zahl 2 – im Spiel am Team für die Abfertigung als zweites Attribut 2 eintragen.')}</p>`}
+    </section>`;
+    // 2. Züge
+    const byId = new Map(s.people.map((x) => [x.id, x]));
+    const teamOf = (x) => (s.teams || []).find((tm) => sameTeam(tm.name, x.team));
+    const trains = `<section class="sd-sec">${secHead('fi-rr-train-side', t('Züge'), s.trainList.length ? fmt(s.trainList.length) : '')}
+      ${s.trainList.length ? `<div class="train-grid" data-reveal>${s.trainList.map((tr) => {
         const L = lineByName(tr.line);
         const cat = L ? L.cat : catOfTrain(tr.veh) || 're';
         return `<article class="ltrain">
@@ -1135,12 +1181,20 @@
             <div class="ltrain__title"><h3>${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || t('Zug'))}</h3><small>${[tr.train, trainName(tr.veh)].filter(Boolean).map(esc).join(' · ')}</small></div></div>
           ${tr.next ? `<p class="train__now">${icon('fi-rr-marker')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
           ${liveStopsHtml(tr)}
-          <div class="ltrain__crew">${tr.crew.map((c) => { const x = byId.get(c.id) || c; return `<button class="crew crew--btn" type="button" data-player="${esc(c.id)}">${personPic(x, avatars)}<span class="crew__text"><small>${esc(t(roleRank(c.role).label))}</small><b>${esc(x.dn || x.name || t('Spieler'))}</b></span></button>`; }).join('')}</div>
+          <div class="ltrain__crew">${tr.crew.map((c) => { const x = byId.get(c.id) || c; const tm = teamOf(x); return `<button class="crew crew--btn" type="button" data-player="${esc(c.id)}">${personPic(x, avatars)}<span class="crew__text"><small${tm ? ` style="color:${esc(teamColor(tm))}"` : ''}>${esc(tm ? tm.name : t(roleRank(c.role).label))}</small><b>${esc(x.dn || x.name || t('Spieler'))}</b></span></button>`; }).join('')}</div>
         </article>`;
-      }).join('')}</div>` : `<div class="empty-card"><span class="empty-card__ic">${icon('fi-rr-train-side')}</span><h3>${t('Kein Zug gemeldet')}</h3><p>${t('Züge erscheinen hier, sobald das Spiel Linie und Zugnummer der Fahrer meldet.')}</p></div>`;
-    }
-    body.innerHTML = stats + content;
-    reveal($('[data-reveal]', body));
+      }).join('')}</div>` : `<p class="team-empty">${t('Kein Zug gemeldet. Züge erscheinen hier, sobald das Spiel Linie und Zugnummer der Fahrer meldet.')}</p>`}
+    </section>`;
+    // 3. Alle Teams aus dem Teams-Service, auch leere; wer neu dazukommt, steht unter den Spielern, die schon im Team sind
+    const groups = teamGroups(s.people, s.teams);
+    const teams = `<section class="sd-sec">${secHead('fi-rr-users-alt', s.teams ? t('Teams') : t('Spieler'), t('{n} Spieler', { n: fmt(s.people.length) }))}
+      ${groups.length ? `<div data-reveal>${groups.map((g) => `<section class="pgroup${g.list.length ? '' : ' is-empty'}">
+          <h3 class="pgroup__title"><i style="--rc:${esc(g.color)}"></i>${esc(g.name)}<small>${g.sub ? `${esc(g.sub)} · ` : ''}${g.list.length}</small></h3>
+          ${g.list.length ? `<ul class="sp-list sp-list--card">${g.list.map(row).join('')}</ul>` : `<p class="team-empty">${t('Noch niemand in diesem Team')}</p>`}
+        </section>`).join('')}</div>` : `<p class="empty">${t('Gerade ist niemand auf diesem Server.')}</p>`}
+    </section>`;
+    body.innerHTML = stats + dispatch + trains + teams;
+    $$('[data-reveal]', body).forEach((x) => reveal(x));
   }
 
   // ---------- Server-Details ----------
@@ -1281,16 +1335,13 @@
       <div class="appbar">
         <div class="appbar__title">
           <span class="appbar__label"><span class="live-dot"></span>${t('Live')} · ${esc(s.region)} · v${esc(s.version)} · ${typeName}</span>
-          <h1 class="appbar__value">${esc(t(s.name))}</h1>
+          <h1 class="appbar__value">${esc(t(s.name))}<button class="sd-copy" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('fi-rr-copy')}</button></h1>
         </div>
         <div class="appbar__actions">${full
           ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
           : `<a class="btn btn--primary btn--sm" href="${esc(joinUrl(s))}" target="_blank" rel="noopener">${icon('fi-sr-play')}${t('Beitreten')}</a>`}</div>
       </div>
       <p class="sd-net">${icon('fi-rr-route')}${esc(t(s.network))}</p>
-      <button class="sd-id" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}">
-        <span>${t('Server-ID')}</span><code>${esc(s.id)}</code>${icon('fi-rr-copy')}
-      </button>
       <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Ansicht'))}">
         ${tabBtn('trains', 'fi-rr-train-side', t('Züge'), m.trains.length)}
         ${tabBtn('players', 'fi-rr-users-alt', t('Spieler'), m.players.length)}
@@ -1728,18 +1779,33 @@
   }
 
   // ---------- Neuigkeiten ----------
+  // Kategorien (wie backend/content.js → NEWS_CATS): Name im Filter, Farbe des Schilds
+  const NEWS_CATS = [
+    ['update', 'Updates', 'Update', '#1E2A78'], ['event', 'Events', 'Event', '#EC0016'], ['community', 'Community', 'Community', '#2E8B57'],
+    ['strecke', 'Neue Strecken', 'Strecke', '#0F7B8A'], ['fahrzeug', 'Neue Züge', 'Fahrzeug', '#7A3FC7'], ['training', 'Trainings', 'Training', '#D97706'],
+    ['team', 'Team & Stellen', 'Team', '#2563EB'], ['wartung', 'Wartung', 'Wartung', '#64748B'], ['gewinnspiel', 'Gewinnspiele', 'Gewinnspiel', '#DB2777'],
+    ['hinweis', 'Wichtig', 'Hinweis', '#B45309'],
+  ];
+  const newsCat = (id) => NEWS_CATS.find((c) => c[0] === id) || NEWS_CATS[0];
+  const catTag = (n) => `<span class="cat-tag" style="--cc:${newsCat(n.cat)[3]}">${esc(t(n.tag || newsCat(n.cat)[2]))}</span>`;
   const newsDate = (n) => dtf({ day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(n.date.length > 10 ? n.date : `${n.date}T00:00:00Z`));
   function newsCard(n) {
     return `<button class="ncard" type="button" data-news-open="${esc(n.id)}">
       <div class="ncard__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="ncard__play" aria-label="${esc(t('Mit Video'))}">${icon('fi-sr-play')}</span>` : ''}</div>
       <div class="ncard__body">
         <h3>${esc(t(n.title))}</h3>
-        <div class="ncard__foot"><span class="cat-tag cat-tag--${n.cat}">${esc(t(n.tag || n.cat))}</span><span>${newsDate(n)}</span></div>
+        <div class="ncard__foot">${catTag(n)}<span>${newsDate(n)}</span></div>
       </div>
     </button>`;
   }
   function renderNewsPage() {
-    $$('[data-news-cat]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.newsCat === state.newsCat)));
+    // Filter: Alle und jede Kategorie, in der es Neuigkeiten gibt (die gewählte bleibt sichtbar)
+    const used = new Set(newsItems().map((n) => n.cat));
+    const tabs = $('[data-news-tabs]');
+    if (tabs) {
+      tabs.innerHTML = [['all', 'Alle'], ...NEWS_CATS.filter((c) => used.has(c[0]) || c[0] === state.newsCat)]
+        .map(([id, label]) => `<button type="button" role="tab" aria-selected="${state.newsCat === id}" data-news-cat="${id}">${esc(t(label))}</button>`).join('');
+    }
     $$('[data-can-pr]').forEach((b) => { b.hidden = !mayPR(); });
     const list = newsItems().filter((n) => state.newsCat === 'all' || n.cat === state.newsCat);
     $('[data-news-feed]').innerHTML = list.length ? list.map(newsCard).join('') : `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`;
@@ -2946,7 +3012,6 @@
   }
   function applyMe(me) {
     if (me.privacy) store.set('tsg-privacy', me.privacy);
-    if (me.profile) { prof.me = me.profile; store.set('tsg-me-profile', me.profile); if (state.page === 'profil') renderProfile(); }
     // Rang aus der Gruppe, vom Backend geprüft
     if (me.rank && state.profile && state.profile.oauth) {
       store.set('tsg-group', { userId: state.profile.userId, role: me.groupRole || null, rank: me.rank, at: Date.now() });
@@ -2978,7 +3043,7 @@
   function safeRender() {
     renderMe();
     if (!(state.page === 'karriere' && state.jobApply)) RENDER[state.page]();
-    if (modalView && !['training-new', 'news-new'].includes(modalView.name)) refreshModal();
+    if (modalView && !['training-new', 'news-new', 'news-edit'].includes(modalView.name)) refreshModal();
     bind();
   }
   const errorText = (e) => (e.status === 403 ? t('Dafür fehlt dir der Rang.')
@@ -3103,43 +3168,45 @@
     roblox: { name: 'Roblox', icon: 'fi-sr-play', label: 'Jetzt spielen', url: () => D.links.play },
     link: { name: 'Weiterleitung (Link)', icon: 'fi-rr-arrow-up-right-from-square', label: 'Mehr erfahren', url: () => '' },
   };
-  const newsBtnRow = () => `<div class="nbtn-row" data-nbtn>
-      <div class="select"><select name="btype" aria-label="${esc(t('Art des Buttons'))}">${Object.entries(NEWS_BUTTONS).map(([k, b]) => `<option value="${k}">${esc(t(b.name))}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div>
-      <input name="blabel" maxlength="40" placeholder="${esc(t('Text, z. B. {label}', { label: t(NEWS_BUTTONS.discord.label) }))}" value="${esc(t(NEWS_BUTTONS.discord.label))}">
-      <input name="burl" type="url" inputmode="url" placeholder="https://…" value="${esc(D.links.discord)}">
+  const newsBtnRow = (b = null) => `<div class="nbtn-row" data-nbtn>
+      <div class="select"><select name="btype" aria-label="${esc(t('Art des Buttons'))}">${Object.entries(NEWS_BUTTONS).map(([k, x]) => `<option value="${k}"${b && b.type === k ? ' selected' : ''}>${esc(t(x.name))}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div>
+      <input name="blabel" maxlength="40" placeholder="${esc(t('Text, z. B. {label}', { label: t(NEWS_BUTTONS.discord.label) }))}" value="${esc(b ? b.label : t(NEWS_BUTTONS.discord.label))}">
+      <input name="burl" type="url" inputmode="url" placeholder="https://…" value="${esc(b ? b.url : D.links.discord)}">
       <button class="round-btn" type="button" data-nbtn-del aria-label="${esc(t('Button entfernen'))}">${icon('fi-rr-cross-small')}</button>
     </div>`;
-  function newsForm() {
+  // n = vorhandene Neuigkeit zum Bearbeiten (sonst neu)
+  function newsForm(n = null) {
     if (mayPR() && !canBackend()) return backendSetupHtml();
     if (!canPR()) return `<p class="muted">${t('Neuigkeiten schreiben kann das Public Relations Department und höher, wenn es mit Roblox angemeldet ist.')}</p>`;
-    return `<form class="cform" data-news-new novalidate>
-      <div class="f"><label class="f__label" for="nw-title">${t('Titel')}</label><input id="nw-title" name="title" maxlength="120"></div>
-      <div class="f"><label class="f__label" for="nw-text">${t('Text')}</label><textarea id="nw-text" name="text" maxlength="4000" rows="5"></textarea></div>
-      <div class="cform__row">
-        <fieldset class="f"><legend class="f__label">${t('Kategorie')}</legend><div class="seg">${[['update', t('Update')], ['event', t('Event')], ['community', t('Community')]]
-          .map(([v, l], i) => `<label><input type="radio" name="cat" value="${v}"${i ? '' : ' checked'}><span>${l}</span></label>`).join('')}</div></fieldset>
-        <div class="f"><label class="f__label" for="nw-tag">${t('Tag')}</label><input id="nw-tag" name="tag" maxlength="30" placeholder="${esc(t('z. B. Update 2.6'))}"></div>
-      </div>
+    const m = (n && n.media) || {};
+    const kind = m.type || '';
+    const cat = n ? newsCat(n.cat)[0] : 'update';
+    return `<form class="cform" data-news-new${n ? ` data-news-id="${esc(n.id)}"` : ''} novalidate>
+      <div class="f"><label class="f__label" for="nw-title">${t('Titel')}</label><input id="nw-title" name="title" maxlength="120" value="${esc(n ? n.title : '')}"></div>
+      <div class="f"><label class="f__label" for="nw-text">${t('Text')}</label><textarea id="nw-text" name="text" maxlength="4000" rows="5">${esc(n ? n.text : '')}</textarea></div>
+      <fieldset class="f"><legend class="f__label">${t('Kategorie')}</legend><div class="cat-pick">${NEWS_CATS
+        .map(([v, , label, color]) => `<label class="cat-pick__item" style="--cc:${color}"><input type="radio" name="cat" value="${v}"${v === cat ? ' checked' : ''}><span><i aria-hidden="true"></i>${esc(t(label))}</span></label>`).join('')}</div></fieldset>
+      <div class="f"><label class="f__label" for="nw-tag">${t('Tag')}</label><input id="nw-tag" name="tag" maxlength="30" value="${esc(n ? n.tag || '' : '')}" placeholder="${esc(t('z. B. Update 2.6'))}"></div>
       <fieldset class="f"><legend class="f__label">${t('Foto oder Video? (Pflicht)')}</legend>
         <div class="seg seg--big">
-          <label><input type="radio" name="media" value="image"><span>${icon('fi-rr-picture')}${t('Foto')}</span></label>
-          <label><input type="radio" name="media" value="video"><span>${icon('fi-sr-play')}${t('Video')}</span></label>
+          <label><input type="radio" name="media" value="image"${kind === 'image' ? ' checked' : ''}><span>${icon('fi-rr-picture')}${t('Foto')}</span></label>
+          <label><input type="radio" name="media" value="video"${kind === 'video' ? ' checked' : ''}><span>${icon('fi-sr-play')}${t('Video')}</span></label>
         </div>
-        <div class="media-in" data-media-in="image" hidden>
-          <label class="upload"><input type="file" name="file" accept="image/*"><span data-upload-label>${icon('fi-rr-picture')}${t('Foto auswählen')}</span></label>
-          <img class="upload__preview" data-upload-preview alt="" hidden>
-          <input name="imageUrl" type="url" inputmode="url" placeholder="${esc(t('oder Link zu einem Bild (https://…)'))}">
+        <div class="media-in" data-media-in="image"${kind === 'image' ? '' : ' hidden'}>
+          <label class="upload"><input type="file" name="file" accept="image/*"><span data-upload-label>${icon('fi-rr-picture')}${kind === 'image' ? t('Anderes Foto auswählen') : t('Foto auswählen')}</span></label>
+          <img class="upload__preview" data-upload-preview alt=""${kind === 'image' && m.url ? ` src="${esc(m.url)}"` : ' hidden'}>
+          <input name="imageUrl" type="url" inputmode="url" value="${esc(kind === 'image' ? m.url || '' : '')}" placeholder="${esc(t('oder Link zu einem Bild (https://…)'))}">
         </div>
-        <div class="media-in" data-media-in="video" hidden>
-          <input name="videoUrl" type="url" inputmode="url" placeholder="${esc(t('YouTube-Link oder Link zu einer .mp4-Datei'))}">
+        <div class="media-in" data-media-in="video"${kind === 'video' ? '' : ' hidden'}>
+          <input name="videoUrl" type="url" inputmode="url" value="${esc(kind === 'video' ? m.url || '' : '')}" placeholder="${esc(t('YouTube-Link oder Link zu einer .mp4-Datei'))}">
         </div>
       </fieldset>
       <fieldset class="f"><legend class="f__label">${t('Buttons (höchstens 2)')}</legend>
-        <div class="nbtns" data-nbtns></div>
-        <button class="btn-text" type="button" data-nbtn-add>${icon('fi-rr-plus')}${t('Button hinzufügen')}</button>
+        <div class="nbtns" data-nbtns>${n ? (n.buttons || []).map((b) => newsBtnRow(b)).join('') : ''}</div>
+        <button class="btn-text" type="button" data-nbtn-add${n && (n.buttons || []).length >= 2 ? ' hidden' : ''}>${icon('fi-rr-plus')}${t('Button hinzufügen')}</button>
       </fieldset>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-paper-plane')}${t('Veröffentlichen')}</button>
-      <p class="sheet-note">${t('Löschen kannst du nur deine eigenen Neuigkeiten.')}</p>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(n ? 'fi-rr-check' : 'fi-rr-paper-plane')}${n ? t('Änderungen speichern') : t('Veröffentlichen')}</button>
+      <p class="sheet-note">${n ? t('Datum und Autor bleiben gleich, die Neuigkeit wird als „bearbeitet“ markiert.') : t('Bearbeiten und löschen kannst du nur deine eigenen Neuigkeiten.')}</p>
     </form>`;
   }
   // Foto verkleinern (höchstens 1600 px, JPEG), damit es schnell lädt
@@ -3159,6 +3226,7 @@
   }
   async function submitNews(form) {
     const f = new FormData(form);
+    const old = form.dataset.newsId ? (remote.news || []).find((x) => x.id === form.dataset.newsId) || null : null;
     const title = f.get('title').trim();
     const text = f.get('text').trim();
     const kind = f.get('media');
@@ -3178,16 +3246,22 @@
           btn.textContent = t('Foto wird hochgeladen …');
           const up = await api('/api/media', { method: 'POST', raw: await shrinkImage(file), type: 'image/jpeg' });
           Object.assign(media, { url: up.url, mediaId: up.id });
-        } else media.url = f.get('imageUrl').trim();
+        } else {
+          media.url = f.get('imageUrl').trim();
+          // Beim Bearbeiten: das schon hochgeladene Foto behalten
+          if (old && old.media && old.media.mediaId && media.url === old.media.url) media.mediaId = old.media.mediaId;
+        }
       } else media.url = f.get('videoUrl').trim();
       if (!media.url) throw Object.assign(new Error('media'), { status: 400, msg: kind === 'image' ? t('Bitte ein Foto auswählen oder einen Bild-Link angeben.') : t('Bitte einen Video-Link angeben.') });
-      await api('/api/news', { method: 'POST', body: { title, text, cat: f.get('cat'), tag: f.get('tag').trim(), media, buttons } });
+      const body = { title, text, cat: f.get('cat'), tag: f.get('tag').trim(), media, buttons };
+      if (old) await api(`/api/news/${encodeURIComponent(old.id)}`, { method: 'PUT', body });
+      else await api('/api/news', { method: 'POST', body });
       closeModal();
-      toast(t('Neuigkeit veröffentlicht'));
+      toast(old ? t('Änderungen gespeichert') : t('Neuigkeit veröffentlicht'));
       await loadContent();
     } catch (e) {
       btn.disabled = false;
-      btn.innerHTML = `${icon('fi-rr-paper-plane')}${t('Veröffentlichen')}`;
+      btn.innerHTML = old ? `${icon('fi-rr-check')}${t('Änderungen speichern')}` : `${icon('fi-rr-paper-plane')}${t('Veröffentlichen')}`;
       toast(e.msg || (e.message === 'video_url' ? t('Das ist kein YouTube- oder Video-Link.') : errorText(e)));
     }
   }
@@ -3923,7 +3997,6 @@
     }
     chatDot();
     if (state.page === 'chat' && ['mine', 'queue'].includes(state.chatView)) renderChat();
-    if (ok && state.page === 'dashboard') renderDash();
     // Server offen: Leiste mit allen Servern auf neuen Stand
     if (ok && state.page === 'chat' && state.chatView === 'conv') { const cc = chat.conv[state.chatArg]; const side = $('[data-cm-side]'); if (cc && cc.community && side) side.outerHTML = cmSide(cc); }
   }
@@ -4002,7 +4075,7 @@
     const unread = l ? l.chats.filter(isUnread).length : 0;
     return `<div class="appbar">
         <div class="appbar__title"><span class="appbar__label">${t('Spieler, Gruppen und Team')}</span><h1 class="appbar__value">${t('Chat')}</h1></div>
-        <div class="appbar__actions"><a class="btn btn--soft btn--sm" href="#/dashboard">${icon('fi-rr-apps')}${t('Dashboard')}</a><a class="btn btn--primary btn--sm" href="#/dashboard">${icon('fi-rr-plus')}${t('Neu')}</a></div>
+        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('fi-rr-plus')}${t('Neu')}</a></div>
       </div>
       <div class="head-tabs head-tabs--chat" role="tablist" aria-label="${esc(t('Chat'))}">
         ${tab('mine', '#/chat', 'fi-rr-comments', t('Gespräche'), unread)}
@@ -4066,7 +4139,7 @@
     if (!list.length) {
       return cat === 'server'
         ? `${tabs}<div class="chat-empty">${icon('fi-rr-apps')}<h2>${t('Noch keine Server')}</h2><p>${t('Ein Server ist eine Community wie bei Discord: Kanäle, Kategorien, Rollen und Bots – auf Wunsch mit deinen privaten Servern im Spiel verbunden.')}</p>
-          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/dashboard?neu=server">${icon('fi-rr-plus')}${t('Server erstellen')}</a></div></div>`
+          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu/server">${icon('fi-rr-plus')}${t('Server erstellen')}</a></div></div>`
         : `${tabs}<div class="chat-empty">${icon('fi-rr-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
     }
     return `${tabs}<div class="chat-tools"><span>${list.length === 1 ? t('1 Gespräch') : t('{n} Gespräche', { n: list.length })}</span>
@@ -4154,14 +4227,15 @@
       ${gate || `<div class="new-grid">
         ${card('#/chat/neu/spieler', 'fi-rr-user-add', t('Spieler anschreiben'), t('Privat mit einer Person schreiben – jeden Roblox-Spieler per Name'))}
         ${card('#/chat/neu/gruppe', 'fi-rr-users-alt', t('Gruppe erstellen'), t('Mehrere Leute, privat oder öffentlich, mit eigenen Regeln und Befehlen'))}
-        ${card('#/chat/neu/server', 'fi-rr-signal-alt-2', t('Server-Chat'), t('Chat für deine privaten Server – Beitreten über die App, Begrüßung und Nachrichten im Spiel'))}
+        ${card('#/chat/neu/server', 'fi-rr-signal-alt-2', t('Server erstellen'), t('Mit Kanälen wie #allgemein – auf Wunsch mit deinen privaten Servern im Spiel verbunden'))}
         ${card('#/chat/neu/anfrage', 'fi-rr-comments-question', t('Anfrage ans Team'), t('Frage, Fehler oder Meldung – das zuständige Team antwortet'))}
+        ${card('#/chat/neu/beitreten', 'fi-rr-link-alt', t('Einem Server beitreten'), t('Mit einem Einladungslink oder Code'))}
       </div>`}`;
   }
   function chatNewDm() {
     const gate = chatGate();
     const f = chat.found;
-    return `${backTo('#/dashboard', t('Dashboard'))}
+    return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="find-player" data-find-player>
         <label class="f__label" for="fp-name">${icon('fi-rr-search')}${t('Wem möchtest du schreiben?')}</label>
         <div class="find-player__row"><input id="fp-name" name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name, z. B. Lokfuehrer_Max'))}">
@@ -4176,7 +4250,7 @@
     const gate = chatGate();
     const next = nextRank(state.rank);
     const nextArea = next && CHAT.areas.find((a) => a.rank === next.name);
-    return `${backTo('#/dashboard', t('Dashboard'))}
+    return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="cform chat-form" data-chat-new novalidate>
         <fieldset class="f"><legend class="f__label">${t('Worum geht es?')}</legend>
           <div class="pick-grid">${CHAT.reasons.map((r) => `<label class="pick"><input type="radio" name="reason" value="${r.id}" data-area-hint="${esc(r.area || (nextArea ? nextArea.id : 'driver'))}"><span>${icon(r.icon)}${esc(t(r.label))}</span></label>`).join('')}</div>
@@ -4226,9 +4300,9 @@
       const p = (chat.staff || []).find((x) => x.userId === withId) || (typeof chatPlayers[withId] === 'object' ? chatPlayers[withId] : null);
       if (p) chat.members.push(p); else if (!chatPlayers[withId]) loadPlayer(withId, () => { if (typeof chatPlayers[withId] === 'object') { chat.members.push(chatPlayers[withId]); const box = $('[data-member-chips]'); if (box) box.innerHTML = memberChips(); } });
     }
-    return `${backTo('#/dashboard', t('Dashboard'))}
+    return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="cform group-form" data-group-new novalidate>
-        <div class="f"><label class="f__label" for="gr-name">${t('Name der Gruppe')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(dashDefaultName('Gruppe'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(dashDefaultName('Gruppe')) })}</small></div>
+        <div class="f"><label class="f__label" for="gr-name">${t('Name der Gruppe')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(defaultName('Gruppe'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(defaultName('Gruppe')) })}</small></div>
         <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Worum geht es in der Gruppe? (optional)'))}"></textarea></div>
         <fieldset class="f"><legend class="f__label">${t('Wer kann die Gruppe sehen?')}</legend>${visPick('private')}</fieldset>
         <div class="f"><span class="f__label">${t('Leute hinzufügen')}</span>
@@ -4259,10 +4333,11 @@
       ? `<div class="ps-pick">${mine.map((p) => `<label class="ps-pick__row"><input type="checkbox" name="servers" value="${esc(p.id)}"${mine.length === 1 ? ' checked' : ''}>
           <span class="ps-pick__ic">${icon('fi-rr-signal-alt-2')}</span><span class="ps-pick__text"><b>${esc(p.name)}</b><small>${psState(p)}${p.chat ? ` · ${t('jetzt mit „{name}“ verbunden', { name: esc(p.chat.name) })}` : ''}</small></span></label>`).join('')}</div>`
       : `<p class="ps-empty">${icon('fi-rr-info')}<span>${t('Noch kein privater Server von dir bekannt. Starte deinen privaten Server einmal in Roblox – dann erscheint er hier (das Spiel meldet ihn automatisch). Den Chat kannst du schon jetzt erstellen und den Server später unter „Info“ verbinden.')}</span></p>`;
-    return `${backTo('#/dashboard', t('Dashboard'))}
+    return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="cform group-form" data-server-new novalidate>
-        <div class="f"><label class="f__label" for="gr-name">${t('Name des Servers')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(dashDefaultName('Server'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(dashDefaultName('Server')) })}</small></div>
+        <div class="f"><label class="f__label" for="gr-name">${t('Name des Servers')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(defaultName('Server'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(defaultName('Server')) })}</small></div>
         <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Wofür ist der Server? (optional)'))}"></textarea></div>
+        <fieldset class="f"><legend class="f__label">${t('Mit einer Vorlage starten')}</legend>${templatePick()}<small class="f__hint">${t('Kanäle und Kategorien kannst du danach jederzeit ändern.')}</small></fieldset>
         <fieldset class="f"><legend class="f__label">${t('Private Server verbinden')}</legend>${pick}</fieldset>
         <fieldset class="f"><legend class="f__label">${t('Wie tritt man bei?')}</legend>${joinPick('app')}</fieldset>
         ${linkField()}
@@ -4417,13 +4492,6 @@
     const mine = String((state.profile && state.profile.username) || '').toLowerCase();
     return esc(text).replace(/@([A-Za-z0-9_]{2,20})/g, (all, n) => `<span class="mention${[mine, 'alle', 'everyone'].includes(n.toLowerCase()) ? ' is-me' : ''}">@${n}</span>`);
   }
-  // Karte eines eigenen Bots (embed() in Luna) – die einzige Stelle mit Karten im Chat
-  function botEmbed(e) {
-    return `<div class="bembed" style="--ec:${esc(/^#[0-9A-Fa-f]{6}$/.test(e.color || '') ? e.color : '#5865F2')}">
-      ${e.title ? `<b class="bembed__title">${esc(e.title)}</b>` : ''}${e.text ? `<p>${mentionHtml(e.text)}</p>` : ''}
-      ${(e.fields || []).length ? `<dl class="bembed__fields">${e.fields.map((f) => `<div><dt>${esc(f.name)}</dt><dd>${esc(f.value)}</dd></div>`).join('')}</dl>` : ''}
-      ${e.footer ? `<small class="bembed__foot">${esc(e.footer)}</small>` : ''}</div>`;
-  }
   function chatMessages(c) {
     const me = meSub();
     const people = peopleOf(c);
@@ -4431,8 +4499,7 @@
     let lastDay = '';
     let lastBy = '';
     if (c.switching) return `<li class="msg-sys">${t('Wird geladen …')}</li>`;
-    const local = (cbots.local[c.id] || []).filter((m) => !c.community || (m.ch || c.home) === c.channel);
-    const all = local.length ? [...c.messages, ...local].sort((a, b) => a.at - b.at) : c.messages;
+    const all = c.messages;
     const botMeta = (id) => (c.bots || []).find((b) => b.id === id) || null;
     return all.map((m) => {
       const day = fmtDate(m.at);
@@ -4449,12 +4516,12 @@
         const first = key !== lastBy || sep;
         lastBy = key;
         const meta = botMeta(m.botId) || { id: m.botId, name: m.title };
-        return `${sep}<li class="msg msg--bot${first ? ' is-first' : ''}${m.local ? ' is-local' : ''}">
+        return `${sep}<li class="msg msg--bot${first ? ' is-first' : ''}">
           ${first ? botAvatar(c.id, meta, 'bot-ava--sm') : '<span class="msg__gap"></span>'}
-          <div class="msg__col"><div class="msg__bubble">${first ? `<b class="msg__name">${esc(meta.name || m.title || 'Bot')} <span class="bot-tag">BOT</span>${m.local ? `<small class="bot-only">${icon('fi-rr-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}${m.embed ? botEmbed(m.embed) : `<p>${mentionHtml(m.text || '')}</p>`}<time>${time}</time></div></div>
+          <div class="msg__col"><div class="msg__bubble">${first ? `<b class="msg__name">${esc(meta.name || m.title || 'Bot')} <span class="bot-tag">BOT</span></b>` : ''}<p>${mentionHtml(m.text || (m.embed ? [m.embed.title, m.embed.text].filter(Boolean).join(' – ') : ''))}</p><time>${time}</time></div></div>
         </li>`;
       }
-      // Antwort vom TSG-Bot auf einen Befehl: eine normale Nachricht (Karten/Embeds gibt es nur bei eigenen Bots)
+      // Antwort vom TSG-Bot auf einen Befehl: eine normale Nachricht (ohne Karten)
       if (m.kind === 'bot') {
         const key = 'bot:tsg';
         const firstB = key !== lastBy || sep;
@@ -4621,11 +4688,8 @@
         if (c && flags.some((k) => JSON.stringify(c[k]) !== JSON.stringify(r[k]))) { flags.forEach((k) => { c[k] = r[k]; }); updateConv(id); }
         return;
       }
-      const prev = chat.conv[id];
-      const before = since && prev && prev.messages && (!r.community || prev.channel === r.channel) ? new Set(prev.messages.map((m) => m.id)) : null;
       chat.conv[id] = r;
       if (r.community) chat.ch[id] = r.channel;
-      clientBotsAfterLoad(id, before);
     } catch (e) {
       chat.conv[id] = { error: true };
     }
@@ -4729,13 +4793,12 @@
     // Leiste ganz links: alle eigenen Gruppen-Chats und Server
     const rail = (chat.list ? chat.list.chats : []).filter((x) => x.kind === 'group').sort((a, b) => (b.category === 'server') - (a.category === 'server') || b.updated - a.updated);
     const p = state.profile;
-    const me = prof.me || {};
     const unreadAll = chat.list ? chat.list.chats.filter(isUnread).length : 0;
     return `<aside class="cm-side" data-cm-side aria-label="${esc(t('Kanäle'))}">
       <nav class="cm-rail" aria-label="${esc(t('Server'))}">
         <a class="cm-rail__dm" href="#/chat" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-sr-comments')}</a><i class="cm-rail__sep"></i>
         ${rail.map((x) => `<a class="cm-rail__srv${x.id === c.id ? ' is-active' : ''}" href="#/chat/${esc(x.id)}" title="${esc(x.name)}">${groupBadge(x, 'cm-rail__img')}${isUnread(x) && x.id !== c.id ? '<i class="cm-rail__dot"></i>' : ''}</a>`).join('')}
-        <a class="cm-rail__add" href="#/dashboard?neu=server" aria-label="${esc(t('Server erstellen'))}">${icon('fi-rr-plus')}</a>
+        <a class="cm-rail__add" href="#/chat/neu/server" aria-label="${esc(t('Server erstellen'))}">${icon('fi-rr-plus')}</a>
       </nav>
       <div class="cm-panel">
         <div class="cm-panel__head">
@@ -4753,8 +4816,8 @@
         </div>
         <nav class="cm-side__list">${loose.map(row).join('')}${groups}${c.canManage ? `<div class="cm-side__foot"><button type="button" class="cm-side__btn" data-cm-new="">${icon('fi-rr-plus')}${t('Kanal')}</button><button type="button" class="cm-side__btn" data-cm-cat-new>${icon('fi-rr-folder')}${t('Kategorie')}</button></div>` : ''}</nav>
         <div class="cm-user">
-          <a class="cm-user__me" href="#/profil">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(p ? p.username : 'G'))}</b>`}<i class="cm-user__dot"></i></a>
-          <a class="cm-user__text" href="#/profil"><span><b>${esc(p ? p.displayName || p.username : t('Gast'))}</b><span class="cm-user__tag">${icon('fi-sr-heart')}${esc(rankOf(state.rank).prefix)}</span></span><small>${me.status ? `${icon('fi-sr-check-circle')}${esc(me.status)}` : `@${esc(p ? p.username : '')}`}</small></a>
+          <button class="cm-user__me" type="button" data-open="profile" aria-label="${esc(t('Profil'))}">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(p ? p.username : 'G'))}</b>`}<i class="cm-user__dot"></i></button>
+          <button class="cm-user__text" type="button" data-open="profile"><span><b>${esc(p ? p.displayName || p.username : t('Gast'))}</b><span class="cm-user__tag">${icon('fi-sr-heart')}${esc(rankOf(state.rank).prefix)}</span></span><small>@${esc(p ? p.username : '')}</small></button>
           <a class="cm-user__bell" href="#/chat" aria-label="${esc(t('Benachrichtigungen'))}">${icon('fi-sr-bell')}${unreadAll ? `<i>${unreadAll > 9 ? '9+' : unreadAll}</i>` : ''}</a>
         </div>
       </div>
@@ -5102,15 +5165,10 @@
     }
   }
 
-  // ---------- Eigene Bots: Basis (Vorlagen) und Erweitert (Luna im Editor) ----------
+  // ---------- Eigene Bots: Regeln mit Vorlagen ----------
   const BOT_TRIGGERS = [['join', 'Jemand tritt dem Chat bei'], ['leave', 'Jemand verlässt den Chat'], ['command', 'Befehl, z. B. !regeln'], ['game_join', 'Jemand betritt einen verbundenen Server im Spiel'], ['game_leave', 'Jemand verlässt den Server im Spiel']];
   const BOT_TARGETS = [['chat', 'In den Chat'], ['discord', 'Nach Discord'], ['both', 'Chat und Discord']];
   const BOT_PH = ['username', 'displayName', 'server', 'chat', 'members', 'game', 'gameId', 'players', 'command', 'args', 'time', 'date'];
-  // Namen wie in Luna nutzbar: script.Parent.Texte
-  const FILE_NAME_RE = /^[A-Za-z_\u00C0-\u024F][A-Za-z0-9_\u00C0-\u024F]{0,31}$/;
-  // Luna (backend/luna.js) wird erst geladen, wenn ein Bot-Skript läuft oder der Editor offen ist
-  let lunaLoad = null;
-  const lunaLib = () => (lunaLoad || (lunaLoad = import(new URL('backend/luna.js', document.baseURI).href).catch((e) => { lunaLoad = null; throw e; })));
   const botPhotoUrl = (cid, b) => (b && b.avatar && apiReady() ? `${API}/media/bot/${encodeURIComponent(cid)}/${encodeURIComponent(b.id)}?v=${b.avatar}` : '');
   // Ohne Bild: zwei Buchstaben auf einer Farbe aus dem Namen (wie bei Servern und Gruppen)
   function botAvatar(cid, b, cls = '') {
@@ -5134,24 +5192,17 @@
     return `<section class="info-sec info-sec--bots"><h3>${icon('fi-rr-robot')}${t('Bots')}</h3>
       ${bots.length ? `<ul class="bot-list">${bots.map((b) => `<li class="bot-row${b.on ? '' : ' is-off'}">
         ${botAvatar(c.id, b)}
-        <span class="bot-row__main"><b>${esc(b.name)} <span class="bot-tag">BOT</span></b><small>${b.desc ? esc(b.desc) : b.mode === 'advanced' ? t('Programmiert mit Luna') : t('Vorlagen mit Platzhaltern')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>
-        <span class="bot-row__tags">${b.mode === 'advanced' ? `<span class="pill pill--info">Luna</span>` : `<span class="pill">${t('Basis')}</span>`}</span>
+        <span class="bot-row__main"><b>${esc(b.name)} <span class="bot-tag">BOT</span></b><small>${b.desc ? esc(b.desc) : t('Vorlagen mit Platzhaltern')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>
         ${c.canBots ? `<span class="bot-row__acts">
-          ${b.mode === 'advanced' ? `<a class="btn btn--primary btn--sm" href="#/bots/${esc(c.id)}/${esc(b.id)}">${icon('fi-rr-square-code')}${t('Editor')}</a>` : ''}
           <button class="btn btn--soft btn--sm" type="button" data-bot-edit="${esc(c.id)}:${esc(b.id)}">${icon('fi-rr-settings')}${t('Einstellungen')}</button></span>` : ''}
-      </li>`).join('')}</ul>` : `<p class="muted">${t('Eigene Bots begrüßen neue Mitglieder, antworten auf Befehle wie !regeln und melden, wer im Spiel ist – einfach mit Vorlagen oder programmiert mit Luna.')}</p>`}
+      </li>`).join('')}</ul>` : `<p class="muted">${t('Eigene Bots begrüßen neue Mitglieder, antworten auf Befehle wie !regeln und melden, wer im Spiel ist – einfach mit Vorlagen.')}</p>`}
       ${c.canBots && bots.length < 5 ? `<button class="btn btn--outline btn--block" type="button" data-bot-new="${esc(c.id)}">${icon('fi-rr-plus')}${t('Bot erstellen')}</button>` : ''}
-      ${c.canBots ? `<a class="bots-docs" href="#/luna">${icon('fi-rr-document')}${t('Luna lernen – zur Dokumentation')}</a>` : ''}
     </section>`;
   }
   function botNewView(cid) {
     return `<form class="cform" data-bot-create="${esc(cid)}" novalidate>
-      <div class="f"><label class="f__label" for="bot-name">${t('Name des Bots')}</label><input id="bot-name" name="name" maxlength="32" placeholder="${esc(dashDefaultName('Bot'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(dashDefaultName('Bot')) })}</small></div>
-      <fieldset class="f"><legend class="f__label">${t('Wie soll dein Bot arbeiten?')}</legend><div class="vis-grid">
-        <label class="vis"><input type="radio" name="mode" value="basic" checked><span>${icon('fi-rr-sparkles')}<b>${t('Basis')}</b><small>${t('Vorlagen wie „Willkommen {username}!“')}</small></span></label>
-        <label class="vis"><input type="radio" name="mode" value="advanced"><span>${icon('fi-rr-square-code')}<b>${t('Erweitert')}</b><small>${t('Programmieren mit Luna im Editor')}</small></span></label>
-      </div></fieldset>
-      <p class="f__hint">${t('Bild, Beschreibung und Befehle stellst du danach ein. Bots brauchen kein Discord – sie laufen direkt in diesem Chat.')}</p>
+      <div class="f"><label class="f__label" for="bot-name">${t('Name des Bots')}</label><input id="bot-name" name="name" maxlength="32" placeholder="${esc(defaultName('Bot'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(defaultName('Bot')) })}</small></div>
+      <p class="f__hint">${t('Bild, Beschreibung und Regeln wie „Willkommen {username}!“ stellst du danach ein. Bots brauchen kein Discord – sie laufen direkt in diesem Chat.')}</p>
       <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-plus')}${t('Bot erstellen')}</button>
     </form>`;
   }
@@ -5176,8 +5227,6 @@
     if (!b) { loadBotFull(cid, bid).then(() => { if (modalView && modalView.name === 'bot') refreshModal(); }); return loadingHtml(); }
     if (b.error) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
     const discordOn = !!(c && c.discord && c.discord.status === 'active');
-    const files = b.files || [];
-    const broken = files.filter((f) => b.checks && b.checks[f.id] && !b.checks[f.id].ok).length;
     const pre = esc(b.prefix || '!');
     return `<form class="cform bot-form" data-bot-form="${esc(cid)}" data-bot-id="${esc(bid)}" novalidate>
       <div class="bot-head">
@@ -5190,22 +5239,12 @@
       <div class="f"><label class="f__label" for="bf-prefix">${t('Präfix für Befehle')}</label><input id="bf-prefix" name="prefix" maxlength="3" value="${pre}" autocapitalize="off" autocomplete="off" spellcheck="false">
         <small class="f__hint">${t('Mit {ex} ruft man den Befehl „regeln“ auf. Befehle mit / gehören zum TSG-Bot.', { ex: `<code>${pre}regeln</code>` })}</small></div>
       <label class="toggle"><span class="toggle__text"><b>${t('Bot ist aktiv')}</b><small>${t('Ausgeschaltet reagiert er auf nichts.')}</small></span><input type="checkbox" role="switch" name="on"${b.on ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
-      <fieldset class="f"><legend class="f__label">${t('Modus')}</legend><div class="vis-grid">
-        <label class="vis"><input type="radio" name="mode" value="basic"${b.mode !== 'advanced' ? ' checked' : ''}><span>${icon('fi-rr-sparkles')}<b>${t('Basis')}</b><small>${t('Vorlagen mit Platzhaltern')}</small></span></label>
-        <label class="vis"><input type="radio" name="mode" value="advanced"${b.mode === 'advanced' ? ' checked' : ''}><span>${icon('fi-rr-square-code')}<b>${t('Erweitert')}</b><small>${t('Luna-Skripte im Editor')}</small></span></label>
-      </div></fieldset>
-      <div class="bot-basic">
+      <div class="bot-rules">
         <h4 class="info-sub">${t('Regeln')}</h4>
         <ul class="auto-list" data-auto-list>${(b.rules || []).map((r) => ruleRow(r, discordOn)).join('')}</ul>
         <button class="btn btn--outline btn--sm" type="button" data-auto-add data-discord-on="${discordOn ? 1 : 0}">${icon('fi-rr-plus')}${t('Regel hinzufügen')}</button>
         <p class="f__hint code-help">${t('Platzhalter:')} ${BOT_PH.map((x) => `<code>{${x}}</code>`).join(' ')}</p>
         ${discordOn ? '' : `<p class="f__hint">${t('Nach Discord geht es erst, wenn dieser Server-Chat mit Discord verbunden und angenommen ist.')}</p>`}
-      </div>
-      <div class="bot-adv">
-        <p class="note">${icon('fi-rr-square-code')}<span>${files.length ? t('{n} Dateien · {e} mit Fehlern', { n: files.length, e: broken }) : t('Noch keine Skripte. Im Editor legst du ServerScripts, ClientScripts, ModulScripts und GameScripts an.')}</span></p>
-        ${b.stats && b.stats.lastError ? `<p class="note note--bad">${icon('fi-rr-triangle-warning')}<span>${t('Letzter Fehler: {file}, Zeile {line} – {text}', { file: esc(b.stats.lastError.file), line: b.stats.lastError.line, text: esc(b.stats.lastError.text) })}</span></p>` : ''}
-        <a class="btn btn--soft btn--block" href="#/bots/${esc(cid)}/${esc(bid)}">${icon('fi-rr-laptop-code')}${t('Im Editor öffnen')}</a>
-        <a class="btn btn--ghost btn--block" href="#/luna">${icon('fi-rr-document')}${t('Luna-Dokumentation')}</a>
       </div>
       <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
       <button class="btn btn--danger btn--block" type="button" data-bot-del="${esc(cid)}:${esc(bid)}">${icon('fi-rr-trash')}${t('Bot löschen')}</button>
@@ -5224,10 +5263,8 @@
   }
   function botChanged(cid, bot) {
     if (bot && bot.id) botsFull[bot.id] = bot;
-    if (ide.bid === (bot && bot.id) && ide.bot) Object.assign(ide.bot, { name: bot.name, avatar: bot.avatar, on: bot.on, mode: bot.mode, prefix: bot.prefix, desc: bot.desc, rules: bot.rules });
     openConv(cid);
     if (modalView && modalView.name === 'bot') refreshModal();
-    if (state.page === 'bots') renderIde();
   }
   async function uploadBotPhoto(arg, file) {
     const [cid, bid] = arg.split(':');
@@ -5238,1463 +5275,6 @@
     } catch (e) {
       toast(t('Dieses Bild lässt sich nicht verwenden.'));
     }
-  }
-
-  // Aus den Regeln des Basis-Modus Luna-Code machen (beim Wechsel in den Editor)
-  function rulesToLuna(rules) {
-    const q = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/["“”]/g, (m) => `\\${m}`).replace(/\n/g, '\\n').replace(/\{args\}/g, '{argtext}')}"`;
-    const out = (r) => [r.target !== 'discord' ? `  print(${q(r.template)})` : '', r.target !== 'chat' ? `  discord(${q(r.template)})` : ''].filter(Boolean);
-    const block = (name, list, args = '') => (list.length ? `${name}(${args}) {\n${list.flatMap(out).join('\n')}\n}\n` : '');
-    const on = (rules || []).filter((r) => r.on !== false);
-    const cmds = on.filter((r) => r.trigger === 'command');
-    const server = ['-- Aus den Regeln des Basis-Modus erzeugt', block('onjoin', on.filter((r) => r.trigger === 'join'), 'username'), block('onleave', on.filter((r) => r.trigger === 'leave'), 'username'),
-      cmds.length ? `oncommand(command, args) {\n${cmds.map((r) => `  if command == ${q(r.command)} {\n${out(r).map((l) => `  ${l}`).join('\n')}\n  }`).join('\n')}\n}\n` : ''].filter(Boolean).join('\n');
-    const game = block('onjoin', on.filter((r) => r.trigger === 'game_join'), 'username') + block('onleave', on.filter((r) => r.trigger === 'game_leave'), 'username');
-    return [
-      server.split('\n').length > 2 ? { name: 'Main', type: 'server', parent: 'ServerScriptService', code: server } : null,
-      game ? { name: 'Spiel', type: 'game', parent: 'GameService', code: `-- Aus den Regeln des Basis-Modus erzeugt\n${game}` } : null,
-    ].filter(Boolean);
-  }
-
-  // ---------- ClientScripts: laufen hier in der App, nur die Person selbst sieht die Ausgabe ----------
-  const cbots = { rev: {}, bundles: {}, local: {}, seen: null, busy: {} };
-  async function clientBundles(c) {
-    if (!c || !c.botsClient) return [];
-    if (cbots.rev[c.id] !== c.botsClient && !cbots.busy[c.id]) {
-      cbots.busy[c.id] = true;
-      try { cbots.bundles[c.id] = (await api(`/api/chats/${encodeURIComponent(c.id)}/bots/client`)).bots || []; cbots.rev[c.id] = c.botsClient; } catch (e) { cbots.bundles[c.id] = []; }
-      cbots.busy[c.id] = false;
-    }
-    return cbots.bundles[c.id] || [];
-  }
-  async function runClientBots(c, event, extra = {}, args = []) {
-    const bundles = await clientBundles(c);
-    if (!bundles.length) return;
-    let luna;
-    try { luna = await lunaLib(); } catch (e) { return; }
-    const me = state.profile || {};
-    const list = cbots.local[c.id] || (cbots.local[c.id] = []);
-    let added = 0;
-    for (const b of bundles) {
-      const key = `tsg-botmem:${c.id}:${b.id}`;
-      const vars = {
-        username: me.username || 'Gast', displayName: me.displayName || me.username || 'Gast', userId: String(me.userId || me.sub || ''),
-        chat: c.name || '', server: c.name || '', members: (c.members || []).length, bot: b.name,
-        game: 'Train Sim Germany', gameId: placeId || '', time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
-        date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()),
-        channel: c.community ? ((c.channels || []).find((x) => x.id === c.channel) || {}).name || '' : '', ...extra,
-      };
-      const res = luna.runEvent({ files: b.files, type: 'client', event, vars, args: args.length ? args : [vars.username], memory: store.get(key, {}) || {}, botName: b.name });
-      if (res.memChanged) store.set(key, res.memory);
-      res.says.forEach((out) => { list.push({ id: `local-${Math.random().toString(36).slice(2, 8)}`, by: 'bot', kind: 'bot', botId: b.id, title: b.name, text: typeof out === 'string' ? out : '', ...(out && out.embed ? { embed: out.embed } : {}), at: Date.now(), local: true, ...(c.community ? { ch: c.channel } : {}) }); added += 1; });
-    }
-    if (list.length > 30) list.splice(0, list.length - 30);
-    if (added) updateConv(c.id);
-  }
-  // Beim Öffnen eines Gesprächs: onopen() · neue Nachrichten anderer: onmessage(text, username)
-  function clientBotsAfterLoad(id, before) {
-    const c = chat.conv[id];
-    if (!c || c.error || !c.botsClient || state.chatView !== 'conv' || state.chatArg !== id) return;
-    if (cbots.seen !== id) {
-      cbots.seen = id;
-      cbots.local[id] = [];
-      runClientBots(c, 'open');
-      return;
-    }
-    if (!before) return;
-    const me = meSub();
-    const people = peopleOf(c);
-    c.messages.filter((m) => !before.has(m.id) && m.by !== me && m.by !== 'bot' && m.by !== 'system' && m.text).forEach((m) => {
-      const p = people[m.by] || { username: m.name };
-      runClientBots(c, 'message', { text: m.text, message: m.text, author: p.username || m.name || '' }, [m.text, p.username || m.name || '']);
-    });
-  }
-
-  // ---------- Bot-Editor (#/bots/<chat>/<bot>): Explorer und Eigenschaften links, Code rechts, Tabs oben ----------
-  // Aufbau wie im Roblox-Explorer: der Bot oben, darunter die Services; ModuleScripts, Ordner usw. dürfen überall liegen.
-  const SERVICE_ORDER = ['ServerScriptService', 'ClientService', 'GameService', 'ConnectorService', 'ReplicatedStorage', 'ServerStorage'];
-  const SERVICE_INFO = {
-    ServerScriptService: { icon: 'svcServer', runs: 'server', desc: 'ServerScripts laufen hier – im Backend, wenn im Chat etwas passiert.' },
-    ClientService: { icon: 'svcClient', runs: 'client', desc: 'ClientScripts laufen hier – in der App von jedem, der den Chat öffnet.' },
-    GameService: { icon: 'svcGame', runs: 'game', desc: 'GameScripts laufen hier – wenn in einem verbundenen privaten Server etwas passiert.' },
-    ConnectorService: { icon: 'svcConnector', runs: null, desc: 'Connectors verbinden Skripte miteinander, Webhooks schicken Nachrichten nach Discord.' },
-    ReplicatedStorage: { icon: 'svcRep', runs: null, desc: 'ModuleScripts und Werte für alle Skripte – auch ClientScripts in der App sehen sie.' },
-    ServerStorage: { icon: 'svcStore', runs: null, desc: 'Nur im Backend: ModuleScripts und Werte, die keine App zu sehen bekommt.' },
-  };
-  const CLASS_INFO = {
-    server: { name: 'ServerScript', desc: 'Läuft im Backend bei Ereignissen im Chat' },
-    client: { name: 'ClientScript', desc: 'Läuft in der App der Person, die den Chat öffnet (wie ein LocalScript)' },
-    module: { name: 'ModuleScript', desc: 'Bausteine für andere Skripte – laden mit require(…)' },
-    game: { name: 'GameScript', desc: 'Läuft bei Ereignissen in verbundenen privaten Servern' },
-    connector: { name: 'Connector', desc: 'Verbindet Skripte: Fire() auf der einen, Connect() auf der anderen Seite' },
-    webhook: { name: 'Webhook', desc: 'Schickt Nachrichten an einen Discord-Kanal: Send(text)' },
-    folder: { name: 'Folder', desc: 'Ordner zum Sortieren' },
-    boolvalue: { name: 'BoolValue', desc: 'Ein Ja/Nein-Wert (true/false) – .Value lesen und setzen' },
-    intvalue: { name: 'IntValue', desc: 'Eine ganze Zahl, z. B. ein Zähler – bleibt gespeichert' },
-    numbervalue: { name: 'NumberValue', desc: 'Eine Zahl mit Komma, z. B. 2.5' },
-    stringvalue: { name: 'StringValue', desc: 'Ein Text, z. B. eine Begrüßung zum Ändern ohne Code' },
-  };
-  const VALUE_TYPES = ['boolvalue', 'intvalue', 'numbervalue', 'stringvalue'];
-  const isLeaf = (type) => type === 'connector' || type === 'webhook' || VALUE_TYPES.includes(type);
-  const INSERT_ORDER = ['server', 'client', 'module', 'game', 'connector', 'webhook', 'folder', 'boolvalue', 'intvalue', 'numbervalue', 'stringvalue'];
-  const RECOMMENDED = {
-    ServerScriptService: ['server', 'module', 'folder'], ClientService: ['client', 'module', 'folder'], GameService: ['game', 'module', 'folder'], ConnectorService: ['connector', 'webhook', 'folder'],
-    ReplicatedStorage: ['module', 'intvalue', 'stringvalue', 'boolvalue', 'folder'], ServerStorage: ['module', 'intvalue', 'stringvalue', 'boolvalue', 'folder'],
-  };
-  const RUNS_IN = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService' };
-  const DEFAULT_PARENT = { server: 'ServerScriptService', client: 'ClientService', game: 'GameService', module: 'ServerScriptService', connector: 'ConnectorService', webhook: 'ConnectorService', folder: 'ServerScriptService', boolvalue: 'ReplicatedStorage', intvalue: 'ReplicatedStorage', numbervalue: 'ReplicatedStorage', stringvalue: 'ReplicatedStorage' };
-  const isScript = (t) => ['server', 'client', 'module', 'game'].includes(t);
-  const isService = (id) => SERVICE_ORDER.includes(id);
-  // Eigene, moderne Symbole (SVG) für jede Art von Objekt
-  const IC = {
-    server: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-server)"/><path d="M8.2 6.6 5.4 10l2.8 3.4M11.8 6.6l2.8 3.4-2.8 3.4" fill="none" stroke="#1f2633" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
-    client: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-client)"/><rect x="6.6" y="4.4" width="6.8" height="11.2" rx="1.8" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M9 13.3h2" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
-    module: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-module)"/><path d="M10 4.6 15 7.3v5.4L10 15.4 5 12.7V7.3zM5 7.3l5 2.7 5-2.7M10 10v5.4" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>',
-    game: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-game)"/><path d="M7 7.2h6a3 3 0 0 1 2.9 2.2l.7 2.8a1.5 1.5 0 0 1-2.6 1.3L12.8 12H7.2L6 13.5a1.5 1.5 0 0 1-2.6-1.3l.7-2.8A3 3 0 0 1 7 7.2z" fill="#fff"/><path d="M6.9 9.1v1.8M6 10h1.8" stroke="#047857" stroke-width="1.1" stroke-linecap="round"/><circle cx="12.6" cy="9.4" r=".75" fill="#047857"/><circle cx="13.9" cy="10.6" r=".75" fill="#047857"/>',
-    connector: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="url(#lg-conn)"/><path d="M8.2 4.8v2.6M11.8 4.8v2.6M6.6 7.4h6.8v1.9a3.4 3.4 0 0 1-6.8 0zM10 12.7v2.6" fill="none" stroke="#3b2405" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
-    webhook: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#5865F2"/><circle cx="10" cy="6.4" r="1.7" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="6.3" cy="13.2" r="1.7" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="13.7" cy="13.2" r="1.7" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M9.2 7.9 7 11.6M10.8 7.9l2.2 3.7M8 13.2h4" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>',
-    folder: '<path d="M2.5 6.2A1.7 1.7 0 0 1 4.2 4.5h3.6l1.7 1.8h6.3a1.7 1.7 0 0 1 1.7 1.7v6.3a1.7 1.7 0 0 1-1.7 1.7H4.2a1.7 1.7 0 0 1-1.7-1.7z" fill="#c8ccd3"/><path d="M2.5 8.3h15" stroke="#a7adb7" stroke-width="1"/>',
-    svcServer: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-server)"/><rect x="5" y="5" width="10" height="2.7" rx="1.2" fill="#1f2633"/><rect x="5" y="8.65" width="10" height="2.7" rx="1.2" fill="#1f2633"/><rect x="5" y="12.3" width="10" height="2.7" rx="1.2" fill="#1f2633"/><circle cx="13.2" cy="6.35" r=".7" fill="#22c55e"/><circle cx="13.2" cy="10" r=".7" fill="#22c55e"/><circle cx="13.2" cy="13.65" r=".7" fill="#22c55e"/>',
-    svcClient: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-client)"/><rect x="6.3" y="3.9" width="7.4" height="12.2" rx="2" fill="none" stroke="#fff" stroke-width="1.6"/><circle cx="10" cy="8.6" r="1.5" fill="#fff"/><path d="M7.9 12.4a2.2 2.2 0 0 1 4.2 0" stroke="#fff" stroke-width="1.3" fill="none" stroke-linecap="round"/>',
-    svcGame: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-game)"/><path d="M6.8 6.9h6.4a3.2 3.2 0 0 1 3.1 2.4l.7 2.9a1.6 1.6 0 0 1-2.8 1.4L13 12.3H7l-1.2 1.3A1.6 1.6 0 0 1 3 12.2l.7-2.9a3.2 3.2 0 0 1 3.1-2.4z" fill="#fff"/><path d="M6.8 8.9v2M5.8 9.9h2" stroke="#e11d48" stroke-width="1.2" stroke-linecap="round"/><circle cx="12.7" cy="9.2" r=".8" fill="#e11d48"/><circle cx="14.1" cy="10.5" r=".8" fill="#f59e0b"/>',
-    svcConnector: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-conn)"/><path d="M8 4.6v2.7M12 4.6v2.7M6.3 7.3h7.4v2.1a3.7 3.7 0 0 1-7.4 0zM10 13.1v2.6" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>',
-    svcRep: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-rep)"/><path d="M6 7.5h8M6 12.5h8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><path d="M11.5 5 14 7.5 11.5 10M8.5 10 6 12.5 8.5 15" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>',
-    svcStore: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-svc-store)"/><rect x="4.5" y="5" width="11" height="4" rx="1.3" fill="#fff"/><rect x="5.3" y="9.6" width="9.4" height="5.6" rx="1.3" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M8.6 12h2.8" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
-    boolvalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#0ea5e9"/><rect x="4.5" y="7" width="11" height="6" rx="3" fill="#fff"/><circle cx="12.4" cy="10" r="2" fill="#0ea5e9"/>',
-    intvalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#14b8a6"/><path d="M8 5.5 7 14.5M12.5 5.5l-1 9M5.5 8.3h9M5 11.7h9" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
-    numbervalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#22c55e"/><path d="M5.5 13.5V6.5l-1.3 1M9 13.6h.1M11.5 7.2a1.8 1.8 0 0 1 3.4.9c0 1.7-3.4 3-3.4 5.4h3.6" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
-    stringvalue: '<rect x="1.5" y="1.5" width="17" height="17" rx="5" fill="#f43f5e"/><path d="M5 7.5c0-1 .7-1.6 1.6-1.6M5 7.5v2h2v-2H5zM11 7.5c0-1 .7-1.6 1.6-1.6M11 7.5v2h2v-2h-2z" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/><path d="M5 13.5h10" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>',
-    bot: '<rect x="1" y="1" width="18" height="18" rx="5.5" fill="url(#lg-bot)"/><rect x="5" y="7" width="10" height="7.5" rx="2.5" fill="#fff"/><circle cx="8.2" cy="10.6" r="1" fill="#0f172a"/><circle cx="11.8" cy="10.6" r="1" fill="#0f172a"/><path d="M10 4.4V7" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/><circle cx="10" cy="4.2" r="1" fill="#fff"/>',
-  };
-  const IC_DEFS = `<svg class="ic-defs" width="0" height="0" aria-hidden="true" focusable="false"><defs>
-    <linearGradient id="lg-server" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9dee6"/></linearGradient>
-    <linearGradient id="lg-client" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#2563eb"/></linearGradient>
-    <linearGradient id="lg-module" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c084fc"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
-    <linearGradient id="lg-game" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#059669"/></linearGradient>
-    <linearGradient id="lg-conn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fcd34d"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
-    <linearGradient id="lg-svc-server" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient>
-    <linearGradient id="lg-svc-game" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fb7185"/><stop offset=".55" stop-color="#f43f5e"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
-    <linearGradient id="lg-svc-conn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset="1" stop-color="#ea580c"/></linearGradient>
-    <linearGradient id="lg-svc-rep" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#4f46e5"/></linearGradient>
-    <linearGradient id="lg-svc-store" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient>
-    <linearGradient id="lg-bot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#475569"/><stop offset="1" stop-color="#0f172a"/></linearGradient>
-  </defs></svg>`;
-  // Farbverläufe der Symbole einmal für die ganze Seite (nicht in einer versteckten Seite, sonst fehlen sie)
-  function iconDefs() {
-    if (document.getElementById('lg-module')) return;
-    const holder = document.createElement('div');
-    holder.innerHTML = IC_DEFS;
-    document.body.appendChild(holder.firstElementChild);
-  }
-  const clsIcon = (k, cls = '') => `<svg class="cls-ic ${cls}" viewBox="0 0 20 20" aria-hidden="true">${IC[k] || IC.folder}</svg>`;
-  const svgPlus = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
-  const svgChev = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const svgDots = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.4" fill="currentColor"/><circle cx="8" cy="8" r="1.4" fill="currentColor"/><circle cx="12.5" cy="8" r="1.4" fill="currentColor"/></svg>';
-  const svgClose = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7m0-7-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  const svgNewFile = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M11.5 2.5H6A1.5 1.5 0 0 0 4.5 4v12A1.5 1.5 0 0 0 6 17.5h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M11.5 2.5 15.5 6.5V10M11.5 2.5v4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14.5 12.5v5M12 15h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  const svgNewFolder = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15.5H4A1.5 1.5 0 0 1 2.5 14V5.5A1.5 1.5 0 0 1 4 4h3.3l1.6 1.8H16A1.5 1.5 0 0 1 17.5 7.3V10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14.5 12.5v5M12 15h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
-  const svgBook = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3.5 4.5A1.5 1.5 0 0 1 5 3h4.5v13H5a1.5 1.5 0 0 0-1.5 1.5zM16.5 4.5A1.5 1.5 0 0 0 15 3h-4.5v13H15a1.5 1.5 0 0 1 1.5 1.5z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
-  const itemIcon = (f) => clsIcon(f.type);
-
-  const ide = { cid: null, bid: null, bot: null, files: [], saved: '', open: [], active: null, sel: null, luna: null, panel: 'problems', panelOpen: null, tree: false, saving: false, diag: {}, bridges: [], err: null, collapsed: {}, draft: false, testMem: null, testOut: null, renaming: null, menu: null, propsOpen: true, cur: 1 };
-  const tmpId = () => `new-${Math.random().toString(36).slice(2, 8)}`;
-  const ideFile = (id) => ide.files.find((f) => f.id === id) || null;
-  const ideSig = (files) => JSON.stringify(files.map((f) => [f.id, f.name, f.type, f.parent, f.code, f.enabled === false, f.url || '', f.value ?? null]));
-  const ideDirty = () => !!ide.bot && ideSig(ide.files) !== ide.saved;
-  const ideFileDirty = (f) => { const s = ide.bot && (ide.bot.files || []).find((x) => x.id === f.id); return !s || s.code !== f.code || s.name !== f.name || s.parent !== f.parent || !!f.url; };
-  const draftKey = () => `tsg-ide:${ide.bid}`;
-  const childrenOf = (parent) => ide.files.filter((f) => f.parent === parent);
-  const parentItem = (f) => (f && !isService(f.parent) ? ideFile(f.parent) : null);
-  function serviceOfItem(f) {
-    for (let x = f, i = 0; x && i < 64; i += 1) {
-      if (isService(x.parent)) return x.parent;
-      x = ideFile(x.parent);
-    }
-    return null;
-  }
-  const isDescendant = (id, ancestorId) => { for (let x = ideFile(id), i = 0; x && i < 64; i += 1) { if (x.parent === ancestorId) return true; x = ideFile(x.parent); } return false; };
-  const botPathName = () => String((ide.bot && ide.bot.name) || 'Bot').replace(/[^A-Za-z0-9_À-ɏ]/g, '') || 'Bot';
-  function itemPath(f) {
-    const parts = [];
-    for (let x = f, i = 0; x && i < 64; i += 1) { parts.unshift(x.name); if (isService(x.parent)) { parts.unshift(x.parent); break; } x = ideFile(x.parent); }
-    return parts;
-  }
-  const absPath = (f) => `../${[botPathName(), ...itemPath(f)].join('.')}`;
-  // Pfad relativ zum Skript: script.Parent… (wie in Roblox)
-  function relPath(from, to) {
-    const up = (x) => { const out = []; for (let y = x, i = 0; y && i < 64; i += 1) { out.push(y.parent); if (isService(y.parent)) break; y = ideFile(y.parent); } return out; };
-    const chainFrom = [from.id, ...up(from)];
-    const chainTo = [to.id, ...up(to)];
-    const common = chainFrom.find((x) => chainTo.includes(x));
-    if (!common) return ['script', ...Array(chainFrom.length).fill('Parent'), ...itemPath(to)].join('.');
-    const ups = chainFrom.indexOf(common);
-    const downs = chainTo.slice(0, chainTo.indexOf(common)).reverse().map((id) => (ideFile(id) || { name: id }).name);
-    return ['script', ...Array(ups).fill('Parent'), ...downs].join('.');
-  }
-  function uniqueName(base, parent, except = null) {
-    const taken = new Set(childrenOf(parent).filter((f) => f.id !== except).map((f) => f.name.toLowerCase()));
-    if (!taken.has(base.toLowerCase())) return base;
-    for (let i = 2; i < 999; i += 1) if (!taken.has(`${base}${i}`.toLowerCase())) return `${base}${i}`;
-    return `${base}${Date.now() % 1000}`;
-  }
-  // Wohin kommt etwas Neues? In den gewählten Service, Ordner oder in das gewählte Skript (wie in Roblox)
-  function insertTarget() {
-    const s = ide.sel;
-    if (isService(s)) return s;
-    const f = ideFile(s);
-    if (!f) return 'ServerScriptService';
-    if (isLeaf(f.type)) return f.parent;
-    return f.id;
-  }
-  const contextService = (parent) => (isService(parent) ? parent : serviceOfItem(ideFile(parent)) || 'ServerScriptService');
-
-  async function openIde(cid, bid) {
-    if (ide.cid === cid && ide.bid === bid && (ide.bot || ide.err)) { renderIde(); return; }
-    Object.assign(ide, { cid, bid, bot: null, files: [], saved: '', open: [], active: null, sel: null, err: null, tree: false, draft: false, testMem: null, testOut: null, diag: {}, bridges: [], renaming: null, menu: null });
-    if (ide.panelOpen === null) ide.panelOpen = window.matchMedia('(min-width: 820px)').matches;
-    if (ide.propsInit !== true) { ide.propsOpen = window.matchMedia('(min-width: 820px)').matches; ide.propsInit = true; }
-    renderIde();
-    if (!sessionToken() || !apiReady()) { ide.err = 'login'; renderIde(); return; }
-    try {
-      const [luna, bot] = await Promise.all([lunaLib(), api(`/api/chats/${encodeURIComponent(cid)}/bots/${encodeURIComponent(bid)}`)]);
-      if (ide.bid !== bid) return;
-      ide.luna = luna;
-      ide.bot = bot;
-      botsFull[bid] = bot;
-      ide.files = (bot.files || []).map((f) => ({ ...f }));
-      ide.saved = ideSig(ide.files);
-      const d = store.get(draftKey(), null);
-      if (d && d.base === bot.updated && Array.isArray(d.files) && ideSig(d.files) !== ide.saved) { ide.files = d.files; ide.draft = true; }
-      const first = ide.files.find((f) => f.type === 'server') || ide.files.find((f) => isScript(f.type));
-      ide.open = first ? [first.id] : [];
-      ide.active = first ? first.id : null;
-      ide.sel = first ? first.id : 'ServerScriptService';
-      if (!chat.conv[cid]) openConv(cid);
-    } catch (e) {
-      ide.err = e;
-    }
-    ideDiagnose();
-    renderIde();
-  }
-  function ideDiagnose() {
-    if (!ide.luna) return;
-    const r = ide.luna.analyze(ide.files, (ide.bot && ide.bot.name) || 'Bot');
-    ide.diag = r.checks;
-    ide.bridges = r.bridges;
-  }
-  function ideProblems() {
-    const out = [];
-    ide.files.forEach((f) => {
-      const d = ide.diag[f.id];
-      if (!d) return;
-      if (d.error) out.push({ f, line: d.error.line, kind: 'error', text: d.error.message });
-      (d.warnings || []).forEach((w) => out.push({ f, line: w.line, kind: 'warn', text: w.message }));
-    });
-    ide.bridges.filter((b) => !b.ok).forEach((b) => { const f = ideFile(b.from); if (f) out.push({ f, line: b.line, kind: 'error', text: `${b.name}: ${b.problem}` }); });
-    return out;
-  }
-  function fileState(f) {
-    const d = ide.diag[f.id];
-    if ((d && d.error) || ide.bridges.some((b) => b.from === f.id && !b.ok)) return 'error';
-    return d && (d.warnings || []).length ? 'warn' : 'ok';
-  }
-
-  // ----- Explorer -----
-  function xpRow({ id, depth, icon: ic, name, kind, canAdd, hasKids, open, item }) {
-    const sel = ide.sel === id;
-    const active = item && ide.active === id;
-    const st = item && isScript(item.type) ? fileState(item) : 'ok';
-    const renaming = ide.renaming === id;
-    return `<div class="xp-row${sel ? ' is-selected' : ''}${active && !sel ? ' is-active' : ''}" style="--d:${depth}" data-xp="${esc(id)}" data-xp-kind="${kind}"${item ? ' draggable="true"' : ''} role="treeitem" aria-selected="${sel}"${hasKids ? ` aria-expanded="${open}"` : ''} tabindex="${sel ? 0 : -1}">
-      ${hasKids ? `<button class="xp-chev${open ? ' is-open' : ''}" type="button" data-xp-toggle="${esc(id)}" tabindex="-1" aria-label="${esc(open ? t('Zuklappen') : t('Aufklappen'))}">${svgChev}</button>` : '<span class="xp-chev"></span>'}
-      <span class="xp-ic">${ic}</span>
-      ${renaming ? `<input class="xp-rename" data-xp-rename-input="${esc(id)}" value="${esc(name)}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false" aria-label="${esc(t('Neuer Name'))}">` : `<span class="xp-name">${esc(name)}</span>`}
-      ${item && ideFileDirty(item) ? '<i class="xp-dot" aria-label="geändert"></i>' : ''}
-      ${st !== 'ok' ? `<i class="xp-state xp-state--${st}" aria-label="${st === 'error' ? 'Fehler' : 'Hinweis'}"></i>` : ''}
-      ${item ? `<button class="xp-more" type="button" data-xp-menu="${esc(id)}" aria-label="${esc(t('Mehr'))}">${svgDots}</button>` : ''}
-      ${canAdd ? `<button class="xp-add" type="button" data-xp-add="${esc(id)}" aria-label="${esc(t('Einfügen in {name}', { name }))}" title="${esc(t('Einfügen'))}">${svgPlus}</button>` : ''}
-    </div>`;
-  }
-  function xpBranch(parent, depth) {
-    const kids = childrenOf(parent);
-    if (!kids.length) return '';
-    return `<ul class="xp-kids" style="--d:${depth}" role="group">${kids.map((f) => {
-      const hasKids = childrenOf(f.id).length > 0;
-      const open = hasKids && !ide.collapsed[f.id];
-      const canAdd = !isLeaf(f.type);
-      return `<li role="none">${xpRow({ id: f.id, depth, icon: itemIcon(f), name: f.name, kind: f.type, canAdd, hasKids, open, item: f })}${open ? xpBranch(f.id, depth + 1) : ''}</li>`;
-    }).join('')}</ul>`;
-  }
-  function ideExplorerHtml() {
-    const b = ide.bot;
-    const botOpen = !ide.collapsed.bot;
-    const services = SERVICE_ORDER.map((s) => {
-      const hasKids = childrenOf(s).length > 0;
-      const open = !ide.collapsed[s];
-      return `<li role="none">${xpRow({ id: s, depth: 1, icon: clsIcon(SERVICE_INFO[s].icon), name: s, kind: 'service', canAdd: true, hasKids, open })}${open ? xpBranch(s, 2) : ''}</li>`;
-    }).join('');
-    return `<div class="xp-head">
-        <span>${t('EXPLORER')}</span>
-        <span class="xp-head__btns">
-          <button type="button" data-xp-add="@sel" aria-label="${esc(t('Neues Objekt'))}" title="${esc(t('Neues Objekt'))}">${svgNewFile}</button>
-          <button type="button" data-xp-folder aria-label="${esc(t('Neuer Ordner'))}" title="${esc(t('Neuer Ordner'))}">${svgNewFolder}</button>
-          <button class="xp-close" type="button" data-ide-tree="0" aria-label="${esc(t('Explorer schließen'))}">${svgClose}</button>
-        </span>
-      </div>
-      <div class="xp-tree" role="tree" aria-label="${esc(t('Struktur des Bots'))}">
-        <ul role="group">
-          <li role="none">${xpRow({ id: 'bot', depth: 0, icon: b && b.avatar ? botAvatar(ide.cid, b, 'bot-ava--xs') : clsIcon('bot'), name: b ? b.name : 'Bot', kind: 'bot', canAdd: false, hasKids: true, open: botOpen })}
-            ${botOpen ? `<ul class="xp-kids" style="--d:1" role="group">${services}</ul>` : ''}
-          </li>
-        </ul>
-      </div>`;
-  }
-  // ----- Eigenschaften (wie das Properties-Fenster) -----
-  function idePropsHtml() {
-    const s = ide.sel;
-    const row = (k, v) => `<div class="pp-row"><span>${k}</span><span>${v}</span></div>`;
-    const copyBtn = (text) => `<button class="pp-copy" type="button" data-pp-copy="${esc(text)}" title="${esc(t('Kopieren'))}"><code>${esc(text)}</code>${icon('fi-rr-copy')}</button>`;
-    let body = '';
-    let title = '';
-    if (s === 'bot' || !s) {
-      const b = ide.bot || {};
-      title = b.name || 'Bot';
-      body = `${row('ClassName', 'Bot')}${row(t('Modus'), b.mode === 'advanced' ? t('Erweitert (Luna)') : t('Basis'))}${row(t('Aktiv'), b.on ? t('Ja') : t('Nein'))}
-        <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(`../${botPathName()}`)}</div>
-        <button class="btn btn--soft btn--sm btn--block" type="button" data-bot-edit="${esc(ide.cid)}:${esc(ide.bid)}">${icon('fi-rr-settings')}${t('Bot-Einstellungen')}</button>`;
-    } else if (isService(s)) {
-      title = s;
-      body = `${row('ClassName', s)}${row(t('Objekte'), childrenOf(s).length)}<p class="pp-note">${esc(t(SERVICE_INFO[s].desc))}</p>
-        <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(`../${botPathName()}.${s}`)}</div>`;
-    } else {
-      const f = ideFile(s);
-      if (!f) return '';
-      title = f.name;
-      const svc = serviceOfItem(f);
-      const runsOk = !RUNS_IN[f.type] || svc === RUNS_IN[f.type];
-      const outgoing = ide.bridges.filter((x) => x.from === f.id && x.ok);
-      const incoming = ide.bridges.filter((x) => x.to === f.id && x.ok);
-      const act = ideFile(ide.active);
-      body = `<label class="pp-row pp-row--input"><span>Name</span><input data-pp-name value="${esc(f.name)}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
-        ${row('ClassName', CLASS_INFO[f.type].name)}
-        ${row('Parent', esc(isService(f.parent) ? f.parent : (ideFile(f.parent) || {}).name || '?'))}
-        ${isScript(f.type) && f.type !== 'module' ? `<label class="pp-row pp-row--check"><span>Enabled</span><input type="checkbox" data-pp-enabled${f.enabled === false ? '' : ' checked'}></label>` : ''}
-        ${RUNS_IN[f.type] ? `<p class="pp-note${runsOk ? '' : ' is-bad'}">${runsOk ? t('Läuft in {svc}.', { svc: RUNS_IN[f.type] }) : t('Läuft nicht: {cls}s laufen nur in {svc}.', { cls: CLASS_INFO[f.type].name, svc: RUNS_IN[f.type] })}</p>` : ''}
-        ${f.type === 'webhook' ? `<label class="pp-row pp-row--input pp-row--stack"><span>${t('Discord-Webhook')}</span><input data-pp-url type="password" autocomplete="off" spellcheck="false" placeholder="${esc(f.hint || 'https://discord.com/api/webhooks/…')}" value="${esc(f.url || '')}"></label>
-          <p class="pp-note">${f.hasUrl || f.url ? t('Wird beim Speichern bei Discord geprüft und nur verschlüsselt gespeichert. Senden geht, sobald die Discord-Verbindung des Server-Chats angenommen ist.') : t('Link aus Discord: Kanal bearbeiten → Integrationen → Webhooks.')}</p>` : ''}
-        ${VALUE_TYPES.includes(f.type) ? (f.type === 'boolvalue' ? `<label class="pp-row pp-row--check"><span>Value</span><input type="checkbox" data-pp-value${f.value ? ' checked' : ''}></label>`
-          : `<label class="pp-row pp-row--input"><span>Value</span><input data-pp-value ${f.type === 'stringvalue' ? 'maxlength="500"' : `type="number" step="${f.type === 'intvalue' ? '1' : 'any'}" inputmode="decimal"`} value="${esc(f.value ?? '')}" autocomplete="off" spellcheck="false"></label>`)
-          + `<p class="pp-note">${t('Im Skript: {code}. Ändert ein Skript den Wert, bleibt er gespeichert.', { code: `<code>${esc(act && isScript(act.type) ? relPath(act, f) : absPath(f))}.Value</code>` })}</p>` : ''}
-        ${f.type === 'connector' ? `<p class="pp-note">${t('Ein Skript ruft {fire} auf, andere hören mit {connect} zu.', { fire: '<code>:Fire(…)</code>', connect: '<code>:Connect(function(…) … end)</code>' })}</p>` : ''}
-        <div class="pp-block"><span>${t('Pfad')}</span>${copyBtn(absPath(f))}${act && act.id !== f.id ? copyBtn(relPath(act, f)) : ''}</div>
-        ${outgoing.length ? `<div class="pp-block"><span>${t('Brücken')}</span><ul class="pp-links">${outgoing.map((x) => `<li><button type="button" data-ide-goto="${esc(f.id)}:${x.line}">${clsIcon(x.kind === 'require' ? 'module' : x.kind)}<span>${esc((ideFile(x.to) || {}).name || '?')}</span><small>${x.kind === 'require' ? 'require' : x.kind}</small></button></li>`).join('')}</ul></div>` : ''}
-        ${incoming.length ? `<div class="pp-block"><span>${t('Genutzt von')}</span><ul class="pp-links">${incoming.map((x) => { const src = ideFile(x.from) || {}; return `<li><button type="button" data-ide-goto="${esc(x.from)}:${x.line}">${clsIcon(src.type)}<span>${esc(src.name || '?')}</span><small>${t('Zeile {n}', { n: x.line })}</small></button></li>`; }).join('')}</ul></div>` : ''}`;
-    }
-    return `<button class="pp-head" type="button" data-pp-toggle aria-expanded="${ide.propsOpen}"><span>${t('EIGENSCHAFTEN')}</span><b>${esc(title)}</b>${svgChev}</button>
-      ${ide.propsOpen ? `<div class="pp-body">${body}</div>` : ''}`;
-  }
-  // ----- Einfügen-Menü (das „+“) -----
-  function ideMenuHtml() {
-    const m = ide.menu;
-    if (!m) return '';
-    if (m.kind === 'item') {
-      const f = ideFile(m.id);
-      if (!f) return '';
-      const can = !isLeaf(f.type);
-      return `<div class="xp-menu xp-menu--ctx" role="menu" style="${m.style}">
-        ${isScript(f.type) ? `<button class="xp-menu__item" type="button" data-xp-act="open">${icon('fi-rr-edit')}<span><b>${t('Öffnen')}</b></span></button>` : ''}
-        ${can ? `<button class="xp-menu__item" type="button" data-xp-act="insert">${svgPlus}<span><b>${t('Objekt einfügen …')}</b></span></button>` : ''}
-        <button class="xp-menu__item" type="button" data-xp-act="rename">${icon('fi-rr-pencil')}<span><b>${t('Umbenennen')}</b><small>F2</small></span></button>
-        <button class="xp-menu__item" type="button" data-xp-act="duplicate">${icon('fi-rr-copy')}<span><b>${t('Duplizieren')}</b></span></button>
-        <button class="xp-menu__item" type="button" data-xp-act="move">${icon('fi-rr-arrow-small-right')}<span><b>${t('Verschieben nach …')}</b></span></button>
-        <button class="xp-menu__item" type="button" data-xp-act="path">${icon('fi-rr-link-alt')}<span><b>${t('Pfad kopieren')}</b><small>${esc(absPath(f))}</small></span></button>
-        <button class="xp-menu__item is-danger" type="button" data-xp-act="delete">${icon('fi-rr-trash')}<span><b>${t('Löschen')}</b><small>Entf</small></span></button>
-      </div>`;
-    }
-    const svc = contextService(m.parent);
-    const rec = RECOMMENDED[svc] || [];
-    const q = (m.q || '').toLowerCase();
-    const match = (k) => !q || CLASS_INFO[k].name.toLowerCase().includes(q) || t(CLASS_INFO[k].desc).toLowerCase().includes(q);
-    const first = INSERT_ORDER.filter((k) => rec.includes(k) && match(k));
-    const rest = INSERT_ORDER.filter((k) => !rec.includes(k) && match(k));
-    const item = (k) => `<button class="xp-menu__item" type="button" data-xp-insert="${k}" role="menuitem">${clsIcon(k)}<span><b>${CLASS_INFO[k].name}</b><small>${esc(t(CLASS_INFO[k].desc))}</small>${RUNS_IN[k] && RUNS_IN[k] !== svc ? `<em>${t('läuft nur in {svc}', { svc: RUNS_IN[k] })}</em>` : ''}</span></button>`;
-    const target = isService(m.parent) ? m.parent : (ideFile(m.parent) || {}).name || '';
-    return `<div class="xp-menu" role="menu" style="${m.style}">
-      <div class="xp-menu__head">${t('Einfügen in')} <b>${esc(target)}</b></div>
-      <input class="xp-menu__search" data-xp-search type="search" value="${esc(m.q || '')}" placeholder="${esc(t('Objekt suchen …'))}" autocomplete="off" spellcheck="false">
-      <div class="xp-menu__list">
-        ${first.length ? `<div class="xp-menu__group">${t('Empfohlen')}</div>${first.map(item).join('')}` : ''}
-        ${rest.length ? `<div class="xp-menu__group">${t('Weitere')}</div>${rest.map(item).join('')}` : ''}
-        ${!first.length && !rest.length ? `<p class="xp-menu__empty">${t('Nichts gefunden.')}</p>` : ''}
-      </div>
-    </div>`;
-  }
-  function openXpMenu(kind, id, anchor) {
-    const box = $('[data-ide]');
-    if (!box) return;
-    const r = anchor.getBoundingClientRect();
-    const b = box.getBoundingClientRect();
-    const narrow = window.matchMedia('(max-width: 600px)').matches;
-    const w = 300;
-    const left = Math.min(Math.max(8, r.right - b.left - w), b.width - w - 8);
-    const top = r.bottom - b.top + 4;
-    const style = narrow ? '' : `left:${left}px;top:${Math.min(top, b.height - 380)}px`;
-    ide.menu = kind === 'item' ? { kind, id, style } : { kind: 'insert', parent: id, q: '', style };
-    drawMenu();
-    const s = $('[data-xp-search]');
-    if (s && !narrow) s.focus({ preventScroll: true });
-  }
-  function drawMenu() {
-    const holder = $('[data-xp-menuholder]');
-    if (!holder) return;
-    holder.innerHTML = ide.menu ? `<div class="xp-menu-backdrop" data-xp-menu-close></div>${ideMenuHtml()}` : '';
-  }
-  const closeXpMenu = () => { if (ide.menu) { ide.menu = null; drawMenu(); } };
-  function insertItem(type, parent) {
-    if (ide.files.length >= 40) { toast(t('Höchstens 40 Objekte pro Bot.')); return; }
-    const base = CLASS_INFO[type].name;
-    const name = uniqueName(base, parent);
-    const f = { id: tmpId(), isNew: true, name, type, parent };
-    if (isScript(type)) f.code = ((ide.luna && ide.luna.TEMPLATES[type]) || '').replace(/NAME/g, name);
-    if (VALUE_TYPES.includes(type)) f.value = type === 'boolvalue' ? false : type === 'stringvalue' ? '' : 0;
-    ide.files.push(f);
-    ide.collapsed[parent] = false;
-    if (!isService(parent)) { let p = ideFile(parent); while (p) { ide.collapsed[p.parent] = false; ide.collapsed[p.id] = false; p = parentItem(p); } }
-    ide.sel = f.id;
-    if (isScript(type)) { ide.open.push(f.id); ide.active = f.id; }
-    ide.renaming = f.id;
-    ide.menu = null;
-    ideDiagnose();
-    renderIde();
-    ideInputDraft();
-    focusRename();
-  }
-  function focusRename() {
-    const inp = $('[data-xp-rename-input]');
-    if (inp) { inp.focus(); inp.select(); }
-  }
-  function renameItem(id, value) {
-    const f = ideFile(id);
-    ide.renaming = null;
-    if (!f) { renderIde(); return; }
-    const name = String(value || '').trim();
-    if (name && name !== f.name) {
-      if (!FILE_NAME_RE.test(name)) toast(t('Namen: Buchstaben, Zahlen und _, nicht mit einer Zahl anfangen (für script.Parent.Name).'));
-      else if (childrenOf(f.parent).some((x) => x.id !== f.id && x.name.toLowerCase() === name.toLowerCase())) toast(t('Hier gibt es schon ein Objekt mit diesem Namen.'));
-      else {
-        // Frisch eingefügtes ModuleScript (noch die Vorlage): Namen in der Vorlage mitändern
-        const tpl = ide.luna && ide.luna.TEMPLATES.module;
-        if (f.type === 'module' && tpl && f.code === tpl.replace(/NAME/g, f.name)) f.code = tpl.replace(/NAME/g, name);
-        f.name = name;
-      }
-    }
-    ideDiagnose();
-    renderIde();
-    ideInputDraft();
-  }
-  function deleteItem(id) {
-    const f = ideFile(id);
-    if (!f) return;
-    const kids = ide.files.filter((x) => x.id === id || isDescendant(x.id, id));
-    if (!confirm(kids.length > 1 ? t('„{name}“ mit {n} Objekten darin löschen? Endgültig erst nach dem Speichern.', { name: f.name, n: kids.length - 1 }) : t('„{name}“ löschen? Endgültig erst nach dem Speichern.', { name: f.name }))) return;
-    const gone = new Set(kids.map((x) => x.id));
-    ide.files = ide.files.filter((x) => !gone.has(x.id));
-    ide.open = ide.open.filter((x) => !gone.has(x));
-    if (gone.has(ide.active)) ide.active = ide.open[0] || null;
-    ide.sel = f.parent;
-    ideDiagnose();
-    renderIde();
-    ideInputDraft();
-  }
-  function duplicateItem(id) {
-    const f = ideFile(id);
-    if (!f) return;
-    const copy = (src, parent) => {
-      const n = { ...src, id: tmpId(), isNew: true, parent, name: uniqueName(src.name, parent) };
-      delete n.hasUrl;
-      delete n.hint;
-      ide.files.push(n);
-      ide.files.filter((x) => x.parent === src.id && x.id !== n.id).forEach((x) => copy(x, n.id));
-      return n;
-    };
-    const n = copy(f, f.parent);
-    ide.sel = n.id;
-    ideDiagnose();
-    renderIde();
-    ideInputDraft();
-  }
-  function moveItem(id, parent) {
-    const f = ideFile(id);
-    if (!f || f.parent === parent || id === parent || isDescendant(parent, id)) return false;
-    const target = ideFile(parent);
-    if (target && isLeaf(target.type)) { toast(t('Connectors, Webhooks und Werte können nichts enthalten.')); return false; }
-    f.name = uniqueName(f.name, parent, f.id);
-    f.parent = parent;
-    ide.collapsed[parent] = false;
-    ideDiagnose();
-    renderIde();
-    ideInputDraft();
-    return true;
-  }
-  function botMoveView(id) {
-    const f = ideFile(id);
-    if (!f) return `<p class="muted">${t('Nicht gefunden.')}</p>`;
-    const can = (x) => x.id !== id && !isDescendant(x.id, id) && !isLeaf(x.type);
-    const branch = (parent, depth) => childrenOf(parent).filter(can).map((x) => `<button class="mv-item" type="button" style="--d:${depth}" data-mv-to="${esc(x.id)}"${x.id === f.parent ? ' disabled' : ''}>${itemIcon(x)}<span>${esc(x.name)}</span></button>${branch(x.id, depth + 1)}`).join('');
-    return `<div class="mv-list">${SERVICE_ORDER.map((s) => `<button class="mv-item mv-item--svc" type="button" style="--d:0" data-mv-to="${s}"${f.parent === s ? ' disabled' : ''}>${clsIcon(SERVICE_INFO[s].icon)}<span>${s}</span></button>${branch(s, 1)}`).join('')}</div>`;
-  }
-
-  // ----- Tabs, Editor, unteres Fenster -----
-  function ideTabsHtml() {
-    const tabs = ide.open.map((id) => ideFile(id)).filter(Boolean).map((f) => `<div class="ide-tab${f.id === ide.active ? ' is-active' : ''}" role="presentation">
-        <button type="button" role="tab" aria-selected="${f.id === ide.active}" data-ide-open="${esc(f.id)}">${itemIcon(f)}<span>${esc(f.name)}</span>${ideFileDirty(f) ? '<i class="xp-dot"></i>' : ''}</button>
-        <button type="button" class="ide-tab__x" data-ide-close="${esc(f.id)}" aria-label="${esc(t('Schließen'))}">${svgClose}</button>
-      </div>`).join('');
-    return tabs || `<span class="ide-tabs__empty">${t('Keine Datei offen')}</span>`;
-  }
-  // ---------- Editor-Werkzeuge: Leiste (✓ ↶ ↷ T + ⋯), Vorschläge beim Tippen, Suchen und Ersetzen, Statusleiste ----------
-  const edx = { ac: null, tool: null, find: false, q: '', rep: '', fs: Math.min(18, Math.max(12, +store.get('tsg-ide-fs', 14) || 14)) };
-  const LUNA_KEYWORDS = ['local', 'function', 'return', 'if', 'then', 'else', 'elseif', 'end', 'for', 'in', 'do', 'while', 'repeat', 'until', 'break', 'continue', 'true', 'false', 'nil', 'and', 'or', 'not', 'const'];
-  const LUNA_GLOBALS = [
-    ['print', 'Funktion', 'Nachricht in den Chat'], ['embed', 'Funktion', 'Karte mit Titel, Text und Feldern (nur eigene Bots)'], ['warn', 'Funktion', 'Warnung ins Protokoll'],
-    ['log', 'Funktion', 'Zeile ins Protokoll'], ['discord', 'Funktion', 'Über die Discord-Verbindung senden'], ['require', 'Funktion', 'ModuleScript laden'],
-    ['typeof', 'Funktion', 'Typ eines Werts'], ['tostring', 'Funktion', 'In Text umwandeln'], ['tonumber', 'Funktion', 'In Zahl umwandeln'], ['pairs', 'Funktion', 'Über Tabellen laufen'],
-    ['ipairs', 'Funktion', 'Über Listen laufen (ab 1)'], ['save', 'Funktion', 'Wert merken'], ['load', 'Funktion', 'Gemerkten Wert laden'], ['error', 'Funktion', 'Mit Fehler beenden'],
-    ['assert', 'Funktion', 'Bedingung prüfen'], ['now', 'Funktion', 'Zeitstempel'], ['time', 'Funktion', 'Uhrzeit'], ['date', 'Funktion', 'Datum'], ['weekday', 'Funktion', 'Wochentag'],
-    ['math', 'Bibliothek', 'Rechnen'], ['string', 'Bibliothek', 'Texte'], ['table', 'Bibliothek', 'Listen und Tabellen'], ['script', 'Objekt', 'Dieses Skript'],
-    ['onjoin', 'Ereignis', 'Jemand tritt bei'], ['onleave', 'Ereignis', 'Jemand geht'], ['onmessage', 'Ereignis', 'Neue Nachricht'], ['oncommand', 'Ereignis', 'Befehl mit Präfix'],
-    ['onstart', 'Ereignis', 'Beim Speichern/Einschalten'], ['onopen', 'Ereignis', 'Chat wird geöffnet (ClientScript)'],
-  ];
-  const LUNA_LIBS = {
-    math: ['abs', 'ceil', 'floor', 'max', 'min', 'random', 'round', 'sqrt', 'pi', 'huge', 'clamp'],
-    string: ['upper', 'lower', 'len', 'sub', 'rep', 'split', 'find', 'reverse', 'trim', 'format'],
-    table: ['insert', 'remove', 'concat', 'find', 'clear', 'sort'],
-  };
-  const INST_METHODS = ['GetChildren', 'GetDescendants', 'FindFirstChild', 'FindFirstChildOfClass', 'WaitForChild', 'IsA', 'GetFullName'];
-  // Kinder eines Knotens im Explorer: 'bot', ein Service oder eine Objekt-ID
-  const nodeKids = (id) => (id === 'bot' ? SERVICE_ORDER.map((sv) => ({ name: sv, id: sv, type: 'service' })) : ide.files.filter((f) => f.parent === id));
-  const nodeParent = (id) => (id === 'bot' ? null : isService(id) ? 'bot' : (ideFile(id) || {}).parent || null);
-  // „script.Parent.Lib“, „../MyBot.ConnectorService“, „c“ (lokale Variable mit Pfad) → Knoten
-  function resolveChain(chain, code, depth = 0) {
-    let node = null;
-    let parts;
-    if (chain.startsWith('../')) {
-      node = 'bot';
-      parts = chain.slice(3).split(/[.:]/);
-      parts.shift(); // Name des Bots
-    } else {
-      parts = chain.split(/[.:]/);
-      const first = parts.shift();
-      if (first === 'script') node = ide.active;
-      else if (depth < 2) {
-        const m = String(code).match(new RegExp(`local\\s+${first.replace(/[^\w]/g, '')}\\s*=\\s*([.\\w/:\u00C0-\u024F]+)`));
-        node = m ? resolveChain(m[1], code, depth + 1) : null;
-      }
-    }
-    for (const p of parts) {
-      if (!node) break;
-      if (!p) continue;
-      if (p === 'Parent') node = nodeParent(node);
-      else { const kid = nodeKids(node).find((k) => k.name === p); node = kid ? kid.id : null; }
-    }
-    return node;
-  }
-  function acSuggest(ta) {
-    const v = ta.value;
-    const pos = ta.selectionStart;
-    if (pos !== ta.selectionEnd) return null;
-    const before = v.slice(0, pos);
-    const word = (before.match(/[\wÀ-ɏ]*$/) || [''])[0];
-    const head = before.slice(0, before.length - word.length);
-    const line = before.slice(before.lastIndexOf('\n') + 1);
-    if (/--/.test(line.replace(/"[^"]*"|'[^']*'/g, ''))) return null;
-    const quotes = (line.match(/"/g) || []).length;
-    // In einem Text nur Platzhalter nach „{“
-    if (quotes % 2 === 1) {
-      if (!head.endsWith('{')) return null;
-      const vars = ((ide.luna && ide.luna.DOCS && ide.luna.DOCS.vars) || []).map(([n, d]) => ({ label: n, kind: 'Platzhalter', detail: d, insert: `${n}}` }));
-      return { word, items: vars.filter((x) => x.label.toLowerCase().startsWith(word.toLowerCase())) };
-    }
-    const sep = head.slice(-1);
-    if (sep === '.' || sep === ':') {
-      const chainM = head.slice(0, -1).match(/((?:\.\.\/)?[\wÀ-ɏ]+(?:[.:][\wÀ-ɏ]+)*)$/);
-      const chain = chainM ? chainM[1] : '';
-      if (sep === '.' && LUNA_LIBS[chain]) return { word, items: LUNA_LIBS[chain].map((n) => ({ label: n, kind: chain, detail: `${chain}.${n}`, insert: ['pi', 'huge'].includes(n) ? n : `${n}()`, back: ['pi', 'huge'].includes(n) ? 0 : 1 })).filter((x) => x.label.toLowerCase().startsWith(word.toLowerCase())) };
-      const node = chain ? resolveChain(chain, v) : null;
-      if (!node) return null;
-      const f = ideFile(node);
-      const type = node === 'bot' ? 'bot' : isService(node) ? 'service' : f && f.type;
-      let items = [];
-      if (sep === '.') {
-        items = nodeKids(node).map((k) => ({ label: k.name, kind: k.type === 'service' ? 'Service' : CLASS_INFO[k.type] ? CLASS_INFO[k.type].name : 'Objekt', detail: k.type === 'service' ? t('Service') : t('Kind'), insert: k.name, icon: k.type === 'service' ? SERVICE_INFO[k.name].icon : k.type }));
-        items.push(...['Name', 'ClassName', 'Parent'].map((n) => ({ label: n, kind: 'Eigenschaft', detail: t('Eigenschaft'), insert: n })));
-        if (VALUE_TYPES.includes(type)) items.unshift({ label: 'Value', kind: 'Eigenschaft', detail: CLASS_INFO[type].name, insert: 'Value' });
-        if (isScript(type)) items.push({ label: 'Enabled', kind: 'Eigenschaft', detail: t('Läuft das Skript?'), insert: 'Enabled' });
-      } else {
-        items = INST_METHODS.map((n) => ({ label: n, kind: 'Methode', detail: t('Methode'), insert: `${n}()`, back: 1 }));
-        if (type === 'connector') items.unshift({ label: 'Connect', kind: 'Methode', detail: 'Connector', insert: 'Connect(function()\n  \nend)', back: 5 }, { label: 'Fire', kind: 'Methode', detail: 'Connector', insert: 'Fire()', back: 1 });
-        if (type === 'webhook') items.unshift({ label: 'Send', kind: 'Methode', detail: 'Webhook', insert: 'Send("")', back: 2 });
-      }
-      return { word, items: items.filter((x) => x.label.toLowerCase().startsWith(word.toLowerCase())) };
-    }
-    if (!word || /\d/.test(word[0])) return null;
-    const w = word.toLowerCase();
-    const own = [...new Set((v.match(/[A-Za-z_À-ɏ][\wÀ-ɏ]{2,}/g) || []))].filter((x) => x !== word && !LUNA_KEYWORDS.includes(x));
-    const items = [
-      ...LUNA_GLOBALS.map(([n, k, d]) => ({ label: n, kind: k, detail: d, insert: k === 'Funktion' ? `${n}()` : k === 'Ereignis' ? `${n}(${n === 'onmessage' ? 'text, username' : n === 'oncommand' ? 'command, args' : n === 'onstart' ? '' : 'username'}) {\n  \n}` : n, back: k === 'Funktion' ? 1 : k === 'Ereignis' ? 2 : 0 })),
-      ...LUNA_KEYWORDS.map((n) => ({ label: n, kind: 'Schlüsselwort', detail: '', insert: n })),
-      ...own.map((n) => ({ label: n, kind: 'Name', detail: t('aus diesem Skript'), insert: n })),
-    ].filter((x) => x.label.toLowerCase().startsWith(w) && x.label !== word);
-    const seen = new Set();
-    return { word, items: items.filter((x) => (seen.has(x.label) ? false : seen.add(x.label))).slice(0, 40) };
-  }
-  // Breite eines Zeichens im Code (Monospace)
-  let chW = 0;
-  function charWidth(ta) {
-    if (chW) return chW;
-    const cv = document.createElement('canvas').getContext('2d');
-    cv.font = getComputedStyle(ta).font;
-    chW = cv.measureText('MMMMMMMMMM').width / 10 || 8;
-    return chW;
-  }
-  function acShow(ta) {
-    const box = $('[data-ac]');
-    if (!box) return;
-    const r = acSuggest(ta);
-    if (!r || !r.items.length) { acHide(); return; }
-    edx.ac = { ...r, i: 0, items: r.items.slice(0, 40) };
-    const before = ta.value.slice(0, ta.selectionStart);
-    const line = before.split('\n').length - 1;
-    const col = before.length - before.lastIndexOf('\n') - 1;
-    const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
-    box.style.top = `${14 + (line + 1) * lh + 2}px`;
-    box.style.left = `${Math.max(4, 12 + (col - r.word.length) * charWidth(ta))}px`;
-    box.hidden = false;
-    acDraw();
-  }
-  function acDraw() {
-    const box = $('[data-ac]');
-    if (!box || !edx.ac) return;
-    box.innerHTML = edx.ac.items.slice(0, 40).map((x, i) => `<button type="button" class="ac-item${i === edx.ac.i ? ' is-on' : ''}" data-ac-pick="${i}" tabindex="-1">
-        ${x.icon ? clsIcon(x.icon) : `<span class="ac-kind ac-kind--${esc(x.kind.toLowerCase())}">${esc(x.kind[0])}</span>`}<b>${esc(x.label)}</b><small>${esc(x.detail || x.kind)}</small></button>`).join('');
-    const on = $('.ac-item.is-on', box);
-    if (on) on.scrollIntoView({ block: 'nearest' });
-  }
-  function acHide() { edx.ac = null; const box = $('[data-ac]'); if (box) { box.hidden = true; box.innerHTML = ''; } }
-  function acAccept(i = edx.ac ? edx.ac.i : 0) {
-    const ta = $('[data-ide-code]');
-    if (!ta || !edx.ac) return;
-    const x = edx.ac.items[i];
-    if (!x) return;
-    const pos = ta.selectionStart;
-    const indent = (ta.value.slice(0, pos).split('\n').pop().match(/^\s*/) || [''])[0];
-    const text = x.insert.replace(/\n/g, `\n${indent}`);
-    ta.setSelectionRange(pos - edx.ac.word.length, pos);
-    acHide();
-    edx.skipAc = true;
-    insertText(ta, text);
-    if (x.back) { const c = ta.selectionStart - x.back - (x.kind === 'Ereignis' || x.label === 'Connect' ? indent.length : 0); ta.setSelectionRange(c, c); }
-    ideInput(ta);
-  }
-  // Kommentar an/aus für die markierten Zeilen
-  function toggleComment(ta) {
-    const v = ta.value;
-    const a = v.lastIndexOf('\n', ta.selectionStart - 1) + 1;
-    const endIdx = v.indexOf('\n', Math.max(ta.selectionEnd - (ta.selectionEnd > ta.selectionStart ? 1 : 0), a));
-    const b = endIdx < 0 ? v.length : endIdx;
-    const lines = v.slice(a, b).split('\n');
-    const all = lines.filter((l) => l.trim()).every((l) => /^\s*--/.test(l));
-    const next = lines.map((l) => (!l.trim() ? l : all ? l.replace(/^(\s*)-- ?/, '$1') : l.replace(/^(\s*)/, '$1-- '))).join('\n');
-    ta.setSelectionRange(a, b);
-    insertText(ta, next);
-    ta.setSelectionRange(a, a + next.length);
-    ideInput(ta);
-  }
-  // „T“: Einrückung neu ordnen (Blöcke mit then/do/function/repeat bzw. { … })
-  function formatCode(ta) {
-    let depth = 0;
-    const out = ta.value.split('\n').map((raw) => {
-      const l = raw.trim();
-      const plain = l.replace(/"([^"\\]|\\.)*"|'([^'\\]|\\.)*'|--.*$/g, '');
-      const closes = /^(end\b|until\b|else\b|elseif\b|\}|\))/.test(plain);
-      if (closes) depth = Math.max(0, depth - 1);
-      const line = l ? `${'  '.repeat(depth)}${l}` : '';
-      const opensWord = (plain.match(/\b(then|do|repeat)\b/g) || []).length + (plain.match(/\bfunction\b/g) || []).length - (plain.match(/\bend\b/g) || []).length - (plain.match(/\buntil\b/g) || []).length
-        - (plain.match(/\b(then|do)\s*\{|\bfunction\b[^\n]*\)\s*\{/g) || []).length;
-      const braces = (plain.match(/\{/g) || []).length - (plain.match(/\}/g) || []).length + (/^\}/.test(plain) ? 1 : 0);
-      depth = Math.max(0, depth + opensWord + braces + (/^(else\b|elseif\b)/.test(plain) ? 1 : 0) - (/^(end\b|until\b)/.test(plain) && opensWord < 0 ? -1 : 0) + (closes && !/^(else|elseif)\b/.test(plain) && /^(end|until)\b/.test(plain) ? 1 : 0));
-      return line;
-    });
-    const next = out.join('\n');
-    if (next === ta.value) { toast(t('Schon ordentlich eingerückt')); return; }
-    const pos = ta.selectionStart;
-    ta.setSelectionRange(0, ta.value.length);
-    insertText(ta, next);
-    ta.setSelectionRange(Math.min(pos, next.length), Math.min(pos, next.length));
-    ideInput(ta);
-    toast(t('Eingerückt'));
-  }
-  function scrollToLine(line) {
-    const box = $('[data-ide-scroll]');
-    const ta = $('[data-ide-code]');
-    if (!box || !ta) return;
-    const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
-    box.scrollTop = Math.max(0, (line - 4) * lh);
-  }
-  function findNext(back = false) {
-    const ta = $('[data-ide-code]');
-    if (!ta || !edx.q) return;
-    const v = ta.value.toLowerCase();
-    const q = edx.q.toLowerCase();
-    let i = back ? v.lastIndexOf(q, ta.selectionStart - 1) : v.indexOf(q, ta.selectionEnd);
-    if (i < 0) i = back ? v.lastIndexOf(q) : v.indexOf(q);
-    const info = $('[data-find-info]');
-    if (i < 0) { if (info) info.textContent = t('Nicht gefunden'); return; }
-    const count = v.split(q).length - 1;
-    const nth = v.slice(0, i).split(q).length;
-    if (info) info.textContent = t('{a} von {b}', { a: nth, b: count });
-    ta.focus();
-    ta.setSelectionRange(i, i + q.length);
-    scrollToLine(ta.value.slice(0, i).split('\n').length);
-    ideCaret();
-  }
-  function replaceOne() {
-    const ta = $('[data-ide-code]');
-    if (!ta || !edx.q) return;
-    if (ta.value.slice(ta.selectionStart, ta.selectionEnd).toLowerCase() === edx.q.toLowerCase()) { insertText(ta, edx.rep); ideInput(ta); }
-    findNext();
-  }
-  function replaceAll() {
-    const ta = $('[data-ide-code]');
-    if (!ta || !edx.q) return;
-    const re = new RegExp(edx.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
-    const n = (ta.value.match(re) || []).length;
-    if (!n) { toast(t('Nicht gefunden')); return; }
-    const next = ta.value.replace(re, () => edx.rep);
-    ta.setSelectionRange(0, ta.value.length);
-    insertText(ta, next);
-    ideInput(ta);
-    toast(t('{n} ersetzt', { n }));
-  }
-  function ideToolbarHtml() {
-    const f = ideFile(ide.active);
-    if (!f) return '';
-    const btn = (id, ic, label, extra = '') => `<button type="button" class="edt-btn" data-edt="${id}" aria-label="${esc(label)}" title="${esc(label)}"${extra}>${ic}</button>`;
-    return `<div class="edt" role="toolbar" aria-label="${esc(t('Werkzeuge'))}">
-      ${btn('save', icon('fi-rr-check'), t('Speichern (Strg+S)'), ide.saving ? ' disabled' : '')}
-      <span class="edt-sep"></span>
-      ${btn('undo', icon('fi-rr-undo'), t('Rückgängig (Strg+Z)'))}${btn('redo', icon('fi-rr-redo'), t('Wiederholen (Strg+Y)'))}
-      ${btn('format', '<b class="edt-t">T</b>', t('Einrücken / formatieren'))}
-      ${btn('insert', icon('fi-rr-plus'), t('Einfügen'), ` aria-expanded="${edx.tool === 'insert'}"`)}
-      ${btn('more', icon('fi-rr-menu-dots'), t('Mehr'), ` aria-expanded="${edx.tool === 'more'}"`)}
-      <span class="edt-name">${clsIcon(f.type)}<b>${esc(f.name)}</b></span>
-      ${edx.tool === 'insert' ? `<div class="edt-menu" role="menu">${[['onjoin', t('Ereignis: jemand tritt bei')], ['onmessage', t('Ereignis: neue Nachricht')], ['oncommand', t('Ereignis: Befehl')], ['if', 'if … then … end'], ['for', 'for i = 1, 10 do … end'], ['function', 'local function …'], ['embed', 'embed({ … })'], ['value', t('Wert lesen und setzen (.Value)')]]
-        .map(([id, label]) => `<button type="button" role="menuitem" data-edt-snip="${id}">${esc(label)}</button>`).join('')}<hr><button type="button" role="menuitem" data-edt-obj>${svgPlus}${t('Objekt einfügen …')}</button></div>` : ''}
-      ${edx.tool === 'more' ? `<div class="edt-menu edt-menu--r" role="menu">
-        <button type="button" role="menuitem" data-edt="find">${icon('fi-rr-search')}${t('Suchen und ersetzen')}<small>Strg+F</small></button>
-        <button type="button" role="menuitem" data-edt="comment">${icon('fi-rr-comment-alt')}${t('Zeile kommentieren')}<small>Strg+/</small></button>
-        <button type="button" role="menuitem" data-edt="goto">${icon('fi-rr-arrow-small-down')}${t('Gehe zu Zeile …')}<small>Strg+G</small></button>
-        <button type="button" role="menuitem" data-edt="test">${icon('fi-rr-play')}${t('Testen')}</button>
-        <button type="button" role="menuitem" data-edt="smaller">${icon('fi-rr-minus-small')}${t('Kleinere Schrift')}</button>
-        <button type="button" role="menuitem" data-edt="bigger">${icon('fi-rr-plus-small')}${t('Größere Schrift')}</button>
-        <a role="menuitem" href="#/luna">${svgBook}${t('Dokumentation')}</a></div>` : ''}
-    </div>
-    ${edx.find ? `<div class="edt-find" role="search">
-      <input data-find-q value="${esc(edx.q)}" placeholder="${esc(t('Suchen'))}" autocomplete="off" spellcheck="false"><span class="edt-find__info" data-find-info></span>
-      <button type="button" data-edt="prev" aria-label="${esc(t('Vorheriger Treffer'))}">${icon('fi-rr-angle-small-up')}</button><button type="button" data-edt="next" aria-label="${esc(t('Nächster Treffer'))}">${icon('fi-rr-angle-small-down')}</button>
-      <input data-find-rep value="${esc(edx.rep)}" placeholder="${esc(t('Ersetzen durch'))}" autocomplete="off" spellcheck="false">
-      <button type="button" data-edt="replace">${t('Ersetzen')}</button><button type="button" data-edt="replaceall">${t('Alle')}</button>
-      <button type="button" data-edt="findclose" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross-small')}</button></div>` : ''}`;
-  }
-  const EDT_SNIPS = {
-    onjoin: 'onjoin(username) {\n  print("Willkommen {username}!")\n}\n',
-    onmessage: 'onmessage(text, username) {\n  if text == "hallo" then\n    print("Hallo {username}!")\n  end\n}\n',
-    oncommand: 'oncommand(command, args) {\n  if command == "regeln" then\n    print("Bitte bleib freundlich.")\n  end\n}\n',
-    if: 'if bedingung then\n  \nend\n',
-    for: 'for i = 1, 10 do\n  \nend\n',
-    function: 'local function name(wert)\n  return wert\nend\n',
-    embed: 'embed({\n  title = "Titel",\n  text = "Text",\n  color = "#5865F2",\n  fields = { { name = "Feld", value = "Wert" } },\n})\n',
-    value: 'local zaehler = ../MyBot.ReplicatedStorage.IntValue\nzaehler.Value = zaehler.Value + 1\n',
-  };
-  function ideStatusHtml() {
-    const f = ideFile(ide.active);
-    const ta = $('[data-ide-code]');
-    const pos = ta ? ta.selectionStart : 0;
-    const before = f ? (f.code || '').slice(0, pos) : '';
-    const line = before.split('\n').length;
-    const col = before.length - before.lastIndexOf('\n');
-    const d = f ? ide.diag[f.id] || {} : {};
-    return f ? `<span>${d.error ? `<b class="ide-st--bad">${icon('fi-rr-cross-circle')}${t('1 Fehler')}</b>` : `<b class="ide-st--ok">${icon('fi-rr-check')}${t('Keine Fehler')}</b>`}</span><span>${t('Zeile {a}, Spalte {b}', { a: line, b: col })}</span><span>${t('Leerzeichen: 2')}</span><span>Luna ${esc((ide.luna && ide.luna.VERSION) || '')}</span><span>${esc(CLASS_INFO[f.type] ? CLASS_INFO[f.type].name : '')}</span>` : '';
-  }
-  function edtUpdateStatus() { const st = $('[data-ide-status]'); if (st) st.innerHTML = ideStatusHtml(); }
-  function edtRedraw() { const bar = $('[data-edt-box]'); if (bar) bar.innerHTML = ideToolbarHtml(); }
-  function edtAction(id) {
-    const ta = $('[data-ide-code]');
-    if (id === 'save') { edx.tool = null; ideSave(); return; }
-    if (id === 'insert' || id === 'more') { edx.tool = edx.tool === id ? null : id; edtRedraw(); return; }
-    edx.tool = null;
-    if (id === 'find') { edx.find = true; edtRedraw(); const i = $('[data-find-q]'); if (i) { if (ta && ta.selectionEnd > ta.selectionStart) { edx.q = ta.value.slice(ta.selectionStart, ta.selectionEnd); i.value = edx.q; } i.focus(); i.select(); } return; }
-    if (id === 'findclose') { edx.find = false; edtRedraw(); if (ta) ta.focus(); return; }
-    if (id === 'next' || id === 'prev') { findNext(id === 'prev'); return; }
-    if (id === 'replace') { replaceOne(); return; }
-    if (id === 'replaceall') { replaceAll(); return; }
-    if (id === 'smaller' || id === 'bigger') { edx.fs = Math.min(18, Math.max(12, edx.fs + (id === 'bigger' ? 1 : -1))); store.set('tsg-ide-fs', edx.fs); const ideBox = $('.ide'); if (ideBox) ideBox.style.setProperty('--code-fs', `${edx.fs}px`); chW = 0; edtRedraw(); return; }
-    if (id === 'test') { ide.panel = 'test'; ide.panelOpen = true; const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.add('is-open'); } edtRedraw(); return; }
-    edtRedraw();
-    if (!ta) return;
-    if (id === 'undo' || id === 'redo') { ta.focus(); try { document.execCommand(id); } catch (e) { /* nicht verfügbar */ } return; }
-    if (id === 'format') { formatCode(ta); return; }
-    if (id === 'comment') { toggleComment(ta); return; }
-    if (id === 'goto') {
-      const n = Math.round(Number(prompt(t('Zu welcher Zeile?'), String(ide.cur || 1))));
-      if (!n) return;
-      const lines = ta.value.split('\n');
-      const line = Math.max(1, Math.min(lines.length, n));
-      const at = lines.slice(0, line - 1).reduce((s, l) => s + l.length + 1, 0);
-      ta.focus();
-      ta.setSelectionRange(at, at);
-      scrollToLine(line);
-      ideCaret();
-    }
-  }
-  function ideEditorHtml() {
-    const f = ideFile(ide.active);
-    const b = ide.bot;
-    const banner = b && b.mode !== 'advanced' ? `<div class="ide-banner">${icon('fi-rr-info')}<span>${t('Dieser Bot läuft im Basis-Modus. Die Skripte laufen erst im erweiterten Modus.')}</span><button class="btn btn--primary btn--sm" type="button" data-ide-advanced>${t('Erweitert einschalten')}</button></div>` : '';
-    const draft = ide.draft ? `<div class="ide-banner ide-banner--soft">${icon('fi-rr-time-fast')}<span>${t('Nicht gespeicherter Entwurf wiederhergestellt.')}</span><button class="btn btn--ghost btn--sm" type="button" data-ide-discard>${t('Verwerfen')}</button></div>` : '';
-    if (!f) {
-      const rules = (b && b.rules) || [];
-      return `${banner}${draft}<div class="ide-empty">
-        <span class="ide-empty__ic">${clsIcon('bot')}</span>
-        <h3>${ide.files.some((x) => isScript(x.type)) ? t('Wähle links ein Skript') : t('Noch kein Skript')}</h3>
-        <p>${t('Füge mit „+“ neben einem Service etwas ein – oder starte hier:')}</p>
-        <div class="ide-kinds">${['server', 'client', 'game', 'module'].map((k) => `<button type="button" class="ide-kind" data-ide-new="${k}">${clsIcon(k)}<b>${CLASS_INFO[k].name}</b><small>${esc(t(CLASS_INFO[k].desc))}</small></button>`).join('')}</div>
-        ${!ide.files.length && rules.length ? `<button class="btn btn--soft" type="button" data-ide-convert>${icon('fi-rr-sparkles')}${t('Regeln aus dem Basis-Modus in Luna umwandeln')}</button>` : ''}
-        <a class="ide-empty__docs" href="#/luna">${svgBook}${t('Luna lernen – zur Dokumentation')}</a>
-      </div>`;
-    }
-    return `${banner}${draft}<div class="edt-box" data-edt-box>${ideToolbarHtml()}</div><div class="code" data-ide-scroll>
-        <div class="code__grid">
-          <pre class="code__gutter" data-ide-gutter aria-hidden="true"></pre>
-          <div class="code__area">
-            <i class="code__cur" data-ide-cur></i>
-            <i class="code__mark" data-ide-mark hidden></i>
-            <pre class="code__hl" data-ide-hl aria-hidden="true"></pre>
-            <textarea class="code__input" data-ide-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Code von {name}', { name: f.name }))}">${esc(f.code || '')}</textarea>
-            <div class="ac" data-ac hidden role="listbox"></div>
-          </div>
-        </div>
-      </div>
-      <div class="ide-status" data-ide-status>${ideStatusHtml()}</div>
-      <div class="ide-keys" role="toolbar" aria-label="${esc(t('Zeichen einfügen'))}">${['⇥', '{ }', '( )', '" "', '=', '.', ':', '..', '[ ]', 'script.Parent', '--'].map((k) => `<button type="button" data-ide-key="${esc(k)}">${esc(k)}</button>`).join('')}</div>`;
-  }
-  function idePanelTabs() {
-    const probs = ideProblems();
-    const tabs = [['problems', `${t('Skriptanalyse')}${probs.length ? ` <b class="ide-count${probs.some((p) => p.kind === 'error') ? ' is-error' : ''}">${probs.length}</b>` : ''}`], ['test', t('Testen')], ['log', t('Ausgabe')], ['help', t('Hilfe')]];
-    return `<div class="ide-panel__tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" role="tab" aria-selected="${ide.panel === k && ide.panelOpen}" data-ide-panel="${k}">${l}</button>`).join('')}
-        <button type="button" class="ide-panel__fold" data-ide-panel="fold" aria-label="${esc(ide.panelOpen ? t('Einklappen') : t('Ausklappen'))}">${svgChev}</button></div>`;
-  }
-  function idePanelHtml() {
-    const probs = ideProblems();
-    const f = ideFile(ide.active);
-    let body = '';
-    if (ide.panel === 'problems') {
-      body = probs.length ? `<ul class="ide-probs">${probs.map((p) => `<li class="is-${p.kind}"><button type="button" data-ide-goto="${esc(p.f.id)}:${p.line}">${icon(p.kind === 'error' ? 'fi-rr-triangle-warning' : 'fi-rr-info')}<span><b>${esc(p.f.name)} <em>· ${t('Zeile {n}', { n: p.line })}</em></b><small>${esc(p.text)}</small></span></button></li>`).join('')}</ul>`
-        : `<p class="ide-ok">${icon('fi-sr-check-circle')}${t('Keine Probleme gefunden.')}</p>`;
-    } else if (ide.panel === 'test') {
-      body = ideTestHtml(f);
-    } else if (ide.panel === 'log') {
-      const logs = ((ide.bot && ide.bot.logs) || []).slice().reverse();
-      body = `<div class="ide-row"><small class="muted">${t('Was der Bot zuletzt im Chat getan hat (die letzten 40 Einträge).')}</small><span class="btn-row"><button class="btn btn--ghost btn--sm" type="button" data-ide-logs="reload">${t('Aktualisieren')}</button>${logs.length ? `<button class="btn btn--ghost btn--sm" type="button" data-ide-logs="clear">${t('Leeren')}</button>` : ''}</span></div>
-        ${logs.length ? `<ul class="ide-log">${logs.map((l) => `<li class="is-${esc(l.kind)}"><time>${l.at ? timeOf(l.at) : ''}</time><span>${l.file ? `<b>${esc(l.file)}${l.line ? `:${l.line}` : ''}</b> ` : ''}${l.event ? `<small>on${esc(l.event)}</small> ` : ''}${esc(l.text)}</span></li>`).join('')}</ul>` : `<p class="muted">${t('Noch nichts passiert.')}</p>`}`;
-    } else {
-      body = ideHelpHtml(f);
-    }
-    return `${idePanelTabs()}${ide.panelOpen ? `<div class="ide-panel__body">${body}</div>` : ''}`;
-  }
-  function ideTestHtml(f) {
-    if (!f) return `<p class="muted">${t('Öffne zuerst ein Skript.')}</p>`;
-    if (f.type === 'module') return `<p class="muted">${t('ModuleScripts testest du über das Skript, das sie mit require lädt.')}</p>`;
-    const evs = (ide.luna && ide.luna.EVENTS[f.type]) || [];
-    const me = state.profile || {};
-    const o = ide.testOut;
-    return `<form class="ide-test" data-ide-test novalidate>
-        <div class="ide-test__row">
-          <label><span>${t('Ereignis')}</span><select name="event">${evs.map((e) => `<option value="${e}">on${e}()</option>`).join('')}</select></label>
-          <label><span>${t('Name')}</span><input name="username" value="${esc(me.username || 'Testspieler')}" autocapitalize="off" spellcheck="false"></label>
-          <label class="ide-test__text"><span>${t('Nachricht / Befehl')}</span><input name="text" value="${esc(`${(ide.bot && ide.bot.prefix) || '!'}hallo`)}" autocapitalize="off" spellcheck="false"></label>
-          ${f.type === 'game' ? `<label><span>${t('Spieler')}</span><input name="players" type="number" min="0" max="50" value="3"></label>` : ''}
-        </div>
-        <div class="btn-row"><button class="btn btn--primary btn--sm" type="submit">${icon('fi-rr-play')}${t('Ausführen')}</button>
-          <button class="btn btn--ghost btn--sm" type="button" data-ide-mem-reset>${t('Speicher zurücksetzen')}</button>
-          <small class="muted">${t('Läuft nur hier – nichts wird gesendet. Connectors und Module laufen mit.')}</small></div>
-      </form>
-      ${o ? `<div class="ide-out">
-        ${o.says.map((s) => `<div class="ide-say">${botAvatar(ide.cid, ide.bot, 'bot-ava--sm')}<p><b>${esc(ide.bot.name)} <span class="bot-tag">BOT</span></b>${esc(s)}</p></div>`).join('')}
-        ${o.discords.map((s) => `<div class="ide-say ide-say--discord">${icon('fi-brands-discord')}<p><b>Discord</b>${esc(s)}</p></div>`).join('')}
-        ${(o.webhooks || []).map((w) => `<div class="ide-say ide-say--discord">${clsIcon('webhook')}<p><b>Webhook ${esc(w.name)}</b>${esc(w.text)}</p></div>`).join('')}
-        ${o.logs.filter((l) => l.kind !== 'out').map((l) => `<p class="ide-out__log is-${esc(l.kind)}">${l.line ? `<button type="button" data-ide-goto="${esc((ide.files.find((x) => x.name === l.file) || f).id)}:${l.line}">${esc(l.file || f.name)}:${l.line}</button> ` : ''}${esc(l.text)}</p>`).join('')}
-        ${!o.ran && !o.errors.length ? `<p class="muted">${t('Dieses Skript hat kein on{ev}() – es ist nichts passiert.', { ev: esc(o.event) })}</p>` : ''}
-        ${o.ran && !o.says.length && !o.discords.length && !(o.webhooks || []).length && !o.errors.length ? `<p class="muted">${t('Gelaufen, aber ohne Ausgabe.')}</p>` : ''}
-      </div>` : ''}`;
-  }
-  function ideHelpHtml(f) {
-    if (!ide.luna) return '';
-    const D2 = ide.luna.DOCS;
-    const type = f ? f.type : 'server';
-    const evs = D2.events[type] || [];
-    return `<div class="ide-help">
-      <a class="btn btn--soft btn--sm" href="#/luna">${svgBook}${t('Ganze Dokumentation öffnen')}</a>
-      <section><h5>${icon('fi-rr-bolt')}${t('Ereignisse in {kind}s', { kind: CLASS_INFO[type].name })}</h5>
-        ${evs.length ? `<ul>${evs.map(([sig, d]) => `<li><button type="button" data-ide-snippet="${esc(sig.replace(/\(.*\)/, ''))}"><code>${esc(sig)}</code></button><small>${esc(t(d))}</small></li>`).join('')}</ul>` : `<p class="muted">${t('Keine – ModuleScripts liefern Funktionen und Werte für andere Skripte.')}</p>`}</section>
-      <section><h5>${icon('fi-rr-brackets-curly')}${t('Platzhalter und Variablen')}</h5><ul>${D2.vars.map(([n, d]) => `<li><code>{${esc(n)}}</code><small>${esc(t(d))}</small></li>`).join('')}</ul></section>
-      <section><h5>${icon('fi-rr-terminal')}${t('Funktionen')}</h5><ul>${D2.functions.map(([n, d]) => `<li><code>${esc(n)}</code><small>${esc(t(d))}</small></li>`).join('')}</ul></section>
-    </div>`;
-  }
-  function renderIde() {
-    const box = $('[data-ide]');
-    if (!box || state.page !== 'bots') return;
-    if (ide.err) {
-      box.innerHTML = `<div class="ide-msg">${clsIcon('bot', 'cls-ic--xl')}<h2>${ide.err === 'login' ? t('Bitte melde dich an') : t('Diesen Bot gibt es nicht (mehr) oder du darfst ihn nicht bearbeiten.')}</h2>
-        <a class="btn btn--primary" href="${ide.cid ? `#/chat/${esc(ide.cid)}/info` : '#/chat'}">${icon('fi-rr-arrow-left')}${t('Zurück zum Chat')}</a></div>`;
-      return;
-    }
-    if (!ide.bot) { box.innerHTML = `<div class="ide-msg">${loadingHtml()}</div>`; return; }
-    const dirty = ideDirty();
-    const act = ideFile(ide.active);
-    const crumbs = act ? [ide.bot.name, ...itemPath(act)] : [ide.bot.name];
-    iconDefs();
-    box.style.setProperty('--code-fs', `${edx.fs}px`);
-    box.innerHTML = `<header class="ide__bar">
-        <button class="ide__tree-btn" type="button" data-ide-tree="1" aria-label="${esc(t('Explorer'))}">${icon('fi-rr-sidebar')}</button>
-        <a class="ide__back" href="#/chat/${esc(ide.cid)}/info" aria-label="${esc(t('Zurück zum Chat'))}">${icon('fi-rr-arrow-left')}</a>
-        <nav class="ide__crumbs" aria-label="${esc(t('Pfad'))}">${crumbs.map((c, i) => `<span${i === crumbs.length - 1 ? ' aria-current="page"' : ''}>${esc(c)}</span>`).join(svgChev)}</nav>
-        <span class="ide__state${dirty ? ' is-dirty' : ''}" data-ide-state>${dirty ? t('Nicht gespeichert') : t('Gespeichert')}</span>
-        <a class="ide__docs" href="#/luna" title="${esc(t('Dokumentation'))}">${svgBook}<span>${t('Dokumentation')}</span></a>
-        <button class="btn btn--primary btn--sm ide__save" type="button" data-ide-save${ide.saving ? ' disabled' : ''}>${icon('fi-rr-disk')}<span>${t('Speichern')}</span></button>
-      </header>
-      <div class="ide__body${ide.tree ? ' is-tree' : ''}">
-        <aside class="ide__side" aria-label="${esc(t('Explorer und Eigenschaften'))}">
-          <section class="xp" data-ide-explorer>${ideExplorerHtml()}</section>
-          <section class="pp${ide.propsOpen ? ' is-open' : ''}" data-ide-props>${idePropsHtml()}</section>
-        </aside>
-        <button class="ide__backdrop" type="button" data-ide-tree="0" tabindex="-1" aria-hidden="true"></button>
-        <div class="ide__main">
-          <nav class="ide__tabs" role="tablist" data-ide-tabs>${ideTabsHtml()}</nav>
-          <div class="ide__editor" data-ide-editor>${ideEditorHtml()}</div>
-          <section class="ide__panel${ide.panelOpen ? ' is-open' : ''}" data-ide-panelbox>${idePanelHtml()}</section>
-        </div>
-      </div>
-      <div data-xp-menuholder>${ide.menu ? `<div class="xp-menu-backdrop" data-xp-menu-close></div>${ideMenuHtml()}` : ''}</div>`;
-    ideHighlight();
-    if (ide.renaming) focusRename();
-  }
-  // Nur Teile neu zeichnen, damit Cursor und Eingabe im Editor bleiben
-  function ideRefreshSide() {
-    const xp = $('[data-ide-explorer]');
-    if (xp) { const tree = $('.xp-tree', xp); const top = tree ? tree.scrollTop : 0; xp.innerHTML = ideExplorerHtml(); const t2 = $('.xp-tree', xp); if (t2) t2.scrollTop = top; }
-    const pp = $('[data-ide-props]');
-    if (pp && !pp.contains(document.activeElement)) pp.innerHTML = idePropsHtml();
-    const tabs = $('[data-ide-tabs]');
-    if (tabs) tabs.innerHTML = ideTabsHtml();
-    const panel = $('[data-ide-panelbox]');
-    if (panel && ide.panel !== 'test') panel.innerHTML = idePanelHtml();
-    else if (panel) { const tb = $('.ide-panel__tabs', panel); if (tb) tb.outerHTML = idePanelTabs(); }
-    const st = $('[data-ide-state]');
-    if (st) { const d = ideDirty(); st.textContent = d ? t('Nicht gespeichert') : t('Gespeichert'); st.classList.toggle('is-dirty', d); }
-  }
-  // Farben, Einrückungslinien, Zeilennummern, aktuelle Zeile
-  function ideHighlight() {
-    const f = ideFile(ide.active);
-    const hl = $('[data-ide-hl]');
-    if (!f || !hl || !ide.luna) return;
-    let html = '';
-    let lineStart = true;
-    ide.luna.highlight(f.code || '').forEach(([k, s]) => {
-      if (k !== 'ws') { html += `<span class="tk-${k}">${esc(s)}</span>`; lineStart = false; return; }
-      s.split(/(\n)/).forEach((part) => {
-        if (part === '\n') { html += '\n'; lineStart = true; return; }
-        if (lineStart && part) {
-          const lead = part.match(/^ */)[0];
-          html += `${lead.replace(/ {2}/g, '<span class="ig">  </span>')}${esc(part.slice(lead.length))}`;
-          if (part.length > lead.length) lineStart = false;
-        } else html += esc(part);
-      });
-    });
-    hl.innerHTML = `${html}\n`;
-    const d = ide.diag[f.id] || {};
-    const errLine = d.error ? d.error.line : (ide.bridges.find((b) => b.from === f.id && !b.ok) || {}).line || 0;
-    const warn = new Set((d.warnings || []).map((w) => w.line));
-    const n = (f.code || '').split('\n').length;
-    let g = '';
-    for (let i = 1; i <= n; i += 1) g += `<span class="${i === errLine ? 'is-error' : warn.has(i) ? 'is-warn' : ''}${i === ide.cur ? ' is-cur' : ''}">${i}</span>`;
-    $('[data-ide-gutter]').innerHTML = g;
-    const mark = $('[data-ide-mark]');
-    mark.hidden = !errLine;
-    if (errLine) mark.style.setProperty('--line', errLine - 1);
-    const cur = $('[data-ide-cur]');
-    if (cur) cur.style.setProperty('--line', ide.cur - 1);
-  }
-  function ideCaret() {
-    const ta = $('[data-ide-code]');
-    if (!ta) return;
-    edtUpdateStatus();
-    const line = ta.value.slice(0, ta.selectionStart).split('\n').length;
-    if (line === ide.cur) return;
-    ide.cur = line;
-    const cur = $('[data-ide-cur]');
-    if (cur) cur.style.setProperty('--line', line - 1);
-    $$('[data-ide-gutter] .is-cur').forEach((x) => x.classList.remove('is-cur'));
-    const g = $(`[data-ide-gutter] span:nth-child(${line})`);
-    if (g) g.classList.add('is-cur');
-  }
-  let ideTimer = null;
-  let draftTimer = null;
-  function ideInput(ta) {
-    const f = ideFile(ide.active);
-    if (!f) return;
-    f.code = ta.value;
-    edtUpdateStatus();
-    ide.cur = ta.value.slice(0, ta.selectionStart).split('\n').length;
-    ideHighlight();
-    clearTimeout(ideTimer);
-    ideTimer = setTimeout(() => { ideDiagnose(); ideHighlight(); ideRefreshSide(); }, 220);
-    clearTimeout(draftTimer);
-    draftTimer = setTimeout(ideInputDraft, 700);
-  }
-  function ideInputDraft() {
-    if (ide.bot) store.set(draftKey(), ideDirty() ? { base: ide.bot.updated, files: ide.files } : null);
-    const st = $('[data-ide-state]');
-    if (st) { const d = ideDirty(); st.textContent = d ? t('Nicht gespeichert') : t('Gespeichert'); st.classList.toggle('is-dirty', d); }
-  }
-  function insertText(ta, text) {
-    ta.focus();
-    let ok = false;
-    try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
-    if (!ok) { ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input', { bubbles: true })); }
-  }
-  function ideKey(e) {
-    const ta = e.target;
-    if (edx.ac) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const n = edx.ac.items.length; edx.ac.i = (edx.ac.i + (e.key === 'ArrowDown' ? 1 : -1) + n) % n; acDraw(); return; }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); acAccept(); return; }
-      if (e.key === 'Escape') { e.preventDefault(); acHide(); return; }
-    }
-    const mod = e.ctrlKey || e.metaKey;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); return; }
-    if (mod && e.key.toLowerCase() === 'f') { e.preventDefault(); edtAction('find'); return; }
-    if (mod && e.key === '/') { e.preventDefault(); toggleComment(ta); return; }
-    if (mod && e.key.toLowerCase() === 'g') { e.preventDefault(); edtAction('goto'); return; }
-    if (mod && e.shiftKey && e.key.toLowerCase() === 'i') { e.preventDefault(); formatCode(ta); return; }
-    if (mod && e.key === ' ') { e.preventDefault(); acShow(ta); return; }
-    const v = ta.value;
-    const pos = ta.selectionStart;
-    const lineStart = v.lastIndexOf('\n', pos - 1) + 1;
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const end = ta.selectionEnd;
-      if (end > pos && v.slice(pos, end).includes('\n')) {
-        const blockEnd = v.indexOf('\n', end - 1) < 0 ? v.length : v.indexOf('\n', end - 1);
-        const next = v.slice(lineStart, blockEnd).split('\n').map((l) => (e.shiftKey ? l.replace(/^ {1,2}/, '') : `  ${l}`)).join('\n');
-        ta.setSelectionRange(lineStart, blockEnd);
-        insertText(ta, next);
-        ta.setSelectionRange(lineStart, lineStart + next.length);
-      } else if (e.shiftKey) {
-        const lead = v.slice(lineStart).match(/^ {1,2}/);
-        if (lead) { ta.setSelectionRange(lineStart, lineStart + lead[0].length); insertText(ta, ''); ta.setSelectionRange(pos - lead[0].length, pos - lead[0].length); }
-      } else insertText(ta, '  ');
-      return;
-    }
-    if (e.key === 'Enter' && !e.isComposing && !e.shiftKey && !e.altKey) {
-      e.preventDefault();
-      const before = v.slice(lineStart, pos);
-      const indent = before.match(/^[ \t]*/)[0];
-      const lineEnd = v.indexOf('\n', pos) < 0 ? v.length : v.indexOf('\n', pos);
-      const after = v.slice(pos, lineEnd);
-      const opensBrace = /[{([]\s*$/.test(before);
-      const opensWord = /(\bthen|\bdo|\bfunction\b.*\)|\brepeat)\s*$/.test(before) && !/\bend\s*$/.test(before);
-      const closes = /^\s*[}\])]/.test(after);
-      // Offener Block ohne passendes Ende? Dann gleich schließen (} bzw. end – wie in Roblox Studio)
-      const depth = ide.luna ? ide.luna.highlight(v).reduce((n, [k, x]) => n + (k === 'br' ? (x === '{' ? 1 : x === '}' ? -1 : 0) : 0), 0) : 0;
-      const opens = (v.match(/\b(then|do|function|repeat)\b/g) || []).length - (v.match(/\b(end|until)\b/g) || []).length - (v.match(/\bfunction\b[^\n]*\{/g) || []).length - (v.match(/\b(then|do)\s*\{/g) || []).length;
-      if (opensBrace && (closes || (/\{\s*$/.test(before) && depth > 0))) {
-        insertText(ta, `\n${indent}  \n${indent}${closes ? '' : '}'}`);
-        const c = pos + 1 + indent.length + 2;
-        ta.setSelectionRange(c, c);
-        ideInput(ta);
-      } else if (opensWord && !after.trim() && opens > 0) {
-        const closer = /\brepeat\s*$/.test(before) ? 'until ' : 'end';
-        insertText(ta, `\n${indent}  \n${indent}${closer}`);
-        const c = pos + 1 + indent.length + 2;
-        ta.setSelectionRange(c, c);
-        ideInput(ta);
-      } else insertText(ta, `\n${indent}${opensBrace || opensWord ? '  ' : ''}`);
-      return;
-    }
-    if (e.key === '}' && /^ {2,}$/.test(v.slice(lineStart, pos))) {
-      e.preventDefault();
-      ta.setSelectionRange(pos - 2, pos);
-      insertText(ta, '}');
-    }
-  }
-  function ideInsertKey(k) {
-    const ta = $('[data-ide-code]');
-    if (!ta) return;
-    const pairs = { '{ }': ['{', '}'], '( )': ['(', ')'], '" "': ['"', '"'], '[ ]': ['[', ']'] };
-    if (k === '⇥') { insertText(ta, '  '); return; }
-    if (k === '--') { insertText(ta, '-- '); return; }
-    if (pairs[k]) {
-      const [a, b] = pairs[k];
-      const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd);
-      const start = ta.selectionStart;
-      insertText(ta, a + sel + b);
-      ta.setSelectionRange(start + 1, start + 1 + sel.length);
-      return;
-    }
-    insertText(ta, k === '..' ? ' .. ' : k);
-  }
-  function ideOpen(id, line = 0) {
-    const f = ideFile(id);
-    if (!f) return;
-    ide.sel = id;
-    if (isScript(f.type)) {
-      if (!ide.open.includes(id)) ide.open.push(id);
-      ide.active = id;
-      if (window.matchMedia('(max-width: 819px)').matches) ide.tree = false;
-    }
-    ide.cur = line > 0 ? line : 1;
-    renderIde();
-    const ta = $('[data-ide-code]');
-    if (!ta || !isScript(f.type)) return;
-    if (line > 0) {
-      const lines = (f.code || '').split('\n');
-      const at = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
-      ta.focus({ preventScroll: true });
-      ta.setSelectionRange(at, at + (lines[line - 1] || '').length);
-      const sc = $('[data-ide-scroll]');
-      if (sc) sc.scrollTop = Math.max(0, (line - 4) * 20);
-    }
-  }
-  function ideSelect(id) {
-    ide.sel = id;
-    const f = ideFile(id);
-    if (f && isScript(f.type)) { ideOpen(id); return; }
-    ideRefreshSide();
-  }
-  function ideCloseTab(id) {
-    const i = ide.open.indexOf(id);
-    if (i < 0) return;
-    ide.open.splice(i, 1);
-    if (ide.active === id) ide.active = ide.open[Math.min(i, ide.open.length - 1)] || null;
-    renderIde();
-  }
-  // Pfad eines Objekts → Schlüssel, um neue IDs nach dem Speichern zuzuordnen
-  const pathKey = (files, f) => { const parts = []; for (let x = f, i = 0; x && i < 64; i += 1) { parts.unshift(x.name.toLowerCase()); if (!files.some((y) => y.id === x.parent)) { parts.unshift(x.parent); break; } x = files.find((y) => y.id === x.parent); } return parts.join('/'); };
-  async function ideSave() {
-    if (ide.saving || !ide.bot) return;
-    ide.saving = true;
-    renderIde();
-    const body = { files: ide.files.map((f) => ({ id: f.id, name: f.name, type: f.type, parent: f.parent, ...(isScript(f.type) ? { code: f.code || '' } : {}), ...(f.enabled === false ? { enabled: false } : {}), ...(f.url ? { url: f.url } : {}), ...(VALUE_TYPES.includes(f.type) ? { value: f.value } : {}) })) };
-    const r = await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body });
-    ide.saving = false;
-    if (r) {
-      const before = ide.files;
-      const byPath = Object.fromEntries((r.files || []).map((f) => [pathKey(r.files, f), f.id]));
-      const remap = (id) => { if (isService(id) || id === 'bot') return id; const f = before.find((x) => x.id === id); return f ? byPath[pathKey(before, f)] || null : null; };
-      ide.open = ide.open.map(remap).filter(Boolean);
-      ide.active = ide.active ? remap(ide.active) : null;
-      ide.sel = ide.sel ? remap(ide.sel) || 'ServerScriptService' : null;
-      const collapsed = {};
-      Object.keys(ide.collapsed).forEach((k) => { const n = remap(k); if (n) collapsed[n] = ide.collapsed[k]; });
-      ide.collapsed = collapsed;
-      ide.bot = r;
-      botsFull[ide.bid] = r;
-      ide.files = (r.files || []).map((f) => ({ ...f }));
-      ide.saved = ideSig(ide.files);
-      ide.draft = false;
-      store.set(draftKey(), null);
-      haptic('success');
-      toast(t('Gespeichert'));
-      openConv(ide.cid);
-    }
-    ideDiagnose();
-    renderIde();
-  }
-  async function ideTest(form) {
-    const f = ideFile(ide.active);
-    if (!f || !ide.luna) return;
-    const fd = form.elements;
-    const event = fd.event.value;
-    const username = fd.username.value.trim() || 'Testspieler';
-    const text = fd.text.value;
-    const prefix = (ide.bot && ide.bot.prefix) || '!';
-    const words = text.startsWith(prefix) ? text.slice(prefix.length).trim().split(/\s+/) : text.trim().split(/\s+/);
-    const command = (words.shift() || '').toLowerCase();
-    const c = chat.conv[ide.cid] || {};
-    const vars = {
-      username, displayName: username, userId: '1', chat: c.name || 'Chat', server: c.name || 'Chat', members: (c.members || []).length || 1, bot: ide.bot.name,
-      game: 'Train Sim Germany', gameId: placeId || '', text, message: text, command, args: words, argtext: words.join(' '),
-      players: fd.players ? +fd.players.value || 0 : 0, serverId: 'test',
-      time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
-      date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date()),
-    };
-    const args = event === 'command' ? [command, words] : event === 'message' ? [text, username] : [username];
-    if (!ide.testMem) ide.testMem = JSON.parse(JSON.stringify((ide.bot && ide.bot.memory) || {}));
-    const res = ide.luna.runEvent({ files: ide.files, type: f.type, event, vars, args, memory: ide.testMem, only: f.id, botName: ide.bot.name });
-    if (res.memChanged) ide.testMem = res.memory;
-    ide.testOut = { ...res, event };
-    const panel = $('[data-ide-panelbox]');
-    if (panel) panel.innerHTML = idePanelHtml();
-    const sel = $('[data-ide-test] select[name="event"]');
-    if (sel) sel.value = event;
-    const box = $('[data-ide-test]');
-    if (box) { box.elements.username.value = username; box.elements.text.value = text; }
-  }
-  function ideSnippet(name) {
-    const ta = $('[data-ide-code]');
-    const f = ideFile(ide.active);
-    if (!ta || !f) return;
-    const params = { onjoin: 'username', onleave: 'username', onmessage: 'text, username', oncommand: 'command, args', onopen: 'username', onstart: '' }[name] ?? '';
-    const end = ta.value.length;
-    ta.focus();
-    ta.setSelectionRange(end, end);
-    const lead = ta.value.endsWith('\n') || !ta.value ? '' : '\n';
-    insertText(ta, `${lead}\n${name}(${params}) {\n  print("…")\n}\n`);
-  }
-
-
-  // ---------- Luna-Dokumentation (#/luna/<seite>) – modern, mit Startseite, Playground und „Intern“ für den CEN ----------
-  let docsLoad = null;
-  const docsLib = () => (docsLoad || (docsLoad = import(new URL('assets/js/luna-docs.js', document.baseURI).href).catch((e) => { docsLoad = null; throw e; })));
-  const docs = { lib: null, q: '', nav: false, spy: null, intern: null, internBusy: false, pgOut: null, pgSteps: 0 };
-  const isCEN = () => state.rank === 'Chief Engineer';
-  const GROUP_INFO = {
-    'Erste Schritte': ['fi-rr-rocket-lunch', 'Was Luna ist, die ganze Sprache auf einer Seite und der Playground'],
-    Sprache: ['fi-rr-brackets-curly', 'Variablen, Operatoren, Bedingungen, Schleifen, Funktionen, Tabellen und Texte'],
-    Standardbibliothek: ['fi-rr-layers', 'Eingebaute Funktionen und die Bibliotheken math, string und table'],
-    'TSG-Bots': ['fi-rr-robot', 'Bots in Servern und Gruppen: Editor, Services, Ereignisse, Connectors, Webhooks'],
-    Referenz: ['fi-rr-book-alt', 'Grenzen, Unterschiede zu Luau und alle Versionen'],
-    Beispiele: ['fi-rr-sparkles', 'Fertige Bausteine zum Kopieren und Ausprobieren'],
-  };
-  const PG_EXAMPLES = [
-    ['Hallo Welt', 'print("Hallo Welt!")\n\nlocal name = "Lok_Max"\nprint("Hallo " .. name .. "!")\n'],
-    ['Schleifen', 'for i = 1, 5 do\n  print("Runde " .. i)\nend\n\nlocal zaehler = 3\nwhile zaehler > 0 do\n  print(zaehler .. " …")\n  zaehler -= 1\nend\nprint("Abfahrt!")\n'],
-    ['Funktionen', 'local function fahrzeit(km, tempo)\n  return math.floor(km / tempo * 60)\nend\n\nprint("Berlin – Hamburg: " .. fahrzeit(289, 230) .. " Minuten")\n'],
-    ['Tabellen', 'local linie = { name = "RE1", halte = { "Magdeburg", "Brandenburg", "Berlin" } }\n\nprint("Linie " .. linie.name)\nfor i, halt in ipairs(linie.halte) do\n  print(i .. ". " .. halt)\nend\nprint(#linie.halte .. " Halte")\n'],
-    ['Begrüßungs-Bot', '-- Mit „Ereignisse simulieren“ laufen onjoin und onmessage\nonjoin(username) {\n  print("Willkommen {username} auf {server}! 👋")\n}\n\nonmessage(text, username) {\n  if text == "hallo" {\n    print("Hallo {username}!")\n  }\n}\n'],
-  ];
-  const pgCode = () => { const v = store.get('tsg-luna-pg', null); return typeof v === 'string' ? v : PG_EXAMPLES[0][1]; };
-  function docsShell(inner, current, toc = []) {
-    const D = docs.lib;
-    const back = ide.cid && ide.bid ? `<a class="docs__back" href="#/bots/${esc(ide.cid)}/${esc(ide.bid)}">${icon('fi-rr-arrow-left')}${t('Zurück zum Editor')}</a>` : '';
-    return `<aside class="docs__nav${docs.nav ? ' is-open' : ''}" data-docs-navbox aria-label="${esc(t('Inhalt der Dokumentation'))}">
-        <div class="docs__brand"><a class="docs__home" href="#/luna">${clsIcon('module')}<span><b>Luna</b><small>${t('Dokumentation')} · ${esc(D.VERSION)}</small></span></a><button class="docs__nav-close" type="button" data-docs-nav="0" aria-label="${esc(t('Schließen'))}">${svgClose}</button></div>
-        <label class="docs__search">${icon('fi-rr-search')}<input type="search" data-docs-search value="${esc(docs.q)}" placeholder="${esc(t('Dokumentation durchsuchen …'))}" autocomplete="off" spellcheck="false"></label>
-        <div class="docs__links" data-docs-links>${docsNavHtml(current)}</div>
-        ${back}
-      </aside>
-      <button class="docs__backdrop" type="button" data-docs-nav="0" tabindex="-1" aria-hidden="true"></button>
-      <div class="docs__main">${inner}</div>
-      <aside class="docs__toc" aria-label="${esc(t('Auf dieser Seite'))}">
-        ${toc.length ? `<h6>${t('Auf dieser Seite')}</h6><nav>${toc.map((h) => `<a class="lv-${h.level}" href="#/luna/${esc(current)}?h=${esc(h.id)}" data-toc="${esc(h.id)}">${esc(h.text)}</a>`).join('')}</nav>` : ''}
-      </aside>`;
-  }
-  const docsTop = (crumbs) => `<div class="docs__top">
-      <button class="docs__menu" type="button" data-docs-nav="1">${icon('fi-rr-menu-burger')}${t('Inhalt')}</button>
-      <nav class="docs__crumbs" aria-label="${esc(t('Pfad'))}"><a href="#/luna">Luna</a>${crumbs.map((c, i) => `${svgChev}<span${i === crumbs.length - 1 ? ' aria-current="page"' : ''}>${esc(c)}</span>`).join('')}</nav>
-    </div>`;
-  // Startseite: worum es geht, ein Beispiel mit echter Ausgabe, die Bereiche
-  function docsLanding() {
-    const D = docs.lib;
-    const sample = 'local halte = { "Berlin", "Spandau", "Wolfsburg" }\n\nfor i, halt in ipairs(halte) do\n  print(i .. ". Halt: " .. halt)\nend';
-    const feat = (ic, title, text) => `<div class="dl-feat"><span>${icon(ic)}</span><b>${title}</b><p>${text}</p></div>`;
-    return `${docsTop([t('Start')])}
-      <section class="dl-hero">
-        <span class="dl-badge">${icon('fi-rr-sparkles')}Luna ${esc(D.VERSION)}</span>
-        <h1>${t('Programmieren,')} <span>${t('einfach gemacht.')}</span></h1>
-        <p>${t('Luna ist eine kleine Programmiersprache: gut lesbar, sicher im Sandkasten und überall einbettbar. Heute für Bots in Train Sim Germany – und für alles, was noch kommt.')}</p>
-        <div class="dl-cta"><a class="btn btn--primary btn--lg" href="#/luna/einfuehrung">${icon('fi-rr-rocket-lunch')}${t('Loslegen')}</a><a class="btn btn--soft btn--lg" href="#/luna/playground">${icon('fi-rr-play')}${t('Playground')}</a></div>
-      </section>
-      <section class="dl-demo">
-        <figure class="doc-code dl-demo__code"><figcaption><span>Luna</span><button type="button" data-doc-try>${t('Ausprobieren')}</button></figcaption><pre><code>${D.codeHtml(sample)}</code></pre><textarea hidden data-doc-src>${esc(sample)}</textarea></figure>
-        <div class="dl-demo__out"><small>${t('Ausgabe')}</small><ol data-dl-out><li>${t('Wird ausgeführt …')}</li></ol></div>
-      </section>
-      <section class="dl-feats">
-        ${feat('fi-rr-graduation-cap', t('Einfach'), t('Wenige Schlüsselwörter, Fehlermeldungen auf Deutsch, Blöcke mit { … } oder then … end.'))}
-        ${feat('fi-rr-shield-check', t('Sicher'), t('Ein Sandkasten ohne Zugriff auf Dateien oder Netzwerk – mit Grenzen für Zeit und Speicher.'))}
-        ${feat('fi-rr-layers', t('Einbettbar'), t('Sprache und Plattform sind getrennt. Luna läuft im Browser und auf Servern.'))}
-      </section>
-      <section class="dl-groups">
-        ${D.GROUPS.map((g) => {
-          const pages = D.PAGES.filter((x) => x.group === g);
-          const [ic, text] = GROUP_INFO[g] || ['fi-rr-document', ''];
-          return `<a class="dl-group" href="#/luna/${esc(pages[0].id)}"><span class="dl-group__ic">${icon(ic)}</span><b>${esc(t(g))}</b><p>${esc(t(text))}</p><small>${pages.length === 1 ? t('1 Seite') : t('{n} Seiten', { n: pages.length })}</small></a>`;
-        }).join('')}
-      </section>
-      ${isCEN() ? `<a class="dl-intern" href="#/luna/intern">${icon('fi-rr-shield-check')}<span><b>${t('Luna von innen')}</b><small>${t('Nur für dich als Chief Engineer: wie die Sprache funktioniert und wie du sie erweiterst')}</small></span>${svgChev}</a>` : ''}`;
-  }
-  function docsPlayground() {
-    const code = pgCode();
-    return `${docsTop([t('Erste Schritte'), 'Playground'])}
-      <article class="doc doc--pg">
-        <h1>Playground</h1>
-        <p class="doc__lead">${t('Luna schreiben und sofort ausführen – ohne Bot und ohne Anmeldung. Strg/Cmd + Enter führt aus.')}</p>
-        <div class="pg">
-          <div class="pg__bar">
-            <select data-pg-example aria-label="${esc(t('Beispiel laden'))}"><option value="">${t('Beispiel laden …')}</option>${PG_EXAMPLES.map(([n], i) => `<option value="${i}">${esc(t(n))}</option>`).join('')}</select>
-            <label class="pg__sim"><input type="checkbox" data-pg-sim${store.get('tsg-luna-pg-sim', false) ? ' checked' : ''}><span>${t('Ereignisse simulieren')}</span></label>
-            <button class="btn btn--primary btn--sm pg__run" type="button" data-pg-run>${icon('fi-rr-play')}${t('Ausführen')}</button>
-          </div>
-          <div class="pg__simbox" data-pg-simbox${store.get('tsg-luna-pg-sim', false) ? '' : ' hidden'}>
-            <label><span>{username}</span><input data-pg-user value="${esc((state.profile && state.profile.username) || 'Lok_Max')}" maxlength="20" spellcheck="false"></label>
-            <label><span>${t('Nachricht')}</span><input data-pg-text value="hallo" maxlength="200" spellcheck="false"></label>
-            <small>${t('Läuft nacheinander: onstart(), onjoin(username), onmessage(text, username)')}</small>
-          </div>
-          <div class="code pg__ed">
-            <div class="code__grid">
-              <pre class="code__gutter" data-pg-gutter aria-hidden="true"></pre>
-              <div class="code__area">
-                <pre class="code__hl" data-pg-hl aria-hidden="true"></pre>
-                <textarea class="code__input" data-pg-code spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="${esc(t('Luna-Code'))}">${esc(code)}</textarea>
-              </div>
-            </div>
-          </div>
-          <div class="pg__out"><div class="pg__out-head"><b>${t('Ausgabe')}</b><small data-pg-steps></small><button class="link-btn" type="button" data-pg-clear>${t('Leeren')}</button></div><ol data-pg-out><li class="pg__hint">${t('Tippe auf „Ausführen“.')}</li></ol></div>
-        </div>
-        <aside class="doc-note doc-note--tipp"><b>${t('Tipp')}</b><p>${t('Im Playground schreibt print() sofort in die Ausgabe. In einem Bot gehört print() in ein Ereignis wie onjoin() – sonst wird es ignoriert.')}</p></aside>
-      </article>`;
-  }
-  function pgPaint() {
-    const ta = $('[data-pg-code]');
-    if (!ta || !docs.lib) return;
-    $('[data-pg-hl]').innerHTML = `${docs.lib.codeHtml(ta.value)}\n`;
-    const n = ta.value.split('\n').length;
-    let g = '';
-    for (let i = 1; i <= n; i += 1) g += `<span>${i}</span>`;
-    $('[data-pg-gutter]').innerHTML = g;
-  }
-  async function pgRun() {
-    const ta = $('[data-pg-code]');
-    const out = $('[data-pg-out]');
-    if (!ta || !out) return;
-    let luna;
-    try { luna = await lunaLib(); } catch (e) { toast(t('Luna konnte nicht geladen werden.')); return; }
-    const sim = $('[data-pg-sim]') && $('[data-pg-sim]').checked;
-    const username = ($('[data-pg-user]') || {}).value || 'Lok_Max';
-    const text = ($('[data-pg-text]') || {}).value || '';
-    const now = new Date();
-    const vars = {
-      username, displayName: username, userId: '1', server: 'Playground', chat: 'Playground', channel: 'allgemein', members: 1, bot: 'Playground',
-      game: 'Train Sim Germany', gameId: placeId || '', text, message: text,
-      time: new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit' }).format(now), date: new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now),
-    };
-    const events = sim ? [{ event: 'start' }, { event: 'join', args: [username] }, { event: 'message', args: [text, username] }] : [];
-    const r = luna.runScript(ta.value, { vars, events });
-    const kindIc = { out: '›', log: '·', warn: '!', error: '×' };
-    out.innerHTML = r.output.length ? r.output.map((x) => `<li class="pg__line pg__line--${esc(x.kind)}"><i>${kindIc[x.kind] || '·'}</i><span>${esc(x.text)}</span>${x.line ? `<small>${t('Zeile {n}', { n: x.line })}</small>` : ''}</li>`).join('')
-      : `<li class="pg__hint">${sim && !r.ran ? t('Keine Ausgabe – das Skript hat kein onstart, onjoin oder onmessage.') : t('Keine Ausgabe. Mit print("…") schreibst du hierher.')}</li>`;
-    $('[data-pg-steps]').textContent = r.errors.length ? t('mit Fehler') : t('{n} Schritte', { n: fmt(r.steps) });
-    haptic(r.errors.length ? 'error' : 'light');
-  }
-  // Nur für den Chief Engineer: Inhalt kommt aus dem Backend
-  async function loadIntern() {
-    if (docs.internBusy || docs.intern) return;
-    docs.internBusy = true;
-    try { docs.intern = await api('/api/luna/intern'); } catch (e) { docs.intern = { error: e.status === 403 ? 'forbidden' : 'error' }; }
-    docs.internBusy = false;
-    if (state.page === 'luna' && state.docsArg === 'intern') renderDocs('intern', state.docsHeading);
-  }
-  function docsIntern() {
-    const top = docsTop([t('Intern'), t('Luna von innen')]);
-    const lock = (text) => `${top}<article class="doc"><h1>${t('Luna von innen')}</h1><div class="dl-lock">${icon('fi-rr-lock')}<p>${text}</p></div></article>`;
-    if (!isCEN()) return { html: lock(t('Diese Seite gibt es nur für den Chief Engineer.')), toc: [] };
-    if (!apiReady() || !sessionToken()) return { html: lock(t('Bitte melde dich an – der Inhalt kommt nach einer Prüfung deines Rangs vom App-Server.')), toc: [] };
-    if (!docs.intern) { loadIntern(); return { html: `${top}<article class="doc"><h1>${t('Luna von innen')}</h1>${loadingHtml()}</article>`, toc: [] }; }
-    if (docs.intern.error) return { html: lock(docs.intern.error === 'forbidden' ? t('Diese Seite gibt es nur für den Chief Engineer.') : t('Die Seite konnte nicht geladen werden.')), toc: [] };
-    const r = docs.lib.render(docs.intern.md, 'intern');
-    return {
-      html: `${top}<article class="doc"><span class="dl-badge dl-badge--cen">${icon('fi-rr-shield-check')}${t('Nur für den Chief Engineer')}</span><h1>${t('Luna von innen')}</h1>
-        <p class="doc__lead">${t('Persönlich für dich: was jedes Teil der Sprache macht, wo du die Dokumentation bearbeitest und wie du eigene Funktionen ergänzt.')}</p>${r.html}</article>`,
-      toc: r.toc,
-    };
-  }
-  async function renderDocs(pageId, heading) {
-    const box = $('[data-docs]');
-    if (!box) return;
-    if (!docs.lib) {
-      box.innerHTML = `<div class="docs-loading">${loadingHtml()}</div>`;
-      try { docs.lib = await docsLib(); } catch (e) { box.innerHTML = `<p class="empty">${t('Die Dokumentation konnte nicht geladen werden.')}</p>`; return; }
-      if (state.page !== 'luna') return;
-    }
-    const D = docs.lib;
-    iconDefs();
-    box.classList.toggle('is-landing', pageId === 'start');
-    if (pageId === 'start') {
-      box.innerHTML = docsShell(docsLanding(), 'start');
-      const out = $('[data-dl-out]');
-      lunaLib().then((luna) => {
-        const r = luna.runScript($('.dl-demo [data-doc-src]').value);
-        if (out) out.innerHTML = r.output.map((x) => `<li>${esc(x.text)}</li>`).join('');
-      }).catch(() => { if (out) out.innerHTML = ''; });
-      return;
-    }
-    if (pageId === 'intern') {
-      const r = docsIntern();
-      box.innerHTML = docsShell(r.html, 'intern', r.toc);
-      docsSpy(heading);
-      return;
-    }
-    if (pageId === 'playground') {
-      box.innerHTML = docsShell(docsPlayground(), 'playground');
-      pgPaint();
-      return;
-    }
-    const page = D.PAGES.find((x) => x.id === pageId) || D.PAGES[0];
-    const idx = D.PAGES.indexOf(page);
-    const prev = D.PAGES[idx - 1];
-    const next = D.PAGES[idx + 1];
-    const r = D.render(page.md, page.id);
-    box.innerHTML = docsShell(`${docsTop([t(page.group), t(page.title)])}
-        <article class="doc">
-          <h1>${esc(t(page.title))}</h1>
-          <p class="doc__lead">${esc(t(page.lead))}</p>
-          ${r.toc.length > 2 ? `<details class="doc__toc-inline"><summary>${t('Auf dieser Seite')}</summary>${r.toc.map((h) => `<a class="lv-${h.level}" href="#/luna/${esc(page.id)}?h=${esc(h.id)}">${esc(h.text)}</a>`).join('')}</details>` : ''}
-          ${r.html}
-        </article>
-        <nav class="doc__pager">
-          ${prev ? `<a href="#/luna/${esc(prev.id)}"><small>${t('Zurück')}</small><b>${esc(t(prev.title))}</b></a>` : '<span></span>'}
-          ${next ? `<a class="is-next" href="#/luna/${esc(next.id)}"><small>${t('Weiter')}</small><b>${esc(t(next.title))}</b></a>` : '<span></span>'}
-        </nav>`, page.id, r.toc);
-    docsSpy(heading);
-  }
-  // Mitlaufendes „Auf dieser Seite“ und Sprung zu einer Überschrift
-  function docsSpy(heading) {
-    if (docs.spy) docs.spy.disconnect();
-    if ('IntersectionObserver' in window) {
-      docs.spy = new IntersectionObserver((entries) => {
-        entries.forEach((en) => {
-          if (!en.isIntersecting) return;
-          const id = en.target.id.replace(/^doc-/, '');
-          $$('.docs__toc a').forEach((a) => a.classList.toggle('is-active', a.dataset.toc === id));
-        });
-      }, { rootMargin: '-80px 0px -70% 0px' });
-      $$('.doc h2, .doc h3').forEach((h) => docs.spy.observe(h));
-    }
-    if (heading) {
-      const el = document.getElementById(`doc-${heading}`);
-      if (el) setTimeout(() => el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }), 30);
-    }
-  }
-  function docsNavHtml(current) {
-    const D = docs.lib;
-    if (docs.q.trim().length >= 2) {
-      const hits = D.search(docs.q);
-      return hits.length ? `<div class="docs__results">${hits.map((h) => `<a href="#/luna/${esc(h.id)}"><b>${esc(t(h.title))}</b><small>${esc(t(h.group))}</small><span>${esc(h.snip)}</span></a>`).join('')}</div>`
-        : `<p class="docs__none">${t('Nichts gefunden.')}</p>`;
-    }
-    const link = (id, title, extra = '') => `<a href="#/luna/${esc(id)}"${id === current ? ' class="is-active" aria-current="page"' : ''}>${extra}${esc(title)}</a>`;
-    return `<div class="docs__group">${link('start', t('Start'))}</div>${D.GROUPS.map((g) => `<div class="docs__group"><h6>${esc(t(g))}</h6>${D.PAGES.filter((x) => x.group === g).map((x) => link(x.id, t(x.title), x.id === 'playground' ? icon('fi-rr-play', 'docs__pg-ic') : '')).join('')}</div>`).join('')}
-      ${isCEN() ? `<div class="docs__group docs__group--cen"><h6>${t('Intern · nur CEN')}</h6>${link('intern', t('Luna von innen'), icon('fi-rr-shield-check', 'docs__pg-ic'))}</div>` : ''}`;
   }
 
   // ---------- Prüfung der Discord-Verbindungen (Ränge über Public Relations Department) ----------
@@ -6758,11 +5338,11 @@
       body.innerHTML = r.body;
       return;
     }
-    const sub = { new: t('Neu'), 'new-dm': t('Spieler anschreiben'), 'new-group': t('Neue Gruppe'), 'new-server': t('Neuer Server-Chat'), 'new-ticket': t('Neue Anfrage'), direct: t('Direktnachricht'), info: t('Info') }[v];
+    const sub = { new: t('Neu'), 'new-dm': t('Spieler anschreiben'), 'new-group': t('Neue Gruppe'), 'new-server': t('Neuer Server'), 'new-ticket': t('Neue Anfrage'), join: t('Beitreten'), direct: t('Direktnachricht'), info: t('Info') }[v];
     if (sub) {
       head.innerHTML = `<div class="appbar"><div class="appbar__title"><span class="appbar__label">${t('Chat')}</span><h1 class="appbar__value">${sub}</h1></div></div>`;
       body.innerHTML = v === 'new' ? chatNewChoice() : v === 'new-dm' ? chatNewDm() : v === 'new-group' ? chatNewGroup() : v === 'new-server' ? chatNewServer()
-        : v === 'new-ticket' ? chatNewTicket() : v === 'info' ? chatInfo(state.chatArg) : chatDirect(state.chatArg);
+        : v === 'new-ticket' ? chatNewTicket() : v === 'join' ? chatJoinView() : v === 'info' ? chatInfo(state.chatArg) : chatDirect(state.chatArg);
       return;
     }
     head.innerHTML = chatHead();
@@ -6814,7 +5394,7 @@
       if ('serverNew' in form.dataset) {
         const f = form.elements;
         Object.assign(body, {
-          category: 'server', servers: [...form.querySelectorAll('input[name="servers"]:checked')].map((x) => x.value),
+          category: 'server', template: (form.querySelector('input[name="template"]:checked') || {}).value || '', servers: [...form.querySelectorAll('input[name="servers"]:checked')].map((x) => x.value),
           server: { join: (form.querySelector('input[name="join"]:checked') || {}).value || 'roblox', link: f.link.value.trim(), access: f.membersOnly.checked ? 'members' : 'all', relay: f.relay.checked, welcome: f.welcome.value },
         });
       }
@@ -7162,7 +5742,7 @@
       status = `<section class="pstatus is-on">
         <p class="pstatus__title"><span class="live-dot"></span>${t('Gerade in Train Sim Germany')}</p>
         <div class="pstatus__server">${icon(sv.private ? 'fi-rr-lock' : 'fi-rr-signal-alt-2')}<span><b>${sv.private ? esc(ps0 ? ps0.name : t('Privater Server')) : t('Öffentlicher Server')}</b><small>ID ${esc(shortId(sv.id))} · ${t('{n} Spieler', { n: `${sv.players}/${sv.max}` })}</small></span></div>
-        ${a ? `<div class="pstatus__role"><span class="role-dot" style="--rc:${roleRank(a.role).color}">${esc(roleRank(a.role).prefix)}</span><span>${esc(a.role)}<small>${esc(t(roleRank(a.role).label))}</small></span></div>` : ''}
+        ${a ? `<div class="pstatus__role"><span class="role-dot" style="--rc:${esc(a.teamColor || roleRank(a.role).color)}">${esc(a.team ? initials(a.team) : roleRank(a.role).prefix)}</span><span>${esc(a.team || a.role)}<small>${esc(t(roleRank(a.role).label))}</small></span></div>` : ''}
         ${a && (a.line || a.train) ? `<div class="pstatus__train">
           ${a.line ? `<span class="line line--${cat}">${esc(a.line)}</span>` : ''}
           <span><b>${a.dest ? t('nach {to}', { to: esc(a.dest) }) : esc(a.train || '')}</b><small>${[a.train, trainName(a.veh)].filter(Boolean).map(esc).join(' · ')}</small>
@@ -7344,7 +5924,6 @@
   // Jede Zeile öffnet eine eigene Seite mit allem, was zu ihr gehört – z. B. „Privatsphäre“ → alle Schalter dazu.
   const SET_PAGES = [
     { group: 'Konto', items: [
-      { id: 'profil', ic: 'fi-rr-user', label: 'Mein Profil', href: '#/profil' },
       { id: 'konto', ic: 'fi-rr-link-alt', label: 'Roblox-Konto' },
       { id: 'privacy', ic: 'fi-rr-shield-check', label: 'Privatsphäre' },
       { id: 'benachrichtigungen', ic: 'fi-rr-bell', label: 'Benachrichtigungen' },
@@ -7388,7 +5967,7 @@
     if (page) return;
     const p = state.profile;
     const r = rankOf(state.rank);
-    menu.innerHTML = `<a class="set-me" href="#/profil">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${p ? esc(p.displayName || p.username) : t('Gast')}</b><small>${p ? `@${esc(p.username)}` : t('Mit Roblox anmelden')}</small></span>${rankPill(r)}${icon('fi-rr-angle-small-right', 'set-row__chev')}</a>
+    menu.innerHTML = `<button class="set-me" type="button" data-open="profile">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${p ? esc(p.displayName || p.username) : t('Gast')}</b><small>${p ? `@${esc(p.username)}` : t('Mit Roblox anmelden')}</small></span>${rankPill(r)}${icon('fi-rr-angle-small-right', 'set-row__chev')}</button>
       ${SET_PAGES.map((g) => `<div class="set-group"><h2>${esc(t(g.group))}</h2><div class="set-list">${g.items.map((x) => `<a class="set-row" href="${x.href || `#/einstellungen/${x.id}`}">
         <span class="set-row__ic">${icon(x.ic)}</span><span class="set-row__label">${esc(t(x.label))}</span><span class="set-row__val">${esc(setValue(x.id) || '')}</span>${icon('fi-rr-angle-small-right', 'set-row__chev')}</a>`).join('')}</div></div>`).join('')}`;
   }
@@ -7434,7 +6013,7 @@
   document.addEventListener('pointerdown', (e) => {
     const skin = document.documentElement.dataset.skin;
     if (!skin || !SKIN_POP[skin] || reducedMotion()) return;
-    const btn = e.target.closest('button, .btn, a.btn, [role="tab"], .dash-new, .set-row');
+    const btn = e.target.closest('button, .btn, a.btn, [role="tab"], .set-row');
     if (!btn) return;
     const list = SKIN_POP[skin];
     for (let i = 0; i < 5; i++) {
@@ -7534,8 +6113,10 @@
     await Promise.allSettled([
       RBX.groupId && j(`${R.groupsApi}/v1/groups/${RBX.groupId}`).then((g) => { out.groupMembers = g.memberCount; }),
       RBX.groupId && j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles`).then((r) => { out.roles = r.roles; }),
-      placeId && j(`${R.apisApi}/universes/v1/places/${placeId}/universe`).then((u) => j(`${R.gamesApi}/v1/games?universeIds=${u.universeId}`))
-        .then((g) => { const x = (g.data || [])[0]; if (x) Object.assign(out, { playing: x.playing, visits: x.visits, favorites: x.favoritedCount }); }),
+      placeId && j(`${R.apisApi}/universes/v1/places/${placeId}/universe`).then((u) => Promise.allSettled([
+        j(`${R.gamesApi}/v1/games?universeIds=${u.universeId}`).then((g) => { const x = (g.data || [])[0]; if (x) Object.assign(out, { playing: x.playing, visits: x.visits, favorites: x.favoritedCount }); }),
+        j(`${R.gamesApi}/v1/games/${u.universeId}/favorites/count`).then((f) => { if (Number.isFinite(f.favoritesCount)) out.favorites = f.favoritesCount; }),
+      ])),
       inviteCode && j(`${R.discordApi}/invites/${inviteCode}?with_counts=true`)
         .then((x) => Object.assign(out, { discordMembers: x.approximate_member_count, discordOnline: x.approximate_presence_count })),
     ]);
@@ -7544,7 +6125,8 @@
   async function loadStats() {
     let s = {};
     if (apiReady()) { try { s = await api('/api/stats'); } catch (e) { /* weiter ohne Backend */ } }
-    if (s.groupMembers == null || s.discordMembers == null) {
+    // Fehlt dem Backend eine Zahl (Roblox hat abgelehnt), fragt die App selbst über roproxy.com
+    if (['groupMembers', 'discordMembers', 'visits', 'favorites', 'playing'].some((k) => s[k] == null)) {
       const b = await browserStats();
       Object.keys(b).forEach((k) => { if (s[k] == null) s[k] = b[k]; });
     }
@@ -7603,10 +6185,6 @@
   const modal = $('[data-modal]');
   let modalView = null;
   const VIEWS = {
-    'profile-edit': {
-      title: () => t('Profil bearbeiten'),
-      render: () => profileEditView(),
-    },
     profile: {
       title: () => t('Profil'),
       render: () => {
@@ -7730,10 +6308,6 @@
       title: (arg) => { const b = botsFull[String(arg).split(':')[1]]; return b && b.name ? b.name : t('Bot'); },
       render: (arg) => botView(arg),
     },
-    botmove: {
-      title: () => t('Verschieben nach …'),
-      render: (id) => botMoveView(id),
-    },
     channel: {
       title: (arg) => { const [cid, ch] = String(arg).split(':'); const c = chat.conv[cid]; const x = c && ch !== 'neu' ? chFind(c, ch) : null; return x ? `#${x.name}` : t('Neuer Kanal'); },
       render: (arg) => channelView(arg),
@@ -7772,11 +6346,12 @@
         if (!n) return `<p class="muted">${t('Diese Neuigkeit gibt es nicht mehr.')}</p>`;
         return `<div class="detail">
           ${mediaHtml(n)}
-          <div class="detail__top"><span class="cat-tag cat-tag--${n.cat}">${esc(t(n.tag || n.cat))}</span><span class="tag">${newsDate(n)}</span>${n.author ? `<span class="tag">${icon('fi-rr-pencil')}${esc(n.author)}</span>` : ''}</div>
+          <div class="detail__top">${catTag(n)}<span class="tag">${newsDate(n)}</span>${n.author ? `<span class="tag">${icon('fi-rr-pencil')}${esc(n.author)}</span>` : ''}${n.edited ? `<span class="tag">${t('bearbeitet')}</span>` : ''}</div>
           <h3>${esc(t(n.title))}</h3>
           <p class="detail__text">${esc(t(n.text))}</p>
           <div class="btn-stack">${newsButtons(n)}
-            ${n.remote && isMine(n.authorId) ? `<button class="btn btn--danger btn--block btn--lg" type="button" data-news-del="${esc(n.id)}">${icon('fi-rr-trash')}${t('Neuigkeit löschen')}</button>` : ''}</div>
+            ${n.remote && isMine(n.authorId) ? `<button class="btn btn--soft btn--block btn--lg" type="button" data-news-edit="${esc(n.id)}">${icon('fi-rr-pencil')}${t('Bearbeiten')}</button>
+            <button class="btn btn--danger btn--block btn--lg" type="button" data-news-del="${esc(n.id)}">${icon('fi-rr-trash')}${t('Neuigkeit löschen')}</button>` : ''}</div>
         </div>`;
       },
     },
@@ -7826,6 +6401,13 @@
     'news-new': {
       title: () => t('Neuigkeit erstellen'),
       render: () => newsForm(),
+    },
+    'news-edit': {
+      title: () => t('Neuigkeit bearbeiten'),
+      render: (id) => {
+        const n = (remote.news || []).find((x) => x.id === id);
+        return n && isMine(n.authorId) ? newsForm(n) : `<p class="muted">${t('Diese Neuigkeit gibt es nicht mehr.')}</p>`;
+      },
     },
     buy: {
       title: () => t('Kaufen'),
@@ -8200,262 +6782,54 @@
     }, 2800);
   }
 
-  // ---------- Dashboard (#/dashboard): Server, Gruppen, Bots und mehr erstellen ----------
-  // Dunkel wie eine App-Startseite: oben „Hallo, Name“, darunter „Dein Bereich“ (was du hast), Erstellen, zuletzt
-  // angesehen und zuletzt bearbeitet. ⋯ öffnet ein Aktionsblatt von unten. Ohne Namen gibt es „Name's Server“ usw.,
-  // ohne Bild zwei Buchstaben auf Farbe.
-  const dash = { data: null, at: 0, busy: false, q: '', search: false, sheet: null, file: null, preview: null };
-  const DASH_COLORS = { server: '#8B5CF6', group: '#14B8A6', bot: '#F97316', chat: '#3B82F6' };
-  async function loadDash(force = false) {
-    if (!chatReady() || dash.busy || (!force && dash.data && Date.now() - dash.at < 15000)) return;
-    dash.busy = true;
-    try { dash.data = await api('/api/dashboard'); } catch (e) { dash.data = dash.data || { bots: [], places: [] }; }
-    dash.busy = false;
-    dash.at = Date.now();
-    if (state.page === 'dashboard') renderDash();
-  }
-  const recentList = () => store.get('tsg-recent', []) || [];
-  function addRecent(k, id, cid = '') {
-    if (!id) return;
-    store.set('tsg-recent', [{ k, id, cid, at: Date.now() }, ...recentList().filter((x) => !(x.k === k && x.id === id))].slice(0, 20));
-  }
-  // Bot ohne Bild: zwei Buchstaben auf einer Farbe aus dem Namen
-  const nameColor = (name) => AVATAR_COLORS[hash(String(name || '?')) % AVATAR_COLORS.length];
-  function initialsBadge(name, cls = '', color = null) {
-    const [a1, a2] = color ? [color, color] : nameColor(name);
-    return `<span class="ini-badge ${cls}" style="--a1:${esc(a1)};--a2:${esc(a2)}" aria-hidden="true">${esc(initials(String(name || '?')))}</span>`;
-  }
-  const kindOfChat = (c) => (c.kind === 'group' ? (c.category === 'server' ? 'server' : 'group') : c.kind === 'direct' ? 'chat' : 'ticket');
-  const KIND_LABEL = { server: 'Server', group: 'Gruppe', chat: 'Chat', ticket: 'Anfrage', bot: 'Bot' };
-  function dashBadge(item, cls = 'dash-badge') {
-    if (item.k === 'bot') return item.b.avatar ? botAvatar(item.b.chat.id, item.b, cls) : initialsBadge(item.b.name, cls);
-    const c = item.c;
-    if (c.kind === 'group') return groupBadge(c, cls);
-    const other = chatOther(c);
-    if (other) return personImg(other, cls);
-    return `<span class="dash-badge__ic ${cls}">${icon(areaOf(c.area).icon)}</span>`;
-  }
-  const chatItem = (c) => ({ k: 'chat', id: c.id, c, name: chatTitle(c), kind: kindOfChat(c), at: c.updated, href: `#/chat/${c.id}` });
-  const botItem = (b) => ({ k: 'bot', id: b.id, b, name: b.name, kind: 'bot', at: b.rev || 0, href: b.mode === 'advanced' ? `#/bots/${b.chat.id}/${b.id}` : `#/chat/${b.chat.id}/info` });
-  function dashItems() {
-    const chats = (chat.list ? chat.list.chats : []).map(chatItem);
-    const bots = (dash.data ? dash.data.bots : []).map(botItem);
-    return { chats, bots, all: [...chats, ...bots] };
-  }
-  function dashMeta(item) {
-    if (item.k === 'bot') return `${t('Bot')} · ${esc(item.b.chat.name || '')}${item.b.on ? '' : ` · ${t('Aus')}`}`;
-    const c = item.c;
-    const parts = [t(KIND_LABEL[item.kind])];
-    if (c.kind === 'group') parts.push(membersText(memberCount(c)));
-    parts.push(chatAgo(c.updated));
-    return parts.map(esc).join(' · ');
-  }
-  function dashDefaultName(what) {
+  // ---------- Standardnamen und Einladungslinks ----------
+  // Ohne Namen heißen neue Server, Gruppen und Bots „Name's Server“, „Name's Server2“ … (das Backend vergibt sie genauso)
+  function defaultName(what) {
     const me = state.profile || {};
     const base = `${me.username || me.displayName || t('Spieler')}'s ${what}`;
-    const taken = new Set((what === 'Bot' ? (dash.data ? dash.data.bots : []).map((b) => b.name)
-      : (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group' && c.from && String(c.from.sub) === meSub()).map((c) => c.name)).map((x) => String(x || '').toLowerCase()));
+    const taken = new Set((chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group' && c.from && String(c.from.sub) === meSub()).map((c) => String(c.name || '').toLowerCase()));
+    if (what === 'Bot') Object.values(chat.conv).forEach((c) => ((c && c.bots) || []).forEach((b) => taken.add(String(b.name || '').toLowerCase())));
     for (let n = 1; n < 1000; n++) { const name = n === 1 ? base : `${base}${n}`; if (!taken.has(name.toLowerCase())) return name; }
     return base;
   }
-  const dashRow = (item) => `<li class="dash-row">
-      <a class="dash-row__main" href="${esc(item.href)}">${dashBadge(item)}<span class="dash-row__text"><b>${esc(item.name)}</b><small>${dashMeta(item)}</small></span>${item.k === 'chat' && isUnread(item.c) ? '<i class="dash-unread" aria-label="ungelesen"></i>' : ''}</a>
-      <button class="dash-more" type="button" data-dash-more="${item.k}:${esc(item.id)}" aria-label="${esc(t('Mehr zu {name}', { name: item.name }))}">${icon('fi-rr-menu-dots')}</button>
-    </li>`;
-  const dashTile = (item) => `<div class="dash-tile dash-tile--${item.kind}">
-      <a class="dash-tile__main" href="${esc(item.href)}">${dashBadge(item, 'dash-badge dash-badge--lg')}<b>${esc(item.name)}</b><small>${dashMeta(item)}</small></a>
-      <button class="dash-more dash-tile__more" type="button" data-dash-more="${item.k}:${esc(item.id)}" aria-label="${esc(t('Mehr zu {name}', { name: item.name }))}">${icon('fi-rr-menu-dots-vertical')}</button>
-    </div>`;
-  // ---------- Dashboard wie ein Creator-Hub ----------
-  // Oben „≡ Home“ mit Suche, Glocke und Profilbild, darunter der Umschalter „Name ▾“: ich selbst oder einer meiner
-  // Gruppen-Chats bzw. Server. Danach Updates, Server, Bots und Lernen als Karten zum Wischen. ≡ öffnet die Seitenleiste,
-  // „Alle Tools“ zeigt alles auf einen Blick (links die Symbolleiste).
-  const DASH_NAV = [
-    [['home', 'fi-rr-home', 'Home', '#/dashboard'], ['erstellungen', 'fi-rr-folder', 'Erstellungen', '#/dashboard/erstellungen'], ['lernen', 'fi-rr-book-alt', 'Lernen', '#/luna'],
-      ['shop', 'fi-rr-shopping-bag', 'Shop', '#/shop'], ['forum', 'fi-rr-comment-alt', 'Forum', '#/chat/gruppen'], ['updates', 'fi-rr-megaphone', 'Updates', '#/news']],
-    [['coins', 'fi-rr-coins', 'Coins', '#/shop'], ['stats', 'fi-rr-chart-histogram', 'Statistiken', '#/statistiken'], ['trainings', 'fi-rr-calendar-lines', 'Trainings', '#/trainings']],
-    [['tools', 'fi-rr-menu-dots', 'Alle Tools', '#/dashboard/tools']],
-  ];
-  const DASH_TOOLS = [
-    ['Erstellungen', [['Server', '#/dashboard/erstellungen?f=server'], ['Gruppen', '#/dashboard/erstellungen?f=group'], ['Bots', '#/dashboard/erstellungen?f=bot'], ['Einladungslinks', '#/dashboard?beitreten=1']]],
-    ['Luna', [['Playground', '#/luna/playground'], ['Dokumentation', '#/luna'], ['Beispiele', '#/luna/beispiele']]],
-    ['Shop', [['Züge', '#/shop?v=trains'], ['Strecken', '#/shop?v=routes'], ['Wunschliste', '#/shop?v=wish']]],
-    ['Spiel', [['Live-Server', '#/server'], ['Spieler', '#/spieler'], ['Private Server', '#/server']]],
-    ['Team', [['Trainings', '#/trainings'], ['Karriere', '#/karriere'], ['Statistiken', '#/statistiken']]],
-    ['Konto', [['Profil', '#/profil'], ['Aufgaben', '#/aufgaben'], ['Einstellungen', '#/einstellungen']]],
-  ];
-  dash.ctx = store.get('tsg-dash-ctx', '') || '';
-  const dashCtxChat = () => (dash.ctx && chat.list ? chat.list.chats.find((c) => c.id === dash.ctx) : null);
-  function dashCtxBadge(cls = 'ch-ctx__img') {
-    const c = dashCtxChat();
-    if (c) return groupBadge(c, cls);
-    const p = state.profile;
-    return p && p.avatar ? `<span class="avatar ${cls}"><img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(p ? p.username : 'TSG', cls);
-  }
-  const dashCtxName = () => { const c = dashCtxChat(); return c ? c.name : state.profile ? state.profile.username : t('Gast'); };
-  function dashNavHtml(active, { rail = false } = {}) {
-    return DASH_NAV.map((grp) => `<div class="${rail ? 'ch-rail__grp' : 'ch-nav__grp'}">${grp.map(([id, ic, label, href]) => `<a href="${href}" class="${id === active ? 'is-active' : ''}"${id === active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${esc(t(label))}</span></a>`).join('')}</div>`).join('');
-  }
-  function dashCtxMenu() {
-    if (!dash.ctxOpen) return '';
-    const groups = (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group');
-    const p = state.profile;
-    const row = (id, img, name, sub) => `<button type="button" class="ch-ctxrow${dash.ctx === id ? ' is-on' : ''}" data-dash-ctx-set="${esc(id)}">${img}<span><b>${esc(name)}</b><small>${esc(sub)}</small></span>${dash.ctx === id ? icon('fi-rr-check') : ''}</button>`;
-    return `<div class="ch-ctxmenu" role="listbox">${row('', p && p.avatar ? `<span class="avatar ch-ctxrow__img"><img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(p ? p.username : 'G', 'ch-ctxrow__img'), p ? p.username : t('Gast'), t('Ich'))}
-      ${groups.length ? `<small class="ch-ctxmenu__h">${t('Gruppen-Chats und Server')}</small>${groups.map((c) => row(c.id, groupBadge(c, 'ch-ctxrow__img'), c.name, c.category === 'server' ? t('Server') : t('Gruppe'))).join('')}` : `<p class="ch-ctxmenu__none">${t('Noch keine Gruppen-Chats.')}</p>`}</div>`;
-  }
-  const chCard = (inner, cls = '') => `<article class="ch-card ${cls}">${inner}</article>`;
-  const statRow = (label, value) => `<div class="ch-stat"><span>${esc(label)}</span><b>${value}</b></div>`;
-  function dashServerCard(c) {
-    const place = dash.data ? dash.data.places.find((x) => x.id === c.id) : null;
-    const pub = c.visibility === 'public';
-    return chCard(`<div class="ch-card__top"><span class="ch-pill">${icon(pub ? 'fi-rr-unlock' : 'fi-rr-lock')}${pub ? t('Öffentlich') : t('Privat')}</span>
-        <button class="ch-dots" type="button" data-dash-more="chat:${esc(c.id)}" aria-label="${esc(t('Mehr'))}">${icon('fi-rr-menu-dots-vertical')}</button></div>
-      <a class="ch-card__title" href="#/chat/${esc(c.id)}">${groupBadge(c, 'ch-card__img')}<b>${esc(c.name)}</b></a>
-      <div class="ch-card__big"><small>${t('Mitglieder')}</small><b>${fmt(memberCount(c))}</b></div>
-      <div class="ch-stats">${statRow(t('Art'), c.category === 'server' ? t('Server') : t('Gruppe'))}${statRow(t('Bots'), place ? place.bots : '–')}${statRow(t('Ungelesen'), isUnread(c) ? t('Ja') : t('Nein'))}${statRow(t('Aktiv'), chatAgo(c.updated))}</div>`, 'ch-card--srv');
-  }
-  function botCard(b) {
-    return chCard(`<div class="ch-card__top"><span class="ch-pill${b.on ? ' is-ok' : ''}">${icon(b.on ? 'fi-sr-check-circle' : 'fi-rr-pause')}${b.on ? t('An') : t('Aus')}</span>
-        <button class="ch-dots" type="button" data-dash-more="bot:${esc(b.id)}" aria-label="${esc(t('Mehr'))}">${icon('fi-rr-menu-dots-vertical')}</button></div>
-      <a class="ch-card__title" href="${b.mode === 'advanced' ? `#/bots/${esc(b.chat.id)}/${esc(b.id)}` : `#/chat/${esc(b.chat.id)}/info`}">${b.avatar ? botAvatar(b.chat.id, b, 'ch-card__img') : initialsBadge(b.name, 'ch-card__img')}<b>${esc(b.name)}</b></a>
-      <div class="ch-card__big"><small>${t('Läuft in')}</small><b class="ch-card__place">${esc(b.chat.name)}</b></div>
-      <div class="ch-stats">${statRow(t('Modus'), b.mode === 'advanced' ? 'Luna' : t('Basis'))}${statRow(t('Präfix'), esc(b.prefix || '!'))}${statRow(t('Geändert'), b.rev ? chatAgo(b.rev) : '–')}</div>`, 'ch-card--bot');
-  }
-  const LEARN = [
-    ['einfuehrung', 'Einführung in Luna', 'fi-rr-rocket-lunch', 'linear-gradient(135deg,#6366f1,#a855f7)'],
-    ['playground', 'Luna-Playground', 'fi-rr-play', 'linear-gradient(135deg,#0ea5e9,#22c55e)'],
-    ['erster-bot', 'Dein erster Bot', 'fi-rr-robot', 'linear-gradient(135deg,#f97316,#ec4899)'],
-    ['beispiele', 'Beispiele zum Kopieren', 'fi-rr-sparkles', 'linear-gradient(135deg,#e11d48,#f59e0b)'],
-  ];
-  const chSec = (title, href, inner) => `<section class="ch-sec"><div class="ch-sec__head"><h2>${href ? `<a href="${href}">${esc(title)}${icon('fi-rr-angle-small-right')}</a>` : esc(title)}</h2></div><div class="ch-row">${inner}</div></section>`;
-  function dashHome() {
-    const ctx = dashCtxChat();
-    const news = newsItems().slice(0, 6);
-    const updates = news.length ? chSec(t('Updates'), '', news.map((n) => `<button type="button" class="ch-card ch-card--upd" data-news-open="${esc(n.id)}"><b>${esc(t(n.title))}</b><small>${icon('fi-rr-calendar-lines')}${newsDate(n)}</small></button>`).join('')).replace('<div class="ch-sec__head"><h2>', `<div class="ch-sec__head"><a class="ch-viewall" href="#/news">${t('Alle ansehen')}</a><h2>`) : '';
-    const learn = chSec(t('Lernen'), '#/luna', LEARN.map(([id, title, ic, bg]) => `<a class="ch-card ch-card--learn" href="#/luna/${id}" style="--bg:${bg}"><span class="ch-learn__art">${icon(ic)}</span><b>${esc(t(title))}</b></a>`).join(''));
-    if (ctx) {
-      const c = chat.conv[ctx.id];
-      if (!c) openConv(ctx.id);
-      const bots = (dash.data ? dash.data.bots : []).filter((b) => b.chat.id === ctx.id);
-      const chans = c && c.community ? c.channels : [];
-      return `<section class="ch-sec"><div class="ch-hero">${groupBadge(ctx, 'ch-hero__img')}<span><b>${esc(ctx.name)}</b><small>${ctx.category === 'server' ? t('Server') : t('Gruppe')} · ${membersText(memberCount(ctx))}</small></span>
-          <a class="ch-btn" href="#/chat/${esc(ctx.id)}">${t('Öffnen')}</a></div>
-        <div class="ch-quick"><button type="button" data-cm-invite-id="${esc(ctx.id)}">${icon('fi-rr-user-add')}<span>${t('Einladen')}</span></button><a href="#/chat/${esc(ctx.id)}/info">${icon('fi-rr-settings')}<span>${t('Info')}</span></a><button type="button" data-dash-create="bot:${esc(ctx.id)}">${icon('fi-rr-robot')}<span>${t('Bot')}</span></button><a href="#/chat/${esc(ctx.id)}/info">${icon('fi-rr-id-badge')}<span>${t('Rollen')}</span></a></div></section>
-        ${chans.length ? chSec(t('Kanäle'), `#/chat/${esc(ctx.id)}`, chans.map((x) => chCard(`<a class="ch-card__title" href="#/chat/${esc(ctx.id)}?k=${esc(x.id)}">${chIcon(x, 'ch-chan__ic')}<b>${esc(chLabel(x.name))}</b></a><p class="ch-card__txt">${esc(x.topic || (x.kind === 'news' ? t('Ankündigungen') : t('Textkanal')))}</p>${statRow(t('Zuletzt'), x.last ? chatAgo(x.last.at) : '–')}`, 'ch-card--chan')).join('')) : ''}
-        ${chSec(t('Bots'), '', `${bots.map(botCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="bot:${esc(ctx.id)}">${icon('fi-rr-plus')}<b>${t('Bot erstellen')}</b></button>`)}
-        ${updates}${learn}`;
-    }
-    const groups = (chat.list ? chat.list.chats : []).filter((c) => c.kind === 'group').sort((a, b) => b.updated - a.updated);
-    const bots = dash.data ? dash.data.bots : [];
-    return `${updates}
-      ${chSec(t('Server und Gruppen'), '#/dashboard/erstellungen', `${groups.map(dashServerCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="server">${icon('fi-rr-plus')}<b>${t('Server erstellen')}</b></button>`)}
-      ${chSec(t('Bots'), '#/dashboard/erstellungen?f=bot', `${bots.map(botCard).join('')}<button type="button" class="ch-card ch-card--add" data-dash-create="bot">${icon('fi-rr-plus')}<b>${t('Bot erstellen')}</b></button>`)}
-      ${learn}`;
-  }
-  function dashCreations() {
-    const f = ['server', 'group', 'bot'].includes(dash.filter) ? dash.filter : 'server';
-    const list = f === 'bot' ? (dash.data ? dash.data.bots : []).map(botItem) : (chat.list ? chat.list.chats : []).filter((c) => kindOfChat(c) === f).map(chatItem);
-    const tab = (id, label) => `<a role="tab" href="#/dashboard/erstellungen?f=${id}" aria-selected="${f === id}">${esc(label)}</a>`;
-    return `<div class="ch-tabs" role="tablist">${tab('server', t('Server'))}${tab('group', t('Gruppen'))}${tab('bot', t('Bots'))}</div>
-      <div class="ch-list">${list.length ? list.map(dashRow).join('') : `<p class="ch-none">${t('Hier ist noch nichts.')}</p>`}</div>
-      <button class="ch-fab" type="button" data-dash-create="${f === 'group' ? 'group' : f}">${icon('fi-rr-plus')}${f === 'bot' ? t('Bot erstellen') : f === 'group' ? t('Gruppe erstellen') : t('Server erstellen')}</button>`;
-  }
-  function dashTools() {
-    return `<div class="ch-tools">
-      <nav class="ch-rail ch-rail--tools" aria-label="${esc(t('Bereiche'))}"><a class="ch-rail__logo" href="#/">${clsIcon('module')}</a>${dashCtxBadge('ch-rail__me')}${dashNavHtml('tools', { rail: true })}<a class="ch-rail__tsg" href="#/">${icon('fi-sr-train-side')}<span>TSG</span></a></nav>
-      <div class="ch-toollist">${DASH_TOOLS.map(([g, items]) => `<div class="ch-toolgrp"><h3>${esc(t(g))}</h3>${items.map(([label, href]) => `<a href="${href}">${esc(t(label))}</a>`).join('')}</div>`).join('')}</div>
-    </div>`;
-  }
-  function renderDash() {
-    const box = $('[data-dash]');
-    if (!box) return;
-    const p = state.profile;
-    const ready = chatReady();
-    if (ready) { loadChats(); loadDash(); }
-    const view = state.dashView || '';
-    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
-    const title = { erstellungen: t('Erstellungen'), tools: t('Alle Tools') }[view] || t('Home');
-    const q = dash.q.trim().toLowerCase();
-    const found = dash.search && q ? dashItems().all.filter((x) => x.name.toLowerCase().includes(q)).slice(0, 20) : null;
-    const content = !ready ? `<section class="ch-card ch-gate">${icon(apiReady() ? 'fi-rr-sign-in-alt' : 'fi-rr-cloud')}<b>${apiReady() ? t('Mit Roblox anmelden') : t('Das Dashboard startet bald')}</b><p>${apiReady() ? t('Melde dich an, um Server, Gruppen und Bots zu erstellen.') : t('Sobald der App-Server läuft, erstellst du hier Server, Gruppen und Bots.')}</p>${apiReady() ? `<button class="ch-btn" type="button" data-open="profile">${t('Anmelden')}</button>` : ''}</section>`
-      : found ? `<div class="ch-list">${found.length ? found.map(dashRow).join('') : `<p class="ch-none">${t('Nichts gefunden.')}</p>`}</div>`
-        : view === 'erstellungen' ? dashCreations() : view === 'tools' ? dashTools() : dashHome();
-    box.innerHTML = `<div class="ch${dash.nav ? ' is-nav' : ''}">
-      <nav class="ch-rail ch-rail--side" aria-label="${esc(t('Dashboard'))}">${dashNavHtml(view === 'tools' ? 'tools' : view === 'erstellungen' ? 'erstellungen' : 'home', { rail: true })}</nav>
-      <div class="ch-main">
-        <header class="ch-top">
-          <button class="ch-ibtn ch-menu" type="button" data-dash-nav aria-label="${esc(t('Menü'))}">${icon('fi-rr-menu-burger')}</button>
-          <h1>${esc(title)}</h1>
-          <button class="ch-ibtn${dash.search ? ' is-on' : ''}" type="button" data-dash-search aria-label="${esc(t('Suchen'))}">${icon('fi-rr-search')}</button>
-          <a class="ch-ibtn" href="#/chat" aria-label="${esc(t('Benachrichtigungen'))}">${icon('fi-rr-bell')}${unread ? `<i class="ch-ibtn__n">${unread > 9 ? '9+' : unread}</i>` : ''}</a>
-          <a class="ch-me" href="#/profil" aria-label="${esc(t('Profil'))}">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : esc(initials(p ? p.username : 'G'))}</a>
-        </header>
-        ${dash.search ? `<label class="ch-search">${icon('fi-rr-search')}<input type="search" data-dash-q value="${esc(dash.q)}" placeholder="${esc(t('Server, Gruppen, Bots …'))}" autocomplete="off"></label>` : ''}
-        ${ready && view !== 'tools' ? `<div class="ch-ctxwrap"><button class="ch-ctx" type="button" data-dash-ctx aria-expanded="${!!dash.ctxOpen}">${dashCtxBadge()}<span>${esc(dashCtxName())}</span>${icon('fi-sr-caret-down')}</button>${dashCtxMenu()}
-          <button class="ch-create" type="button" data-dash-create="chooser">${icon('fi-rr-plus')}${t('Erstellen')}</button></div>` : ''}
-        ${content}
-      </div>
-      <button class="ch-scrim" type="button" data-dash-nav aria-label="${esc(t('Schließen'))}"></button>
-      <aside class="ch-drawer" aria-label="${esc(t('Dashboard-Menü'))}">
-        <a class="ch-brand" href="#/dashboard">${clsIcon('module')}<b>DASHBOARD</b></a>
-        <button class="ch-drawer__me" type="button" data-dash-ctx>${dashCtxBadge('ch-drawer__img')}<span>${esc(dashCtxName())}</span>${icon('fi-rr-angle-small-down')}</button>
-        <nav class="ch-nav">${dashNavHtml(view === 'tools' ? 'tools' : view === 'erstellungen' ? 'erstellungen' : 'home')}</nav>
-        <a class="ch-brand ch-brand--foot" href="#/">${icon('fi-sr-train-side')}<b>Train Sim Germany</b></a>
-      </aside>
-    </div><div class="dsh" data-dsh hidden></div>`;
-    if (dash.sheet) drawSheet(true);
-    if (dash.search && !found) { const input = $('[data-dash-q]'); if (input && document.activeElement !== input) input.focus(); }
-  }
-  // Server erstellen wie in Messenger-Apps: „Selbst erstellen“ oder mit Vorlage, unten „Tritt einem Server bei“
-  const SERVER_TEMPLATES = [['gaming', '🎮', 'Gaming'], ['schule', '📘', 'Schulklub'], ['lernen', '🍎', 'Lerngruppe'], ['freunde', '💗', 'Freunde'], ['creator', '🎨', 'Künstler & Creator'], ['vorort', '🍃', 'Community vor Ort']];
-  function serverStartView() {
-    return `<div class="srvx"><h2>${t('Deinen Server erstellen')}</h2><p>${t('Dein Server ist der Ort, wo du und deine Freunde abhängen. Erstelle jetzt deinen eigenen und rede drauflos.')}</p>
-      <button class="srvx-row srvx-row--own" type="button" data-srv-template="">${'<span class="srvx-emoji">🧑‍💻</span>'}<b>${t('Selbst erstellen')}</b>${icon('fi-rr-angle-small-right')}</button>
-      <small class="srvx-h">${t('Mit einer Vorlage starten')}</small>
-      <div class="srvx-list">${SERVER_TEMPLATES.map(([id, emo, label]) => `<button class="srvx-row" type="button" data-srv-template="${id}"><span class="srvx-emoji">${emo}</span><b>${esc(t(label))}</b>${icon('fi-rr-angle-small-right')}</button>`).join('')}</div>
-      <div class="srvx-join"><b>${t('Hast du schon eine Einladung?')}</b><button class="srvx-joinbtn" type="button" data-srv-join>${t('Tritt einem Server bei')}</button></div></div>`;
-  }
-  function joinView() {
-    const pv = dash.invitePreview;
-    return `<form class="dsh-form" data-srv-join-form novalidate><div class="srvx"><h2>${t('Einem Server beitreten')}</h2><p>${t('Gib unten einen Einladungslink oder Code ein.')}</p></div>
-      <label class="dsh-field"><span>${t('Einladungslink oder Code')}</span><input name="code" value="${esc(dash.inviteCode || '')}" placeholder="${esc(`${location.origin}${location.pathname}#/einladung/aB3dE5fG`)}" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-      ${pv ? `<div class="srvx-preview">${groupBadge(pv, 'dash-badge dash-badge--lg')}<span><b>${esc(pv.name)}</b><small>${membersText(pv.members)}${pv.desc ? ` · ${esc(pv.desc)}` : ''}</small></span></div>` : ''}
-      <button class="dash-btn" type="submit">${pv ? (pv.joined ? t('Öffnen') : t('Beitreten')) : t('Weiter')}</button>
-      <a class="dsh-link" href="#/chat/gruppen">${t('Oder öffentliche Server und Gruppen entdecken')}</a></form>`;
-  }
-  function chooserView() {
-    const tile = (kind, ic, label, sub, attrs) => `<button class="dash-new dash-new--${kind}" type="button" ${attrs}><span class="dash-new__ic">${icon(ic)}</span><b>${label}</b><small>${sub}</small></button>`;
-    return `<div class="srvx"><h2>${t('Erstellen')}</h2></div><div class="dash-news">
-      ${tile('server', 'fi-rr-apps', t('Server'), t('Mit Kanälen'), 'data-dash-create="server"')}
-      ${tile('group', 'fi-rr-users-alt', t('Gruppe'), t('Privat oder öffentlich'), 'data-dash-create="group"')}
-      ${tile('bot', 'fi-rr-robot', t('Bot'), t('Basis oder Luna'), 'data-dash-create="bot"')}
-      ${tile('chat', 'fi-rr-comment-alt-dots', t('Chat'), t('Spieler anschreiben'), 'data-dash-go="#/chat/neu/spieler"')}
-      ${tile('ticket', 'fi-rr-comments-question', t('Anfrage'), t('An das Team'), 'data-dash-go="#/chat/neu/anfrage"')}
-      ${tile('luna', 'fi-rr-square-terminal', 'Luna', t('Code ausprobieren'), 'data-dash-go="#/luna/playground"')}</div>`;
-  }
+  // Vorlagen beim Erstellen eines Servers (Kanäle und Kategorien kommen aus backend/channels.js)
+  const SERVER_TEMPLATES = [['', '✨', 'Standard'], ['gaming', '🎮', 'Gaming'], ['schule', '📘', 'Schulklub'], ['lernen', '🍎', 'Lerngruppe'], ['freunde', '💗', 'Freunde'], ['creator', '🎨', 'Künstler & Creator'], ['vorort', '🍃', 'Community vor Ort']];
+  const templatePick = () => `<div class="tpl-grid">${SERVER_TEMPLATES.map(([id, emo, label]) => `<label class="tpl"><input type="radio" name="template" value="${id}"${id === '' ? ' checked' : ''}><span><i aria-hidden="true">${emo}</i><b>${esc(t(label))}</b></span></label>`).join('')}</div>`;
   const inviteCodeOf = (v) => { const m = String(v || '').trim().match(/(?:einladung\/)?([\w-]{6,12})\s*$/); return m ? m[1] : ''; };
+  const invite = { code: '', preview: null, busy: false };
+  function chatJoinView() {
+    const pv = invite.preview;
+    return `${backTo('#/chat/neu', t('Neu'))}
+      ${chatGate() || `<form class="cform" data-invite-join novalidate>
+        <div class="f"><label class="f__label" for="inv-code">${t('Einladungslink oder Code')}</label>
+          <input id="inv-code" name="code" value="${esc(invite.code || '')}" placeholder="${esc(`${location.origin}${location.pathname}#/einladung/aB3dE5fG`)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        ${pv ? `<div class="inv-preview">${groupBadge(pv, 'inv-preview__img')}<span><b>${esc(pv.name)}</b><small>${membersText(pv.members)}${pv.desc ? ` · ${esc(pv.desc)}` : ''}</small></span></div>` : ''}
+        <button class="btn btn--primary btn--lg btn--block" type="submit"${invite.busy ? ' disabled' : ''}>${pv ? (pv.joined ? t('Öffnen') : t('Beitreten')) : t('Weiter')}</button>
+        <a class="back-link" href="#/chat/gruppen">${icon('fi-rr-globe')}${t('Oder öffentliche Server und Gruppen entdecken')}</a>
+      </form>`}`;
+  }
   async function joinSubmit(form) {
     const code = inviteCodeOf(form.elements.code.value);
     if (!code) { toast(t('Das ist kein gültiger Einladungslink.')); return; }
-    const pv = dash.invitePreview;
+    const pv = invite.preview;
+    invite.busy = true;
     try {
-      if (pv && dash.inviteCode === code) {
-        if (pv.joined) { closeSheet(); location.hash = `#/chat/${pv.id}`; return; }
+      if (pv && invite.code === code) {
+        if (pv.joined) { location.hash = `#/chat/${pv.id}`; return; }
         const r = await api(`/api/chat-invites/${encodeURIComponent(code)}/join`, { method: 'POST' });
         chat.conv[r.id] = r;
         chat.at = 0;
         haptic('success');
         toast(t('Willkommen in {name}!', { name: r.name }));
-        closeSheet();
+        Object.assign(invite, { code: '', preview: null });
         location.hash = `#/chat/${r.id}`;
         return;
       }
-      dash.inviteCode = code;
-      dash.invitePreview = await api(`/api/chat-invites/${encodeURIComponent(code)}`);
-      if (dash.invitePreview.banned) { toast(t('Du kannst diesem Server nicht beitreten.')); dash.invitePreview = null; }
-      drawSheet(true);
-    } catch (e) { toast(e.status === 404 ? t('Diese Einladung gibt es nicht (mehr).') : chatError(e)); }
+      invite.code = code;
+      invite.preview = await api(`/api/chat-invites/${encodeURIComponent(code)}`);
+      if (invite.preview.banned) { toast(t('Du kannst diesem Server nicht beitreten.')); invite.preview = null; }
+    } catch (e) { toast(e.status === 404 ? t('Diese Einladung gibt es nicht (mehr).') : chatError(e)); } finally { invite.busy = false; }
+    if (state.page === 'chat' && state.chatView === 'join') renderChat();
   }
   async function shareInvite(id) {
     try {
@@ -8465,384 +6839,6 @@
       haptic('success');
     } catch (e) { toast(chatError(e)); }
   }
-  // ---------- Blatt von unten: Aktionen (⋯) und Erstellen ----------
-  function openSheet(kind, arg) {
-    dash.sheet = { kind, arg };
-    if (kind === 'create' && arg === 'server') dash.template = null;
-    if (kind === 'join') { dash.invitePreview = null; }
-    if (kind === 'create') { dash.file = null; if (dash.preview) URL.revokeObjectURL(dash.preview); dash.preview = null; }
-    drawSheet();
-    if (Date.now() - lastInput < 1500) haptic('light');
-  }
-  function closeSheet() {
-    const el = $('[data-dsh]');
-    dash.sheet = null;
-    if (!el) return;
-    el.classList.remove('is-open');
-    setTimeout(() => { if (!dash.sheet) { el.hidden = true; el.innerHTML = ''; } }, reducedMotion() ? 0 : 220);
-  }
-  function findItem(key) {
-    const [k, id] = key.split(':');
-    return dashItems().all.find((x) => x.k === k && x.id === id) || null;
-  }
-  function sheetActions(item) {
-    const a = (act, ic, label, extra = '') => `<button class="dsh-act" type="button" data-dsh-act="${act}" ${extra}>${icon(ic)}<span>${label}</span></button>`;
-    const out = [];
-    if (item.k === 'chat') {
-      const c = item.c;
-      out.push(a('open', 'fi-rr-comments', t('Öffnen')), a('info', 'fi-rr-info', t('Info und Einstellungen')));
-      if (c.kind === 'group' && c.admin) {
-        out.push(a('bot', 'fi-rr-robot', t('Bot hinzufügen')));
-        out.push(a('rename', 'fi-rr-pencil', t('Umbenennen')));
-        out.push(`<label class="dsh-act">${icon('fi-rr-picture')}<span>${c.photo ? t('Bild ändern') : t('Bild hinzufügen')}</span><input type="file" accept="image/*" data-dsh-photo="chat:${esc(c.id)}"></label>`);
-      }
-      out.push(a('copy', 'fi-rr-link', t('Link kopieren')), a('hide', 'fi-rr-eye-crossed', t('Für mich ausblenden')));
-      if (c.kind === 'group') out.push('<hr>', a('leave', 'fi-rr-sign-out-alt', t('Verlassen'), 'data-danger'));
-    } else {
-      const b = item.b;
-      out.push(b.mode === 'advanced' ? a('editor', 'fi-rr-square-code', t('Im Editor öffnen')) : a('settings', 'fi-rr-settings', t('Einstellungen')));
-      if (b.mode === 'advanced') out.push(a('settings', 'fi-rr-settings', t('Einstellungen')));
-      out.push(a('rename', 'fi-rr-pencil', t('Umbenennen')),
-        `<label class="dsh-act">${icon('fi-rr-picture')}<span>${b.avatar ? t('Bild ändern') : t('Bild hinzufügen')}</span><input type="file" accept="image/*" data-dsh-photo="bot:${esc(b.chat.id)}:${esc(b.id)}"></label>`,
-        a('toggle', b.on ? 'fi-rr-pause' : 'fi-rr-play', b.on ? t('Ausschalten') : t('Einschalten')),
-        a('place', b.chat.category === 'server' ? 'fi-rr-apps' : 'fi-rr-users-alt', t('{name} öffnen', { name: b.chat.name })),
-        '<hr>', a('delete', 'fi-rr-trash', t('Bot löschen'), 'data-danger'));
-    }
-    return out.join('');
-  }
-  function createForm(kind, preset = '') {
-    const what = kind === 'bot' ? 'Bot' : kind === 'server' ? 'Server' : t('Gruppe');
-    const def = dashDefaultName(kind === 'bot' ? 'Bot' : kind === 'server' ? 'Server' : 'Gruppe');
-    const places = dash.data ? dash.data.places : [];
-    const color = kind === 'bot' ? null : GROUP_COLORS[hash(def) % (GROUP_COLORS.length - 1)];
-    const prev = dash.preview ? `<span class="dash-badge dash-badge--xl has-photo"><img src="${esc(dash.preview)}" alt=""></span>` : initialsBadge(def, 'dash-badge dash-badge--xl', color);
-    const hint = { server: t('Ein Server ist eine Community wie bei Discord – mit Kategorien und Kanälen.'), group: t('Eine Gruppe ist ein gemeinsamer Chat ohne Kanäle.'), bot: t('Bots laufen direkt in deinem Server oder deiner Gruppe – Discord ist nicht nötig.') }[kind];
-    return `<form class="dsh-form" data-dsh-create-form="${kind}" novalidate>
-      <div class="dsh-form__top"><label class="dsh-pick" title="${esc(t('Bild wählen'))}"><span data-dsh-preview>${prev}</span><span class="dsh-pick__cam">${icon('fi-rr-camera')}</span><input type="file" accept="image/*" data-dsh-file></label>
-        <div><h2>${t('Neuer {what}', { what })}</h2><p>${hint}</p></div></div>
-      <label class="dsh-field"><span>${t('Name')}</span><input name="name" maxlength="${kind === 'bot' ? 32 : 60}" placeholder="${esc(def)}" data-dsh-name autocomplete="off"><small>${t('Leer lassen für „{name}“', { name: esc(def) })}</small></label>
-      ${kind !== 'bot' ? `<fieldset class="dsh-field"><legend>${t('Farbe ohne Bild')}</legend><div class="dsh-colors">${GROUP_COLORS.map((col) => `<label style="--c:${col}"><input type="radio" name="color" value="${col}"${col === color ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
-        <div class="dsh-seg" role="radiogroup" aria-label="${esc(t('Sichtbarkeit'))}"><label><input type="radio" name="visibility" value="private" checked><span>${icon('fi-rr-lock')}${t('Privat')}</span></label><label><input type="radio" name="visibility" value="public"><span>${icon('fi-rr-globe')}${t('Öffentlich')}</span></label></div>` : `
-        ${places.length ? `<label class="dsh-field"><span>${t('Wo soll der Bot laufen?')}</span><select name="place">${places.map((x) => `<option value="${esc(x.id)}"${x.id === preset ? ' selected' : ''}${x.bots >= (dash.data.maxBots || 5) ? ' disabled' : ''}>${esc(x.name)}${x.bots >= (dash.data.maxBots || 5) ? ` (${t('voll')})` : ''}</option>`).join('')}</select></label>`
-          : `<p class="dsh-note">${icon('fi-rr-info')}<span>${t('Bots laufen in einem Server oder einer Gruppe, die du leitest. Erstell zuerst einen Server.')}</span></p>`}
-        <div class="dsh-seg" role="radiogroup" aria-label="${esc(t('Modus'))}"><label><input type="radio" name="mode" value="basic" checked><span>${icon('fi-rr-sparkles')}${t('Basis')}</span></label><label><input type="radio" name="mode" value="advanced"><span>${icon('fi-rr-square-code')}${t('Luna')}</span></label></div>`}
-      ${kind === 'server' ? `<div class="dsh-chips"><small>${dash.template ? t('Vorlage: {name}', { name: t((SERVER_TEMPLATES.find((x) => x[0] === dash.template) || ['', '', ''])[2]) }) : t('Startet mit diesen Kanälen')}</small>${dash.template ? '' : `<span>${['willkommen', 'ankündigungen', 'allgemein', 'medien', 'befehle'].map((x) => `<i>#${x}</i>`).join('')}</span>`}</div>` : ''}
-      ${kind === 'bot' && !places.length ? `<button class="dash-btn" type="button" data-dash-create="server">${icon('fi-rr-apps')}${t('Server erstellen')}</button>`
-        : `<button class="dash-btn" type="submit">${icon('fi-rr-plus')}${t('{what} erstellen', { what })}</button>`}
-      ${kind !== 'bot' ? `<a class="dsh-link" href="#/chat/neu/${kind === 'server' ? 'server' : 'gruppe'}">${t('Mehr Optionen: Leute, Regeln, Rechte{extra}', { extra: kind === 'server' ? t(', private Server') : '' })}</a>` : ''}
-    </form>`;
-  }
-  function drawSheet(keep = false) {
-    const el = $('[data-dsh]');
-    if (!el || !dash.sheet) return;
-    const { kind, arg } = dash.sheet;
-    let body = '';
-    if (kind === 'more') {
-      const item = findItem(arg);
-      if (!item) { closeSheet(); return; }
-      body = `<div class="dsh-head">${dashBadge(item, 'dash-badge dash-badge--lg')}<span><b>${esc(item.name)}</b><small>${dashMeta(item)}</small></span></div><div class="dsh-acts">${sheetActions(item)}</div>`;
-    } else if (kind === 'create' && arg === 'chooser') body = chooserView();
-    else if (kind === 'create' && arg === 'server' && dash.template === null) body = serverStartView();
-    else if (kind === 'create') body = createForm(arg.split(':')[0], arg.split(':')[1] || '');
-    else if (kind === 'join') body = joinView();
-    else if (kind === 'rename') {
-      const item = findItem(arg);
-      if (!item) { closeSheet(); return; }
-      body = `<form class="dsh-form" data-dsh-rename="${esc(arg)}" novalidate><div class="dsh-head">${dashBadge(item, 'dash-badge dash-badge--lg')}<span><b>${t('Umbenennen')}</b><small>${esc(item.name)}</small></span></div>
-        <label class="dsh-field"><span>${t('Neuer Name')}</span><input name="name" maxlength="${item.k === 'bot' ? 32 : 60}" value="${esc(item.name)}" autocomplete="off"></label>
-        <button class="dash-btn" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button></form>`;
-    }
-    el.innerHTML = `<button class="dsh__scrim" type="button" data-dsh-close aria-label="${esc(t('Schließen'))}"></button>
-      <div class="dsh__panel" role="dialog" aria-modal="true"><span class="dsh__grip" aria-hidden="true"></span>${body}
-      <button class="dsh-cancel" type="button" data-dsh-close>${t('Abbrechen')}</button></div>`;
-    el.hidden = false;
-    if (keep) el.classList.add('is-open');
-    else requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-open')));
-  }
-  function updatePreview(form) {
-    const box = $('[data-dsh-preview]', form);
-    if (!box) return;
-    if (dash.preview) { box.innerHTML = `<span class="dash-badge dash-badge--xl has-photo"><img src="${esc(dash.preview)}" alt=""></span>`; return; }
-    const input = form.elements.name;
-    const name = input.value.trim() || input.placeholder;
-    const col = form.querySelector('input[name="color"]:checked');
-    box.innerHTML = initialsBadge(name, 'dash-badge dash-badge--xl', col ? col.value : null);
-  }
-  async function dashCreate(form) {
-    const kind = form.dataset.dshCreateForm;
-    const btn = $('button[type="submit"]', form);
-    const name = form.elements.name.value.replace(/\s+/g, ' ').trim();
-    if (name.length === 1) { toast(t('Der Name braucht mindestens 2 Zeichen.')); return; }
-    btn.disabled = true;
-    try {
-      if (kind === 'bot') {
-        const cid = form.elements.place.value;
-        const mode = (form.querySelector('input[name="mode"]:checked') || {}).value || 'basic';
-        const b = await api(`/api/chats/${encodeURIComponent(cid)}/bots`, { method: 'POST', body: { name, mode } });
-        if (dash.file) { try { await api(`/api/chats/${encodeURIComponent(cid)}/bots/${encodeURIComponent(b.id)}/photo`, { method: 'PUT', raw: await squareJpeg(dash.file), type: 'image/jpeg' }); } catch (e) { toast(t('Bot erstellt, das Bild ließ sich aber nicht speichern.')); } }
-        delete botsFull[b.id];
-        haptic('success');
-        toast(t('{name} ist da', { name: b.name }));
-        closeSheet();
-        dash.at = 0;
-        chat.at = 0;
-        addRecent('bot', b.id, cid);
-        if (mode === 'advanced') location.hash = `#/bots/${cid}/${b.id}`;
-        else { location.hash = `#/chat/${cid}/info`; setTimeout(() => openModal('bot', `${cid}:${b.id}`), 120); }
-        return;
-      }
-      const visibility = (form.querySelector('input[name="visibility"]:checked') || {}).value || 'private';
-      const c = await api('/api/chats', { method: 'POST', body: { kind: 'group', ...(kind === 'server' ? { category: 'server', servers: [], template: dash.template || '' } : {}), name, color: (form.querySelector('input[name="color"]:checked') || {}).value, settings: { ...GROUP_DEFAULTS, visibility } } });
-      if (dash.file) {
-        try { await api(`/api/chats/${encodeURIComponent(c.id)}/photo`, { method: 'PUT', raw: await squareJpeg(dash.file), type: 'image/jpeg' }); c.photo = Date.now(); } catch (e) { toast(t('Erstellt, das Bild ließ sich aber nicht speichern.')); }
-      }
-      chat.conv[c.id] = c;
-      if (c.community) chat.ch[c.id] = c.channel;
-      haptic('success');
-      toast(kind === 'server' ? t('Server „{name}“ erstellt', { name: c.name }) : t('Gruppe „{name}“ erstellt', { name: c.name }));
-      closeSheet();
-      chat.at = 0;
-      dash.at = 0;
-      if (dash.file) delete chat.conv[c.id];
-      location.hash = `#/chat/${c.id}`;
-    } catch (e) {
-      toast(chatError(e));
-    } finally {
-      btn.disabled = false;
-    }
-  }
-  async function dashAction(act) {
-    const item = dash.sheet && findItem(dash.sheet.arg);
-    if (!item) return;
-    const go = (href) => { closeSheet(); location.hash = href; };
-    if (item.k === 'chat') {
-      const c = item.c;
-      if (act === 'open') go(`#/chat/${c.id}`);
-      else if (act === 'info') go(`#/chat/${c.id}/info`);
-      else if (act === 'bot') openSheet('create', `bot:${c.id}`);
-      else if (act === 'rename') openSheet('rename', `chat:${c.id}`);
-      else if (act === 'copy') {
-        const url = `${location.origin}${location.pathname}#/chat/${c.id}`;
-        try { await navigator.clipboard.writeText(url); toast(t('Link kopiert')); } catch (e) { toast(url); }
-        closeSheet();
-      } else if (act === 'hide') {
-        try { await api(`/api/chats/${encodeURIComponent(c.id)}/hide`, { method: 'POST' }); toast(t('Ausgeblendet')); chat.at = 0; closeSheet(); await loadChats(true); renderDash(); } catch (e) { toast(chatError(e)); }
-      } else if (act === 'leave') {
-        if (!confirm(t('„{name}“ verlassen?', { name: c.name }))) return;
-        try { await api(`/api/chats/${encodeURIComponent(c.id)}/leave`, { method: 'POST' }); toast(t('Verlassen')); closeSheet(); chat.at = 0; dash.at = 0; await loadChats(true); loadDash(true); } catch (e) { toast(chatError(e)); }
-      }
-      return;
-    }
-    const b = item.b;
-    const cid = b.chat.id;
-    if (act === 'editor') go(`#/bots/${cid}/${b.id}`);
-    else if (act === 'settings') { closeSheet(); delete botsFull[b.id]; openModal('bot', `${cid}:${b.id}`); }
-    else if (act === 'place') go(`#/chat/${cid}`);
-    else if (act === 'rename') openSheet('rename', `bot:${b.id}`);
-    else if (act === 'toggle') {
-      const r = await botCall(cid, `/${encodeURIComponent(b.id)}`, { method: 'PUT', body: { on: !b.on } });
-      if (r) { toast(r.on ? t('Eingeschaltet') : t('Ausgeschaltet')); closeSheet(); loadDash(true); }
-    } else if (act === 'delete') {
-      if (!confirm(t('Bot „{name}“ löschen? Seine Regeln, Skripte und sein Speicher gehen verloren.', { name: b.name }))) return;
-      if (await botCall(cid, `/${encodeURIComponent(b.id)}`, { method: 'DELETE' })) { toast(t('Bot gelöscht')); closeSheet(); loadDash(true); }
-    }
-  }
-  async function dashRename(form) {
-    const key = form.dataset.dshRename;
-    const item = findItem(key);
-    const name = form.elements.name.value.replace(/\s+/g, ' ').trim();
-    if (!item || name.length < 2) { toast(t('Der Name braucht mindestens 2 Zeichen.')); return; }
-    try {
-      if (item.k === 'bot') await api(`/api/chats/${encodeURIComponent(item.b.chat.id)}/bots/${encodeURIComponent(item.id)}`, { method: 'PUT', body: { name } });
-      else await api(`/api/chats/${encodeURIComponent(item.id)}`, { method: 'PUT', body: { name } });
-      haptic('success');
-      toast(t('Gespeichert'));
-      closeSheet();
-      chat.at = 0;
-      await Promise.all([loadChats(true), loadDash(true)]);
-      renderDash();
-    } catch (e) { toast(chatError(e)); }
-  }
-  async function dashPhoto(arg, file) {
-    const [k, a, b] = arg.split(':');
-    try {
-      const raw = await squareJpeg(file);
-      if (k === 'bot') await api(`/api/chats/${encodeURIComponent(a)}/bots/${encodeURIComponent(b)}/photo`, { method: 'PUT', raw, type: 'image/jpeg' });
-      else await api(`/api/chats/${encodeURIComponent(a)}/photo`, { method: 'PUT', raw, type: 'image/jpeg' });
-      toast(t('Bild gespeichert'));
-      closeSheet();
-      chat.at = 0;
-      await Promise.all([loadChats(true), loadDash(true)]);
-      renderDash();
-    } catch (e) { toast(e && e.status ? chatError(e) : t('Dieses Bild lässt sich nicht verwenden.')); }
-  }
-
-  // ---------- Profil (#/profil) wie in Messenger-Apps ----------
-  // Banner, Profilbild mit Status, Name, @Name • Pronomen, Rang, Abzeichen, „Profil bearbeiten“, Reiter
-  // (Hauptprofil, Board, Aktivität, Wunschliste), Coins, Über mich, Mitglied seit, Verknüpfungen, Freunde.
-  // Unten schwebt eine eigene Leiste: Aufgaben, Shop, Einstellungen.
-  const prof = { me: store.get('tsg-me-profile', null), tab: 'main', busy: false };
-  const bannerSrc = (p) => (p && p.banner && apiReady() && state.profile ? `${API}/media/banner/${encodeURIComponent(state.profile.userId)}?v=${p.banner}` : '');
-  function profBadges() {
-    const r = rankOf(state.rank);
-    const out = [{ ic: 'fi-sr-train-side', title: r.name, color: r.color }];
-    if (isTeam('Junior Supervisor')) out.push({ ic: 'fi-sr-shield-check', title: t('Team'), color: '#1455C0' });
-    const mine = chat.list ? chat.list.chats : [];
-    if (mine.some((c) => c.category === 'server' && c.admin)) out.push({ ic: 'fi-sr-apps', title: t('Server-Gründer'), color: '#8B5CF6' });
-    if (dash.data && dash.data.bots.length) out.push({ ic: 'fi-sr-robot', title: t('Bot-Entwickler'), color: '#F97316' });
-    const w = shop.data && shop.data.wallet;
-    if (w && (w.trains || []).length >= 5) out.push({ ic: 'fi-sr-star', title: t('Sammler'), color: '#E2B33C' });
-    if (store.get('tsg-luna-pg', null)) out.push({ ic: 'fi-sr-square-terminal', title: t('Luna-Programmierer'), color: '#6366F1' });
-    return out;
-  }
-  // Über mich: Zeilen, **fett**, → bleibt wie geschrieben
-  const bioHtml = (s) => esc(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\n/g, '<br>');
-  function renderProfile() {
-    const box = $('[data-profile]');
-    if (!box) return;
-    const p = state.profile;
-    const me = prof.me || {};
-    const r = rankOf(state.rank);
-    if (apiReady() && sessionToken()) { loadChats(); loadDash(); if (!shop.data) loadShop(); if (!pl.friends) loadFriends(); }
-    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
-    const banner = bannerSrc(me);
-    const accent = me.accent || r.color;
-    const inGame = p && pl.data[p.userId] && pl.data[p.userId].inGame;
-    const w = shop.data && shop.data.wallet;
-    const friends = pl.friends ? pl.friends.ids.map((id) => pl.data[id]).filter(Boolean) : [];
-    const since = me.since ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(me.since * (me.since < 1e12 ? 1000 : 1))) : null;
-    const tab = (id, label) => `<button type="button" role="tab" aria-selected="${prof.tab === id}" data-prof-tab="${id}">${label}</button>`;
-    let main = '';
-    if (!p) {
-      main = `<div class="pf-card pf-empty">${icon('fi-rr-sign-in-alt')}<p>${t('Melde dich mit Roblox an – dann gehört dieses Profil dir.')}</p><button class="btn btn--primary" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
-    } else if (prof.tab === 'board') {
-      const own = shopItems('trains').filter((x) => itemStatus('trains', x) === 'owned');
-      main = own.length ? `<div class="shx-grid">${own.map((x) => shxCard('trains', x, { wide: true })).join('')}</div>` : `<p class="shx-empty">${t('Noch keine Züge – im Shop findest du alle.')}</p>`;
-    } else if (prof.tab === 'activity') {
-      const recent = (chat.list ? chat.list.chats : []).slice().sort((a, b) => b.updated - a.updated).slice(0, 6);
-      main = `${inGame ? `<div class="pf-card pf-live">${icon('fi-sr-play')}<span><b>${t('Gerade im Spiel')}</b><small>Train Sim Germany</small></span></div>` : ''}
-        <button class="pf-card pf-stats" type="button" data-open="stats">${icon('fi-rr-chart-histogram')}<span><b>${t('Meine Statistik')}</b><small>${t('Spielzeit, Fahrten, Kilometer und Pünktlichkeit aus dem Spiel')}</small></span>${icon('fi-rr-angle-small-right')}</button>
-        ${recent.length ? `<div class="pf-card pf-list">${recent.map((c) => `<a href="#/chat/${esc(c.id)}">${chatImg(c, 'pf-mini')}<span><b>${esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>${icon('fi-rr-angle-small-right')}</a>`).join('')}</div>` : `<p class="shx-empty">${t('Noch keine Aktivität.')}</p>`}`;
-    } else if (prof.tab === 'wish') {
-      const items = [...shopItems('trains').map((x) => ['trains', x]), ...shopItems('routes').map((x) => ['routes', x])].filter(([k, x]) => shopWish().has(shopKey(k, x)));
-      main = items.length ? `<div class="shx-grid">${items.map(([k, x]) => shxCard(k, x, { wide: true })).join('')}</div>` : `<p class="shx-empty">${t('Deine Wunschliste ist leer. Im Shop tippst du dafür auf das Herz.')}</p>`;
-    } else {
-      main = `${store.get('tsg-prof-tip', true) ? `<div class="pf-tip">${icon('fi-rr-info')}<p>${(store.get('tsg-privacy', {}) || {}).profile ? t('Dein Profil ist öffentlich – andere Spieler sehen es in der App.') : t('Dein Profil sehen gerade nur du und das Team.')} <a href="#/einstellungen/privacy">${t('Privatsphäre-Einstellungen')}</a></p><button type="button" data-prof-tip aria-label="${esc(t('Ausblenden'))}">${icon('fi-rr-cross-small')}</button></div>` : ''}
-        <a class="pf-card pf-coins" href="#/shop"><b>${t('Coins-Guthaben')}</b><span class="pf-pill">${icon('fi-sr-coins')}${w ? fmt(w.coins) : '–'}</span></a>
-        <section class="pf-sec"><h3>${t('Über mich')}</h3>${me.bio ? `<p class="pf-bio">${bioHtml(me.bio)}</p>` : `<button class="pf-add" type="button" data-prof-edit>${icon('fi-rr-plus')}${t('Etwas über dich schreiben')}</button>`}</section>
-        ${since ? `<section class="pf-sec"><h3>${t('Mitglied seit')}</h3><p class="pf-since">${icon('fi-sr-train-side')}${since}</p></section>` : ''}
-        <hr class="pf-hr">
-        <section class="pf-sec"><h3>${t('Verknüpfungen')}</h3>
-          <a class="pf-card pf-conn" href="https://www.roblox.com/users/${esc(p.userId || '')}/profile" target="_blank" rel="noopener"><span class="pf-conn__logo" aria-hidden="true"><i></i></span><b>${esc(p.username)}</b>${p.oauth ? `<span class="pf-verified" title="${esc(t('Bestätigt'))}">${icon('fi-sr-badge-check')}</span>` : ''}${icon('fi-rr-arrow-up-right', 'pf-conn__go')}</a></section>
-        <a class="pf-card pf-friends" href="#/spieler"><b>${t('Freunde')}</b><span class="pf-stack">${friends.slice(0, 5).map((f) => (f.avatar ? `<img src="${esc(f.avatar)}" alt="" referrerpolicy="no-referrer">` : `<i>${esc(initials(f.username || '?'))}</i>`)).join('')}</span>${icon('fi-rr-angle-small-right')}</a>`;
-    }
-    box.innerHTML = `<div class="pf" style="--acc:${esc(accent)}">
-      <div class="pf-banner"${banner ? ` style="background-image:url('${esc(banner)}')"` : ''}>
-        <a class="pf-x" href="#/" aria-label="${esc(t('Schließen'))}">${icon('fi-rr-cross')}${unread ? `<i>${unread > 99 ? '99+' : unread}</i>` : ''}</a>
-      </div>
-      <div class="pf-body">
-        <div class="pf-head">
-          <span class="pf-ava">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(p ? p.username : 'G'))}</b>`}<i class="pf-dot${inGame ? ' is-on' : ''}" title="${esc(inGame ? t('Im Spiel') : t('Abwesend'))}">${inGame ? '' : '☾'}</i></span>
-          ${p ? `<button class="pf-status" type="button" data-prof-edit="status">${me.status ? `${icon('fi-sr-check-circle', 'pf-status__ic')}<span>${esc(me.status)}</span>` : `${icon('fi-rr-smile', 'pf-status__ic')}<span class="pf-status__ph">${t('Status festlegen')}</span>`}</button>` : ''}
-        </div>
-        <div class="pf-name"><h1>${esc(p ? p.displayName || p.username : t('Gast'))}</h1>${p ? `<button type="button" data-prof-more aria-label="${esc(t('Mehr'))}">${icon('fi-rr-angle-small-down')}</button>` : ''}</div>
-        ${p ? `<div class="pf-handle"><span>${esc(p.username)}${me.pronouns ? ` • ${esc(me.pronouns)}` : ''}</span><span class="pf-tag" style="--rc:${esc(r.color)}">${icon('fi-sr-heart')}${esc(r.prefix)}</span></div>
-        <div class="pf-badges">${profBadges().map((b) => `<span title="${esc(b.title)}" style="--bc:${esc(b.color)}">${icon(b.ic)}</span>`).join('')}</div>
-        <button class="pf-editbtn" type="button" data-prof-edit>${icon('fi-sr-pencil')}${t('Profil bearbeiten')}</button>
-        <div class="pf-tabs" role="tablist">${tab('main', t('Hauptprofil'))}${tab('board', t('Board'))}${tab('activity', t('Aktivität'))}${tab('wish', t('Wunschliste'))}</div>` : ''}
-        <div class="pf-main">${main}</div>
-      </div>
-    </div>
-    <nav class="pf-dock" aria-label="${esc(t('Profil'))}">
-      <a href="#/aufgaben">${icon('fi-rr-puzzle-alt')}${questsOpen() ? '<i class="pf-dock__dot"></i>' : ''}<span>${t('Aufgaben')}</span></a>
-      <a href="#/shop">${icon('fi-sr-shop')}<span>${t('Shop')}</span></a>
-      <a href="#/einstellungen">${icon('fi-sr-settings')}<span>${t('Einstellungen')}</span></a>
-    </nav>`;
-  }
-  function profileEditView() {
-    const me = prof.me || {};
-    const banner = bannerSrc(me);
-    return `<form class="cform pf-form" data-prof-form novalidate>
-      <div class="f"><span class="f__label">${t('Banner')}</span>
-        <div class="pf-bannerpick"${banner ? ` style="background-image:url('${esc(banner)}')"` : ''}><label class="btn btn--soft btn--sm">${icon('fi-rr-picture')}${banner ? t('Ändern') : t('Bild wählen')}<input type="file" accept="image/*" data-prof-banner hidden></label>${banner ? `<button class="btn btn--soft btn--sm" type="button" data-prof-banner-del>${icon('fi-rr-trash')}${t('Entfernen')}</button>` : ''}</div></div>
-      <div class="f"><label class="f__label" for="pf-status">${t('Status')}</label><input id="pf-status" name="status" maxlength="80" value="${esc(me.status || '')}" placeholder="${esc(t('z. B. ICE 4 / Strecke Berlin – Hamburg'))}"></div>
-      <div class="f"><label class="f__label" for="pf-pron">${t('Pronomen')}</label><input id="pf-pron" name="pronouns" maxlength="30" value="${esc(me.pronouns || '')}" placeholder="${esc(t('z. B. er/ihn'))}"></div>
-      <div class="f"><label class="f__label" for="pf-bio">${t('Über mich')}</label><textarea id="pf-bio" name="bio" rows="6" maxlength="600" placeholder="${esc(t('→ Lokführer seit 2024\n→ Lieblingszug: ICE 4'))}">${esc(me.bio || '')}</textarea><small class="f__hint">${t('**Text** wird fett. Höchstens 600 Zeichen.')}</small></div>
-      <fieldset class="f"><legend class="f__label">${t('Akzentfarbe')}</legend><div class="swatches">${['', ...GROUP_COLORS].map((c) => `<label class="swatch" style="--gc:${c || rankOf(state.rank).color}"><input type="radio" name="accent" value="${c}"${(me.accent || '') === c ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-check')}${t('Speichern')}</button>
-    </form>`;
-  }
-  async function saveProfile(form) {
-    const f = form.elements;
-    const btn = $('button[type="submit"]', form);
-    btn.disabled = true;
-    try {
-      const r = await api('/api/me/profile', { method: 'PUT', body: { status: f.status.value, pronouns: f.pronouns.value, bio: f.bio.value, accent: (form.querySelector('input[name="accent"]:checked') || {}).value || '' } });
-      prof.me = r.profile;
-      store.set('tsg-me-profile', prof.me);
-      haptic('success');
-      toast(t('Profil gespeichert'));
-      closeModal();
-      renderProfile();
-    } catch (e) { btn.disabled = false; toast(errorText(e)); }
-  }
-  async function uploadBanner(file) {
-    try {
-      const bmp = await createImageBitmap(file);
-      const W = 1200;
-      const H = 480;
-      const scale = Math.max(W / bmp.width, H / bmp.height);
-      const cv = document.createElement('canvas');
-      cv.width = W;
-      cv.height = H;
-      const w = bmp.width * scale;
-      const h = bmp.height * scale;
-      cv.getContext('2d').drawImage(bmp, (W - w) / 2, (H - h) / 2, w, h);
-      if (bmp.close) bmp.close();
-      const blob = await new Promise((ok, fail) => cv.toBlob((b) => (b ? ok(b) : fail(new Error('blob'))), 'image/jpeg', 0.84));
-      const r = await api('/api/me/banner', { method: 'PUT', raw: blob, type: 'image/jpeg' });
-      prof.me = r.profile;
-      store.set('tsg-me-profile', prof.me);
-      toast(t('Banner gespeichert'));
-      refreshModal();
-      renderProfile();
-    } catch (e) { toast(e && e.status ? errorText(e) : t('Dieses Bild lässt sich nicht verwenden.')); }
-  }
-
-  // ---------- Aufgaben (#/aufgaben): kleine Ziele mit Fortschritt ----------
-  function quests() {
-    const p = state.profile;
-    const me = prof.me || {};
-    const mine = chat.list ? chat.list.chats : [];
-    const w = shop.data && shop.data.wallet;
-    const q = (id, ic, title, text, done, href, act) => ({ id, ic, title, text, done: !!done, href, act });
-    return [
-      q('login', 'fi-rr-sign-in-alt', t('Mit Roblox anmelden'), t('Name, Profilbild und Rang aus der Gruppe'), p && p.oauth, '#/profil', t('Anmelden')),
-      q('profile', 'fi-rr-user-pen', t('Profil vervollständigen'), t('Status und „Über mich“ ausfüllen'), me.status && me.bio, '#/profil', t('Bearbeiten')),
-      q('server', 'fi-rr-apps', t('Eigenen Server erstellen'), t('Mit Kanälen wie #allgemein'), mine.some((c) => c.category === 'server' && c.admin), '#/dashboard?neu=server', t('Erstellen')),
-      q('bot', 'fi-rr-robot', t('Ersten Bot bauen'), t('Basis oder mit Luna'), dash.data && dash.data.bots.length, '#/dashboard?neu=bot', t('Erstellen')),
-      q('luna', 'fi-rr-square-terminal', t('Luna ausprobieren'), t('Ein Skript im Playground ausführen'), store.get('tsg-luna-pg', null), '#/luna/playground', t('Öffnen')),
-      q('track', 'fi-rr-user-add', t('Einem Spieler folgen'), t('Sehen, wann er im Spiel ist'), pl.track.length, '#/spieler', t('Spieler')),
-      q('notify', 'fi-rr-bell', t('Benachrichtigungen einschalten'), t('Nichts mehr verpassen'), notifyState().on, '#/einstellungen/benachrichtigungen', t('Einschalten')),
-      q('train', 'fi-rr-train-side', t('Einen Zug kaufen'), t('Im Shop mit deinen Coins'), w && (w.trains || []).length > 1, '#/shop', t('Shop')),
-      q('remind', 'fi-rr-calendar', t('Ein Training merken'), t('Mit Erinnerung vorher'), remind.ids.size, '#/trainings', t('Trainings')),
-      q('skin', 'fi-rr-sparkles', t('Ein Theme wählen'), t('Zum Beispiel Halloween'), fx.skin !== 'auto', '#/einstellungen/themes', t('Themes')),
-    ];
-  }
-  const questsOpen = () => quests().some((x) => !x.done);
-  function renderQuests() {
-    const box = $('[data-quests]');
-    if (!box) return;
-    if (apiReady() && sessionToken()) { loadChats(); loadDash(); if (!shop.data) loadShop(); }
-    const list = quests();
-    const done = list.filter((x) => x.done).length;
-    const pctDone = Math.round((done / list.length) * 100);
-    box.innerHTML = `<div class="qs">
-      <div class="qs-head"><a class="pf-x pf-x--plain" href="#/profil" aria-label="${esc(t('Zurück'))}">${icon('fi-rr-arrow-left')}</a><h1>${t('Aufgaben')}</h1></div>
-      <div class="qs-hero"><span class="qs-ring" style="--p:${pctDone}"><b>${done}/${list.length}</b></span><span><b>${done === list.length ? t('Alles erledigt!') : t('Noch {n} Aufgaben', { n: list.length - done })}</b><small>${t('Kleine Ziele, um alles in der App kennenzulernen.')}</small></span></div>
-      <div class="qs-list">${list.map((x) => `<a class="qs-item${x.done ? ' is-done' : ''}" href="${x.href}"><span class="qs-item__ic">${icon(x.done ? 'fi-sr-check-circle' : x.ic)}</span><span class="qs-item__text"><b>${esc(x.title)}</b><small>${esc(x.text)}</small></span><span class="qs-item__act">${x.done ? t('Erledigt') : esc(x.act)}</span></a>`).join('')}</div>
-    </div>`;
-  }
 
   // ---------- Bindings ----------
   function bind() {
@@ -8850,13 +6846,13 @@
     const values = {
       online: fmt(state.online), servers: fmt(s.servers), groupMembers: compact(s.groupMembers),
       discordOnline: compact(s.discordOnline), discordMembers: compact(s.discordMembers),
-      visits: compact(s.visits), favorites: compact(s.favorites),
+      visits: FORMATS.exact(s.visits), favorites: FORMATS.exact(s.favorites),
     };
     $$('[data-bind]').forEach((el) => { if (values[el.dataset.bind] != null) el.textContent = values[el.dataset.bind]; });
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'bots', 'luna', 'dashboard', 'profil', 'aufgaben'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
@@ -8880,19 +6876,14 @@
     spieler() { renderPlayers(); loadTracked(); if (pl.tab === 'friends') loadFriends(); },
     statistiken() { renderStatsKpis(); renderChart(); renderBars(); loadGameStats(); },
     einstellungen() { renderSettings(); },
-    bots() { openIde(state.botsArg[0], state.botsArg[1]); },
-    luna() { renderDocs(state.docsArg, state.docsHeading); },
-    dashboard() { renderDash(); },
-    profil() { renderProfile(); },
-    aufgaben() { renderQuests(); },
   };
 
   function route() {
     const raw = location.hash.replace(/^#\/?/, '');
     const [path, query] = raw.split('?');
     const [first, sub, sub2] = path.split('/');
-    // Einladungslink: #/einladung/<code> → Dashboard mit „Beitreten“
-    if (first === 'einladung' && sub) { location.replace(`#/dashboard?code=${encodeURIComponent(sub)}`); return; }
+    // Einladungslink: #/einladung/<code> → Chat „Beitreten“ mit Vorschau
+    if (first === 'einladung' && sub) { location.replace(`#/chat/neu/beitreten?code=${encodeURIComponent(sub)}`); return; }
     const page = PAGES.includes(first) ? first : 'home';
     const jobId = page === 'karriere' ? (sub || null) : null;
     const jobApply = !!jobId && sub2 === 'bewerben';
@@ -8900,27 +6891,16 @@
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
-    const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', server: 'new-server', anfrage: 'new-ticket' };
+    const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', server: 'new-server', anfrage: 'new-ticket', beitreten: 'join' };
     let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', discord: 'discord', neu: 'new', an: 'direct' }[chatSub] || 'conv';
     if (chatView === 'new' && NEW_VIEWS[sub2]) chatView = NEW_VIEWS[sub2];
-    // „Neu“ im Chat führt jetzt zum Dashboard
-    if (chatView === 'new') { location.replace('#/dashboard'); return; }
-    // Dashboard: #/dashboard?neu=server|gruppe|bot öffnet gleich das Erstellen, ?code=… bzw. ?beitreten=1 das Beitreten
-    if (page === 'dashboard') {
-      const qp = new URLSearchParams(query || '');
-      state.dashView = ['erstellungen', 'tools'].includes(sub) ? sub : '';
-      if (qp.get('f')) dash.filter = qp.get('f');
-      dash.nav = false;
-      const code = qp.get('code');
-      if (code || qp.get('beitreten')) {
-        history.replaceState(null, '', '#/dashboard');
-        setTimeout(() => { if (state.page !== 'dashboard') return; dash.inviteCode = code || ''; openSheet('join'); const f = $('form[data-srv-join-form]'); if (f && code) joinSubmit(f); }, 80);
-      }
-      const want = qp.get('neu');
-      if (want) {
-        history.replaceState(null, '', '#/dashboard');
-        const kind = { gruppe: 'group', group: 'group', server: 'server', bot: 'bot' }[want];
-        if (kind) setTimeout(() => { if (state.page === 'dashboard') openSheet('create', kind); }, 60);
+    // Beitreten: Code aus dem Link gleich prüfen
+    if (chatView === 'join') {
+      const code = inviteCodeOf(new URLSearchParams(query || '').get('code') || '');
+      if (code && code !== invite.code) {
+        Object.assign(invite, { code, preview: null });
+        history.replaceState(null, '', '#/chat/neu/beitreten');
+        setTimeout(() => { const f = $('form[data-invite-join]'); if (f) joinSubmit(f); }, 60);
       }
     }
     if (chatView === 'conv' && sub2 === 'info') chatView = 'info';
@@ -8934,29 +6914,18 @@
       if (cc && !cc.error && cc.community) { Object.assign(cc, { channel: kParam, messages: [], switching: true }); if (state.chatArg === chatArg && state.chatView === 'conv') { renderChat(); openConv(chatArg); } }
     }
     if (chatView !== state.chatView || chatArg !== state.chatArg) { chat.side = false; chat.cmq = ''; chat.sideAuto = chatView === 'conv' && !kParam ? chatArg : null; }
-    const botsArg = page === 'bots' ? [sub || '', sub2 || ''] : null;
-    const docsArg = page === 'luna' ? (sub || 'start') : null;
     const settingsSub = page === 'einstellungen' ? (sub || '') : '';
-    const docsHeading = page === 'luna' ? new URLSearchParams(query || '').get('h') : null;
-    // Nur zu einer Überschrift springen: Seite nicht neu aufbauen
-    if (page === 'luna' && state.page === 'luna' && docsArg === state.docsArg && docsHeading) {
-      const el = document.getElementById(`doc-${docsHeading}`);
-      if (el) { el.scrollIntoView({ behavior: reducedMotion() ? 'auto' : 'smooth', block: 'start' }); docs.nav = false; const nav = $('[data-docs-navbox]'); if (nav) nav.classList.remove('is-open'); return; }
-    }
-    if (page === 'bots' && !(/^[\w-]{6,30}$/.test(botsArg[0]) && /^[\w-]{4,16}$/.test(botsArg[1]))) { location.replace('#/chat'); return; }
-    // Gespräch verlassen: beim nächsten Öffnen läuft onopen() der ClientScripts wieder
-    if (chatView !== 'conv' || chatArg !== state.chatArg) cbots.seen = null;
-    if (state.page === 'bots' && page !== 'bots' && ideDirty()) toast(t('Nicht gespeicherte Änderungen im Bot-Editor bleiben als Entwurf erhalten.'));
     const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
-      || String(botsArg) !== String(state.botsArg) || docsArg !== state.docsArg || settingsSub !== (state.settingsSub || '') || (page === 'dashboard' && (sub || '') !== (state.dashSub || ''));
+      || settingsSub !== (state.settingsSub || '');
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
     if (chatView === 'public' && state.chatView !== 'public') chat.pubAt = 0;
     if (chatView === 'mod' && state.chatView !== 'mod') chat.modAt = 0;
     if (chatView === 'new-dm' && state.chatView !== 'new-dm') chat.found = null;
     if (['new-group', 'new-server'].includes(chatView) && state.chatView !== chatView) chat.members = [];
     if (chatView === 'new-server' || (page === 'server' && !serverId)) loadPservers(true);
-    if (page === 'server' && liveMode()) { if (serverId) loadLiveDetail(serverId); else loadLive(); }
+    // Server-Details beim Öffnen frisch laden (wer gerade in welchem Team ist)
+    if (page === 'server' && liveMode()) { if (serverId) loadLiveDetail(serverId, serverId !== state.serverId); else loadLive(); }
     // Info öffnen: Gespräch frisch laden (Mitglieder, Rechte)
     if (chatView === 'info' && chatArg && chat.conv[chatArg] && !chat.conv[chatArg].error) openConv(chatArg);
     if (reviewId !== state.reviewId) review.answers = 'all';
@@ -8971,23 +6940,14 @@
     state.serverId = serverId;
     state.chatView = chatView;
     state.chatArg = chatArg;
-    state.botsArg = botsArg;
-    state.docsArg = docsArg;
-    state.docsHeading = docsHeading;
     state.settingsSub = settingsSub;
-    state.dashSub = page === 'dashboard' ? (sub || '') : '';
-    if (page === 'luna') docs.nav = false;
     if (page === 'shop') { const v = new URLSearchParams(query || '').get('v'); if (v) shop.view = v; }
-    // Gespräch aus dem Speicher: gleich auf neuen Stand bringen (und onopen() der ClientScripts)
+    // Gespräch aus dem Speicher: gleich auf neuen Stand bringen
     if (chatView === 'conv' && chat.conv[chatArg] && !chat.conv[chatArg].error && changed) {
-      clientBotsAfterLoad(chatArg, null);
       if (chat.conv[chatArg].updated) openConv(chatArg, { since: chat.conv[chatArg].updated });
     }
     document.body.dataset.page = page;
     document.body.dataset.chatView = chatView || '';
-    if (changed && chatView === 'conv' && chatArg) addRecent('chat', chatArg);
-    if (changed && page === 'bots') addRecent('bot', botsArg[1], botsArg[0]);
-    if (page !== 'dashboard') dash.sheet = null;
     const view = serverId ? 'server-detail' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
@@ -9084,8 +7044,6 @@
       if (!el) return;
       const ds = el.dataset;
       if (ds.skinSet) { setSkin(ds.skinSet); return; }
-      // Angemeldet: Profilbild oben bzw. in der Leiste öffnet die Profilseite
-      if (ds.open === 'profile' && state.profile && state.profile.oauth && el.closest('.tabbar, .topbar, .drawer') && !el.closest('[data-modal]')) { closeMenu(); location.hash = '#/profil'; return; }
       if (ds.iconSet) { setAppIcon(ds.iconSet); return; }
       if (ds.open) openModal(ds.open);
       else if (ds.detail) openModal('training', ds.detail);
@@ -9356,28 +7314,6 @@
     });
     document.addEventListener('pointerup', dragEnd);
     document.addEventListener('pointercancel', dragEnd);
-    // Luna-Dokumentation
-    document.addEventListener('input', (e) => {
-      if (!e.target.matches || !e.target.matches('[data-docs-search]') || !docs.lib) return;
-      docs.q = e.target.value;
-      const links = $('[data-docs-links]');
-      if (links) links.innerHTML = docsNavHtml(state.docsArg);
-    });
-    document.addEventListener('click', async (e) => {
-      const el = e.target.closest('[data-doc-copy], [data-docs-nav]');
-      if (!el) return;
-      if ('docCopy' in el.dataset) {
-        const src = $('[data-doc-src]', el.closest('.doc-code'));
-        try { await navigator.clipboard.writeText(src ? src.value : ''); el.textContent = t('Kopiert'); setTimeout(() => { el.textContent = t('Kopieren'); }, 1400); } catch (err) { toast(t('Kopieren geht hier nicht.')); }
-      } else {
-        docs.nav = el.dataset.docsNav === '1';
-        const nav = $('[data-docs-navbox]');
-        if (nav) nav.classList.toggle('is-open', docs.nav);
-        const page = $('.docs');
-        if (page) page.classList.toggle('is-nav', docs.nav);
-      }
-    });
-
     // Server: Kanäle wechseln, bearbeiten, Kategorien
     document.addEventListener('click', async (e) => {
       const el = e.target.closest('[data-cm-browse], [data-cm-ch], [data-cm-edit], [data-cm-new], [data-cm-cat-new], [data-cm-cat-edit], [data-cm-cat], [data-cm-side-open], [data-cm-side-close], [data-cm-convert], [data-cm-go], [data-ch-move], [data-ch-del], [data-cat-move], [data-cat-del]');
@@ -9516,363 +7452,30 @@
       btn.disabled = false;
     });
 
-    // Dashboard: Suchen, Erstellen, ⋯-Aktionen
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-dash-search], [data-dash-create], [data-dash-go], [data-dash-more], [data-dsh-close], [data-dsh-act], [data-dash-nav], [data-dash-ctx], [data-dash-ctx-set], [data-srv-template], [data-srv-join], [data-cm-invite-id]');
-      if (!el) { if (dash.ctxOpen && !e.target.closest('.ch-ctxmenu')) { dash.ctxOpen = false; if (state.page === 'dashboard') renderDash(); } return; }
-      const ds = el.dataset;
-      if (ds.dashNav !== undefined) { dash.nav = !dash.nav; const r = $('.ch'); if (r) r.classList.toggle('is-nav', dash.nav); return; }
-      if (ds.dashCtx !== undefined) { dash.ctxOpen = !dash.ctxOpen; dash.nav = false; renderDash(); return; }
-      if (ds.dashCtxSet !== undefined) { dash.ctx = ds.dashCtxSet; store.set('tsg-dash-ctx', dash.ctx); dash.ctxOpen = false; haptic('select'); if (state.dashView) location.hash = '#/dashboard'; else renderDash(); return; }
-      if (ds.srvTemplate !== undefined) { dash.template = ds.srvTemplate; drawSheet(true); return; }
-      if (ds.srvJoin !== undefined) { dash.inviteCode = ''; openSheet('join'); return; }
-      if (ds.cmInviteId) { shareInvite(ds.cmInviteId); return; }
-      if (ds.dashSearch !== undefined) { dash.search = !dash.search; if (!dash.search) dash.q = ''; renderDash(); return; }
-      if (ds.dashCreate) { openSheet('create', ds.dashCreate); return; }
-      if (ds.dashGo) { location.hash = ds.dashGo; return; }
-      if (ds.dashMore) { openSheet('more', ds.dashMore); return; }
-      if (ds.dshClose !== undefined) { closeSheet(); return; }
-      if (ds.dshAct) dashAction(ds.dshAct);
-    });
-    document.addEventListener('input', (e) => {
-      if (e.target.matches('[data-dash-q]')) {
-        dash.q = e.target.value;
-        const pos = e.target.selectionStart;
-        renderDash();
-        const input = $('[data-dash-q]');
-        if (input) { input.focus(); input.setSelectionRange(pos, pos); }
-      }
-      if (e.target.matches('[data-dsh-name]')) updatePreview(e.target.form);
-    });
-    document.addEventListener('change', (e) => {
-      const form = e.target.closest('form[data-dsh-create-form]');
-      if (form && e.target.matches('[data-dsh-file]') && e.target.files && e.target.files[0]) {
-        if (dash.preview) URL.revokeObjectURL(dash.preview);
-        dash.file = e.target.files[0];
-        dash.preview = URL.createObjectURL(dash.file);
-        updatePreview(form);
-      } else if (form && e.target.name === 'color') updatePreview(form);
-      if (e.target.matches('[data-dsh-photo]') && e.target.files && e.target.files[0]) dashPhoto(e.target.dataset.dshPhoto, e.target.files[0]);
-    });
-    document.addEventListener('submit', (e) => {
-      const cf = e.target.closest('form[data-dsh-create-form]');
-      const rf = e.target.closest('form[data-dsh-rename]');
-      const jf = e.target.closest('form[data-srv-join-form]');
-      if (jf) { e.preventDefault(); joinSubmit(jf); return; }
-      if (!cf && !rf) return;
-      e.preventDefault();
-      if (cf) dashCreate(cf); else dashRename(rf);
-    });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && dash.sheet) closeSheet(); });
+    // Einladungslinks: teilen (Server-Leiste) und beitreten
+    document.addEventListener('click', (e) => { const el = e.target.closest('[data-cm-invite-id]'); if (el) shareInvite(el.dataset.cmInviteId); });
+    document.addEventListener('submit', (e) => { const f = e.target.closest('form[data-invite-join]'); if (f) { e.preventDefault(); joinSubmit(f); } });
 
-    // Doku: „Ausprobieren“ öffnet den Codeblock im Playground; Playground: Ausführen, Beispiele, Simulation
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-doc-try], [data-pg-run], [data-pg-clear]');
-      if (!el) return;
-      if ('docTry' in el.dataset) {
-        const src = $('[data-doc-src]', el.closest('.doc-code'));
-        if (!src) return;
-        store.set('tsg-luna-pg', src.value.endsWith('\n') ? src.value : `${src.value}\n`);
-        // Codeblöcke mit Ereignissen (onjoin …) gleich mit Simulation
-        store.set('tsg-luna-pg-sim', /\bon(start|join|leave|message|command|open)\s*\(/.test(src.value));
-        if (state.page === 'luna' && state.docsArg === 'playground') renderDocs('playground'); else location.hash = '#/luna/playground';
-        setTimeout(() => { if (state.docsArg === 'playground') pgRun(); }, 250);
-        return;
-      }
-      if ('pgRun' in el.dataset) { pgRun(); return; }
-      if ('pgClear' in el.dataset) { const out = $('[data-pg-out]'); if (out) out.innerHTML = ''; const st = $('[data-pg-steps]'); if (st) st.textContent = ''; }
-    });
-    document.addEventListener('input', (e) => {
-      if (!e.target.matches('[data-pg-code]')) return;
-      pgPaint();
-      store.set('tsg-luna-pg', e.target.value);
-    });
-    document.addEventListener('change', (e) => {
-      if (e.target.matches('[data-pg-example]') && e.target.value !== '') {
-        const ex = PG_EXAMPLES[+e.target.value];
-        const ta = $('[data-pg-code]');
-        if (!ex || !ta) return;
-        ta.value = ex[1];
-        store.set('tsg-luna-pg', ex[1]);
-        const sim = /\bon(start|join|message)\s*\(/.test(ex[1]);
-        const box = $('[data-pg-sim]');
-        if (box) box.checked = sim;
-        store.set('tsg-luna-pg-sim', sim);
-        $('[data-pg-simbox]').hidden = !sim;
-        e.target.value = '';
-        pgPaint();
-        pgRun();
-      }
-      if (e.target.matches('[data-pg-sim]')) { store.set('tsg-luna-pg-sim', e.target.checked); $('[data-pg-simbox]').hidden = !e.target.checked; }
-    });
-    document.addEventListener('keydown', (e) => {
-      if (!e.target.matches('[data-pg-code]')) return;
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); pgRun(); return; }
-      if (e.key === 'Tab' && !e.shiftKey) { e.preventDefault(); insertText(e.target, '  '); }
-    });
-
-    // Profil und Aufgaben
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-prof-tab], [data-prof-edit], [data-prof-tip], [data-prof-more], [data-prof-banner-del]');
-      if (!el) return;
-      const ds = el.dataset;
-      if (ds.profTab) { prof.tab = ds.profTab; renderProfile(); return; }
-      if (ds.profEdit !== undefined) { openModal('profile-edit'); if (ds.profEdit === 'status') setTimeout(() => { const i = $('#pf-status'); if (i) i.focus(); }, 60); return; }
-      if (ds.profTip !== undefined) { store.set('tsg-prof-tip', false); renderProfile(); return; }
-      if (ds.profMore !== undefined) { openModal('profile'); return; }
-      if (ds.profBannerDel !== undefined) {
-        api('/api/me/banner', { method: 'DELETE' }).then((r) => { prof.me = r.profile; store.set('tsg-me-profile', prof.me); refreshModal(); renderProfile(); toast(t('Banner entfernt')); }).catch((err) => toast(errorText(err)));
-      }
-    });
-    document.addEventListener('change', (e) => { if (e.target.matches('[data-prof-banner]') && e.target.files && e.target.files[0]) uploadBanner(e.target.files[0]); });
-    document.addEventListener('submit', (e) => { const f = e.target.closest('form[data-prof-form]'); if (f) { e.preventDefault(); saveProfile(f); } });
-
-    // Editor-Werkzeuge: Leiste, Vorschläge, Suchen
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-edt], [data-edt-snip], [data-edt-obj], [data-ac-pick]');
-      if (!el) {
-        if (edx.tool && !e.target.closest('.edt-menu')) { edx.tool = null; edtRedraw(); }
-        if (edx.ac && !e.target.closest('[data-ac]')) acHide();
-        return;
-      }
-      const ds = el.dataset;
-      if (ds.acPick !== undefined) { acAccept(+ds.acPick); const ta = $('[data-ide-code]'); if (ta) ta.focus(); return; }
-      if (ds.edt) { edtAction(ds.edt); return; }
-      const ta = $('[data-ide-code]');
-      if (ds.edtSnip && ta) {
-        edx.tool = null;
-        edtRedraw();
-        const pos = ta.selectionStart;
-        const lineStart = ta.value.lastIndexOf('\n', pos - 1) + 1;
-        const indent = (ta.value.slice(lineStart, pos).match(/^\s*/) || [''])[0];
-        const lead = ta.value.slice(lineStart, pos).trim() ? `\n${indent}` : '';
-        ta.focus();
-        edx.skipAc = true;
-        insertText(ta, lead + EDT_SNIPS[ds.edtSnip].replace(/\n(?!$)/g, `\n${indent}`));
-        ideInput(ta);
-        return;
-      }
-      if (ds.edtObj !== undefined) {
-        edx.tool = null;
-        edtRedraw();
-        const f = ideFile(ide.active);
-        const anchor = $('[data-edt="insert"]');
-        if (f && anchor) openXpMenu('insert', f.parent, anchor);
-      }
-    });
-    document.addEventListener('input', (e) => {
-      if (e.target.matches && e.target.matches('[data-find-q]')) { edx.q = e.target.value; const i = $('[data-find-info]'); if (i) i.textContent = ''; }
-      if (e.target.matches && e.target.matches('[data-find-rep]')) edx.rep = e.target.value;
-    });
-    document.addEventListener('keydown', (e) => {
-      if (!e.target.matches || !e.target.matches('[data-find-q], [data-find-rep]')) return;
-      if (e.key === 'Enter') { e.preventDefault(); if (e.target.matches('[data-find-rep]')) replaceOne(); else { findNext(e.shiftKey); e.target.focus(); } }
-      if (e.key === 'Escape') { e.preventDefault(); edtAction('findclose'); }
-    });
-
-    // Eigene Bots und Bot-Editor
-    const idePanelRedraw = () => { const panel = $('[data-ide-panelbox]'); if (panel) { panel.innerHTML = idePanelHtml(); panel.classList.toggle('is-open', !!ide.panelOpen); } };
-    const setTree = (open) => { ide.tree = open; const body = $('.ide__body'); if (body) body.classList.toggle('is-tree', open); };
+    // Eigene Bots
     document.addEventListener('click', async (e) => {
-      const el = e.target.closest('[data-bot-new], [data-bot-edit], [data-bot-del], [data-bot-photo-del], [data-ide-tree], [data-ide-open], [data-ide-close], [data-ide-new], [data-ide-goto], [data-ide-save], [data-ide-panel], [data-ide-key], [data-ide-logs], [data-ide-advanced], [data-ide-convert], [data-ide-discard], [data-ide-mem-reset], [data-ide-snippet], [data-xp-toggle], [data-xp-add], [data-xp-folder], [data-xp-menu], [data-xp-insert], [data-xp-act], [data-xp-menu-close], [data-pp-copy], [data-pp-toggle], [data-mv-to], [data-xp]');
+      const el = e.target.closest('[data-bot-new], [data-bot-edit], [data-bot-del], [data-bot-photo-del]');
       if (!el) return;
       const ds = el.dataset;
       if (ds.botNew) openModal('botnew', ds.botNew);
       else if (ds.botEdit) { delete botsFull[ds.botEdit.split(':')[1]]; openModal('bot', ds.botEdit); }
       else if (ds.botDel) {
         const [cid, bid] = ds.botDel.split(':');
-        if (!confirm(t('Bot löschen? Seine Regeln, Skripte und sein Speicher gehen verloren.'))) return;
+        if (!confirm(t('Bot löschen? Seine Regeln gehen verloren.'))) return;
         if (await botCall(cid, `/${encodeURIComponent(bid)}`, { method: 'DELETE' })) {
           delete botsFull[bid];
           closeModal();
           toast(t('Bot gelöscht'));
-          if (ide.bid === bid) { ide.bid = null; ide.bot = null; store.set(`tsg-ide:${bid}`, null); }
-          if (state.page === 'bots') location.hash = `#/chat/${cid}/info`;
           openConv(cid);
         }
       } else if (ds.botPhotoDel) {
         const [cid, bid] = ds.botPhotoDel.split(':');
         const r = await botCall(cid, `/${encodeURIComponent(bid)}/photo`, { method: 'DELETE' });
         if (r) botChanged(cid, r);
-      } else if (ds.ideTree !== undefined) { setTree(ds.ideTree === '1'); haptic('tap'); }
-      else if (ds.ideOpen) ideOpen(ds.ideOpen);
-      else if (ds.ideClose) ideCloseTab(ds.ideClose);
-      else if (ds.ideNew) insertItem(ds.ideNew, DEFAULT_PARENT[ds.ideNew]);
-      else if (ds.ideGoto) { const [fid, line] = ds.ideGoto.split(':'); ideOpen(fid, +line); }
-      else if ('ideSave' in ds) ideSave();
-      else if (ds.idePanel) {
-        if (ds.idePanel === 'fold') ide.panelOpen = !ide.panelOpen;
-        else if (ide.panel === ds.idePanel && ide.panelOpen) ide.panelOpen = false;
-        else { ide.panel = ds.idePanel; ide.panelOpen = true; }
-        idePanelRedraw();
-      } else if (ds.ideKey) ideInsertKey(ds.ideKey);
-      else if (ds.ideLogs) {
-        const r = ds.ideLogs === 'clear' ? await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body: { clearLogs: true } }) : await loadBotFull(ide.cid, ide.bid);
-        if (r && !r.error && ide.bot) Object.assign(ide.bot, { logs: r.logs, stats: r.stats, memory: r.memory });
-        idePanelRedraw();
-      } else if ('ideAdvanced' in ds) {
-        const r = await botCall(ide.cid, `/${encodeURIComponent(ide.bid)}`, { method: 'PUT', body: { mode: 'advanced' } });
-        if (r) { toast(t('Erweiterter Modus ist an')); botChanged(ide.cid, r); }
-      } else if ('ideConvert' in ds) {
-        const made = rulesToLuna((ide.bot && ide.bot.rules) || []);
-        made.forEach((f) => ide.files.push({ id: tmpId(), isNew: true, ...f }));
-        if (made.length) { ide.open = ide.files.filter((f) => isScript(f.type)).map((f) => f.id); ide.active = ide.open[0]; ide.sel = ide.active; }
-        ideDiagnose();
-        renderIde();
-        ideInputDraft();
-        toast(made.length ? t('Umgewandelt – prüfen und speichern') : t('Keine aktiven Regeln zum Umwandeln.'));
-      } else if ('ideDiscard' in ds) {
-        ide.files = ((ide.bot && ide.bot.files) || []).map((f) => ({ ...f }));
-        ide.draft = false;
-        store.set(draftKey(), null);
-        ide.open = ide.open.filter((id) => ideFile(id));
-        if (!ideFile(ide.active)) ide.active = ide.open[0] || null;
-        ideDiagnose();
-        renderIde();
-      } else if ('ideMemReset' in ds) { ide.testMem = null; ide.testOut = null; idePanelRedraw(); toast(t('Test-Speicher geleert')); }
-      else if (ds.ideSnippet) ideSnippet(ds.ideSnippet);
-      else if (ds.xpToggle) { e.stopPropagation(); ide.collapsed[ds.xpToggle] = !ide.collapsed[ds.xpToggle]; ideRefreshSide(); }
-      else if (ds.xpAdd) { e.stopPropagation(); openXpMenu('insert', ds.xpAdd === '@sel' ? insertTarget() : ds.xpAdd, el); }
-      else if ('xpFolder' in ds) insertItem('folder', insertTarget());
-      else if (ds.xpMenu) { e.stopPropagation(); ide.sel = ds.xpMenu; ideRefreshSide(); openXpMenu('item', ds.xpMenu, el); }
-      else if (ds.xpInsert) insertItem(ds.xpInsert, ide.menu ? ide.menu.parent : insertTarget());
-      else if (ds.xpAct) {
-        const id = ide.menu && ide.menu.id;
-        const f = ideFile(id);
-        closeXpMenu();
-        if (!f) return;
-        if (ds.xpAct === 'open') ideOpen(id);
-        else if (ds.xpAct === 'insert') { const row = $(`.xp-row[data-xp="${CSS.escape(id)}"] .xp-add`) || $(`.xp-row[data-xp="${CSS.escape(id)}"]`); if (row) openXpMenu('insert', id, row); }
-        else if (ds.xpAct === 'rename') { ide.renaming = id; ideRefreshSide(); focusRename(); }
-        else if (ds.xpAct === 'duplicate') duplicateItem(id);
-        else if (ds.xpAct === 'move') openModal('botmove', id);
-        else if (ds.xpAct === 'path') { try { await navigator.clipboard.writeText(absPath(f)); toast(t('Pfad kopiert')); } catch (err) { toast(absPath(f)); } }
-        else if (ds.xpAct === 'delete') deleteItem(id);
-      } else if ('xpMenuClose' in ds) closeXpMenu();
-      else if (ds.ppCopy) { try { await navigator.clipboard.writeText(ds.ppCopy); toast(t('Kopiert')); } catch (err) { toast(ds.ppCopy); } }
-      else if ('ppToggle' in ds) { ide.propsOpen = !ide.propsOpen; const pp = $('[data-ide-props]'); if (pp) { pp.classList.toggle('is-open', ide.propsOpen); pp.innerHTML = idePropsHtml(); } }
-      else if (ds.mvTo) { if (modalView && modalView.name === 'botmove') { const id = modalView.arg; closeModal(); if (moveItem(id, ds.mvTo)) toast(t('Verschoben')); } }
-      else if (ds.xp) {
-        if (e.target.closest('input')) return;
-        const id = ds.xp;
-        if (id === 'bot' || isService(id)) { ide.sel = id; ideRefreshSide(); return; }
-        ideSelect(id);
-      }
-    });
-    // Rechtsklick (und langes Drücken) auf ein Objekt: Menü wie im Explorer
-    document.addEventListener('contextmenu', (e) => {
-      const row = e.target.closest('.xp-row[data-xp]');
-      if (!row || !ideFile(row.dataset.xp)) return;
-      e.preventDefault();
-      ide.sel = row.dataset.xp;
-      ideRefreshSide();
-      openXpMenu('item', row.dataset.xp, $(`.xp-row[data-xp="${CSS.escape(row.dataset.xp)}"]`) || row);
-    });
-    document.addEventListener('dblclick', (e) => {
-      const row = e.target.closest('.xp-row[data-xp]');
-      if (!row || !ideFile(row.dataset.xp)) return;
-      ide.renaming = row.dataset.xp;
-      ideRefreshSide();
-      focusRename();
-    });
-    // Ziehen und Ablegen im Explorer (Desktop)
-    let dragId = null;
-    document.addEventListener('dragstart', (e) => {
-      const row = e.target.closest && e.target.closest('.xp-row[data-xp]');
-      if (!row || !ideFile(row.dataset.xp)) return;
-      dragId = row.dataset.xp;
-      e.dataTransfer.effectAllowed = 'move';
-      try { e.dataTransfer.setData('text/plain', dragId); } catch (err) { /* egal */ }
-    });
-    document.addEventListener('dragover', (e) => {
-      const row = dragId && e.target.closest && e.target.closest('.xp-row[data-xp]');
-      if (!row) return;
-      const to = row.dataset.xp;
-      const target = ideFile(to);
-      const ok = to !== dragId && to !== 'bot' && !isDescendant(to, dragId) && (!target || (target.type !== 'connector' && target.type !== 'webhook'));
-      if (!ok) return;
-      e.preventDefault();
-      $$('.xp-row.is-drop').forEach((x) => x !== row && x.classList.remove('is-drop'));
-      row.classList.add('is-drop');
-    });
-    document.addEventListener('drop', (e) => {
-      const row = dragId && e.target.closest && e.target.closest('.xp-row[data-xp]');
-      if (!row) return;
-      e.preventDefault();
-      const id = dragId;
-      dragId = null;
-      if (moveItem(id, row.dataset.xp)) toast(t('Verschoben'));
-    });
-    document.addEventListener('dragend', () => { dragId = null; $$('.xp-row.is-drop').forEach((x) => x.classList.remove('is-drop')); });
-    // Zeichenleiste über der Tastatur: Fokus bleibt im Editor
-    document.addEventListener('pointerdown', (e) => { if (e.target.closest('[data-ide-key]')) e.preventDefault(); });
-    document.addEventListener('input', (e) => {
-      if (!e.target.matches) return;
-      if (e.target.matches('[data-ide-code]')) {
-        ideInput(e.target);
-        // Vorschläge beim Tippen (nicht direkt nach dem Übernehmen eines Vorschlags)
-        if (edx.skipAc) edx.skipAc = false;
-        else if (e.inputType === 'insertText' || e.inputType === 'deleteContentBackward') acShow(e.target); else acHide();
-      }
-      else if (e.target.matches('[data-xp-search]') && ide.menu) {
-        ide.menu.q = e.target.value;
-        const menu = $('.xp-menu');
-        if (menu) { const list = $('.xp-menu__list', menu); const tmp = document.createElement('div'); tmp.innerHTML = ideMenuHtml(); const nl = $('.xp-menu__list', tmp); if (list && nl) list.innerHTML = nl.innerHTML; }
-      } else if (e.target.matches('[data-pp-url]')) {
-        const f = ideFile(ide.sel);
-        if (f) { f.url = e.target.value.trim(); ideInputDraft(); }
-      }
-    });
-    document.addEventListener('change', (e) => {
-      if (!e.target.matches) return;
-      if (e.target.matches('[data-pp-name]')) renameItem(ide.sel, e.target.value);
-      else if (e.target.matches('[data-pp-enabled]')) {
-        const f = ideFile(ide.sel);
-        if (f) { if (e.target.checked) delete f.enabled; else f.enabled = false; ideDiagnose(); ideRefreshSide(); ideInputDraft(); }
-      } else if (e.target.matches('[data-pp-value]')) {
-        // Werte-Objekte: Standardwert im Editor einstellen
-        const f = ideFile(ide.sel);
-        if (f) {
-          const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-          f.value = f.type === 'boolvalue' ? !!v : f.type === 'intvalue' ? Math.round(Number(v) || 0) : f.type === 'numbervalue' ? Number(v) || 0 : String(v).slice(0, 500);
-          ideInputDraft();
-        }
-      }
-    });
-    document.addEventListener('focusout', (e) => {
-      if (e.target.matches && e.target.matches('[data-xp-rename-input]') && ide.renaming === e.target.dataset.xpRenameInput) renameItem(ide.renaming, e.target.value);
-    });
-    ['keyup', 'click', 'select'].forEach((ev) => document.addEventListener(ev, (e) => { if (e.target.matches && e.target.matches('[data-ide-code]')) ideCaret(); }));
-    document.addEventListener('keydown', (e) => {
-      if (!e.target.matches) return;
-      if (e.target.matches('[data-ide-code]')) { ideKey(e); return; }
-      if (e.target.matches('[data-xp-rename-input]')) {
-        if (e.key === 'Enter') { e.preventDefault(); renameItem(e.target.dataset.xpRenameInput, e.target.value); }
-        if (e.key === 'Escape') { e.preventDefault(); ide.renaming = null; ideRefreshSide(); }
-        return;
-      }
-      if (e.target.matches('[data-pp-name]') && e.key === 'Enter') { e.preventDefault(); e.target.blur(); return; }
-      if (e.target.matches('[data-xp-search]') && e.key === 'Enter') { e.preventDefault(); const first = $('.xp-menu [data-xp-insert]'); if (first) first.click(); return; }
-      if (state.page !== 'bots') return;
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); ideSave(); return; }
-      if (e.key === 'Escape') { if (ide.menu) { closeXpMenu(); return; } if (ide.tree) setTree(false); return; }
-      const row = e.target.closest('.xp-row[data-xp]');
-      if (!row) return;
-      const id = row.dataset.xp;
-      if (e.key === 'F2' && ideFile(id)) { e.preventDefault(); ide.renaming = id; ideRefreshSide(); focusRename(); }
-      else if ((e.key === 'Delete' || e.key === 'Backspace') && ideFile(id)) { e.preventDefault(); deleteItem(id); }
-      else if (e.key === 'Enter') { e.preventDefault(); row.click(); }
-      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const rows = $$('.xp-row[data-xp]');
-        const next = rows[rows.indexOf(row) + (e.key === 'ArrowDown' ? 1 : -1)];
-        if (next) { ide.sel = next.dataset.xp; ideRefreshSide(); const n2 = $(`.xp-row[data-xp="${CSS.escape(ide.sel)}"]`); if (n2) n2.focus(); }
-      } else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        ide.collapsed[id] = e.key === 'ArrowLeft';
-        ideRefreshSide();
-        const n2 = $(`.xp-row[data-xp="${CSS.escape(id)}"]`);
-        if (n2) n2.focus();
       }
     });
     document.addEventListener('change', (e) => {
@@ -9884,19 +7487,17 @@
         e.preventDefault();
         const cid = bc.dataset.botCreate;
         const name = bc.elements.name.value.trim();
-        const mode = (bc.querySelector('input[name="mode"]:checked') || {}).value || 'basic';
         if (name.length === 1) { toast(t('Der Name braucht mindestens 2 Zeichen.')); return; }
         const btn = $('button[type="submit"]', bc);
         btn.disabled = true;
-        const r = await botCall(cid, '', { method: 'POST', body: { name, mode } });
+        const r = await botCall(cid, '', { method: 'POST', body: { name } });
         btn.disabled = false;
         if (!r) return;
         botsFull[r.id] = r;
         haptic('success');
         toast(t('Bot erstellt'));
         openConv(cid);
-        if (mode === 'advanced') location.hash = `#/bots/${cid}/${r.id}`;
-        else openModal('bot', `${cid}:${r.id}`);
+        openModal('bot', `${cid}:${r.id}`);
         return;
       }
       const bf = e.target.closest('form[data-bot-form]');
@@ -9905,7 +7506,6 @@
         const f = bf.elements;
         const body = {
           name: f.name.value.trim(), desc: f.desc.value.trim(), prefix: f.prefix.value.trim() || '!', on: f.on.checked,
-          mode: (bf.querySelector('input[name="mode"]:checked') || {}).value || 'basic',
           rules: $$('[data-auto-row]', bf).map((row) => ({
             id: row.dataset.autoId || undefined, trigger: $('select[name="trigger"]', row).value, target: $('select[name="target"]', row).value,
             command: $('input[name="command"]', row).value.trim().replace(/^[!?.$%&#+~-]+/, ''), template: $('textarea', row).value, on: $('input[name="on"]', row).checked,
@@ -9917,12 +7517,8 @@
         const r = await botCall(bf.dataset.botForm, `/${encodeURIComponent(bf.dataset.botId)}`, { method: 'PUT', body });
         btn.disabled = false;
         if (r) { haptic('success'); toast(t('Gespeichert')); botChanged(bf.dataset.botForm, r); }
-        return;
       }
-      const tf = e.target.closest('form[data-ide-test]');
-      if (tf) { e.preventDefault(); ideTest(tf); }
     });
-    window.addEventListener('beforeunload', (e) => { if (ideDirty()) { e.preventDefault(); e.returnValue = ''; } });
     // Rollen und Discord im Server-Chat, Prüfung der Discord-Verbindungen
     document.addEventListener('click', async (e) => {
       const el = e.target.closest('[data-role-edit], [data-role-del], [data-mem-roles], [data-auto-add], [data-auto-del], [data-discord-test], [data-discord-submit], [data-discord-remove], [data-dreq-accept], [data-dreq-deny]');
@@ -10119,7 +7715,6 @@
         const on = toggleWish(ds.shopWish);
         toast(on ? t('Auf der Wunschliste') : t('Von der Wunschliste entfernt'));
         if (state.page === 'shop') renderShop();
-        if (state.page === 'profil') renderProfile();
         return;
       }
       if (ds.shopMenu !== undefined) { shop.menu = !shop.menu; renderShop(); return; }
@@ -10149,10 +7744,11 @@
 
     // Trainings und Neuigkeiten erstellen/löschen
     document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-training-del], [data-news-del], [data-nbtn-add], [data-nbtn-del]');
+      const el = e.target.closest('[data-training-del], [data-news-del], [data-news-edit], [data-nbtn-add], [data-nbtn-del]');
       if (!el) return;
       const ds = el.dataset;
       if (ds.trainingDel) deleteTraining(ds.trainingDel);
+      else if (ds.newsEdit) openModal('news-edit', ds.newsEdit);
       else if (ds.newsDel) deleteNews(ds.newsDel);
       else if ('nbtnAdd' in ds) {
         const box = $('[data-nbtns]', el.closest('form'));
