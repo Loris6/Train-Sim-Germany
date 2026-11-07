@@ -49,13 +49,16 @@ local ServerStorage = game:GetService("ServerStorage")
 local TextService = game:GetService("TextService")
 local Teams = game:GetService("Teams")
 
+-- Version dieses Skripts (die App zeigt dem Team, wenn ein Server noch eine alte Version nutzt)
+local SCRIPT_VERSION = 2
+
 local CONFIG = {
 	Backend = "https://tsg-backend.lorismziray01.workers.dev",
 	SecretName = "tsg_game_key",
 	Interval = 30,
-	-- Teams mit diesem Attribut erscheinen in der App (Wert egal)
+	-- Teams mit diesem Attribut (oder einem Werte-Objekt mit diesem Namen im Team) erscheinen in der App, Wert egal
 	TeamShowAttribute = "Extern",
-	-- Attribut am Team mit der Zahl für die Reihenfolge (1 zuerst). nil = automatisch: eines der Namen in
+	-- Attribut am Team mit der Zahl für die Reihenfolge (1 zuerst). nil = automatisch: einer der Namen in
 	-- TeamOrderNames, sonst das erste Attribut mit einer Zahl, sonst „Extern“ selbst, wenn es eine Zahl ist.
 	TeamOrderAttribute = nil,
 	TeamOrderNames = { "Order", "Reihenfolge", "Position", "Pos", "Index", "Sort", "Nummer", "Number", "Nr", "Prio", "Priority", "Rang", "Rank", "Layer", "Level", "Id", "ID" },
@@ -144,34 +147,67 @@ function Activity.read(player)
 end
 -- ===== Ende Anpassen =====
 
--- Teams für die App: Name, Farbe (#RRGGBB aus TeamColor) und Zahl für die Reihenfolge
+-- Teams für die App: Name, Farbe (#RRGGBB aus TeamColor) und Zahl für die Reihenfolge.
+-- „Extern“ und die Zahl dürfen Attribute am Team sein (Eigenschaften → Attribute) oder Werte-Objekte im Team
+-- (z. B. ein BoolValue „Extern“ und ein IntValue „Order“). Groß-/Kleinschreibung und Leerzeichen sind egal.
+local function norm(name)
+	return string.lower((string.gsub(tostring(name), "%s+", "")))
+end
+-- Wert einer Eigenschaft des Teams: erst Attribute, dann Kinder mit diesem Namen. found = gibt es sie?
+local function teamValue(team, wanted)
+	local w = norm(wanted)
+	for name, value in pairs(team:GetAttributes()) do
+		if norm(name) == w then
+			return value, true
+		end
+	end
+	for _, child in ipairs(team:GetChildren()) do
+		if norm(child.Name) == w then
+			if child:IsA("ValueBase") then
+				return child.Value, true
+			end
+			return true, true
+		end
+	end
+	return nil, false
+end
 local function teamOrder(team)
 	if CONFIG.TeamOrderAttribute then
-		return tonumber(team:GetAttribute(CONFIG.TeamOrderAttribute))
+		return tonumber((teamValue(team, CONFIG.TeamOrderAttribute)))
 	end
 	for _, name in ipairs(CONFIG.TeamOrderNames) do
-		local value = tonumber(team:GetAttribute(name))
+		local value = tonumber((teamValue(team, name)))
 		if value then
 			return value
 		end
 	end
-	local attrs = team:GetAttributes()
-	local names = {}
-	for name, value in pairs(attrs) do
-		if name ~= CONFIG.TeamShowAttribute and type(value) == "number" then
-			table.insert(names, name)
+	-- sonst: das erste Attribut bzw. Werte-Objekt mit einer Zahl (außer „Extern“), alphabetisch
+	local found = {}
+	for name, value in pairs(team:GetAttributes()) do
+		if norm(name) ~= norm(CONFIG.TeamShowAttribute) and type(value) == "number" then
+			table.insert(found, { name = name, value = value })
 		end
 	end
-	table.sort(names)
-	if names[1] then
-		return attrs[names[1]]
+	for _, child in ipairs(team:GetChildren()) do
+		if norm(child.Name) ~= norm(CONFIG.TeamShowAttribute) and (child:IsA("IntValue") or child:IsA("NumberValue")) then
+			table.insert(found, { name = child.Name, value = child.Value })
+		end
 	end
-	return tonumber(team:GetAttribute(CONFIG.TeamShowAttribute))
+	table.sort(found, function(a, b)
+		return a.name < b.name
+	end)
+	if found[1] then
+		return found[1].value
+	end
+	return tonumber((teamValue(team, CONFIG.TeamShowAttribute)))
 end
+local lastTeamReport
 local function teamList()
-	local list = {}
+	local list, names = {}, {}
 	for _, team in ipairs(Teams:GetTeams()) do
-		if team:GetAttribute(CONFIG.TeamShowAttribute) ~= nil then
+		table.insert(names, team.Name)
+		local _, shown = teamValue(team, CONFIG.TeamShowAttribute)
+		if shown then
 			local ok, hex = pcall(function()
 				return team.TeamColor.Color:ToHex()
 			end)
@@ -182,7 +218,28 @@ local function teamList()
 			})
 		end
 	end
-	return list
+	-- Im Output einmal zeigen, welche Teams in die App gehen (und warum nicht)
+	local parts = {}
+	for _, t in ipairs(list) do
+		table.insert(parts, string.format("%s (#%s, %s)", t.name, t.color or "?", t.order and tostring(t.order) or "ohne Zahl"))
+	end
+	local report
+	if #list > 0 then
+		report = "Teams für die App: " .. table.concat(parts, ", ")
+	elseif #names > 0 then
+		report = "Kein Team hat „" .. CONFIG.TeamShowAttribute .. "“ (Attribut oder Werte-Objekt im Team). Teams im Spiel: " .. table.concat(names, ", ")
+	else
+		report = "Im Teams-Service gibt es keine Teams."
+	end
+	if report ~= lastTeamReport then
+		lastTeamReport = report
+		if #list > 0 then
+			print("[TSG] " .. report)
+		else
+			warn("[TSG] " .. report)
+		end
+	end
+	return list, names
 end
 
 local RunService = game:GetService("RunService")
@@ -377,6 +434,7 @@ local function serverInfo(closing)
 		version = game.PlaceVersion,
 		private = isPrivate,
 		closing = closing == true,
+		script = SCRIPT_VERSION,
 	}
 	if isPrivate then
 		info.privateId = game.PrivateServerId
@@ -415,6 +473,7 @@ local function sync(extra, closing)
 	for _, snap in ipairs(extra or {}) do
 		table.insert(players, snap)
 	end
+	local teamsNow, teamNames = teamList()
 	local sending = done
 	done = {}
 	local sendingTrips = trips
@@ -431,7 +490,8 @@ local function sync(extra, closing)
 				done = sending,
 				server = serverInfo(closing),
 				activity = doing,
-				teams = teamList(),
+				teams = teamsNow,
+				teamNames = teamNames,
 				trips = sendingTrips,
 			}),
 		})

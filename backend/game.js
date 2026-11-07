@@ -12,7 +12,9 @@
  *   game:servers     → { <jobId>: { at, since, players, max, version, private, privateId, online, who, teams, acc, flushed } }
  *   pstats:<userId>  → eigene Statistik { minutes, trips, km, punctual, routes, vehicles, days, first, last }
  *   gstats:<Tag>     → ein Tag (Berlin) { trips, km, punctual, cats, routes: { R001: { n, ok, km } } }
- *   gstats:total     → { trips, km, punctual }
+ *   gstats:total     → { trips, km, punctual, visits, players }   visits = Beitritte auf Servern, players = verschiedene Spieler
+ *   game:teams       → letzter Stand der Teams aus dem Spiel { at, teams, names, script } (auch wenn gerade kein Server läuft)
+ *   seen:<userId>    → 1, sobald jemand zum ersten Mal auf einem Server war (für „verschiedene Spieler“)
  *   hist:online      → [[Stunde seit 1970, höchste Spielerzahl], …] der letzten 31 Tage
  *   avatar:<userId>  → Profilbild (6 Std.), friends:<userId> → IDs der Freunde (15 Min.)
  */
@@ -55,6 +57,29 @@ export function cleanTeams(list) {
   // Noch kein Team mit „Extern“: wie bisher feste Rollen
   if (!out.length) return null;
   return out.sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || a.name.localeCompare(b.name));
+}
+const cleanNames = (list) => (Array.isArray(list) ? [...new Set(list.slice(0, 60).map((x) => txt(x, 40)).filter(Boolean))] : null);
+// Letzter bekannter Stand der Teams (für Server mit altem Skript und wenn gerade niemand spielt)
+export async function knownTeams(store) {
+  const k = await store.get('game:teams');
+  return k && Array.isArray(k.teams) && k.teams.length ? k.teams : null;
+}
+// Besuche selbst zählen (Roblox zeigt sie für private oder nicht freigegebene Spiele nicht): jeder Beitritt auf einem
+// Server = 1 Besuch, dazu verschiedene Spieler
+async function countVisits(store, ids, t) {
+  if (!ids.length) return;
+  const day = dayKey(t);
+  const g = (await store.get(`gstats:${day}`)) || { trips: 0, km: 0, punctual: 0, cats: {}, routes: {} };
+  const total = (await store.get('gstats:total')) || { trips: 0, km: 0, punctual: 0 };
+  g.visits = (g.visits || 0) + ids.length;
+  total.visits = (total.visits || 0) + ids.length;
+  for (const id of ids) {
+    if (await store.get(`seen:${id}`)) continue;
+    await store.put(`seen:${id}`, 1);
+    total.players = (total.players || 0) + 1;
+  }
+  await store.put(`gstats:${day}`, g, { ttl: 40 * 86400 });
+  await store.put('gstats:total', total);
 }
 // Team, dessen Spieler Bahnhöfe abfertigen (Attribut mit der Zahl 2)
 export const DISPATCH_ORDER = 2;
@@ -172,9 +197,14 @@ export async function recordServer(store, servers, jobId, sv, body, online, cata
     servers[jobId] = {
       at: t, since: (prev && prev.since) || t, players: Math.max(0, Math.round(+sv.players || online.length)), max: Math.max(0, Math.round(+sv.max || 0)),
       version: Math.round(+sv.version) || null, private: sv.private === true, privateId: sv.privateId ? clip(sv.privateId, 64) : null,
-      online, who: cleanWho(body.activity, online), teams: cleanTeams(body.teams), acc, flushed,
+      online, who: cleanWho(body.activity, online), teams: cleanTeams(body.teams), script: Math.round(+sv.script) || null, acc, flushed,
     };
   }
+  // Was das Spiel zu Teams meldet, merken – auch leer (dann zeigt die App dem Team, woran es liegt)
+  if (Array.isArray(body.teams) && !sv.closing) {
+    await store.put('game:teams', { at: t, teams: cleanTeams(body.teams) || [], names: cleanNames(body.teamNames) || [], script: Math.round(+sv.script) || null, jobId });
+  }
+  await countVisits(store, sv.closing ? [] : joined, t);
   await recordTrips(store, cleanTrips(body.trips, catalog), t);
   // Wer kam, wer ging (mit Namen) – für Automationen in Server-Chats (chat.js → gameEvents)
   const names = new Map([...((prev && prev.who) || []), ...((servers[jobId] && servers[jobId].who) || [])].map((w) => [w.id, w]));
@@ -288,18 +318,19 @@ const pserverLite = (p) => (p ? { id: p.id, name: p.name, ownerName: p.ownerName
 
 // Teams des Servers mit Spielerzahl (null = das Spiel meldet noch keine Teams, dann gelten die festen Rollen)
 const sameTeam = (a, b) => String(a || '').toLowerCase() === String(b || '').toLowerCase();
-function teamsOf(s, who) {
-  if (!Array.isArray(s.teams)) return null;
-  return s.teams.map((x) => ({ ...x, n: who.filter((w) => sameTeam(w.team, x.name)).length }));
+function teamsOf(s, who, known) {
+  const list = Array.isArray(s.teams) ? s.teams : known;
+  if (!Array.isArray(list)) return null;
+  return list.map((x) => ({ ...x, n: who.filter((w) => sameTeam(w.team, x.name)).length }));
 }
 // Reihenfolge der Teams: wer in einem gemeldeten Team ist, steht in dessen Reihenfolge, die anderen danach
 function byTeam(who, teams) {
   const rank = (w) => { const i = teams.findIndex((x) => sameTeam(x.name, w.team)); return i < 0 ? 1e6 : i; };
   return [...who].sort((a, b) => rank(a) - rank(b));
 }
-function serverOut(jobId, s, p, full) {
+function serverOut(jobId, s, p, full, known = null) {
   const who = s.who || (s.online || []).map((id) => ({ id, role: 'Passenger' }));
-  const teams = teamsOf(s, who);
+  const teams = teamsOf(s, who, known);
   const people = teams ? byTeam(who, teams) : byRole(who);
   return {
     id: jobId, private: !!s.private, players: s.players, max: s.max, version: s.version, since: s.since || s.at, at: s.at,
@@ -333,14 +364,18 @@ export async function serverOf(store, viewer, sub) {
 }
 
 // Alle Teams über alle laufenden Server: Farbe und Reihenfolge vom zuletzt gemeldeten Server, Spieler zusammengezählt
-function allTeams(list) {
-  const map = new Map();
+function allTeams(list, known = null) {
+  const map = new Map((known || []).map((x) => [x.name.toLowerCase(), { ...x, n: 0 }]));
   for (const s of [...list].sort((a, b) => a.at - b.at)) {
     const who = s.who || [];
     for (const x of s.teams || []) {
       const k = x.name.toLowerCase();
       const old = map.get(k);
       map.set(k, { name: x.name, color: x.color, order: x.order, n: (old ? old.n : 0) + who.filter((w) => sameTeam(w.team, x.name)).length });
+    }
+    // Server mit altem Skript: Spieler den bekannten Teams zuordnen
+    if (!Array.isArray(s.teams)) {
+      for (const [k, x] of map) x.n += who.filter((w) => w.team && w.team.toLowerCase() === k).length;
     }
   }
   return [...map.values()].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || a.name.localeCompare(b.name));
@@ -359,17 +394,18 @@ function liveRoles(list) {
 // GET /api/servers – alle laufenden Server, die man sehen darf
 export async function serversView(store, env, user) {
   const list = await visibleServers(store, user);
-  const shown = list.filter((x) => !x.hidden).map((x) => serverOut(x.jobId, x.s, x.p, false))
+  const known = await knownTeams(store);
+  const shown = list.filter((x) => !x.hidden).map((x) => serverOut(x.jobId, x.s, x.p, false, known))
     .sort((a, b) => a.private - b.private || b.players - a.players);
   const avatars = await avatarsOf(store, env, shown.flatMap((s) => s.people.map((x) => x.id)));
-  return { servers: shown, avatars, teams: allTeams(list.map((x) => x.s)), online: list.reduce((n, x) => n + (x.s.players || 0), 0), hidden: list.filter((x) => x.hidden).length, at: Date.now() };
+  return { servers: shown, avatars, teams: allTeams(list.map((x) => x.s), known), online: list.reduce((n, x) => n + (x.s.players || 0), 0), hidden: list.filter((x) => x.hidden).length, at: Date.now() };
 }
 
 // GET /api/servers/<jobId> – ein Server mit allen Spielern und Zügen
 export async function serverDetail(store, env, user, jobId) {
   const hit = (await visibleServers(store, user)).find((x) => x.jobId === jobId && !x.hidden);
   if (!hit) throw Object.assign(new Error('not_found'), { status: 404 });
-  const sv = serverOut(hit.jobId, hit.s, hit.p, true);
+  const sv = serverOut(hit.jobId, hit.s, hit.p, true, await knownTeams(store));
   return { server: sv, avatars: await avatarsOf(store, env, sv.people.map((x) => x.id)) };
 }
 
@@ -438,7 +474,7 @@ export async function gameStats(store) {
     hours: (await store.get('hist:online')) || [],
     live: {
       servers: live.length, players: live.reduce((n, [, s]) => n + (s.players || 0), 0), trains: trainsOf(who).length,
-      ...liveRoles(live.map(([, s]) => s)), teams: allTeams(live.map(([, s]) => s)),
+      ...liveRoles(live.map(([, s]) => s)), teams: allTeams(live.map(([, s]) => s), await knownTeams(store)),
     },
     at: t,
   };

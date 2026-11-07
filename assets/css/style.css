@@ -3094,6 +3094,12 @@ button.sp-row:hover .sp-row__chev { transform: translateX(2px); }
 .game-link { display: flex; gap: 12px; margin-bottom: 16px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); border-radius: var(--r-sm); background: color-mix(in srgb, var(--warn) 8%, var(--surface)); }
 .game-link.is-ok { align-items: center; gap: 8px; padding: 10px 14px; border-color: var(--line); background: var(--surface); font-size: 14px; color: var(--text-2); }
 .game-link.is-ok .ic { color: var(--ok); }
+.game-link--teams { align-items: flex-start; gap: 8px; padding: 10px 14px; font-size: 14px; color: var(--text-2); }
+.game-link--teams .ic { margin-top: 2px; color: var(--warn); }
+.game-link--teams.is-ok .ic { color: var(--ok); }
+.tstat { display: inline-flex; align-items: center; gap: 5px; margin: 2px 8px 2px 0; color: var(--ink); font-weight: 600; }
+.tstat i { width: 9px; height: 9px; border-radius: 50%; background: var(--rc); }
+.tstat small { color: var(--muted); font-weight: 500; }
 .game-link__ic { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--warn-soft); color: var(--warn); }
 .game-link__body { min-width: 0; display: grid; gap: 6px; }
 .game-link__body b { color: var(--ink); font-size: 15px; }

@@ -60,7 +60,11 @@ export async function liveStats(store, env, robloxUrl) {
         robloxJson(robloxUrl, env, 'games', `/v1/games/${universe}/favorites/count`),
       ]);
       const game = games.status === 'fulfilled' ? ((games.value && games.value.data) || [])[0] : null;
-      if (game) { set('playing', game.playing); set('visits', game.visits); set('favorites', game.favoritedCount); }
+      if (game) {
+        // Privat oder ohne Altersfreigabe: Roblox nennt dann weder Namen noch Besuche (alles 0)
+        out.restricted = !!game.isContentRestricted || game.name === '[TITLE UNAVAILABLE]';
+        if (!out.restricted) { set('playing', game.playing); set('visits', game.visits); set('favorites', game.favoritedCount); }
+      }
       // Eigene Abfrage für Favoriten: genauer und auch dann, wenn die Spieldaten fehlen
       if (favs.status === 'fulfilled' && favs.value) set('favorites', favs.value.favoritesCount);
     }),

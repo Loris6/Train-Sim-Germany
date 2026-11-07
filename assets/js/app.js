@@ -391,7 +391,7 @@
     }
     const box = $('[data-kpis="stats"]');
     box.innerHTML = [
-      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L, ic: 'fi-rr-gamepad', key: 'st-visits' }),
+      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L && !s.restricted, note: t('vom Spiel gezählt'), ic: 'fi-rr-gamepad', key: 'st-visits' }),
       kpi({ label: t('Favoriten'), num: s.favorites, format: 'exact', live: L, ic: 'fi-rr-star', key: 'st-favs' }),
       kpi({ label: t('Gruppenmitglieder'), num: s.groupMembers, format: 'compact', live: L, ic: 'fi-rr-users-alt', key: 'st-group' }),
       kpi({ label: 'Discord', num: s.discordMembers, format: 'compact', live: L, ic: 'fi-brands-discord', key: 'st-discord' }),
@@ -1010,6 +1010,27 @@
     try { gstat.data = await api('/api/game/status'); } catch (e) { gstat.data = null; }
     if (state.page === 'server' && !state.serverId) renderServers();
   }
+  // Teams aus dem Spiel (nur fürs Team): kommen sie an, und wenn nicht, woran liegt es?
+  function teamsStatusHtml(g) {
+    const k = g.teams;
+    const old = (g.scripts || []).some((v) => v < (g.script || 2));
+    let cls = 'is-ok';
+    let body;
+    if (!k) {
+      cls = 'is-warn';
+      body = t('Das Spiel hat noch keine Teams gemeldet. Im Spiel läuft noch das alte Skript – das neue TSGAppSync einfügen, veröffentlichen und einen neuen Server starten.');
+    } else if (!k.teams.length) {
+      cls = 'is-warn';
+      body = k.names.length
+        ? t('Kein Team hat „Extern“ (als Attribut oder als Werte-Objekt im Team). Teams im Spiel: {list}', { list: k.names.map(esc).join(', ') })
+        : t('Im Teams-Service des Spiels gibt es keine Teams.');
+    } else {
+      const dot = (x) => `<span class="tstat"><i style="--rc:${esc(teamColor(x))}"></i>${esc(x.name)}${x.order != null ? ` <small>${esc(String(x.order))}</small>` : ''}</span>`;
+      body = `${t('Teams aus dem Spiel ({when}):', { when: agoText(k.at) })} ${k.teams.map(dot).join('')}${k.teams.some((x) => Number(x.order) === DISPATCH_ORDER) ? '' : `<br>${t('Kein Team hat die Zahl 2 – die Abfertigung bleibt leer.')}`}`;
+    }
+    if (old) { cls = 'is-warn'; body += `<br>${t('Mindestens ein laufender Server nutzt noch eine alte Version des Skripts.')}`; }
+    return `<p class="game-link game-link--teams ${cls}">${icon(cls === 'is-ok' ? 'fi-rr-users-alt' : 'fi-rr-triangle-warning')}<span>${body}</span></p>`;
+  }
   function gameStatusHtml() {
     if (!isTeam('Public Relations Department')) return '';
     loadGameStatus();
@@ -1018,7 +1039,7 @@
     const fresh = g.lastSync && Date.now() - g.lastSync < 10 * 60000;
     const rejected = g.lastReject && (!g.lastSync || g.lastReject.at > g.lastSync);
     if (g.configured && fresh && !rejected) {
-      return `<p class="game-link is-ok">${icon('fi-sr-check-circle')}<span>${t('Verbindung zum Spiel steht · letzte Meldung {when}', { when: agoText(g.lastSync) })}</span></p>`;
+      return `<p class="game-link is-ok">${icon('fi-sr-check-circle')}<span>${t('Verbindung zum Spiel steht · letzte Meldung {when}', { when: agoText(g.lastSync) })}</span></p>${teamsStatusHtml(g)}`;
     }
     const host = esc(String(API).replace(/^https?:\/\//, ''));
     const steps = `<ol class="game-link__steps">
@@ -1062,7 +1083,7 @@
       text = t('Letzte Meldung {when}. Läuft gerade ein Server mit TSGAppSync?', { when: agoText(g.lastSync) });
       help = script;
     }
-    return `<div class="game-link"><span class="game-link__ic">${icon('fi-rr-triangle-warning')}</span><div class="game-link__body"><b>${title}</b><p>${text}</p>${help}<small>${t('Nur für das Team sichtbar.')}</small></div></div>`;
+    return `<div class="game-link"><span class="game-link__ic">${icon('fi-rr-triangle-warning')}</span><div class="game-link__body"><b>${title}</b><p>${text}</p>${help}<small>${t('Nur für das Team sichtbar.')}</small></div></div>${g.lastSync ? teamsStatusHtml(g) : ''}`;
   }
 
   // Alle Spieler eines Servers (Sheet)
@@ -6094,6 +6115,9 @@
   function applyStats(s) {
     const st = D.stats;
     ['groupMembers', 'visits', 'favorites', 'discordMembers', 'discordOnline'].forEach((k) => { if (Number.isFinite(s[k])) st[k] = s[k]; });
+    // Roblox verbirgt Besuche bei privaten bzw. nicht freigegebenen Spielen: dann zählt das Spiel selbst (jeder Beitritt)
+    st.restricted = !!s.restricted;
+    if (s.counted && Number.isFinite(s.counted.visits)) st.visits = Math.max(st.visits || 0, s.counted.visits);
     if (Number.isFinite(s.playing)) { st.online = s.playing; state.online = s.playing; state.liveOnline = true; }
     if (Array.isArray(s.roles)) {
       const counts = {};

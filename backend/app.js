@@ -331,12 +331,18 @@ export async function handle(req, env, store) {
       return json(req, env, { ok: true, login: loginReady(env), applications: true, discord: !!env.DISCORD_WEBHOOK_URL, results: !!env.DISCORD_RESULTS_WEBHOOK_URL, push: true, chat: true, mail: mailReady(env), game: !!env.GAME_API_KEY, group: groupId(env) });
     }
     if (path === '/api/content' && m === 'GET') return json(req, env, await getContent(store));
-    if (path === '/api/stats' && m === 'GET') return json(req, env, await liveStats(store, env, robloxUrl));
+    if (path === '/api/stats' && m === 'GET') {
+      // Roblox-Zahlen plus das, was das Spiel selbst meldet (Spieler online, gezählte Besuche)
+      const [s, online, total] = await Promise.all([liveStats(store, env, robloxUrl), liveOnline(store), store.get('gstats:total')]);
+      return json(req, env, { ...s, playing: Math.max(s.playing || 0, online), counted: { visits: (total && total.visits) || 0, players: (total && total.players) || 0 } });
+    }
     if (path === '/api/gamestats' && m === 'GET') return json(req, env, await gameStats(store));
     if (path === '/api/game/status' && m === 'GET') {
       const [last, reject, servers] = await Promise.all([store.get('game:last'), store.get('game:reject'), store.get('game:servers')]);
       const live = Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).length;
-      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live });
+      const teams = await store.get('game:teams');
+      const scripts = [...new Set(Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).map((x) => x.script || 1))];
+      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live, teams: teams || null, scripts, script: 2 });
     }
     const file = path.match(/^\/api\/files\/([\w-]+)$/);
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
