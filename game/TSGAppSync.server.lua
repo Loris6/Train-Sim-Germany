@@ -50,7 +50,7 @@ local TextService = game:GetService("TextService")
 local Teams = game:GetService("Teams")
 
 -- Version dieses Skripts (die App zeigt dem Team, wenn ein Server noch eine alte Version nutzt)
-local SCRIPT_VERSION = 2
+local SCRIPT_VERSION = 3
 
 local CONFIG = {
 	Backend = "https://tsg-backend.lorismziray01.workers.dev",
@@ -171,35 +171,61 @@ local function teamValue(team, wanted)
 	end
 	return nil, false
 end
+-- Zahl für die Reihenfolge und woher sie kommt (auch als Text, z. B. „2“)
+local function asNumber(value)
+	if type(value) == "number" then
+		return value
+	end
+	if type(value) == "string" then
+		return tonumber((string.gsub(value, "%s+", "")))
+	end
+	return nil
+end
 local function teamOrder(team)
 	if CONFIG.TeamOrderAttribute then
-		return tonumber((teamValue(team, CONFIG.TeamOrderAttribute)))
+		return asNumber((teamValue(team, CONFIG.TeamOrderAttribute))), CONFIG.TeamOrderAttribute
 	end
 	for _, name in ipairs(CONFIG.TeamOrderNames) do
-		local value = tonumber((teamValue(team, name)))
+		local value = asNumber((teamValue(team, name)))
 		if value then
-			return value
+			return value, name
 		end
 	end
 	-- sonst: das erste Attribut bzw. Werte-Objekt mit einer Zahl (außer „Extern“), alphabetisch
 	local found = {}
 	for name, value in pairs(team:GetAttributes()) do
-		if norm(name) ~= norm(CONFIG.TeamShowAttribute) and type(value) == "number" then
-			table.insert(found, { name = name, value = value })
+		if norm(name) ~= norm(CONFIG.TeamShowAttribute) and asNumber(value) then
+			table.insert(found, { name = name, value = asNumber(value) })
 		end
 	end
 	for _, child in ipairs(team:GetChildren()) do
-		if norm(child.Name) ~= norm(CONFIG.TeamShowAttribute) and (child:IsA("IntValue") or child:IsA("NumberValue")) then
-			table.insert(found, { name = child.Name, value = child.Value })
+		if norm(child.Name) ~= norm(CONFIG.TeamShowAttribute) and child:IsA("ValueBase") and asNumber(child.Value) then
+			table.insert(found, { name = child.Name, value = asNumber(child.Value) })
 		end
 	end
 	table.sort(found, function(a, b)
 		return a.name < b.name
 	end)
 	if found[1] then
-		return found[1].value
+		return found[1].value, found[1].name
 	end
-	return tonumber((teamValue(team, CONFIG.TeamShowAttribute)))
+	local ext = asNumber((teamValue(team, CONFIG.TeamShowAttribute)))
+	if ext then
+		return ext, CONFIG.TeamShowAttribute
+	end
+	return nil, nil
+end
+-- Was am Team hängt (Attribute und Werte-Objekte mit Typ) – damit die App zeigen kann, warum die Zahl fehlt
+local function teamKeys(team)
+	local keys = {}
+	for name, value in pairs(team:GetAttributes()) do
+		table.insert(keys, name .. ":" .. typeof(value))
+	end
+	for _, child in ipairs(team:GetChildren()) do
+		table.insert(keys, child.Name .. ":" .. child.ClassName)
+	end
+	table.sort(keys)
+	return keys
 end
 local lastTeamReport
 local function teamList()
@@ -211,17 +237,20 @@ local function teamList()
 			local ok, hex = pcall(function()
 				return team.TeamColor.Color:ToHex()
 			end)
+			local order, source = teamOrder(team)
 			table.insert(list, {
 				name = team.Name,
 				color = ok and hex or nil,
-				order = teamOrder(team),
+				order = order,
+				source = source,
+				keys = teamKeys(team),
 			})
 		end
 	end
 	-- Im Output einmal zeigen, welche Teams in die App gehen (und warum nicht)
 	local parts = {}
 	for _, t in ipairs(list) do
-		table.insert(parts, string.format("%s (#%s, %s)", t.name, t.color or "?", t.order and tostring(t.order) or "ohne Zahl"))
+		table.insert(parts, string.format("%s (#%s, %s)", t.name, t.color or "?", t.order and (tostring(t.order) .. " aus „" .. tostring(t.source) .. "“") or ("ohne Zahl – am Team: " .. table.concat(t.keys, ", "))))
 	end
 	local report
 	if #list > 0 then

@@ -342,7 +342,7 @@ export async function handle(req, env, store) {
       const live = Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).length;
       const teams = await store.get('game:teams');
       const scripts = [...new Set(Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).map((x) => x.script || 1))];
-      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live, teams: teams || null, scripts, script: 2 });
+      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live, teams: teams || null, scripts, script: 3 });
     }
     const file = path.match(/^\/api\/files\/([\w-]+)$/);
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));

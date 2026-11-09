@@ -52,7 +52,7 @@ export function cleanTeams(list) {
     seen.add(name.toLowerCase());
     const hex = String((x && x.color) || '').replace(/^#/, '');
     const order = Number(x && x.order);
-    out.push({ name, color: /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toUpperCase()}` : null, order: Number.isFinite(order) ? Math.max(-999, Math.min(999, order)) : null });
+    out.push({ name, color: /^[0-9a-f]{6}$/i.test(hex) ? `#${hex.toUpperCase()}` : null, order: x.order != null && Number.isFinite(order) ? Math.max(-999, Math.min(999, order)) : null });
   }
   // Noch kein Team mit „Extern“: wie bisher feste Rollen
   if (!out.length) return null;
@@ -202,7 +202,9 @@ export async function recordServer(store, servers, jobId, sv, body, online, cata
   }
   // Was das Spiel zu Teams meldet, merken – auch leer (dann zeigt die App dem Team, woran es liegt)
   if (Array.isArray(body.teams) && !sv.closing) {
-    await store.put('game:teams', { at: t, teams: cleanTeams(body.teams) || [], names: cleanNames(body.teamNames) || [], script: Math.round(+sv.script) || null, jobId });
+    // keys: was am Team hängt (Attribute, Werte-Objekte) – zeigt dem Team, warum z. B. die Zahl fehlt
+    const keys = Object.fromEntries(body.teams.slice(0, 40).filter((x) => x && txt(x.name, 40)).map((x) => [txt(x.name, 40), cleanNames(x.keys) || []]));
+    await store.put('game:teams', { at: t, teams: cleanTeams(body.teams) || [], names: cleanNames(body.teamNames) || [], keys, script: Math.round(+sv.script) || null, jobId });
   }
   await countVisits(store, sv.closing ? [] : joined, t);
   await recordTrips(store, cleanTrips(body.trips, catalog), t);

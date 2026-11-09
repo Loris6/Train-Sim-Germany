@@ -839,7 +839,13 @@
     }
     return [...GAME_ROLES].reverse().map((r) => ({ key: r, name: r, color: roleRank(r).color, sub: t(ROLE_LABEL[r]), list: people.filter((p) => p.role === r) })).filter((g) => g.list.length);
   }
-  const dispatchTeam = (teams) => (Array.isArray(teams) ? teams.find((x) => Number(x.order) === DISPATCH_ORDER) || null : null);
+  // Abfertigung: Team mit der Zahl 2; meldet das Spiel gar keine Zahlen, das Team für Bahnsteigpersonal (z. B. „Platform Staff“)
+  function dispatchTeam(teams) {
+    if (!Array.isArray(teams)) return null;
+    const two = teams.find((x) => x.order != null && Number(x.order) === DISPATCH_ORDER);
+    if (two) return two;
+    return teams.every((x) => x.order == null) ? teams.find((x) => roleOfTeam(x.name) === 'Platform Staff') || null : null;
+  }
   async function loadLive(force = false) {
     if (!liveMode() || live.busy || (!force && live.data && Date.now() - live.at < 25000)) return;
     live.busy = true;
@@ -1013,7 +1019,7 @@
   // Teams aus dem Spiel (nur fürs Team): kommen sie an, und wenn nicht, woran liegt es?
   function teamsStatusHtml(g) {
     const k = g.teams;
-    const old = (g.scripts || []).some((v) => v < (g.script || 2));
+    const old = (g.scripts || []).some((v) => v < (g.script || 3)) || (k && (k.script || 1) < (g.script || 3));
     let cls = 'is-ok';
     let body;
     if (!k) {
@@ -1026,9 +1032,14 @@
         : t('Im Teams-Service des Spiels gibt es keine Teams.');
     } else {
       const dot = (x) => `<span class="tstat"><i style="--rc:${esc(teamColor(x))}"></i>${esc(x.name)}${x.order != null ? ` <small>${esc(String(x.order))}</small>` : ''}</span>`;
-      body = `${t('Teams aus dem Spiel ({when}):', { when: agoText(k.at) })} ${k.teams.map(dot).join('')}${k.teams.some((x) => Number(x.order) === DISPATCH_ORDER) ? '' : `<br>${t('Kein Team hat die Zahl 2 – die Abfertigung bleibt leer.')}`}`;
+      body = `${t('Teams aus dem Spiel ({when}):', { when: agoText(k.at) })} ${k.teams.map(dot).join('')}`;
+      if (k.teams.every((x) => x.order == null)) {
+        cls = 'is-warn';
+        const keys = k.keys ? k.teams.map((x) => `${esc(x.name)}: ${(k.keys[x.name] || []).map(esc).join(', ') || '–'}`).join(' · ') : '';
+        body += `<br>${t('Keine Zahl für die Reihenfolge gefunden – die Teams stehen alphabetisch, die Abfertigung nutzt das Team für Bahnsteigpersonal.')}${keys ? `<br><small>${t('Am Team gefunden:')} ${keys}</small>` : ''}`;
+      } else if (!k.teams.some((x) => x.order != null && Number(x.order) === DISPATCH_ORDER)) body += `<br>${t('Kein Team hat die Zahl 2 – die Abfertigung bleibt leer.')}`;
     }
-    if (old) { cls = 'is-warn'; body += `<br>${t('Mindestens ein laufender Server nutzt noch eine alte Version des Skripts.')}`; }
+    if (old) { cls = 'is-warn'; body += `<br>${t('Im Spiel läuft noch eine alte Version von TSGAppSync (Version {v}, aktuell {now}) – neues Skript einfügen und veröffentlichen.', { v: (k && k.script) || 1, now: g.script || 3 })}`; }
     return `<p class="game-link game-link--teams ${cls}">${icon(cls === 'is-ok' ? 'fi-rr-users-alt' : 'fi-rr-triangle-warning')}<span>${body}</span></p>`;
   }
   function gameStatusHtml() {
