@@ -7,7 +7,7 @@
 
   Echtzeit (K.Echtzeit = true):
   • Rang aus der Roblox-Gruppe (Kürzel in eckigen Klammern, „[QD] Qualified Driver“), nicht in der Gruppe = Guest.
-  • XP aus player.playerStats.Ehrfahrung, Spielzeit zählt dieses Skript selbst.
+  • XP aus player.playerStats.Erfahrung, Spielzeit zählt dieses Skript selbst.
   • Theorie: höchstens 10 Fragen, gewichtet, Bestehen ab 90 %. Nicht bestanden = genau 4 Tage gesperrt.
   • Warteschlange: Wer die Theorie besteht, bekommt eine Nummer (#1902). Jeder Server rechnet daraus dieselbe
     Zuteilung: kleinste Nummer → frühestes Training seines Rangs mit freiem Platz, jeder steht in genau einem Training.

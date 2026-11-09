@@ -390,11 +390,15 @@ local function statusBild(row)
 	end
 	return box and box:FindFirstChildOfClass("ImageLabel")
 end
+-- Zeile = Frame oder CanvasGroup mit „A1“ (die Klasse ist egal)
+local function istZeile(c)
+	return c:IsA("GuiObject") and c:FindFirstChild("A1") ~= nil
+end
 local reqVorlage, bildFertig, bildOffen
 if aListe then
 	local zeileFertig, zeileOffen
 	for _, row in ipairs(aListe:GetChildren()) do
-		if row:IsA("CanvasGroup") then
+		if istZeile(row) then
 			if row:FindFirstChild("Frame") then
 				zeileOffen = zeileOffen or row
 			else
@@ -409,7 +413,7 @@ if aListe then
 	reqVorlage = (zeileOffen or zeileFertig)
 	reqVorlage = reqVorlage and reqVorlage:Clone()
 	for _, row in ipairs(aListe:GetChildren()) do
-		if row:IsA("CanvasGroup") then
+		if istZeile(row) then
 			row:Destroy()
 		end
 	end
@@ -900,12 +904,15 @@ end
 local vorlageZugewiesen, vorlageNormal, trenner
 local farbeZugewiesen, farbeNormal = "#ffff7f", "#00ff5e"
 if cListe then
+	-- Zeile = Frame oder CanvasGroup mit „Btn“, ohne „Btn“ = Trennlinie (die Klasse ist egal)
 	local zeilen = {}
 	for _, c in ipairs(cListe:GetChildren()) do
-		if c:IsA("CanvasGroup") then
-			table.insert(zeilen, c)
-		elseif c:IsA("Frame") then
-			trenner = trenner or c
+		if c:IsA("GuiObject") then
+			if c:FindFirstChild("Btn") then
+				table.insert(zeilen, c)
+			else
+				trenner = trenner or c
+			end
 		end
 	end
 	table.sort(zeilen, function(a, b)
@@ -1154,6 +1161,7 @@ end
 -- ===== Training öffnen und schließen =====
 local trainingPos = Training.Position
 local buttonsPos = Buttons and Buttons.Position
+local buttonsBlenden = Buttons ~= nil and Buttons:IsA("CanvasGroup") -- nur eine CanvasGroup kann ausblenden, ein Frame gleitet nur
 local wechselt = false
 local function schliessen()
 	if wechselt then
@@ -1164,10 +1172,12 @@ local function schliessen()
 	Training.Visible = false
 	Training.Position = trainingPos
 	if Buttons then
-		Buttons.GroupTransparency = 1
 		Buttons.Position = buttonsPos + UDim2.fromOffset(-40, 0)
+		if buttonsBlenden then
+			Buttons.GroupTransparency = 1
+		end
 		Buttons.Visible = true
-		tween(Buttons, 0.45, { GroupTransparency = 0, Position = buttonsPos })
+		tween(Buttons, 0.45, buttonsBlenden and { GroupTransparency = 0, Position = buttonsPos } or { Position = buttonsPos })
 	end
 	wechselt = false
 end
@@ -1177,10 +1187,12 @@ local function oeffnen()
 	end
 	wechselt = true
 	if Buttons and Buttons.Visible then
-		tween(Buttons, 0.25, { GroupTransparency = 1, Position = buttonsPos + UDim2.fromOffset(-40, 0) }).Completed:Wait()
+		tween(Buttons, 0.25, buttonsBlenden and { GroupTransparency = 1, Position = buttonsPos + UDim2.fromOffset(-40, 0) } or { Position = buttonsPos + UDim2.fromOffset(-40, 0) }).Completed:Wait()
 		Buttons.Visible = false
 		Buttons.Position = buttonsPos
-		Buttons.GroupTransparency = 0
+		if buttonsBlenden then
+			Buttons.GroupTransparency = 0
+		end
 	end
 	Training.Position = trainingPos + UDim2.fromOffset(0, 40)
 	Training.Visible = true

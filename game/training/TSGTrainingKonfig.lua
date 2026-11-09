@@ -8,7 +8,7 @@
   Neue Anforderung oder Frage: einfach eine Zeile kopieren und anpassen.
   Anforderungen (Typ):
     "Gruppe"     – Mitglied der Roblox-Gruppe (Zeile antippen = der Gruppe beitreten)
-    "XP"         – Menge = nötige XP (aus player.playerStats.Ehrfahrung, siehe K.XP)
+    "XP"         – Menge = nötige XP (aus player.playerStats.Erfahrung, siehe K.XP)
     "Spielzeit"  – Stunden = nötige Spielzeit im Spiel (wird vom Server mitgezählt)
     "ImRang"     – Tage = so lange schon im aktuellen Rang
     "Attribut"   – Name = Attribut am Spieler, Wert = Zahl (mindestens) oder true/Text (genau)
@@ -37,7 +37,7 @@ K.Bestehensgrenze = 0.9 -- Anteil der Punkte zum Bestehen (0.9 = mindestens 90 %
 K.MaxFragen = 10 -- höchstens so viele Fragen pro Versuch (bei mehr Fragen im Pool zufällig ausgewählt)
 K.Sperre = 4 * 24 * 3600 -- Sperrfrist nach nicht bestandener Theorie in Sekunden (exakt ab Absenden)
 K.JoinVorher = 15 * 60 -- der Trainingsserver öffnet so viele Sekunden vor Beginn
-K.XP = { Ordner = "playerStats", Wert = "Ehrfahrung" }
+K.XP = { Ordner = "playerStats", Wert = "Erfahrung" }
 
 -- Ränge wie in der Roblox-Gruppe („[QD] Qualified Driver“). Team = Name des Teams in Studio: dessen TeamColor wird
 -- genommen (ändert sich die Teamfarbe in Studio, ändert sie sich auch hier). Farbe = Ersatz ohne passendes Team.
