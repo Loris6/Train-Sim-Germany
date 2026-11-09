@@ -559,4 +559,9 @@ window.TSG_I18N.pl = {
   "Supervisors": "Supervisorzy",
   "Supervisors (optional)": "Supervisorzy (opcjonalnie)",
   "Roblox-Namen, mit Komma getrennt": "Nazwy Roblox, oddzielone przecinkami",
+  "Fahr als {team} mit.": "Jedź jako {team}.",
+  "Ganz ohne Training: Steig an einem Bahnhof ein, fahr durch den Osten von Magdeburg bis Warschau und schau den Teams bei der Arbeit zu.": "Bez szkolenia: wsiądź na dowolnej stacji, jedź przez wschód od Magdeburga do Warszawy i patrz, jak pracują drużyny.",
+  "Spiel im Team {team}.": "Graj w drużynie {team}.",
+  "Wähle im Spiel das Team {team} und leg los.": "Wybierz w grze drużynę {team} i zaczynaj.",
+  "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> teraz w drużynie {team}",
 };

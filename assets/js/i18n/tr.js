@@ -559,4 +559,9 @@ window.TSG_I18N.tr = {
   "Supervisors": "Süpervizörler",
   "Supervisors (optional)": "Süpervizörler (isteğe bağlı)",
   "Roblox-Namen, mit Komma getrennt": "Roblox adları, virgülle ayrılmış",
+  "Fahr als {team} mit.": "{team} olarak yolculuk et.",
+  "Ganz ohne Training: Steig an einem Bahnhof ein, fahr durch den Osten von Magdeburg bis Warschau und schau den Teams bei der Arbeit zu.": "Eğitim gerekmez: herhangi bir istasyondan bin, Magdeburg’dan Varşova’ya doğuyu gez ve takımları iş başında izle.",
+  "Spiel im Team {team}.": "{team} takımında oyna.",
+  "Wähle im Spiel das Team {team} und leg los.": "Oyunda {team} takımını seç ve başla.",
+  "<b>{n}</b> gerade im Team {team}": "Şu anda {team} takımında <b>{n}</b> kişi",
 };

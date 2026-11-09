@@ -527,8 +527,9 @@
   // Einstieg und Rollen (Startseite)
   function renderRoles() {
     const rk = (name, color) => `<b class="rk" style="--rc:${esc(color || rankOf(name).color)}">${esc(name)}</b>`;
-    const fill = (text, rank, color) => esc(t(text))
+    const fill = (text, rank, color, team = rank) => esc(t(text))
       .replace(/\{rank\}/g, rk(rank, color))
+      .replace(/\{team\}/g, rk(team, color))
       .replace('{group}', `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Train Sim Germany Gruppe auf Roblox')}${icon('fi-rr-arrow-up-right-from-square')}</a>`);
     const start = `<article class="role-card role-card--start">
       <div class="role-card__media"><img src="assets/img/group.svg" alt="${esc(t('Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug'))}" loading="lazy"></div>
@@ -544,19 +545,38 @@
         </div>
       </div>
     </article>`;
-    $('[data-roles]').innerHTML = start + D.roleCards.map((c) => {
-      const x = inGameRole(c.rank);
-      // Team aus Studio (Name und TeamColor), das zu dieser Rolle gehört – kommt live vom Spiel, nichts im Code pflegen
-      const team = x.team ? `<span class="role-card__team" style="--rc:${esc(x.color)};--ink:${inkOn(x.color)}" title="${esc(t('Team im Spiel'))}"><i aria-hidden="true"></i>${esc(x.team)}</span>` : '';
+    // Eine Karte je Team aus Studio (Attribut „Extern“), in der Reihenfolge aus Studio, mit Name, TeamColor und Spielerzahl.
+    // Text und Bild kommen aus data.js → roleCards (passend zum Team, z. B. „Driver“ → Qualified Driver).
+    // Ohne Teams aus dem Spiel (kein Backend): die Karten aus data.js mit den Rollen.
+    const teams = liveTeams();
+    const karten = teams.length
+      ? teams.map((tm) => ({ c: cardOf(tm.name), name: tm.name, color: teamColor(tm), n: tm.n || 0, team: true }))
+      : D.roleCards.map((c) => { const x = inGameRole(c.rank); return { c, name: c.rank, color: x.color, n: x.n, team: false }; });
+    $('[data-roles]').innerHTML = start + karten.map(({ c, name, color, n, team }) => {
+      const chip = team ? `<span class="role-card__team" style="--rc:${esc(color)};--ink:${inkOn(color)}" title="${esc(t('Team im Spiel'))}"><i aria-hidden="true"></i>${esc(name)}</span>` : '';
+      const zahl = team ? t('<b>{n}</b> gerade im Team {team}', { n: fmt(n), team: esc(name) }) : t('<b>{n}</b> gerade im Spiel als {rank}', { n: fmt(n), rank: esc(name) });
       return `<article class="role-card">
-      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy">${team}</div>
+      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy">${chip}</div>
       <div class="role-card__body">
-        <h3>${fill(c.title, c.rank, x.color)}</h3>
-        <p>${fill(c.text, c.rank, x.color)}</p>
-        <span class="count-pill count-pill--live" style="--rc:${esc(x.color)}"><i class="count-pill__dot" aria-hidden="true"></i>${t('<b>{n}</b> gerade im Spiel als {rank}', { n: fmt(x.n), rank: esc(x.name) })}</span>
+        <h3>${fill(c.title, c.rank || name, color, name)}</h3>
+        <p>${fill(c.text, c.rank || name, color, name)}</p>
+        <span class="count-pill count-pill--live" style="--rc:${esc(color)}"><i class="count-pill__dot" aria-hidden="true"></i>${zahl}</span>
       </div>
     </article>`;
     }).join('');
+  }
+  // Teams aus dem Spiel (live oder zuletzt bekannt), sortiert nach ihrer Zahl in Studio
+  function liveTeams() {
+    if (!liveMode()) return [];
+    const L = G().live || {};
+    const teams = (live.data && live.data.teams) || L.teams || [];
+    return [...teams].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+  }
+  // Text und Bild für ein Team: Karte der passenden Rolle, sonst eine allgemeine Karte mit dem Teamnamen
+  function cardOf(teamName) {
+    const role = roleOfTeam(teamName);
+    return D.roleCards.find((c) => c.rank === role)
+      || { rank: null, img: 'hero.svg', title: 'Spiel im Team {team}.', text: 'Wähle im Spiel das Team {team} und leg los.' };
   }
   // Wie viele gerade im Spiel diese Rolle haben: Team mit dem Namen der Rolle (Farbe aus dem Spiel), sonst aus dem
   // Teamnamen abgeleitet (z. B. „Driver“ → Qualified Driver). Ohne Backend: die Demo-Server.
@@ -3002,12 +3022,17 @@
   async function syncGroupRank({ force = false } = {}) {
     const p = state.profile;
     if (!p || !p.oauth || !RBX.groupId) return;
+    // Angemeldet mit Backend: der Rang kommt vom Backend (/api/me). Der Proxy ist dafür zu unzuverlässig –
+    // eine leere oder gedrosselte Antwort darf niemanden zum Gast machen.
+    if (apiReady() && sessionToken()) { await loadMe(); return; }
     const last = store.get('tsg-group', null);
     if (!force && last && last.userId === p.userId && Date.now() - last.at < 10 * 60000) return;
     try {
       const res = await fetch(`${D.roblox.groupsApi}/v2/users/${encodeURIComponent(p.userId)}/groups/roles`);
       if (!res.ok) throw new Error('groups');
-      const hit = ((await res.json()).data || []).find((x) => String(x.group && x.group.id) === String(RBX.groupId));
+      const json = await res.json();
+      if (!json || !Array.isArray(json.data)) throw new Error('groups'); // keine echte Antwort: alten Rang behalten
+      const hit = json.data.find((x) => String(x.group && x.group.id) === String(RBX.groupId));
       const role = hit ? { name: hit.role.name, rank: hit.role.rank } : null;
       store.set('tsg-group', { userId: p.userId, role, rank: rankFromRole(role), at: Date.now() });
       applyGroupRank();

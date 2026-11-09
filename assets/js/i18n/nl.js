@@ -559,4 +559,9 @@ window.TSG_I18N.nl = {
   "Supervisors": "Supervisors",
   "Supervisors (optional)": "Supervisors (optioneel)",
   "Roblox-Namen, mit Komma getrennt": "Roblox-namen, gescheiden door komma's",
+  "Fahr als {team} mit.": "Reis mee als {team}.",
+  "Ganz ohne Training: Steig an einem Bahnhof ein, fahr durch den Osten von Magdeburg bis Warschau und schau den Teams bei der Arbeit zu.": "Geen training nodig: stap in op elk station, reis door het oosten van Maagdenburg tot Warschau en kijk hoe de teams werken.",
+  "Spiel im Team {team}.": "Speel in het team {team}.",
+  "Wähle im Spiel das Team {team} und leg los.": "Kies in het spel het team {team} en ga aan de slag.",
+  "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> nu in het team {team}",
 };
