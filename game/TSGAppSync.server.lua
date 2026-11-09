@@ -10,7 +10,8 @@
       daraus zeigt die App die Rollen je Server, die Züge und unter „Spieler“, wo jemand gerade ist
     • meldet alle Teams aus dem Teams-Service, die das Attribut „Extern“ haben (Wert egal), mit ihrer Farbe
       (TeamColor, z. B. Driver rot → in der App rot) und ihrer Zahl für die Reihenfolge (1, 2, 3 … – das zweite
-      Attribut am Team, siehe CONFIG.TeamOrderAttribute). Die App zeigt die Teams in dieser Reihenfolge, auch leere.
+      Attribut am Team, als Wert z. B. „Order = 2“ oder als Name z. B. „2 = true“, siehe CONFIG.TeamOrderAttribute).
+      Die App zeigt die Teams in dieser Reihenfolge, auch leere.
       Das Team mit der Zahl 2 fertigt ab: seine Spieler erscheinen in der App oben mit ihrem Bahnhof (TSG_Station).
     • meldet beendete Fahrten für die Statistik (siehe „Fahrten melden“ unten). Ohne Meldung bleibt die Statistik bei 0.
     • private Server: meldet ID und Besitzer und setzt die Einstellungen aus der App um
@@ -59,7 +60,8 @@ local CONFIG = {
 	-- Teams mit diesem Attribut (oder einem Werte-Objekt mit diesem Namen im Team) erscheinen in der App, Wert egal
 	TeamShowAttribute = "Extern",
 	-- Attribut am Team mit der Zahl für die Reihenfolge (1 zuerst). nil = automatisch: einer der Namen in
-	-- TeamOrderNames, sonst das erste Attribut mit einer Zahl, sonst „Extern“ selbst, wenn es eine Zahl ist.
+	-- TeamOrderNames, sonst ein Attribut, dessen Name die Zahl ist (z. B. „2“ = true), sonst das erste Attribut
+	-- mit einer Zahl als Wert, sonst „Extern“ selbst, wenn es eine Zahl ist.
 	TeamOrderAttribute = nil,
 	TeamOrderNames = { "Order", "Reihenfolge", "Position", "Pos", "Index", "Sort", "Nummer", "Number", "Nr", "Prio", "Priority", "Rang", "Rank", "Layer", "Level", "Id", "ID" },
 }
@@ -190,6 +192,26 @@ local function teamOrder(team)
 		if value then
 			return value, name
 		end
+	end
+	-- sonst: ein Attribut bzw. Werte-Objekt, dessen Name die Zahl ist (z. B. Attribut „2“ = true), die kleinste zuerst
+	local named = {}
+	for name in pairs(team:GetAttributes()) do
+		local n = asNumber(name)
+		if n then
+			table.insert(named, { name = name, value = n })
+		end
+	end
+	for _, child in ipairs(team:GetChildren()) do
+		local n = asNumber(child.Name)
+		if n then
+			table.insert(named, { name = child.Name, value = n })
+		end
+	end
+	table.sort(named, function(a, b)
+		return a.value < b.value
+	end)
+	if named[1] then
+		return named[1].value, named[1].name
 	end
 	-- sonst: das erste Attribut bzw. Werte-Objekt mit einer Zahl (außer „Extern“), alphabetisch
 	local found = {}
