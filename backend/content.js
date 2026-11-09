@@ -1,7 +1,8 @@
 /*
  * Train Sim Germany – Inhalte aus der App: Trainings, Neuigkeiten, Bilder, Stellen (offen/geschlossen)
  *
- *   content:trainings  → [{ id, type, title, start, dur, server, slots, text, host, hostName, hostAvatar, hostId }]
+ *   content:trainings  → [{ id, type, title, start, dur, server, slots, text, helpers, host, hostName, hostAvatar, hostId }]
+ *                         helpers = Roblox-Namen der Supervisors (bis zu 6)
  *   content:news       → [{ id, date, edited, cat, tag, title, text, media, buttons, author, authorId }]   cat: siehe NEWS_CATS
  *   content:jobs       → { <stelle>: { open, from, to, limit, received, note, urgent, closedAt, openedAt, updatedBy, log } }
  *   media:<id>         → { type, data }   (Bilder für Neuigkeiten, als Base64)
@@ -46,9 +47,12 @@ export async function addTraining(store, user, body) {
   const dur = Math.round(+body.dur);
   const slots = Math.round(+body.slots);
   if (!(dur >= 15 && dur <= 240) || !(slots >= 1 && slots <= 50)) throw bad();
+  // Supervisors neben der Leitung: Roblox-Namen (das Spiel zeigt ihre Profilbilder mit schwarzem Rand)
+  const helpers = [...new Set((Array.isArray(body.helpers) ? body.helpers : String(body.helpers || '').split(/[\s,;]+/))
+    .map((x) => String(x).trim().replace(/^@/, '')).filter((x) => /^[A-Za-z0-9_]{3,20}$/.test(x)))].slice(0, 6);
   const training = {
     id: randomKey(9), type, title: clip(body.title, 80).trim() || `${type}-Training`, start, dur, slots,
-    server: clip(body.server, 60).trim(), text: clip(body.text, 500).trim(),
+    server: clip(body.server, 60).trim(), text: clip(body.text, 500).trim(), helpers,
     host: user.username, hostName: user.displayName || user.username, hostAvatar: user.avatar || null, hostId: user.sub, created: now,
   };
   const list = ((await store.get('content:trainings')) || []).filter((x) => x.start + x.dur * 60000 > now - 86400000);

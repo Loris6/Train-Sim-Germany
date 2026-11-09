@@ -555,4 +555,8 @@ window.TSG_I18N.tr = {
   "Alle Seiten": "Tüm sayfalar",
   "Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.": "Uygulama olarak kullan: Safari’de “Paylaş”a, ardından “Ana Ekrana Ekle”ye dokun.",
   "Schließen": "Kapat",
+  "Team im Spiel": "Oyundaki takım",
+  "Supervisors": "Süpervizörler",
+  "Supervisors (optional)": "Süpervizörler (isteğe bağlı)",
+  "Roblox-Namen, mit Komma getrennt": "Roblox adları, virgülle ayrılmış",
 };

@@ -526,9 +526,9 @@
   // ---------- Strecken & News ----------
   // Einstieg und Rollen (Startseite)
   function renderRoles() {
-    const rk = (name) => `<b class="rk" style="--rc:${rankOf(name).color}">${esc(name)}</b>`;
-    const fill = (text, rank) => esc(t(text))
-      .replace(/\{rank\}/g, rk(rank))
+    const rk = (name, color) => `<b class="rk" style="--rc:${esc(color || rankOf(name).color)}">${esc(name)}</b>`;
+    const fill = (text, rank, color) => esc(t(text))
+      .replace(/\{rank\}/g, rk(rank, color))
       .replace('{group}', `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Train Sim Germany Gruppe auf Roblox')}${icon('fi-rr-arrow-up-right-from-square')}</a>`);
     const start = `<article class="role-card role-card--start">
       <div class="role-card__media"><img src="assets/img/group.svg" alt="${esc(t('Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug'))}" loading="lazy"></div>
@@ -546,11 +546,13 @@
     </article>`;
     $('[data-roles]').innerHTML = start + D.roleCards.map((c) => {
       const x = inGameRole(c.rank);
+      // Team aus Studio (Name und TeamColor), das zu dieser Rolle gehört – kommt live vom Spiel, nichts im Code pflegen
+      const team = x.team ? `<span class="role-card__team" style="--rc:${esc(x.color)};--ink:${inkOn(x.color)}" title="${esc(t('Team im Spiel'))}"><i aria-hidden="true"></i>${esc(x.team)}</span>` : '';
       return `<article class="role-card">
-      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy"></div>
+      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy">${team}</div>
       <div class="role-card__body">
-        <h3>${fill(c.title, c.rank)}</h3>
-        <p>${fill(c.text, c.rank)}</p>
+        <h3>${fill(c.title, c.rank, x.color)}</h3>
+        <p>${fill(c.text, c.rank, x.color)}</p>
         <span class="count-pill count-pill--live" style="--rc:${esc(x.color)}"><i class="count-pill__dot" aria-hidden="true"></i>${t('<b>{n}</b> gerade im Spiel als {rank}', { n: fmt(x.n), rank: esc(x.name) })}</span>
       </div>
     </article>`;
@@ -567,11 +569,20 @@
     const L = G().live || {};
     const teams = (live.data && live.data.teams) || L.teams || [];
     const team = teams.find((x) => sameTeam(x.name, rank));
-    if (team) return { name: team.name, color: teamColor(team), n: team.n || 0 };
+    if (team) return { name: team.name, team: team.name, color: teamColor(team), n: team.n || 0 };
     // Teams, deren Name zur Rolle passt (z. B. „Driver“ → Qualified Driver): Farbe aus dem Spiel, Spieler zusammen
     const near = teams.filter((x) => roleOfTeam(x.name) === rank);
-    if (near.length) return { name: rank, color: teamColor(near[0]), n: near.reduce((n, x) => n + (x.n || 0), 0) };
+    if (near.length) return { name: rank, team: near.map((x) => x.name).join(' · '), color: teamColor(near[0]), n: near.reduce((n, x) => n + (x.n || 0), 0) };
     return { ...fallback, n: (L.roles && L.roles[rank]) || 0 };
+  }
+  // Lesbare Schrift auf einer Teamfarbe (helle Farben wie Gold → dunkle Schrift)
+  function inkOn(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return '#fff';
+    const n = parseInt(m[1], 16);
+    const lin = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    const lum = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    return lum > 0.42 ? '#131821' : '#fff';
   }
   // Wie backend/game.js → gameRole: Teamname aus dem Spiel → feste Rolle
   const ROLE_WORDS = [
@@ -922,8 +933,6 @@
         <div class="svc__count"><b>${countHtml(c.players, 'fmt', `sv-${c.id}`)}</b><small>/${fmt(c.max)} ${t('Spieler')}</small></div>
       </header>
       <div class="svc__bar bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
-      <ul class="svc__roles" aria-label="${esc(t('Rollen'))}">${(c.teams && c.teams.length ? c.teams.map((x) => [x.name, teamColor(x), x.n || 0]) : GAME_ROLES.map((r) => [r, roleRank(r).color, c.roles[r] || 0]))
-        .map(([name, color, n]) => `<li class="${n ? '' : 'is-zero'}" style="--rc:${esc(color)}"><i></i><span>${esc(name)}</span><b>${fmt(n)}</b></li>`).join('')}</ul>
       <footer class="svc__foot">
         <button class="svc__people" type="button" data-server-people="${esc(c.id)}"${c.players ? '' : ' disabled'} aria-label="${esc(t('Alle Spieler ansehen'))}">
           <span class="avatars">${shown.map((p) => personPic(p, c.avatars)).join('')}${more ? `<span class="avatar avatar--more">+${more > 99 ? '99' : more}</span>` : ''}</span>
@@ -1620,6 +1629,7 @@
       const b = berlinOf(x.start);
       return {
         id: x.id, type: x.type, title: x.title, host: x.host, hostName: x.hostName, hostAvatar: x.hostAvatar, hostId: x.hostId, server: x.server, slots: x.slots, taken: 0, dur: x.dur, text: x.text,
+        helpers: Array.isArray(x.helpers) ? x.helpers : [],
         day: b.day, start: b.abs, end: b.abs + x.dur, time: hhmm(b.abs), req: reqFor(x.type),
         img: (typeOf(x.type) || {}).img || 'training.svg', color: rankOf(x.type).color, remote: true,
       };
@@ -3159,6 +3169,7 @@
         <div class="f"><label class="f__label" for="tn-slots">${t('Plätze')}</label><input id="tn-slots" name="slots" type="number" inputmode="numeric" min="1" max="50" value="12"></div>
       </div>
       <div class="f"><label class="f__label" for="tn-server">${t('Server')}</label><div class="select"><select id="tn-server" name="server">${D.servers.map((x) => `<option${x.type === 'training' ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
+      <div class="f"><label class="f__label" for="tn-helpers">${t('Supervisors (optional)')}</label><input id="tn-helpers" name="helpers" maxlength="140" autocomplete="off" spellcheck="false" placeholder="${esc(t('Roblox-Namen, mit Komma getrennt'))}"></div>
       <div class="f"><label class="f__label" for="tn-text">${t('Beschreibung (optional)')}</label><textarea id="tn-text" name="text" maxlength="500" rows="3" placeholder="${esc(t('Was lernen die Teilnehmer?'))}"></textarea></div>
       <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-plus')}${t('Training anbieten')}</button>
       <p class="sheet-note">${t('Löschen kannst du nur deine eigenen Trainings.')}</p>
@@ -3174,6 +3185,7 @@
     try {
       await api('/api/trainings', { method: 'POST', body: {
         type: f.get('type'), title: f.get('title').trim(), start, dur: +f.get('dur'), slots: +f.get('slots'), server: f.get('server'), text: f.get('text').trim(),
+        helpers: String(f.get('helpers') || '').split(/[\s,;]+/).map((x) => x.replace(/^@/, '')).filter(Boolean),
       } });
       closeModal();
       toast(t('Training angeboten'));
@@ -6415,6 +6427,7 @@
             <div><dt>${icon('fi-rr-clock-three')}${t('Uhrzeit')}</dt><dd>${t('{time} Uhr', { time: `${tn.time} – ${hhmm(tn.end)}` })}</dd></div>
             <div><dt>${icon('fi-rr-database')}${t('Server')}</dt><dd>${esc(t(tn.server || '–'))}</dd></div>
             <div><dt>${icon('fi-rr-users-alt')}${t('Leitung')}</dt><dd>${hostHtml(tn, 'host--sm')}</dd></div>
+            ${tn.helpers && tn.helpers.length ? `<div><dt>${icon('fi-rr-users')}${t('Supervisors')}</dt><dd>${tn.helpers.map(esc).join(', ')}</dd></div>` : ''}
             ${tn.remote ? `<div><dt>${icon('fi-sr-user')}${t('Plätze')}</dt><dd>${t('max. {n}', { n: tn.slots })}</dd></div>` : ''}
           </dl>
           ${tn.remote ? '' : `<div class="occ">

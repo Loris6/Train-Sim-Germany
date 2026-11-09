@@ -555,4 +555,8 @@ window.TSG_I18N.en = {
   "Alle Seiten": "All pages",
   "Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.": "Use as an app: in Safari, tap “Share” and then “Add to Home Screen”.",
   "Schließen": "Close",
+  "Team im Spiel": "Team in the game",
+  "Supervisors": "Supervisors",
+  "Supervisors (optional)": "Supervisors (optional)",
+  "Roblox-Namen, mit Komma getrennt": "Roblox names, separated by commas",
 };

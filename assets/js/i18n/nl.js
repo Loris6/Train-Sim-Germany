@@ -555,4 +555,8 @@ window.TSG_I18N.nl = {
   "Alle Seiten": "Alle pagina’s",
   "Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.": "Als app gebruiken: tik in Safari op “Deel” en dan op “Zet op beginscherm”.",
   "Schließen": "Sluiten",
+  "Team im Spiel": "Team in het spel",
+  "Supervisors": "Supervisors",
+  "Supervisors (optional)": "Supervisors (optioneel)",
+  "Roblox-Namen, mit Komma getrennt": "Roblox-namen, gescheiden door komma's",
 };

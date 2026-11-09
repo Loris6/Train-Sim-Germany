@@ -555,4 +555,8 @@ window.TSG_I18N.pl = {
   "Alle Seiten": "Wszystkie strony",
   "Als App nutzen: In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.": "Używaj jako aplikacji: w Safari stuknij „Udostępnij”, a potem „Do ekranu początkowego”.",
   "Schließen": "Zamknij",
+  "Team im Spiel": "Drużyna w grze",
+  "Supervisors": "Supervisorzy",
+  "Supervisors (optional)": "Supervisorzy (opcjonalnie)",
+  "Roblox-Namen, mit Komma getrennt": "Nazwy Roblox, oddzielone przecinkami",
 };
