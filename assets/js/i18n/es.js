@@ -564,4 +564,6 @@ window.TSG_I18N.es = {
   "Spiel im Team {team}.": "Juega en el equipo {team}.",
   "Wähle im Spiel das Team {team} und leg los.": "Elige el equipo {team} en el juego y empieza.",
   "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> ahora en el equipo {team}",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Tu sesión en el servidor ha caducado. Inicia sesión de nuevo con Roblox y podrás volver a crear entrenamientos y noticias.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Tu sesión ha caducado. Vuelve a iniciar sesión con Roblox.",
 };

@@ -564,4 +564,6 @@ window.TSG_I18N.tr = {
   "Spiel im Team {team}.": "{team} takımında oyna.",
   "Wähle im Spiel das Team {team} und leg los.": "Oyunda {team} takımını seç ve başla.",
   "<b>{n}</b> gerade im Team {team}": "Şu anda {team} takımında <b>{n}</b> kişi",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Sunucudaki oturumunun süresi doldu. Roblox ile bir kez yeniden giriş yap, sonra yine eğitim ve haber oluşturabilirsin.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Oturumunun süresi doldu. Lütfen Roblox ile yeniden giriş yap.",
 };

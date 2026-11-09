@@ -564,4 +564,6 @@ window.TSG_I18N.en = {
   "Spiel im Team {team}.": "Play in the {team} team.",
   "Wähle im Spiel das Team {team} und leg los.": "Pick the {team} team in the game and get going.",
   "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> in the {team} team right now",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Your sign-in with the server has expired. Sign in again with Roblox once and you can create trainings and news again.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Your sign-in has expired. Please sign in again with Roblox.",
 };

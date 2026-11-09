@@ -564,4 +564,6 @@ window.TSG_I18N.nl = {
   "Spiel im Team {team}.": "Speel in het team {team}.",
   "Wähle im Spiel das Team {team} und leg los.": "Kies in het spel het team {team} en ga aan de slag.",
   "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> nu in het team {team}",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Je aanmelding bij de server is verlopen. Meld je één keer opnieuw aan met Roblox, dan kun je weer trainingen en nieuws maken.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Je aanmelding is verlopen. Meld je opnieuw aan met Roblox.",
 };

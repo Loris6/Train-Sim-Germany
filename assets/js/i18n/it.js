@@ -564,4 +564,6 @@ window.TSG_I18N.it = {
   "Spiel im Team {team}.": "Gioca nella squadra {team}.",
   "Wähle im Spiel das Team {team} und leg los.": "Scegli la squadra {team} nel gioco e parti.",
   "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> ora nella squadra {team}",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Il tuo accesso al server è scaduto. Accedi di nuovo con Roblox e potrai di nuovo creare addestramenti e notizie.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Il tuo accesso è scaduto. Accedi di nuovo con Roblox.",
 };

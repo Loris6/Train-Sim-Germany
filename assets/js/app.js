@@ -3063,7 +3063,11 @@
     if (raw) headers['Content-Type'] = type;
     const res = await fetch(API + path, { method, headers, body: raw || (body === undefined ? undefined : JSON.stringify(body)) });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 && token) store.set('tsg-session', null);
+    if (res.status === 401 && token) {
+      // Sitzung ungültig: nicht still weitermachen, sondern einmal deutlich sagen, was zu tun ist
+      store.set('tsg-session', null);
+      if (!api.hinweis) { api.hinweis = true; toast(t('Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.')); }
+    }
     if (!res.ok) throw Object.assign(new Error(data.error || 'api'), { status: res.status });
     return data;
   }
@@ -3124,8 +3128,11 @@
   const canBackend = () => apiReady() && !!sessionToken() && state.rankFromGroup;
   const canTrain = () => canBackend() && rankIdx(state.rank) >= rankIdx('Supervisor');
   const canPR = () => canBackend() && rankIdx(state.rank) >= rankIdx('Public Relations Department');
-  // Darf es laut Rang? Dann sind die Knöpfe sichtbar – auch wenn das Backend noch fehlt (dann kommt die Anleitung).
-  const isTeam = (min) => state.rankFromGroup && rankIdx(state.rank) >= rankIdx(min);
+  // Mit Roblox angemeldet, aber das Backend kennt die Sitzung nicht mehr (abgelaufen oder auf einem anderen Gerät abgemeldet)
+  const needsReLogin = () => apiReady() && !!(state.profile && state.profile.oauth) && !sessionToken();
+  // Darf es laut Rang? Dann sind die Knöpfe sichtbar – auch wenn das Backend noch fehlt (dann kommt die Anleitung)
+  // oder die Sitzung weg ist (dann kommt „Bitte neu anmelden“ mit Anmelde-Knopf statt gar nichts).
+  const isTeam = (min) => (state.rankFromGroup || needsReLogin()) && rankIdx(state.rank) >= rankIdx(min);
   const mayTrain = () => isTeam('Supervisor');
   const mayPR = () => isTeam('Public Relations Department');
   const BACKEND_GUIDE = 'https://github.com/Loris6/Train-Sim-Germany/blob/main/backend/README.md';
@@ -3135,9 +3142,9 @@
     return `<div class="setup">
       <span class="setup__ic">${icon('fi-rr-database')}</span>
       <h3>${reLogin ? t('Bitte neu anmelden') : t('Der App-Server fehlt noch')}</h3>
-      <p>${reLogin ? t('Melde dich einmal ab und wieder mit Roblox an, damit der Server dich erkennt.')
+      <p>${reLogin ? t('Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.')
         : t('Als {rank} darfst du das. Damit Trainings, Neuigkeiten, Bewerbungen und der Chat bei allen ankommen, braucht die App ihren Server (Backend). Er ist noch nicht verbunden.', { rank: `<b>[${esc(r.prefix)}] ${esc(r.name)}</b>` })}</p>
-      ${reLogin ? '' : `<ol class="setup__steps">
+      ${reLogin ? `<button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('fi-rr-sign-in-alt')}${t('Mit Roblox anmelden')}</button>` : `<ol class="setup__steps">
         <li>${t('Bei Cloudflare ein kostenloses Konto anlegen und einen API-Token erstellen.')}</li>
         <li>${t('Auf GitHub unter Settings → Secrets die Werte CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID eintragen.')}</li>
         <li>${t('Unter Actions „Backend veröffentlichen“ starten – die Adresse wird automatisch eingetragen.')}</li>
@@ -8012,6 +8019,7 @@
       toast(state.rankFromGroup ? t('Angemeldet als {name} · Rang: [{prefix}] {rank}', { name: state.profile.displayName, prefix: r.prefix, rank: r.name })
         : t('Angemeldet als {name}', { name: state.profile.displayName }));
     } else if (loginNote) toast(loginNote);
+    else if (needsReLogin()) toast(t('Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.'));
     remindersTick();
     // Echte Daten: Inhalte und Einstellungen vom Backend, Zahlen von Roblox und Discord
     loadContent();

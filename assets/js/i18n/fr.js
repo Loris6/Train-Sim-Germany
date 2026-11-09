@@ -564,4 +564,6 @@ window.TSG_I18N.fr = {
   "Spiel im Team {team}.": "Joue dans l’équipe {team}.",
   "Wähle im Spiel das Team {team} und leg los.": "Choisis l’équipe {team} dans le jeu et lance-toi.",
   "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> en ce moment dans l’équipe {team}",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Ta connexion au serveur a expiré. Reconnecte-toi une fois avec Roblox pour pouvoir à nouveau créer des formations et des actualités.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Ta connexion a expiré. Reconnecte-toi avec Roblox.",
 };

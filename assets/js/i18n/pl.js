@@ -564,4 +564,6 @@ window.TSG_I18N.pl = {
   "Spiel im Team {team}.": "Graj w drużynie {team}.",
   "Wähle im Spiel das Team {team} und leg los.": "Wybierz w grze drużynę {team} i zaczynaj.",
   "<b>{n}</b> gerade im Team {team}": "<b>{n}</b> teraz w drużynie {team}",
+  "Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.": "Twoje logowanie na serwerze wygasło. Zaloguj się ponownie przez Roblox, a znów utworzysz szkolenia i aktualności.",
+  "Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.": "Twoje logowanie wygasło. Zaloguj się ponownie przez Roblox.",
 };
