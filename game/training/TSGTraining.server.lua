@@ -2,21 +2,22 @@
   Train Sim Germany – Trainings im Spiel (Server)
 
   Ablauf je Rang: 1. Anforderungen → 2. Theorie (Fragen zum nächsten Rang) → 3. Praktisch (Training aus der App).
-  Einstellungen (Anforderungen, Fragen, Bestehensgrenze, Test-Schalter „Wartezeiten“): ServerStorage.TSGTrainingKonfig
+  Einstellungen (Anforderungen, Fragen, Bestehensgrenze, Hauptschalter „Echtzeit“): ServerStorage.TSGTrainingKonfig
   Dazu gehört das LocalScript StarterGui.Menu.container.Training.TSGTraining.
 
-  • Rang: aus der Roblox-Gruppe (Kürzel in eckigen Klammern, „[QD] Qualified Driver“), nicht in der Gruppe = Guest.
-  • XP: player.playerStats.Ehrfahrung (IntValue, legt ein anderes Skript an). Spielzeit zählt dieses Skript selbst.
+  Echtzeit (K.Echtzeit = true):
+  • Rang aus der Roblox-Gruppe (Kürzel in eckigen Klammern, „[QD] Qualified Driver“), nicht in der Gruppe = Guest.
+  • XP aus player.playerStats.Ehrfahrung, Spielzeit zählt dieses Skript selbst.
   • Theorie: höchstens 10 Fragen, gewichtet, Bestehen ab 90 %. Nicht bestanden = genau 4 Tage gesperrt.
   • Warteschlange: Wer die Theorie besteht, bekommt eine Nummer (#1902). Jeder Server rechnet daraus dieselbe
-    Zuteilung: kleinste Nummer → frühestes Training seines Rangs mit freiem Platz. So steht jeder Spieler in genau
-    einem Training und rückt automatisch nach, wenn ein Training voll ist oder vorbei ist.
+    Zuteilung: kleinste Nummer → frühestes Training seines Rangs mit freiem Platz, jeder steht in genau einem Training.
   • Trainings, Leitung und Supervisors kommen aus der App (GET /api/content). „Join“ teleportiert in einen
     reservierten Server je Training (öffnet 15 Minuten vor Beginn).
+  • Gespeichert im DataStore „TSG_Training_v1“, Warteschlange je Rang im OrderedDataStore „TSG_TrainingQueue_v1_<Rang>“.
 
-  Gespeichert wird im DataStore „TSG_Training_v1“ (pro Spieler), die Warteschlange je Rang im OrderedDataStore
-  „TSG_TrainingQueue_v1_<Rang>“. Studio: „Game Settings → Security → Enable Studio Access to API Services“ – ohne
-  Zugriff läuft alles nur im Speicher dieses Servers. Teleport geht nur im echten Spiel.
+  Simulation (K.Echtzeit = false): alles läuft nur im Speicher dieses Servers, nichts wird gelesen oder gespeichert.
+  Start als Gast; XP, Spielzeit und Gruppe springen nach 10 Sekunden auf den nötigen Wert; Sperre 10 Sekunden;
+  Beispiel-Trainings; „Join“ simuliert das Training und befördert nach 10 Sekunden in den nächsten Rang.
 ]]
 
 local DataStoreService = game:GetService("DataStoreService")
@@ -30,6 +31,8 @@ local Teams = game:GetService("Teams")
 local TeleportService = game:GetService("TeleportService")
 
 local K = require(ServerStorage:WaitForChild("TSGTrainingKonfig"))
+local ECHT = K.Echtzeit ~= false
+local SIM_SEKUNDEN = 10 -- Simulation: so lange bis XP/Zeit/Gruppe erfüllt sind, Sperre, Training
 
 -- ===== Verbindung zum Menü =====
 local ordner = ReplicatedStorage:FindFirstChild("TSGTraining") or Instance.new("Folder")
@@ -45,23 +48,18 @@ local rAbsenden = remote("RemoteFunction", "Absenden")
 local rBeitreten = remote("RemoteFunction", "Beitreten")
 ordner.Parent = ReplicatedStorage
 
--- ===== Speicher =====
+-- ===== Speicher (nur Echtzeit) =====
 local store, queueStore, serverStore
-local online = pcall(function()
+local online = ECHT and pcall(function()
 	store = DataStoreService:GetDataStore("TSG_Training_v1")
 	queueStore = DataStoreService:GetDataStore("TSG_TrainingQueue_v1")
 	serverStore = DataStoreService:GetDataStore("TSG_TrainingServer_v1")
 	store:GetAsync("_check")
 end)
-print("[TSG] Trainings: " .. (online and "DataStore verbunden" or "ohne DataStore (nur im Speicher dieses Servers)"))
-if not K.Wartezeiten then
-	warn("[TSG] Trainings: Wartezeiten sind AUS (Testmodus in TSGTrainingKonfig) – vor dem Veröffentlichen auf true setzen!")
-end
-if K.Testtrainings and RunService:IsStudio() then
-	warn("[TSG] Trainings: Beispiel-Trainings aktiv (nur in Studio, K.Testtrainings)")
-end
-if K.TestRang and RunService:IsStudio() then
-	warn("[TSG] Trainings: Test-Rang " .. tostring(K.TestRang) .. " aktiv (nur in Studio, K.TestRang)")
+if ECHT then
+	print("[TSG] Trainings: Echtzeit – " .. (online and "DataStore verbunden" or "ohne DataStore (nur im Speicher dieses Servers)"))
+else
+	warn("[TSG] Trainings: SIMULATION (K.Echtzeit = false) – nichts ist echt, nichts wird gespeichert. Vor dem Veröffentlichen auf true!")
 end
 local function ordered(ziel)
 	return DataStoreService:GetOrderedDataStore("TSG_TrainingQueue_v1_" .. ziel)
@@ -190,6 +188,9 @@ local function laden(player)
 		return p
 	end
 	p = { d = neueDaten(), laedt = true, seit = os.time(), dirty = false }
+	if not ECHT then
+		p.sim = { rang = "G", seit = os.time(), gruppe = false } -- Simulation: Start als Gast
+	end
 	profile[player] = p
 	if online then
 		local ok, gespeichert
@@ -236,37 +237,29 @@ local function speichern(player, p)
 	end
 end
 
--- ===== Trainings aus der App =====
+-- ===== Trainings: aus der App (Echtzeit) oder Beispiele (Simulation) =====
 local trainings = { at = -1e9, liste = {} }
--- Nur Studio (K.Testtrainings): je Rang ein Training, das in 10 Minuten beginnt, und eins morgen mit nur 1 Platz
-local demo
-local function mitDemo(liste)
-	if not (K.Testtrainings and RunService:IsStudio()) then
-		return liste
-	end
-	if not demo then
-		demo = {}
+local simListe
+local function simTrainings()
+	if not simListe then
+		simListe = {}
 		local jetzt = os.time()
 		for _, s in ipairs(K.Stufen) do
 			local name = K.Raenge[s.Ziel].Name
-			table.insert(demo, { id = "test-" .. s.Ziel .. "-1", ziel = s.Ziel, titel = "Test: " .. name .. " Training", start = jetzt + 600, dauer = 60,
-				plaetze = 12, server = "Studio", hostId = 1, hostName = "Roblox", helfer = { "builderman" } })
-			table.insert(demo, { id = "test-" .. s.Ziel .. "-2", ziel = s.Ziel, titel = "Test: " .. name .. " (1 place)", start = jetzt + 86400 + 3600, dauer = 45,
-				plaetze = 1, server = "Studio", hostId = 156, hostName = "builderman", helfer = {} })
+			table.insert(simListe, { id = "sim-" .. s.Ziel .. "-1", ziel = s.Ziel, titel = name .. " Training", start = jetzt + 600, dauer = 60,
+				plaetze = 16, server = "Simulation", hostId = 1, hostName = "Roblox", helfer = { "builderman" } })
+			table.insert(simListe, { id = "sim-" .. s.Ziel .. "-2", ziel = s.Ziel, titel = name .. " Training", start = jetzt + 86400 + 3600, dauer = 45,
+				plaetze = 12, server = "Simulation", hostId = 156, hostName = "builderman", helfer = {} })
 		end
 	end
-	local alle = table.clone(liste)
-	for _, d in ipairs(demo) do
-		table.insert(alle, d)
-	end
-	table.sort(alle, function(a, b)
-		return a.start < b.start
-	end)
-	return alle
+	return simListe
 end
 local function trainingsHolen()
+	if not ECHT then
+		return simTrainings()
+	end
 	if os.clock() - trainings.at < 60 then
-		return mitDemo(trainings.liste)
+		return trainings.liste
 	end
 	trainings.at = os.clock()
 	local ok, body = pcall(HttpService.GetAsync, HttpService, K.Backend .. "/api/content", true)
@@ -313,7 +306,7 @@ local function trainingsHolen()
 		end
 		trainings.fehler = grund
 	end
-	return mitDemo(trainings.liste)
+	return trainings.liste
 end
 
 local personCache = {}
@@ -332,7 +325,7 @@ end
 
 -- ===== Warteschlange =====
 local warte = {} -- ziel → { at, eintraege = { { id, nr } } } (aufsteigend)
-local memQueue, memZaehler = {}, 0
+local memQueue, memZaehler = {}, ECHT and 0 or 1900
 local function queueLesen(ziel)
 	local c = warte[ziel]
 	if c and os.clock() - c.at < 60 then
@@ -458,27 +451,31 @@ end
 
 local function pruefen(player, p, rang, a)
 	local typ = a.Typ
+	-- Simulation: alles startet bei 0 und springt nach 10 Sekunden auf den nötigen Wert
+	local simFertig = p.sim and os.time() - p.sim.seit >= SIM_SEKUNDEN
 	if typ == "Gruppe" then
-		return rang.inGruppe and 1 or 0, nil, not rang.inGruppe and "gruppe" or nil
+		local drin = rang.inGruppe or simFertig == true
+		return drin and 1 or 0, not drin and "click to join" or nil, not drin and "gruppe" or nil
 	elseif typ == "XP" then
-		local xp = math.floor(xpVon(player))
 		local soll = math.max(1, math.floor(tonumber(a.Menge) or 1))
+		local xp = p.sim and (simFertig and soll or 0) or math.floor(xpVon(player))
 		return math.clamp(xp / soll, 0, 1), string.format("%d / %d XP", math.min(xp, soll), soll)
 	elseif typ == "Spielzeit" then
 		local soll = math.max(0.01, tonumber(a.Stunden) or 1)
-		if not K.Wartezeiten then
-			return 1, "test mode: " .. zahl(soll) .. " h skipped"
-		end
-		local h = spielzeit(p) / 3600
+		local h = p.sim and (simFertig and soll or 0) or spielzeit(p) / 3600
 		return math.clamp(h / soll, 0, 1), zahl(math.min(h, soll)) .. " / " .. zahl(soll) .. " h"
 	elseif typ == "ImRang" then
 		local soll = math.max(0.01, tonumber(a.Tage) or 1)
-		if not K.Wartezeiten then
-			return 1, "test mode: " .. zahl(soll) .. " d skipped"
+		local tage
+		if p.sim then
+			tage = simFertig and soll or 0
+		else
+			local seit = (p.d.Rang and tonumber(p.d.Rang.Seit)) or os.time()
+			tage = (os.time() - seit) / 86400
 		end
-		local seit = (p.d.Rang and tonumber(p.d.Rang.Seit)) or os.time()
-		local tage = (os.time() - seit) / 86400
 		return math.clamp(tage / soll, 0, 1), zahl(math.min(tage, soll)) .. " / " .. zahl(soll) .. " d"
+	elseif p.sim then
+		return simFertig and 1 or 0, nil
 	elseif typ == "Attribut" then
 		local v = player:GetAttribute(a.Name)
 		if type(a.Wert) == "number" then
@@ -523,7 +520,7 @@ local function theorieStatus(p, ziel)
 	if type(t) == "table" and t.Bestanden then
 		return "bestanden", t
 	end
-	if type(t) == "table" and t.GesperrtBis and K.Wartezeiten and t.GesperrtBis > os.time() then
+	if type(t) == "table" and t.GesperrtBis and t.GesperrtBis > os.time() then
 		return "sperre", t
 	end
 	return "offen", t
@@ -608,7 +605,7 @@ end
 
 -- ===== Zustand für das Menü =====
 local function zeile(tr, anzahl, meinId)
-	local host = person(tr.hostId)
+	local host = ECHT and person(tr.hostId) or { kuerzel = tr.hostId == 1 and "CEN" or "SV" }
 	local helfer = {}
 	for _, name in ipairs(tr.helfer) do
 		local id = idVonName(name)
@@ -637,13 +634,16 @@ local function zeile(tr, anzahl, meinId)
 	}
 end
 
-local function zustand(player, frisch)
+local function zustand(player, frisch, aktion)
 	local p = laden(player)
-	local rang = rangVon(player.UserId, frisch)
-	if K.TestRang and K.Raenge[K.TestRang] and RunService:IsStudio() then
-		rang = table.clone(rang)
-		rang.kuerzel = K.TestRang
-		rang.inGruppe = K.TestRang ~= "G"
+	local rang
+	if p.sim then
+		if aktion == "gruppe" then
+			p.sim.gruppe = true
+		end
+		rang = { kuerzel = p.sim.rang, inGruppe = p.sim.gruppe or p.sim.rang ~= "G" }
+	else
+		rang = rangVon(player.UserId, frisch)
 	end
 	if not rang.fehler and (type(p.d.Rang) ~= "table" or p.d.Rang.Kuerzel ~= rang.kuerzel) then
 		p.d.Rang = { Kuerzel = rang.kuerzel, Seit = os.time() }
@@ -654,9 +654,12 @@ local function zustand(player, frisch)
 		JoinVorher = K.JoinVorher,
 		GruppenId = K.GruppenId,
 		Grenze = K.Bestehensgrenze,
-		Wartezeiten = K.Wartezeiten,
+		Simulation = not ECHT,
 		Rang = { Kuerzel = rang.kuerzel, Name = (K.Raenge[rang.kuerzel] or {}).Name or rang.kuerzel, Farbe = rangFarbe(rang.kuerzel) },
 	}
+	if p.sim and os.time() < p.sim.seit + SIM_SEKUNDEN then
+		aus.Aktualisieren = p.sim.seit + SIM_SEKUNDEN -- dann springen die Werte: Menü lädt neu
+	end
 	local nr, stufe = stufeVon(rang.kuerzel)
 	if not stufe then
 		aus.KeinTraining = true
@@ -705,10 +708,10 @@ local function zustand(player, frisch)
 	-- 1. Anforderungen
 	local liste, alle = {}, true
 	for i, a in ipairs(stufe.Anforderungen or {}) do
-		local wert, anzeige, aktion = pruefen(player, p, rang, a)
+		local wert, anzeige, aktion2 = pruefen(player, p, rang, a)
 		local fertig = wert >= 0.9999
 		alle = alle and fertig
-		liste[i] = { Text = tostring(a.Text or ""), Wert = wert, Anzeige = anzeige, Fertig = fertig, Aktion = aktion }
+		liste[i] = { Text = tostring(a.Text or ""), Wert = wert, Anzeige = anzeige, Fertig = fertig, Aktion = aktion2 }
 	end
 	aus.Anforderungen = liste
 	aus.AnforderungenFertig = alle
@@ -719,6 +722,9 @@ local function zustand(player, frisch)
 		status = "gesperrt"
 	end
 	aus.Theorie = { Status = status, Bis = t and t.GesperrtBis or nil, Prozent = t and t.Prozent or nil }
+	if status == "sperre" and t and t.GesperrtBis then
+		aus.Aktualisieren = math.min(aus.Aktualisieren or math.huge, t.GesperrtBis)
+	end
 	if status == "offen" then
 		local s = fragenAuswahl(p, ziel, stufe)
 		aus.Theorie.Id = s.id
@@ -763,13 +769,16 @@ local function zustand(player, frisch)
 		Nummer = type(w) == "table" and w.Nummer or nil,
 		Zugewiesen = meinId,
 		Trainings = zeilen,
-		AppFehler = trainings.fehler ~= nil,
+		AppFehler = ECHT and trainings.fehler ~= nil,
 	}
+	if p.sim and p.sim.befoerdertAm then
+		aus.Aktualisieren = math.min(aus.Aktualisieren or math.huge, p.sim.befoerdertAm)
+	end
 	return aus
 end
 
-rZustand.OnServerInvoke = function(player, frisch)
-	local ok, res = pcall(zustand, player, frisch == true)
+rZustand.OnServerInvoke = function(player, frisch, aktion)
+	local ok, res = pcall(zustand, player, frisch == true, aktion)
 	if not ok then
 		warn("[TSG] Trainings-Zustand für " .. player.Name .. ": " .. tostring(res))
 		return { Fehler = true }
@@ -819,7 +828,8 @@ rAbsenden.OnServerInvoke = function(player, sitzungId, antworten)
 			task.spawn(speichern, player, p)
 			return { Ok = true, Bestanden = true, Prozent = prozent, Nummer = n }
 		end
-		local bis = os.time() + (K.Wartezeiten and K.Sperre or 0)
+		-- Echtzeit: exakt 4 Tage ab jetzt, Simulation: 10 Sekunden
+		local bis = os.time() + (ECHT and K.Sperre or SIM_SEKUNDEN)
 		p.d.Theorie[ziel] = { GesperrtBis = bis, Prozent = prozent, Versuche = versuche }
 		p.dirty = true
 		task.spawn(speichern, player, p)
@@ -904,6 +914,27 @@ rBeitreten.OnServerInvoke = function(player, trainingId)
 	end
 	if not darf then
 		return { Ok = false, Text = "You are not assigned to this training." }
+	end
+	local p = laden(player)
+	if p.sim then
+		-- Simulation: Training „besucht“, nach 10 Sekunden in den nächsten Rang
+		if not p.sim.befoerdertAm then
+			local ziel = tr.ziel
+			p.sim.befoerdertAm = os.time() + SIM_SEKUNDEN
+			task.delay(SIM_SEKUNDEN, function()
+				if profile[player] == p and ziel then
+					if p.d.Warteschlange then
+						queueVerlassen(p.d.Warteschlange.Ziel, player.UserId)
+						p.d.Warteschlange = nil
+					end
+					p.sim.rang = ziel
+					p.sim.seit = os.time()
+					p.sim.befoerdertAm = nil
+					p.sitzung = nil
+				end
+			end)
+		end
+		return { Ok = true, Text = string.format("Simulation: training joined – you will be promoted to %s in %d seconds.", K.Raenge[tr.ziel] and K.Raenge[tr.ziel].Name or "the next rank", SIM_SEKUNDEN), Aktualisieren = p.sim.befoerdertAm }
 	end
 	if RunService:IsStudio() then
 		return { Ok = false, Text = "Teleporting only works in the live game, not in Studio." }

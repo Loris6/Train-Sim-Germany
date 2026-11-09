@@ -1,12 +1,16 @@
 --[[
   Train Sim Germany – Trainings im Menü (Client)
-  Liegt als LocalScript in StarterGui.Menu.container.Training. Füllt das vorhandene Layout mit Leben:
-    Top:      3 Abschnitte (Anforderungen, Theorie, Praktisch) – fertige grün mit Haken
-    Frames:   Anforderungen, Theory, Assessment, calender (unter canvas.items)
-    bottom:   ← Return (Kalender → zurück zum Assessment, sonst Training schließen und die Buttons zeigen),
-              Guides (noch ohne Funktion), Kalender, „Join Assessment →“ (nur grün und klickbar, wenn der Server offen ist)
-    notify:   Meldungen (im selben Parent wie das Training)
-  Die Vorlagen im Layout (Zeilen, Fragen Q1 … Q10, Kalenderzeile, Tags, Profile) werden geklont und dynamisch befüllt.
+  Liegt als LocalScript in StarterGui.Menu.container.Training und füllt das vorhandene Design mit Logik.
+  Am Design wird nichts hinzugefügt: Zustände werden aus den Vorlagen im Layout übernommen.
+    Top (selector, quiz, practical) – reine Anzeige, nicht klickbar. Fertig sieht aus wie im Design der Abschnitt mit
+                    grünem Hintergrund und Haken, offen wie die Abschnitte mit dunklem Hintergrund.
+    Anforderungen   – Zeile ohne Balken mit Haken = erfüllt, Zeile mit rotem Balken = Fortschritt (Balken läuft an).
+    Theory          – Q1 (Auswahl), Q10 (Mehrfachauswahl), Q3 (Texteingabe) sind die Vorlagen; das TextLabel oben
+                    zeigt Hinweis bzw. Sperrzeit. Gewählte Antworten leuchten wie der grüne „Join“-Knopf.
+    Assessment      – Text im Format des Designs, Tags (#Nummer, Rang, Spieler, Status), Leitung und Supervisors.
+    calender        – obere Zeile = zugewiesenes Training, darunter die Trennlinie und alle weiteren.
+    bottom          – Return (Kalender → Assessment, sonst Training schließen), Guides (noch ohne Funktion),
+                    Kalender, „Join Assessment →“ nur grün und klickbar, wenn der Server offen ist.
   Daten kommen vom Server (ServerScriptService.TSGTraining), Einstellungen in ServerStorage.TSGTrainingKonfig.
 ]]
 
@@ -18,7 +22,6 @@ local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 local Training = script.Parent
 local container = Training.Parent
-local menu = Training:FindFirstAncestorWhichIsA("ScreenGui")
 local Buttons = container:FindFirstChild("Buttons")
 local notify = container:FindFirstChild("notify")
 local Top = Training:WaitForChild("Top")
@@ -51,20 +54,8 @@ local rZustand = remotes:WaitForChild("Zustand")
 local rAbsenden = remotes:WaitForChild("Absenden")
 local rBeitreten = remotes:WaitForChild("Beitreten")
 
--- Farben und Bilder wie im Layout
-local GRUEN = Color3.fromHex("00ff5e")
-local GRUEN_BALKEN = Color3.fromHex("1fa34a")
-local ROT = Color3.fromHex("ff2929")
-local DUNKEL = Color3.fromHex("000014")
-local GRAU = Color3.fromHex("585b67")
-local SCHWARZ = Color3.new(0, 0, 0)
-local TEXT_DUNKEL = Color3.fromHex("131821")
-local WEISS = Color3.new(1, 1, 1)
-local HAKEN = "rbxassetid://104065181064771"
-local OFFEN_BILD = "rbxassetid://83732171172408"
-
-local function tween(inst, zeit, ziel, stil, richtung, verzoegerung)
-	local tw = TweenService:Create(inst, TweenInfo.new(zeit, stil or Enum.EasingStyle.Quint, richtung or Enum.EasingDirection.Out, 0, false, verzoegerung or 0), ziel)
+local function tween(inst, zeit, ziel, stil, richtung)
+	local tw = TweenService:Create(inst, TweenInfo.new(zeit, stil or Enum.EasingStyle.Quint, richtung or Enum.EasingDirection.Out), ziel)
 	tw:Play()
 	return tw
 end
@@ -74,147 +65,75 @@ end
 local function thumb(userId)
 	return userId and string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=150&h=150", userId) or ""
 end
-
--- ===== Sounds (aus StarterGui.Menu: „ui-bubble-click“ und „Sound“) =====
-local function ton(vorlage, tempo, laut)
-	if not vorlage or not vorlage:IsA("Sound") then
-		return nil
-	end
-	local s = vorlage:Clone()
-	for _, c in ipairs(s:GetChildren()) do
-		c:Destroy()
-	end
-	s.Name = "TSG_" .. vorlage.Name
-	s.Looped = false
-	s.PlaybackSpeed = tempo or vorlage.PlaybackSpeed
-	s.Volume = vorlage.Volume * (laut or 1)
-	s.Parent = script
-	return s
-end
-local klickVorlage = menu and menu:FindFirstChild("ui-bubble-click", true)
-local KLICK = ton(klickVorlage, 1, 0.6)
-local HOVER = ton(klickVorlage, 1.5, 0.25)
-local WECHSEL = ton(menu and menu:FindFirstChild("Sound"), 1, 0.35) or KLICK
-local function spiele(s)
-	if s then
-		s.TimePosition = 0
-		s:Play()
-	end
+local function fontFarbe(text, standard)
+	return (tostring(text or ""):match("<font color=['\"](#%x+)['\"]")) or standard
 end
 
--- Knöpfe: Hover-Ton, leichtes Vergrößern, Klick-Ton und kurzes Eindrücken
-local function istAus(btn)
-	return btn:GetAttribute("TSGAus") == true
-end
-local function knopf(btn, beiKlick, ohneSkala)
+-- ===== Klick-Ton: modern, leise, nur beim Klicken =====
+local klick = Instance.new("Sound")
+klick.Name = "TSGKlick"
+klick.SoundId = "rbxassetid://15675059323" -- Roblox_UI_Bright_Click
+klick.Volume = 0.35
+klick.Parent = script
+local gesperrt = {} -- Knöpfe, die gerade nicht klickbar sind
+local function knopf(btn, beiKlick)
 	if not btn or not btn:IsA("GuiButton") then
 		return
 	end
-	local skala
-	if not ohneSkala then
-		skala = btn:FindFirstChild("TSGSkala") or Instance.new("UIScale")
-		skala.Name = "TSGSkala"
-		skala.Parent = btn
-	end
-	btn.MouseEnter:Connect(function()
-		if istAus(btn) then
-			return
-		end
-		spiele(HOVER)
-		if skala then
-			tween(skala, 0.15, { Scale = 1.04 })
-		end
-	end)
-	btn.MouseLeave:Connect(function()
-		if skala then
-			tween(skala, 0.15, { Scale = 1 })
-		end
-	end)
 	btn.Activated:Connect(function()
-		if istAus(btn) then
+		if gesperrt[btn] then
 			return
 		end
-		spiele(KLICK)
-		if skala then
-			tween(skala, 0.06, { Scale = 0.94 }).Completed:Once(function()
-				tween(skala, 0.2, { Scale = 1 }, Enum.EasingStyle.Back)
-			end)
-		end
+		klick.TimePosition = 0
+		klick:Play()
 		if beiKlick then
 			task.spawn(beiKlick)
 		end
 	end)
 end
-local function setAus(btn, aus)
-	if not btn then
-		return
-	end
-	if btn:GetAttribute("TSGInit") and btn:GetAttribute("TSGAus") == aus then
-		return
-	end
-	btn:SetAttribute("TSGInit", true)
-	btn:SetAttribute("TSGAus", aus)
-	btn.AutoButtonColor = false
-	tween(btn, 0.2, { BackgroundColor3 = aus and DUNKEL or GRUEN, BackgroundTransparency = aus and 0.6 or 0.2 })
-	for _, d in ipairs(btn:GetDescendants()) do
-		if d:IsA("TextLabel") then
-			tween(d, 0.2, { TextTransparency = aus and 0.5 or 0 })
-		elseif d:IsA("ImageLabel") then
-			tween(d, 0.2, { ImageTransparency = aus and 0.6 or 0 })
-		end
-	end
-end
 
--- ===== Meldungen (container.notify) =====
+-- ===== Meldungen (container.notify, Vorlage = notify.Frame) =====
 local notifyVorlage = notify and notify:FindFirstChild("Frame")
+local notifyBg = notifyVorlage and notifyVorlage.BackgroundTransparency or 0.1
 if notifyVorlage then
 	notifyVorlage.Visible = false
-	notify.ZIndex = 50
 end
-local function melden(text, art)
+local function melden(text)
 	if not notifyVorlage then
 		warn("[TSG] " .. tostring(text))
 		return
 	end
 	notify.Visible = true
 	local f = notifyVorlage:Clone()
-	f.Name = "TSGMeldung"
+	f.Name = "Meldung"
 	local label = f:FindFirstChildOfClass("TextLabel")
 	local bild = f:FindFirstChildOfClass("ImageLabel")
-	local bg = f.BackgroundTransparency
 	if label then
-		label.RichText = true
 		label.Text = text
 		label.TextTransparency = 1
 	end
 	if bild then
-		bild.ImageColor3 = art == "ok" and GRUEN or art == "fehler" and ROT or WEISS
 		bild.ImageTransparency = 1
 	end
 	f.BackgroundTransparency = 1
-	local skala = Instance.new("UIScale")
-	skala.Scale = 0.85
-	skala.Parent = f
 	f.Visible = true
 	f.Parent = notify
-	tween(f, 0.25, { BackgroundTransparency = bg })
-	tween(skala, 0.35, { Scale = 1 }, Enum.EasingStyle.Back)
+	tween(f, 0.3, { BackgroundTransparency = notifyBg })
 	if label then
-		tween(label, 0.25, { TextTransparency = 0 })
+		tween(label, 0.3, { TextTransparency = 0 })
 	end
 	if bild then
-		tween(bild, 0.25, { ImageTransparency = 0 })
+		tween(bild, 0.3, { ImageTransparency = 0 })
 	end
 	task.delay(4.5, function()
-		tween(f, 0.3, { BackgroundTransparency = 1 })
-		tween(skala, 0.3, { Scale = 0.9 })
+		tween(f, 0.35, { BackgroundTransparency = 1 })
 		if label then
-			tween(label, 0.3, { TextTransparency = 1 })
+			tween(label, 0.35, { TextTransparency = 1 })
 		end
 		if bild then
-			tween(bild, 0.3, { ImageTransparency = 1 })
+			tween(bild, 0.35, { ImageTransparency = 1 })
 		end
-		task.wait(0.32)
+		task.wait(0.4)
 		f:Destroy()
 	end)
 end
@@ -240,13 +159,17 @@ end
 local function berlin(t)
 	local y = os.date("!*t", t).year
 	local sommer = t >= letzterSonntag(y, 3) * 86400 + 3600 and t < letzterSonntag(y, 10) * 86400 + 3600
-	return os.date("!*t", t + (sommer and 7200 or 3600))
+	return os.date("!*t", t + (sommer and 7200 or 3600)), sommer and "MESZ" or "MEZ"
 end
 local function datum(t)
 	local d = berlin(t or 0)
 	return string.format("%02d.%02d.%04d — %02d:%02d", d.day, d.month, d.year, d.hour, d.min)
 end
-local function bis(sek)
+local function uhrzeit(t)
+	local d, zone = berlin(t or 0)
+	return string.format("%02d:%02d %s", d.hour, d.min, zone)
+end
+local function kurz(sek) -- Kalender: „(in 21 min)“
 	if sek < 3600 then
 		return math.max(1, math.ceil(sek / 60)) .. " min"
 	elseif sek < 86400 then
@@ -255,6 +178,19 @@ local function bis(sek)
 		return math.floor(sek / 86400) .. " d"
 	end
 	return math.floor(sek / (7 * 86400)) .. " w"
+end
+local function lang(sek) -- Assessment: „16 mins“
+	local function n(x, eins, mehr)
+		return x .. " " .. (x == 1 and eins or mehr)
+	end
+	if sek < 3600 then
+		return n(math.max(1, math.ceil(sek / 60)), "min", "mins")
+	elseif sek < 86400 then
+		return n(math.floor(sek / 3600), "hour", "hours")
+	elseif sek < 7 * 86400 then
+		return n(math.floor(sek / 86400), "day", "days")
+	end
+	return n(math.floor(sek / (7 * 86400)), "week", "weeks")
 end
 local function rest(sek)
 	sek = math.max(0, math.floor(sek))
@@ -317,70 +253,76 @@ local function startSektion()
 	end
 	return z.AnforderungenFertig and "Theorie" or "Anforderungen"
 end
-local function rangText(name, kuerzel, farbe)
-	return string.format("%s Training — From <font color='%s'>%s</font>", esc(name), farbe or "#ffffff", esc(kuerzel))
-end
-local SCHRIFT
-local function hinweis(parent, name, layout)
-	local l = parent:FindFirstChild(name)
-	if not l then
-		l = Instance.new("TextLabel")
-		l.Name = name
-		l.BackgroundTransparency = 1
-		l.Size = UDim2.new(1, 0, 0, 0)
-		l.AutomaticSize = Enum.AutomaticSize.Y
-		l.TextWrapped = true
-		l.RichText = true
-		l.TextXAlignment = Enum.TextXAlignment.Left
-		l.TextColor3 = WEISS
-		l.TextSize = 24
-		l.FontFace = SCHRIFT or Font.fromEnum(Enum.Font.BuilderSans)
-		l.LayoutOrder = layout or 0
-		l.Parent = parent
+-- „Conductor Training — From DS to CD“ wie im Design
+local function rangText()
+	if not z or not z.Ziel then
+		return string.format("Your rank: <font color='%s'>%s</font>", z and z.Rang.Farbe or "#ffffff", esc(z and z.Rang.Name or ""))
 	end
-	return l
+	return string.format("%s Training — From <font color='%s'>%s</font> to <font color='%s'>%s</font>",
+		esc(z.Ziel.Name), z.Rang.Farbe, esc(z.Rang.Kuerzel), z.Ziel.Farbe, esc(z.Ziel.Kuerzel))
 end
 
--- ===== Top: 3 Abschnitte =====
+-- ===== Top: Anzeige der 3 Abschnitte (nicht klickbar) =====
 local SEKTOR = { Anforderungen = Top:FindFirstChild("selector"), Theorie = Top:FindFirstChild("quiz"), Assessment = Top:FindFirstChild("practical") }
+local function stilLesen(cg)
+	local btn = cg:FindFirstChild("Btn")
+	local sel = btn and btn:FindFirstChild("selected")
+	local ic = sel and sel:FindFirstChild("icon")
+	local h = btn and btn:FindFirstChild("heading")
+	return {
+		bg = cg.BackgroundColor3, bgT = cg.BackgroundTransparency,
+		selBg = sel and sel.BackgroundColor3, selT = sel and sel.BackgroundTransparency,
+		icon = ic and ic.Visible, bild = ic and ic.Image, text = h and h.TextColor3,
+	}
+end
+local stilFertig, stilOffen
+for _, cg in pairs(SEKTOR) do
+	local s = stilLesen(cg)
+	if s.icon then
+		stilFertig = stilFertig or s
+	else
+		stilOffen = stilOffen or s
+	end
+end
+stilFertig = stilFertig or stilOffen
+stilOffen = stilOffen or stilFertig
 local function topSetzen()
-	local aktiverSektor = aktuell == "Calender" and "Assessment" or aktuell
 	for name, cg in pairs(SEKTOR) do
-		local ok = fertig(name)
-		tween(cg, 0.25, { BackgroundColor3 = ok and GRUEN or DUNKEL, BackgroundTransparency = 0.2 })
-		local btn = cg:FindFirstChild("Btn")
-		local sel = btn and btn:FindFirstChild("selected")
-		local ic = sel and sel:FindFirstChild("icon")
-		if ic then
-			ic.Visible = ok
+		local s = fertig(name) and stilFertig or stilOffen
+		if s then
+			tween(cg, 0.35, { BackgroundColor3 = s.bg, BackgroundTransparency = s.bgT })
+			local btn = cg:FindFirstChild("Btn")
+			local sel = btn and btn:FindFirstChild("selected")
+			local ic = sel and sel:FindFirstChild("icon")
+			local h = btn and btn:FindFirstChild("heading")
+			if sel and s.selBg then
+				tween(sel, 0.35, { BackgroundColor3 = s.selBg, BackgroundTransparency = s.selT })
+			end
+			if ic then
+				if s.icon then
+					ic.Image = s.bild
+				end
+				ic.Visible = s.icon
+			end
+			if h and s.text then
+				tween(h, 0.35, { TextColor3 = s.text })
+			end
 		end
-		if sel then
-			tween(sel, 0.25, { BackgroundColor3 = ok and DUNKEL or GRAU, BackgroundTransparency = ok and 0.2 or 0.6 })
-		end
-		local h = btn and btn:FindFirstChild("heading")
-		if h then
-			tween(h, 0.25, { TextColor3 = ok and TEXT_DUNKEL or WEISS, TextTransparency = erlaubt(name) and 0 or 0.45 })
-		end
-		local st = cg:FindFirstChild("stroke") or cg:FindFirstChildOfClass("UIStroke")
-		if not st then
-			st = Instance.new("UIStroke")
-			st.Name = "stroke"
-			st.Thickness = 1.5
-			st.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-			st.Parent = cg
-		end
-		st.Color = ok and WEISS or GRUEN
-		st.Enabled = aktiverSektor == name
 	end
 end
 
--- ===== Unten: Return, Guides, Kalender, Next =====
+-- ===== Unten =====
 local unten = bottom:FindFirstChild("Frame")
 local nextBtn = unten and unten:FindFirstChild("Next")
 local nextText = nextBtn and nextBtn:FindFirstChildOfClass("TextLabel")
 local guides = unten and unten:FindFirstChild("Guides")
 local kalBtn = unten and kind(unten, "calender", "Calender")
 local zurueck = bottom:FindFirstChild("return")
+-- leuchtend = wie „Join Assessment →“ im Design, abgedunkelt = wie „← Return“
+local LEUCHT_BG = nextBtn and nextBtn.BackgroundColor3 or Color3.fromHex("00ff5e")
+local LEUCHT_T = nextBtn and nextBtn.BackgroundTransparency or 0.2
+local DUNKEL_BG = zurueck and zurueck.BackgroundColor3 or Color3.fromHex("000014")
+local DUNKEL_T = zurueck and zurueck.BackgroundTransparency or 0.1
 
 local function meinTraining()
 	if not z or not z.Praktisch then
@@ -411,33 +353,28 @@ local function darf(tr)
 	end
 	return false
 end
-local function untenSetzen()
-	local imAssessment = aktuell == "Assessment"
-	if guides then
-		guides.Visible = imAssessment
-	end
-	if kalBtn then
-		kalBtn.Visible = imAssessment
-	end
+local nextStand = nil
+local function nextSetzen()
 	if not nextBtn then
 		return
 	end
-	if aktuell == "Anforderungen" and erlaubt("Theorie") then
-		nextBtn.Visible = true
-		if nextText then
-			nextText.Text = theorieBestanden() and "Practical Training →" or "Start Theory →"
-		end
-		setAus(nextBtn, false)
-	elseif imAssessment then
-		nextBtn.Visible = true
-		if nextText then
-			nextText.Text = "Join Assessment →"
-		end
-		local tr = meinTraining()
-		setAus(nextBtn, not (tr and istOffen(tr) and darf(tr)))
-	else
-		nextBtn.Visible = false
+	local tr = meinTraining()
+	local an = tr ~= nil and istOffen(tr) and darf(tr)
+	if nextStand == an then
+		return
 	end
+	nextStand = an
+	gesperrt[nextBtn] = not an
+	tween(nextBtn, 0.25, { BackgroundColor3 = an and LEUCHT_BG or DUNKEL_BG, BackgroundTransparency = an and LEUCHT_T or DUNKEL_T })
+	if nextText then
+		tween(nextText, 0.25, { TextTransparency = an and 0 or 0.5 })
+	end
+end
+local function untenSetzen()
+	if unten then
+		unten.Visible = aktuell == "Assessment"
+	end
+	nextSetzen()
 end
 
 -- ===== 1. Anforderungen =====
@@ -445,58 +382,52 @@ local A = F.Anforderungen
 local aKopf = A and A:FindFirstChild("Heading")
 local aRang = aKopf and aKopf:FindFirstChild("Rank")
 local aListe = A and kind(A, "conent", "content")
-local reqVorlage
+local function statusBild(row)
+	local a1 = row:FindFirstChild("A1") or row:FindFirstChildWhichIsA("GuiButton")
+	local box = a1 and a1:FindFirstChild("ImageLabel")
+	if box and box:IsA("ImageLabel") then
+		return box
+	end
+	return box and box:FindFirstChildOfClass("ImageLabel")
+end
+local reqVorlage, bildFertig, bildOffen
 if aListe then
-	for _, c in ipairs(aListe:GetChildren()) do
-		if c:IsA("CanvasGroup") and (not reqVorlage or (not reqVorlage:FindFirstChild("Frame") and c:FindFirstChild("Frame"))) then
-			reqVorlage = c
+	local zeileFertig, zeileOffen
+	for _, row in ipairs(aListe:GetChildren()) do
+		if row:IsA("CanvasGroup") then
+			if row:FindFirstChild("Frame") then
+				zeileOffen = zeileOffen or row
+			else
+				zeileFertig = zeileFertig or row
+			end
 		end
 	end
+	local bf = zeileFertig and statusBild(zeileFertig)
+	local bo = zeileOffen and statusBild(zeileOffen)
+	bildFertig = bf and { Image = bf.Image, T = bf.ImageTransparency }
+	bildOffen = bo and { Image = bo.Image, T = bo.ImageTransparency }
+	reqVorlage = (zeileOffen or zeileFertig)
 	reqVorlage = reqVorlage and reqVorlage:Clone()
-	for _, c in ipairs(aListe:GetChildren()) do
-		if c:IsA("CanvasGroup") then
-			c:Destroy()
+	for _, row in ipairs(aListe:GetChildren()) do
+		if row:IsA("CanvasGroup") then
+			row:Destroy()
 		end
 	end
 end
 local reqZeilen = {}
-
 local function gruppeBeitreten()
 	if not z then
 		return
 	end
-	local ok, status = pcall(GroupService.PromptJoinAsync, GroupService, z.GruppenId)
-	if ok and tostring(status):find("Joined") then
-		melden("Welcome to the Train Sim Germany group!", "ok")
+	if z.Simulation then
+		laden(true, nil, "gruppe")
+		return
 	end
+	pcall(GroupService.PromptJoinAsync, GroupService, z.GruppenId)
 	task.wait(1)
 	laden(true)
 	task.wait(5)
 	laden(true) -- Roblox meldet den Beitritt manchmal etwas später
-end
-local function gruppenKnopf(r)
-	if r.gruppe then
-		return r.gruppe
-	end
-	local b = Instance.new("TextButton")
-	b.Name = "TSGJoinGroup"
-	b.AnchorPoint = Vector2.new(1, 0.5)
-	b.Position = UDim2.new(1, -12, 0.5, 0)
-	b.Size = UDim2.fromOffset(140, 34)
-	b.BackgroundColor3 = Color3.fromHex("EC0016")
-	b.AutoButtonColor = false
-	b.Text = "Join Group"
-	b.TextColor3 = WEISS
-	b.TextSize = 18
-	b.FontFace = r.text and Font.new(r.text.FontFace.Family, Enum.FontWeight.Bold) or Font.fromEnum(Enum.Font.BuilderSansBold)
-	b.ZIndex = 20
-	local ecke = Instance.new("UICorner")
-	ecke.CornerRadius = UDim.new(0, 10)
-	ecke.Parent = b
-	b.Parent = r.row
-	knopf(b, gruppeBeitreten)
-	r.gruppe = b
-	return b
 end
 local function reqZeile(i)
 	local r = reqZeilen[i]
@@ -507,76 +438,73 @@ local function reqZeile(i)
 	row.Name = "Anforderung" .. i
 	row.LayoutOrder = i
 	local text = row:FindFirstChild("A1") or row:FindFirstChildWhichIsA("GuiButton")
-	local box = text and text:FindFirstChild("ImageLabel")
-	local bild = box and (box:IsA("ImageLabel") and box or box:FindFirstChildOfClass("ImageLabel"))
-	local balken = row:FindFirstChild("Frame")
-	if not balken then
-		balken = Instance.new("Frame")
-		balken.Name = "Frame"
-		balken.BorderSizePixel = 0
-		balken.BackgroundColor3 = ROT
-		balken.Parent = row
+	r = { row = row, text = text, bild = statusBild(row), balken = row:FindFirstChild("Frame"), fertig = nil }
+	if r.balken then
+		r.balken.Size = UDim2.new(0, 0, r.balken.Size.Y.Scale, r.balken.Size.Y.Offset)
 	end
-	balken.Size = UDim2.fromScale(0, 1)
-	if text then
-		text.RichText = true
-		text.AutoButtonColor = false
-	end
-	r = { row = row, text = text, bild = bild, balken = balken }
-	if text then
-		knopf(text, function()
-			if r.aktion == "gruppe" then
-				gruppeBeitreten()
-			end
-		end, true)
-	end
+	knopf(text, function()
+		if r.aktion == "gruppe" then
+			gruppeBeitreten()
+		end
+	end)
 	row.Parent = aListe
 	reqZeilen[i] = r
 	return r
+end
+local function balkenZiel(r, wert)
+	local s = r.balken.Size
+	return UDim2.new(math.clamp(wert, 0, 1), 0, s.Y.Scale, s.Y.Offset)
 end
 local function anforderungenZeigen(animieren)
 	if not A or not z or not aListe or not reqVorlage then
 		return
 	end
-	local info = hinweis(aListe, "TSGHinweis", 100)
 	if aRang then
-		aRang.RichText = true
+		aRang.Text = rangText()
 	end
-	if z.KeinTraining then
-		if aRang then
-			aRang.Text = string.format("No further training — your rank: <font color='%s'>%s</font>", z.Rang.Farbe, esc(z.Rang.Name))
-		end
-		for _, r in ipairs(reqZeilen) do
-			r.row.Visible = false
-		end
-		info.Visible = true
-		info.Text = leitung() and "You are hosting a training – open <b>Practical Training</b> to join its server." or "You have completed all trainings. Thank you for being part of the team!"
-		return
-	end
-	info.Visible = false
-	if aRang then
-		aRang.Text = rangText(z.Ziel.Name, z.Rang.Kuerzel, z.Rang.Farbe)
-	end
-	local liste = z.Anforderungen or {}
+	local liste = (not z.KeinTraining and z.Anforderungen) or {}
 	for i, a in ipairs(liste) do
 		local r = reqZeile(i)
 		r.row.Visible = true
 		r.aktion = a.Aktion
 		if r.text then
-			r.text.Text = esc(a.Text) .. (a.Anzeige and ("  <font color='#b2b9c4'>· " .. esc(a.Anzeige) .. "</font>") or "")
+			r.text.Text = a.Anzeige and (a.Text .. "  ·  " .. a.Anzeige) or a.Text
 		end
-		if r.bild then
-			r.bild.Image = a.Fertig and HAKEN or OFFEN_BILD
-		end
-		-- Roter Balken wächst von links nach rechts bis zum Fortschritt (XP bzw. Zeit), fertig = grün
-		if animieren then
-			r.balken.Size = UDim2.fromScale(0, 1)
-		end
-		tween(r.balken, animieren and 1 or 0.5, { Size = UDim2.fromScale(math.clamp(tonumber(a.Wert) or 0, 0, 1), 1), BackgroundColor3 = a.Fertig and GRUEN_BALKEN or ROT },
-			Enum.EasingStyle.Quint, Enum.EasingDirection.Out, animieren and (0.1 + i * 0.12) or 0)
-		local g = a.Aktion == "gruppe" and gruppenKnopf(r) or r.gruppe
-		if g then
-			g.Visible = a.Aktion == "gruppe"
+		local warFertig = r.fertig
+		r.fertig = a.Fertig
+		if a.Fertig then
+			-- erfüllt: wie die Zeile ohne Balken im Design (Haken). Gerade erst erfüllt: Balken läuft voll, dann Haken.
+			local function haken()
+				if not r.fertig then
+					return
+				end
+				if r.bild and bildFertig then
+					r.bild.Image = bildFertig.Image
+					r.bild.ImageTransparency = bildFertig.T
+				end
+				if r.balken then
+					r.balken.Visible = false
+				end
+			end
+			if warFertig == false and r.balken then
+				r.balken.Visible = true
+				tween(r.balken, 0.8, { Size = balkenZiel(r, 1) }).Completed:Once(haken)
+			else
+				haken()
+			end
+		else
+			-- offen: roter Balken läuft von links nach rechts bis zum Fortschritt
+			if r.bild and bildOffen then
+				r.bild.Image = bildOffen.Image
+				r.bild.ImageTransparency = bildOffen.T
+			end
+			if r.balken then
+				r.balken.Visible = true
+				if animieren then
+					r.balken.Size = balkenZiel(r, 0)
+				end
+				tween(r.balken, animieren and 1 or 0.5, { Size = balkenZiel(r, tonumber(a.Wert) or 0) })
+			end
 		end
 	end
 	for i = #liste + 1, #reqZeilen do
@@ -590,8 +518,6 @@ local tInfo, tAbsenden
 local vorlagen = {}
 local fragenFrames, antwortListe, gebautId = {}, {}, nil
 if T then
-	T.Size = UDim2.new(1, 0, 0, 0)
-	T.AutomaticSize = Enum.AutomaticSize.Y
 	for _, c in ipairs(T:GetChildren()) do
 		if c:IsA("TextLabel") and not tInfo then
 			tInfo = c
@@ -627,16 +553,6 @@ if T then
 	for _, f in pairs(q) do
 		f:Destroy()
 	end
-	if tInfo then
-		tInfo.LayoutOrder = 1
-		tInfo.RichText = true
-		tInfo.TextWrapped = true
-		tInfo.AutomaticSize = Enum.AutomaticSize.Y
-		SCHRIFT = tInfo.FontFace
-	end
-	if tAbsenden then
-		tAbsenden.LayoutOrder = 100
-	end
 end
 local submitKnopf = tAbsenden and tAbsenden:FindFirstChildOfClass("TextButton")
 local tZurueck = tAbsenden and tAbsenden:FindFirstChild("return")
@@ -644,10 +560,7 @@ local tZurueck = tAbsenden and tAbsenden:FindFirstChild("return")
 local function wahlZeigen(e)
 	for k, kb in pairs(e.knoepfe) do
 		local an = e.wahl[k] == true
-		tween(kb.b, 0.15, { BackgroundColor3 = an and GRUEN or SCHWARZ, BackgroundTransparency = an and 0.82 or 1, TextColor3 = an and GRUEN or WEISS })
-		if kb.bild then
-			tween(kb.bild, 0.15, { ImageColor3 = an and GRUEN or WEISS })
-		end
+		tween(kb.b, 0.2, { BackgroundColor3 = an and LEUCHT_BG or kb.bg, BackgroundTransparency = an and LEUCHT_T or kb.bgT })
 	end
 end
 local function fragenBauen(th)
@@ -661,9 +574,7 @@ local function fragenBauen(th)
 		if v then
 			local f = v:Clone()
 			f.Name = "Q" .. i
-			f.LayoutOrder = 10 + i
-			f.AutomaticSize = Enum.AutomaticSize.Y
-			f.Size = UDim2.new(1, 0, 0, 0)
+			f.LayoutOrder = 1 + i -- wie im Design: Q1 = 2 … Q10 = 11
 			local kopf
 			for _, c in ipairs(f:GetChildren()) do
 				if c:IsA("Frame") and c:FindFirstChildOfClass("TextLabel") and not c:FindFirstChildWhichIsA("TextBox", true) then
@@ -672,26 +583,15 @@ local function fragenBauen(th)
 				end
 			end
 			local label = kopf and kopf:FindFirstChildOfClass("TextLabel")
-			if kopf then
-				kopf.AutomaticSize = Enum.AutomaticSize.Y
-			end
 			if label then
-				label.RichText = true
-				label.TextWrapped = true
-				label.AutomaticSize = Enum.AutomaticSize.Y
-				local extra = q.Typ == "Mehrfach" and " <font color='#b2b9c4'>(select all that apply)</font>" or ""
-				label.Text = string.format("<font color='#ff0000'>Question %d</font> | %s%s <font color='#8a8f9a'>· %d %s</font>", i, esc(q.Text), extra, q.Punkte, q.Punkte == 1 and "pt" or "pts")
+				local extra = q.Typ == "Mehrfach" and " (Select one or more answers)" or ""
+				label.Text = string.format("<font color='#ff0000'>Question %d</font> | %s%s", i, esc(q.Text), extra)
 			end
 			local eintrag = { typ = q.Typ, wahl = {}, knoepfe = {} }
 			if q.Typ == "Text" then
 				local box = f:FindFirstChildWhichIsA("TextBox", true)
 				if box then
 					box.Text = ""
-					box.PlaceholderText = "Type your answer …"
-					box.ClearTextOnFocus = false
-					box.Focused:Connect(function()
-						spiele(HOVER)
-					end)
 					eintrag.box = box
 				end
 			else
@@ -708,9 +608,8 @@ local function fragenBauen(th)
 						b.Name = "A" .. k
 						b.Text = text
 						b.LayoutOrder = k
-						b.AutoButtonColor = false
 						b.Parent = f
-						eintrag.knoepfe[k] = { b = b, bild = b:FindFirstChildOfClass("ImageLabel") }
+						eintrag.knoepfe[k] = { b = b, bg = b.BackgroundColor3, bgT = b.BackgroundTransparency }
 						knopf(b, function()
 							if q.Typ == "Auswahl" then
 								eintrag.wahl = { [k] = true }
@@ -718,7 +617,7 @@ local function fragenBauen(th)
 								eintrag.wahl[k] = (not eintrag.wahl[k]) or nil
 							end
 							wahlZeigen(eintrag)
-						end, true)
+						end)
 					end
 				end
 				if muster then
@@ -732,31 +631,23 @@ local function fragenBauen(th)
 	end
 end
 
-local nachgeladen = nil
 local function theorieText()
 	if not tInfo or not z then
 		return
 	end
 	local th = z.Theorie or {}
-	local klein = "<font size='20' color='#b2b9c4'>%s</font>"
 	if z.KeinTraining then
-		tInfo.Text = "<b>No theory for your rank</b><br/>" .. string.format(klein, "You have already completed all trainings.")
+		tInfo.Text = "You have already completed all trainings."
 	elseif th.Status == "offen" then
-		tInfo.Text = string.format("<b>Theory Quiz — %s</b><br/>", esc(z.Ziel.Name))
-			.. string.format(klein, string.format("Answer all %d questions about your next rank. You need at least %d %% of the points to pass.", #(th.Fragen or {}), math.floor((z.Grenze or 0.9) * 100 + 0.5)))
+		tInfo.Text = string.format("Theory Quiz for <b>%s</b>: answer all %d questions. You need at least %d %% to pass.",
+			esc(z.Ziel.Name), #(th.Fragen or {}), math.floor((z.Grenze or 0.9) * 100 + 0.5))
 	elseif th.Status == "sperre" then
-		local s = (th.Bis or 0) - jetzt()
-		if s <= 0 and nachgeladen ~= th.Bis then
-			nachgeladen = th.Bis
-			task.spawn(laden)
-		end
-		tInfo.Text = string.format("<b>You did not pass the theory%s.</b><br/>Next attempt in <font color='#ff2929'>%s</font><br/>", th.Prozent and (" (" .. th.Prozent .. " %)") or "", rest(s))
-			.. string.format(klein, "on " .. datum(th.Bis or 0))
+		tInfo.Text = string.format("You did not pass the theory%s.<br/>Next attempt in <font color='#ff0000'>%s</font> (on %s).",
+			th.Prozent and (" (" .. th.Prozent .. " %)") or "", rest((th.Bis or 0) - jetzt()), datum(th.Bis or 0))
 	elseif th.Status == "bestanden" then
-		tInfo.Text = string.format("<b>Theory passed <font color='#00ff5e'>✓</font></b>%s<br/>", th.Prozent and (" (" .. th.Prozent .. " %)") or "")
-			.. string.format(klein, "Continue with the practical training.")
+		tInfo.Text = string.format("Theory passed%s. Continue with the practical training.", th.Prozent and (" with " .. th.Prozent .. " %") or "")
 	else
-		tInfo.Text = "<b>Theory locked</b><br/>" .. string.format(klein, "Complete all requirements first.")
+		tInfo.Text = "Complete all requirements first."
 	end
 end
 local function theorieZeigen()
@@ -768,7 +659,7 @@ local function theorieZeigen()
 	if offen and th.Id ~= gebautId then
 		fragenBauen(th)
 	end
-	-- Gesperrt, bestanden oder Sperrfrist: Fragen ausblenden, nur das TextLabel (LayoutOrder 1) bleibt sichtbar
+	-- gesperrt, bestanden oder Sperrfrist: Fragen ausblenden, nur das TextLabel bleibt sichtbar
 	for _, f in ipairs(fragenFrames) do
 		f.Visible = offen
 	end
@@ -813,33 +704,26 @@ local function absenden()
 		end
 	end
 	if fehlt > 0 then
-		melden(string.format("Please answer all questions (%d still open).", fehlt), "fehler")
+		melden(string.format("Please answer all questions (%d still open).", fehlt))
 		return
 	end
 	sendet = true
-	local altText = submitKnopf and submitKnopf.Text
-	if submitKnopf then
-		submitKnopf.Text = "Checking …"
-	end
 	local ok, res = pcall(rAbsenden.InvokeServer, rAbsenden, z.Theorie.Id, antworten)
 	sendet = false
-	if submitKnopf then
-		submitKnopf.Text = altText
-	end
 	if not ok or type(res) ~= "table" then
-		melden("Could not submit – please try again.", "fehler")
+		melden("Could not submit – please try again.")
 		return
 	end
 	if res.Ok == false then
-		melden(esc(res.Text or "Could not submit."), "fehler")
+		melden(esc(res.Text or "Could not submit."))
 		laden()
 		return
 	end
 	if res.Bestanden then
-		melden(string.format("Theory passed with <b>%d %%</b>! You are <b>#%s</b> in the queue.", res.Prozent, tostring(res.Nummer or "?")), "ok")
+		melden(string.format("Theory passed with %d %%! You are #%s in the queue.", res.Prozent, tostring(res.Nummer or "?")))
 		laden(false, "Assessment")
 	else
-		melden(string.format("Not passed (%d %%, you need %d %%). Next attempt on %s.", res.Prozent, math.floor((z.Grenze or 0.9) * 100 + 0.5), datum(res.Bis)), "fehler")
+		melden(string.format("Not passed (%d %%). You need %d %%.", res.Prozent, math.floor((z.Grenze or 0.9) * 100 + 0.5)))
 		laden()
 	end
 end
@@ -856,73 +740,47 @@ local tag = {}
 if tags then
 	for _, t in ipairs(tags:GetChildren()) do
 		if t:IsA("Frame") then
-			local ecke = t:FindFirstChildOfClass("UICorner")
 			local l = t:FindFirstChildOfClass("TextLabel")
-			if ecke and ecke.CornerRadius.Scale >= 0.5 then
-				tag.Status = t
-			elseif l and l.Text:lower():find("player") then
+			local tx = l and string.lower(l.Text) or ""
+			if tx:match("^%s*#") then
+				tag.Warteschlange = t
+			elseif tx:find("player") then
 				tag.Spieler = t
-			elseif not tag.Rang then
-				tag.Rang = t
-			end
-		end
-	end
-	if tag.Spieler then
-		tag.Warteschlange = tag.Spieler:Clone()
-		tag.Warteschlange.Name = "Warteschlange"
-		tag.Warteschlange.Parent = tags
-	end
-	for i, n in ipairs({ "Rang", "Spieler", "Warteschlange", "Status" }) do
-		local t = tag[n]
-		if t then
-			t.Name = "Tag" .. n
-			t.LayoutOrder = i
-			local breite = math.max(60, t.Size.X.Offset)
-			t.AutomaticSize = Enum.AutomaticSize.X
-			local l = t:FindFirstChildOfClass("TextLabel")
-			if l then
-				l.AnchorPoint = Vector2.zero
-				l.Position = UDim2.new()
-				l.Size = UDim2.new(0, breite, 1, 0)
-				l.AutomaticSize = Enum.AutomaticSize.X
-				l.TextXAlignment = Enum.TextXAlignment.Center
+			elseif tx:find("closed") or tx:find("open") then
+				tag.Status = t
+			else
+				tag.Rang = tag.Rang or t
 			end
 		end
 	end
 end
-local function tagSetzen(t, text, farbe, transparenz)
-	if not t then
-		return
-	end
-	local l = t:FindFirstChildOfClass("TextLabel")
+local statusZu = tag.Status and { bg = tag.Status.BackgroundColor3, t = tag.Status.BackgroundTransparency }
+local rangT = tag.Rang and tag.Rang.BackgroundTransparency or 0.1
+local function tagText(t, text)
+	local l = t and t:FindFirstChildOfClass("TextLabel")
 	if l and l.Text ~= text then
 		l.Text = text
 	end
-	if farbe and (t.BackgroundColor3 ~= farbe or (transparenz and t.BackgroundTransparency ~= transparenz)) then
-		tween(t, 0.25, { BackgroundColor3 = farbe, BackgroundTransparency = transparenz or t.BackgroundTransparency })
-	end
 end
 
-local profilHost, profilHelfer
+local profilHost, helferVorlage
 local helferFrames = {}
 if hostBox then
 	profilHost = hostBox:FindFirstChild("Profil1")
-	local p2 = hostBox:FindFirstChild("Profil2")
-	profilHelfer = p2 and p2:Clone()
 	for _, c in ipairs(hostBox:GetChildren()) do
 		if c:IsA("Frame") and c ~= profilHost then
-			c:Destroy()
+			table.insert(helferFrames, c)
 		end
 	end
+	table.sort(helferFrames, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	helferVorlage = helferFrames[#helferFrames] and helferFrames[#helferFrames]:Clone()
 end
-local function profilSetzen(profil, userId, randFarbe)
+local function profilBild(profil, userId)
 	local img = profil:FindFirstChildOfClass("ImageLabel")
 	if img then
 		img.Image = thumb(userId)
-	end
-	local rand = profil:FindFirstChildOfClass("UIStroke")
-	if rand then
-		rand.Color = randFarbe
 	end
 end
 local function hostsZeigen(tr)
@@ -935,21 +793,21 @@ local function hostsZeigen(tr)
 	end
 	if profilHost then
 		profilHost.Visible = tr.HostId ~= nil
-		profilSetzen(profilHost, tr.HostId, ROT) -- Leitung: rot
+		profilBild(profilHost, tr.HostId) -- Leitung (roter Rand im Design)
 	end
 	local helfer = tr.Helfer or {}
 	for i, h in ipairs(helfer) do
 		local f = helferFrames[i]
-		if not f and profilHelfer then
-			f = profilHelfer:Clone()
-			f.Name = "Supervisor" .. i
-			f.LayoutOrder = 1 + i
+		if not f and helferVorlage then
+			f = helferVorlage:Clone()
+			f.Name = "Profil" .. (i + 1)
+			f.LayoutOrder = i + 1
 			f.Parent = hostBox
 			helferFrames[i] = f
 		end
 		if f then
 			f.Visible = true
-			profilSetzen(f, h.Id, SCHWARZ) -- Supervisors: schwarz
+			profilBild(f, h.Id) -- Supervisors (schwarzer Rand im Design)
 		end
 	end
 	for i = #helfer + 1, #helferFrames do
@@ -957,61 +815,65 @@ local function hostsZeigen(tr)
 	end
 end
 
+local function statusTag()
+	if not tag.Status then
+		return
+	end
+	local offen = istOffen(meinTraining())
+	tagText(tag.Status, offen and "Open" or "Closed")
+	local bg = offen and LEUCHT_BG or statusZu.bg
+	local bt = offen and LEUCHT_T or statusZu.t
+	if tag.Status.BackgroundColor3 ~= bg or tag.Status.BackgroundTransparency ~= bt then
+		tween(tag.Status, 0.3, { BackgroundColor3 = bg, BackgroundTransparency = bt })
+	end
+end
+-- „Next Training Session:<br/>Starting in 16 mins at 10:00 MEZ with [CEN] EinfachLost.“ wie im Design
 local function assessmentText()
 	if not pText or not z then
 		return
 	end
-	pText.RichText = true
-	local klein = "<font size='24' color='#b2b9c4'>%s</font>"
 	local tr = meinTraining()
 	if z.KeinTraining and not leitung() then
-		pText.Text = "No practical training for your rank."
+		pText.Text = "Next Training Session:<br/>There is no practical training for your rank."
 		return
 	end
 	if not theorieBestanden() and not leitung() then
-		pText.Text = "Pass the theory first."
+		pText.Text = "Next Training Session:<br/>Pass the theory first."
 		return
 	end
-	if tr then
-		local s = tr.Start - jetzt()
-		local wann
-		if istOffen(tr) then
-			wann = s > 0 and string.format("Server <font color='#00ff5e'>open</font> — starting in <font color='#ff0000'>%s</font>", bis(s))
-				or "Server <font color='#00ff5e'>open</font> — the training is running"
-		else
-			wann = string.format("Starting in <font color='#ff0000'>%s</font>", bis(s))
-		end
-		local titel = tr.Titel ~= "" and tr.Titel or ((tr.Ziel or "") .. " Training")
-		pText.Text = string.format("%s <b>%s</b><br/>%s<br/>", leitung() and "You are hosting:" or "Next Training Session:", esc(titel), wann)
-			.. string.format(klein, datum(tr.Start) .. (tr.Server ~= "" and (" · " .. esc(tr.Server)) or ""))
-	else
-		local nr = z.Praktisch and z.Praktisch.Nummer
-		pText.Text = "No training assigned yet.<br/>"
-			.. string.format(klein, string.format("You are <b>#%s</b> in the queue – you will be assigned to the next %s training with a free place automatically.", tostring(nr or "?"), esc(z.Ziel and z.Ziel.Name or "")))
+	if not tr then
+		pText.Text = string.format("Next Training Session:<br/>No training assigned yet – you are <b>#%s</b> in the queue and will be assigned automatically.", tostring(z.Praktisch and z.Praktisch.Nummer or "?"))
+		return
 	end
-end
-local function statusTag()
-	local tr = meinTraining()
-	local offen = istOffen(tr)
-	tagSetzen(tag.Status, offen and "Open" or "Closed", offen and GRUEN or SCHWARZ, offen and 0.2 or 0.8)
+	local mit = string.format("<b>[%s] %s</b>", esc(tr.HostKuerzel or "?"), esc(tr.HostName ~= "" and tr.HostName or "?"))
+	local s = tr.Start - jetzt()
+	if s > 0 then
+		pText.Text = string.format("Next Training Session:<br/>Starting in <font color='#ff0000'>%s</font> at <font color='#ff0000'>%s</font> with %s.", lang(s), uhrzeit(tr.Start), mit)
+	else
+		pText.Text = string.format("Next Training Session:<br/>Running since <font color='#ff0000'>%s</font> with %s.", uhrzeit(tr.Start), mit)
+	end
 end
 local function assessmentZeigen()
 	if not P or not z then
 		return
 	end
 	local tr = meinTraining()
-	local zielName = (z.Ziel and z.Ziel.Name) or (tr and tr.Ziel) or "Training"
-	local zielFarbe = (z.Ziel and z.Ziel.Farbe) or (tr and tr.ZielFarbe) or "#878C96"
 	if pRang then
-		pRang.RichText = true
-		pRang.Text = z.Ziel and rangText(z.Ziel.Name, z.Rang.Kuerzel, z.Rang.Farbe) or string.format("Your rank: <font color='%s'>%s</font>", z.Rang.Farbe, esc(z.Rang.Name))
+		pRang.Text = rangText()
 	end
-	tagSetzen(tag.Rang, zielName, Color3.fromHex(zielFarbe), 0.1)
-	tagSetzen(tag.Spieler, tr and string.format("%d/%d Players", tr.Belegt, tr.Plaetze) or "– Players")
+	local zielName = (z.Ziel and z.Ziel.Name) or (tr and tr.Ziel) or "Training"
+	local zielFarbe = (z.Ziel and z.Ziel.Farbe) or (tr and tr.ZielFarbe)
+	if tag.Rang then
+		tagText(tag.Rang, zielName)
+		if zielFarbe then
+			tween(tag.Rang, 0.3, { BackgroundColor3 = Color3.fromHex(zielFarbe), BackgroundTransparency = rangT })
+		end
+	end
+	tagText(tag.Spieler, tr and string.format("%d/%d Players", tr.Belegt, tr.Plaetze) or "– Players")
 	local nr = z.Praktisch and z.Praktisch.Nummer
 	if tag.Warteschlange then
 		tag.Warteschlange.Visible = nr ~= nil
-		tagSetzen(tag.Warteschlange, nr and ("#" .. nr) or "")
+		tagText(tag.Warteschlange, nr and ("#" .. nr) or "")
 	end
 	statusTag()
 	hostsZeigen(tr)
@@ -1023,14 +885,46 @@ local C = F.Calender
 local cKopf = C and C:FindFirstChild("Heading")
 local cTitel = cKopf and cKopf:FindFirstChildOfClass("TextLabel")
 local cListe = C and kind(C, "conent", "content")
-local calVorlage
+local function zeitLabel(row)
+	local btn = row:FindFirstChild("Btn")
+	if not btn then
+		return nil
+	end
+	for _, c in ipairs(btn:GetChildren()) do
+		if c:IsA("TextLabel") and c.Position.X.Scale >= 0.5 then
+			return c
+		end
+	end
+	return nil
+end
+local vorlageZugewiesen, vorlageNormal, trenner
+local farbeZugewiesen, farbeNormal = "#ffff7f", "#00ff5e"
 if cListe then
-	calVorlage = cListe:FindFirstChildOfClass("CanvasGroup")
-	calVorlage = calVorlage and calVorlage:Clone()
+	local zeilen = {}
 	for _, c in ipairs(cListe:GetChildren()) do
 		if c:IsA("CanvasGroup") then
-			c:Destroy()
+			table.insert(zeilen, c)
+		elseif c:IsA("Frame") then
+			trenner = trenner or c
 		end
+	end
+	table.sort(zeilen, function(a, b)
+		return a.LayoutOrder < b.LayoutOrder
+	end)
+	-- obere Zeile im Design = zugewiesenes Training, untere = weitere Trainings
+	vorlageZugewiesen = zeilen[1]
+	vorlageNormal = zeilen[#zeilen]
+	local zl = vorlageZugewiesen and zeitLabel(vorlageZugewiesen)
+	local nl = vorlageNormal and zeitLabel(vorlageNormal)
+	farbeZugewiesen = fontFarbe(zl and zl.Text, farbeZugewiesen)
+	farbeNormal = fontFarbe(nl and nl.Text, farbeNormal)
+	vorlageZugewiesen = vorlageZugewiesen and vorlageZugewiesen:Clone()
+	vorlageNormal = vorlageNormal and vorlageNormal:Clone()
+	for _, c in ipairs(zeilen) do
+		c:Destroy()
+	end
+	if trenner then
+		trenner.Visible = false
 	end
 end
 local calZeilen = {}
@@ -1039,15 +933,15 @@ local function joinZustand(r)
 		return
 	end
 	local an = r.tr ~= nil and darf(r.tr) and istOffen(r.tr)
-	if r.join:GetAttribute("TSGInit") and r.join:GetAttribute("TSGAus") == not an then
+	if r.an == an then
 		return
 	end
-	r.join:SetAttribute("TSGInit", true)
-	r.join:SetAttribute("TSGAus", not an)
-	tween(r.join, 0.2, { BackgroundColor3 = an and GRUEN or DUNKEL, BackgroundTransparency = an and 0.2 or 0.6 })
+	r.an = an
+	gesperrt[r.join] = not an
+	tween(r.join, 0.25, { BackgroundColor3 = an and r.joinBg or DUNKEL_BG, BackgroundTransparency = an and r.joinT or DUNKEL_T })
 	local img = r.join:FindFirstChildOfClass("ImageLabel")
 	if img then
-		tween(img, 0.2, { ImageTransparency = an and 0 or 0.6 })
+		tween(img, 0.25, { ImageTransparency = an and 0 or 0.5 })
 	end
 end
 local function calZeit(r)
@@ -1056,20 +950,21 @@ local function calZeit(r)
 		return
 	end
 	local s = tr.Start - jetzt()
-	local wann = istOffen(tr) and (s > 0 and ("open · in " .. bis(s)) or "running") or ("in " .. bis(s))
-	local vorne = tr.Meins and (leitung() and "hosting " or "zugewiesen ") or ""
-	local text = string.format("%s%s <font color='%s'>(%s)</font>", vorne, datum(tr.Start), tr.Meins and "#00ff5e" or "#b2b9c4", wann)
+	local wann = s > 0 and ("in " .. kurz(s)) or "running"
+	local text = string.format("%s%s <font color='%s'>(%s)</font>", tr.Meins and (leitung() and "hosting " or "zugewiesen ") or "", datum(tr.Start), tr.Meins and farbeZugewiesen or farbeNormal, wann)
 	if r.zeit.Text ~= text then
 		r.zeit.Text = text
 	end
 end
 local function calZeile(tr)
-	local r = calZeilen[tr.Id]
+	local schluessel = tr.Id .. (tr.Meins and "#m" or "")
+	local r = calZeilen[schluessel]
 	if r then
 		return r
 	end
-	local row = calVorlage:Clone()
-	row.Name = "Training_" .. tr.Id
+	local vorlage = (tr.Meins and vorlageZugewiesen or vorlageNormal) or vorlageNormal or vorlageZugewiesen
+	local row = vorlage:Clone()
+	row.Name = "Training"
 	local btn = row:FindFirstChild("Btn")
 	r = { row = row }
 	if btn then
@@ -1089,33 +984,23 @@ local function calZeile(tr)
 			end
 		end
 		r.join = btn:FindFirstChild("Join")
-		knopf(btn, function()
-			local t = r.tr
-			if t then
-				melden(string.format("<b>%s</b> · %s · %d/%d Players%s", esc(t.Titel ~= "" and t.Titel or "Training"), esc(t.HostName), t.Belegt, t.Plaetze, t.Server ~= "" and (" · " .. esc(t.Server)) or ""), "info")
-			end
-		end, true)
 		if r.join then
+			r.joinBg, r.joinT = r.join.BackgroundColor3, r.join.BackgroundTransparency
 			knopf(r.join, function()
 				if r.tr then
 					beitreten(r.tr.Id)
 				end
 			end)
 		end
+		knopf(btn, function()
+			local t = r.tr
+			if t then
+				melden(string.format("%s · %d/%d Players%s", esc(t.Titel ~= "" and t.Titel or "Training"), t.Belegt, t.Plaetze, t.Server ~= "" and (" · " .. esc(t.Server)) or ""))
+			end
+		end)
 	end
-	if r.zeit then
-		r.zeit.RichText = true
-		r.zeit.AutomaticSize = Enum.AutomaticSize.X
-		r.zeit.TextXAlignment = Enum.TextXAlignment.Right
-	end
-	r.rand = Instance.new("UIStroke")
-	r.rand.Color = GRUEN
-	r.rand.Thickness = 1.5
-	r.rand.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	r.rand.Enabled = false
-	r.rand.Parent = row
 	row.Parent = cListe
-	calZeilen[tr.Id] = r
+	calZeilen[schluessel] = r
 	return r
 end
 local function kalenderZeigen()
@@ -1123,19 +1008,25 @@ local function kalenderZeigen()
 		return
 	end
 	local zielName = (z.Ziel and z.Ziel.Name) or "Your"
-	local zielFarbe = (z.Ziel and z.Ziel.Farbe) or "#ffff7f"
 	if cTitel then
-		cTitel.RichText = true
-		cTitel.Text = string.format("Upcoming Trainings <font color='%s'>%s Trainings</font>", zielFarbe, esc(zielName))
+		cTitel.Text = string.format("Upcoming Trainings <font color='%s'>%s Trainings</font>", (z.Ziel and z.Ziel.Farbe) or farbeZugewiesen, esc(zielName))
 	end
 	local liste = (z.Praktisch and z.Praktisch.Trainings) or {}
-	local gesehen = {}
-	if calVorlage then
-		for i, tr in ipairs(liste) do
+	local gesehen, hatMeins, hatAndere = {}, false, false
+	if vorlageNormal or vorlageZugewiesen then
+		local n = 0
+		for _, tr in ipairs(liste) do
 			local r = calZeile(tr)
 			r.tr = tr
-			gesehen[tr.Id] = true
-			r.row.LayoutOrder = i -- das zugewiesene Training steht ganz oben
+			gesehen[r] = true
+			if tr.Meins then
+				hatMeins = true
+				r.row.LayoutOrder = 0 -- das zugewiesene Training steht ganz oben
+			else
+				hatAndere = true
+				n += 1
+				r.row.LayoutOrder = (trenner and trenner.LayoutOrder or 2) + n
+			end
 			if r.avatar then
 				r.avatar.Image = thumb(tr.HostId)
 			end
@@ -1144,46 +1035,44 @@ local function kalenderZeigen()
 				r.kuerzel.BackgroundColor3 = Color3.fromHex(tr.HostFarbe or "#878C96")
 			end
 			if r.name then
-				r.name.Text = tr.HostName ~= "" and tr.HostName or "Unknown host"
+				r.name.Text = tr.HostName ~= "" and tr.HostName or "?"
 			end
-			r.rand.Enabled = tr.Meins == true
 			calZeit(r)
 			joinZustand(r)
 		end
 	end
-	for id, r in pairs(calZeilen) do
-		if not gesehen[id] then
+	for key, r in pairs(calZeilen) do
+		if not gesehen[r] then
 			r.row:Destroy()
-			calZeilen[id] = nil
+			calZeilen[key] = nil
 		end
 	end
-	local leer = hinweis(cListe, "TSGLeer", 1000)
-	leer.Visible = #liste == 0
-	leer.Text = (z.Praktisch and z.Praktisch.AppFehler) and "Trainings could not be loaded from the app – please try again later."
-		or string.format("No upcoming %s trainings yet. New dates appear here as soon as they are offered in the app.", esc(zielName))
+	if trenner then
+		trenner.Visible = hatMeins and hatAndere
+	end
 end
 
 -- ===== Join =====
+local neuLaden
 beitreten = function(id)
 	if not id then
 		return
 	end
 	local ok, res = pcall(rBeitreten.InvokeServer, rBeitreten, id)
 	if not ok or type(res) ~= "table" then
-		melden("Join failed – please try again.", "fehler")
+		melden("Join failed – please try again.")
 		return
 	end
-	melden(esc(res.Text or ""), res.Ok and "ok" or "fehler")
+	melden(esc(res.Text or ""))
+	if res.Aktualisieren then
+		neuLaden(res.Aktualisieren)
+	end
 end
 
--- ===== Abschnitte wechseln =====
+-- ===== Abschnitte wechseln (weich hereingleiten) =====
 zeige = function(name, richtung)
 	local f = F[name]
-	if not f then
-		return
-	end
-	if not erlaubt(name) then
-		melden(name == "Theorie" and "Complete all requirements first." or "Pass the theory first.", "fehler")
+	if not f or not erlaubt(name) then
 		return
 	end
 	richtung = richtung or 1
@@ -1198,7 +1087,7 @@ zeige = function(name, richtung)
 	if alt ~= name or not f.Visible then
 		f.Position = startPos[f] + UDim2.fromOffset(60 * richtung, 0)
 		f.Visible = true
-		tween(f, 0.35, { Position = startPos[f] })
+		tween(f, 0.4, { Position = startPos[f] })
 		items.CanvasPosition = Vector2.zero
 	end
 	if name == "Anforderungen" then
@@ -1210,15 +1099,26 @@ end
 
 -- ===== Laden =====
 local laedt = false
-laden = function(frisch, sektion)
+local timerNr = 0
+neuLaden = function(zeitpunkt)
+	timerNr += 1
+	local meine = timerNr
+	task.delay(math.max(0.5, zeitpunkt - jetzt() + 0.5), function()
+		if meine == timerNr and Training.Visible then
+			laden()
+		end
+	end)
+end
+laden = function(frisch, sektion, aktion)
 	if laedt then
 		return
 	end
 	laedt = true
-	local ok, res = pcall(rZustand.InvokeServer, rZustand, frisch == true)
+	local vorher = z
+	local ok, res = pcall(rZustand.InvokeServer, rZustand, frisch == true, aktion)
 	laedt = false
 	if not ok or type(res) ~= "table" or res.Fehler then
-		melden("Training data could not be loaded – please try again.", "fehler")
+		melden("Training data could not be loaded – please try again.")
 		if not aktuell then
 			zeige("Anforderungen")
 		end
@@ -1234,17 +1134,24 @@ laden = function(frisch, sektion)
 		zeige(startSektion(), 1)
 	elseif sektion then
 		zeige(sektion, (ORDNUNG[sektion] or 1) >= (ORDNUNG[aktuell] or 1) and 1 or -1)
-	elseif not erlaubt(aktuell) then
-		zeige("Anforderungen", -1)
+	elseif not erlaubt(aktuell) or (vorher and vorher.Rang and z.Rang.Kuerzel ~= vorher.Rang.Kuerzel) then
+		zeige(startSektion(), -1)
+	elseif aktuell == "Anforderungen" and z.AnforderungenFertig and not (vorher and vorher.AnforderungenFertig) then
+		-- alle Anforderungen gerade erfüllt: kurz zeigen, dann weiter zur Theorie
+		task.delay(1.6, function()
+			if aktuell == "Anforderungen" and erlaubt("Theorie") then
+				zeige(theorieBestanden() and "Assessment" or "Theorie", 1)
+			end
+		end)
 	end
 	topSetzen()
 	untenSetzen()
+	if z.Aktualisieren then
+		neuLaden(z.Aktualisieren)
+	end
 end
 
--- ===== Training öffnen und schließen (mit Animation) =====
-local skala = Training:FindFirstChild("TSGSkala") or Instance.new("UIScale")
-skala.Name = "TSGSkala"
-skala.Parent = Training
+-- ===== Training öffnen und schließen =====
 local trainingPos = Training.Position
 local buttonsPos = Buttons and Buttons.Position
 local wechselt = false
@@ -1253,17 +1160,14 @@ local function schliessen()
 		return
 	end
 	wechselt = true
-	spiele(WECHSEL)
-	tween(skala, 0.25, { Scale = 0.94 }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
-	tween(Training, 0.25, { Position = trainingPos + UDim2.fromOffset(0, 30) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In).Completed:Wait()
+	tween(Training, 0.3, { Position = trainingPos + UDim2.fromOffset(0, 40) }, Enum.EasingStyle.Quint, Enum.EasingDirection.In).Completed:Wait()
 	Training.Visible = false
 	Training.Position = trainingPos
-	skala.Scale = 1
 	if Buttons then
 		Buttons.GroupTransparency = 1
 		Buttons.Position = buttonsPos + UDim2.fromOffset(-40, 0)
 		Buttons.Visible = true
-		tween(Buttons, 0.4, { GroupTransparency = 0, Position = buttonsPos })
+		tween(Buttons, 0.45, { GroupTransparency = 0, Position = buttonsPos })
 	end
 	wechselt = false
 end
@@ -1272,24 +1176,20 @@ local function oeffnen()
 		return
 	end
 	wechselt = true
-	spiele(WECHSEL)
 	if Buttons and Buttons.Visible then
-		tween(Buttons, 0.2, { GroupTransparency = 1, Position = buttonsPos + UDim2.fromOffset(-40, 0) }).Completed:Wait()
+		tween(Buttons, 0.25, { GroupTransparency = 1, Position = buttonsPos + UDim2.fromOffset(-40, 0) }).Completed:Wait()
 		Buttons.Visible = false
 		Buttons.Position = buttonsPos
 		Buttons.GroupTransparency = 0
 	end
-	skala.Scale = 0.94
-	Training.Position = trainingPos + UDim2.fromOffset(0, 30)
+	Training.Position = trainingPos + UDim2.fromOffset(0, 40)
 	Training.Visible = true
-	tween(skala, 0.35, { Scale = 1 })
-	tween(Training, 0.35, { Position = trainingPos })
+	tween(Training, 0.45, { Position = trainingPos })
 	wechselt = false
 	laden(false, "start")
 end
-
 local function zurueckKlick()
-	-- Kalender → zurück zum Assessment, sonst (Anforderungen, Theorie, Praktisch) das ganze Training schließen
+	-- Kalender → zurück zum Assessment, sonst (Anforderungen, Theorie, Praktisch) das Training schließen
 	if aktuell == "Calender" then
 		zeige("Assessment", -1)
 	else
@@ -1297,12 +1197,7 @@ local function zurueckKlick()
 	end
 end
 
--- ===== Verbinden =====
-for name, cg in pairs(SEKTOR) do
-	knopf(cg:FindFirstChild("Btn"), function()
-		zeige(name, (ORDNUNG[name] or 1) >= (ORDNUNG[aktuell] or 1) and 1 or -1)
-	end, true)
-end
+-- ===== Verbinden (die Abschnitte oben sind nur Anzeige und bekommen nichts) =====
 knopf(zurueck, zurueckKlick)
 knopf(tZurueck, zurueckKlick)
 knopf(submitKnopf, absenden)
@@ -1311,28 +1206,16 @@ knopf(kalBtn, function()
 	zeige("Calender", 1)
 end)
 knopf(nextBtn, function()
-	if aktuell == "Anforderungen" then
-		zeige(theorieBestanden() and "Assessment" or "Theorie", 1)
-	elseif aktuell == "Assessment" then
-		local tr = meinTraining()
-		if tr then
-			beitreten(tr.Id)
-		end
+	local tr = meinTraining()
+	if tr then
+		beitreten(tr.Id)
 	end
 end)
 if Buttons then
 	for _, cg in ipairs(Buttons:GetChildren()) do
 		local b = cg:FindFirstChildWhichIsA("GuiButton")
 		if b then
-			b.MouseEnter:Connect(function()
-				spiele(HOVER)
-			end)
-			b.Activated:Connect(function()
-				spiele(KLICK)
-				if cg.Name == "training" then
-					oeffnen()
-				end
-			end)
+			knopf(b, cg.Name == "training" and oeffnen or nil)
 		end
 	end
 end
@@ -1348,14 +1231,16 @@ task.spawn(function()
 	while true do
 		task.wait(1)
 		if Training.Visible and z then
-			theorieText()
+			if z.Theorie and z.Theorie.Status == "sperre" then
+				theorieText()
+			end
 			assessmentText()
 			statusTag()
 			for _, r in pairs(calZeilen) do
 				calZeit(r)
 				joinZustand(r)
 			end
-			untenSetzen()
+			nextSetzen()
 			takt += 1
 			if takt >= 20 then
 				takt = 0

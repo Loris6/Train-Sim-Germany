@@ -123,15 +123,15 @@ Solange das Backend fehlt, läuft alles andere mit Beispieldaten. Teammitglieder
 
 ## Trainings im Spiel
 
-Im Roblox-Menü (`StarterGui.Menu.container.Training`) durchläuft jeder Spieler für seinen **nächsten** Rang drei Abschnitte. Oben stehen sie als „Training Selector“, „Theory Quiz“ und „Practical Training“; fertige Abschnitte werden grün mit Haken.
+Im Roblox-Menü (`StarterGui.Menu.container.Training`) durchläuft jeder Spieler für seinen **nächsten** Rang drei Abschnitte. Oben stehen sie als „Training Selector“, „Theory Quiz“ und „Practical Training“ – reine Anzeige (nicht klickbar), fertige Abschnitte bekommen den grünen Hintergrund mit Haken aus dem Design. Das Skript fügt dem Design nichts hinzu: Alle Zustände (fertig/offen, leuchtend/abgedunkelt, zugewiesene Kalenderzeile) werden aus den Vorlagen im Layout übernommen. Das Menü wechselt von selbst weiter, sobald ein Abschnitt fertig ist.
 
-1. **Anforderungen** – je Rang im Modul `TSGTrainingKonfig` (beliebig viele, eine Zeile kopieren reicht). Standard: Rang 1 (Guest/Learning Driver → Qualified Driver) Gruppe beitreten (mit „Join Group“-Knopf), 1 h Spielzeit, 50 XP · Rang 2 (→ Platform Staff) 300 XP und 6 h · Rang 3 (→ Conductor) 600 XP · Rang 4 (→ Signaller) 1000 XP und 72 h Spielzeit. XP kommen aus `player.playerStats.Ehrfahrung`, die Spielzeit zählt das Skript selbst. Rote Balken laufen von links nach rechts bis zum Fortschritt.
+1. **Anforderungen** – je Rang im Modul `TSGTrainingKonfig` (beliebig viele, eine Zeile kopieren reicht). Standard: Rang 1 (Guest/Learning Driver → Qualified Driver) Gruppe beitreten (Zeile antippen öffnet den Beitritt), 1 h Spielzeit, 50 XP · Rang 2 (→ Platform Staff) 300 XP und 6 h · Rang 3 (→ Conductor) 600 XP · Rang 4 (→ Signaller) 1000 XP und 72 h Spielzeit. XP kommen aus `player.playerStats.Ehrfahrung`, die Spielzeit zählt das Skript selbst. Rote Balken laufen von links nach rechts bis zum Fortschritt.
 2. **Theorie** – höchstens 10 gewichtete Fragen zum nächsten Rang (Auswahl, Mehrfachauswahl, Texteingabe), Bestehen ab 90 %. Ergebnis als Meldung in `container.notify`. Nicht bestanden: genau 4 Tage gesperrt (ab Absende-Uhrzeit), dann ist nur noch das TextLabel mit der Restzeit sichtbar.
 3. **Praktisch** – wer besteht, bekommt eine Nummer in der Warteschlange (`#1902`). Jeder Server teilt daraus dasselbe zu: kleinste Nummer → frühestes Training des Rangs mit freiem Platz, jeder steht in genau einem Training. Trainings, Uhrzeit, Leitung (rot umrandet) und Supervisors (schwarz umrandet) kommen aus der App. Tags: Ziel-Rang in seiner Teamfarbe, Belegung, Warteschlangen-Nummer, Offen/Geschlossen. „Join Assessment“ ist nur grün und klickbar, solange der Trainingsserver offen ist (15 Minuten vor Beginn bis Ende), und teleportiert in einen reservierten Server je Training. Der Kalender zeigt alle kommenden Trainings des Rangs, das zugewiesene oben („zugewiesen 09.11.2026 — 18:00 (in 21 min)“).
 
-„← Return“ schließt das Training und zeigt die Buttons wieder (im Kalender geht es zurück zum Assessment). Alle Knöpfe haben Hover- und Klick-Töne (aus `StarterGui.Menu`) und weiche Animationen.
+„← Return“ schließt das Training und zeigt die Buttons wieder (im Kalender geht es zurück zum Assessment). Knöpfe spielen einen leisen, modernen Klick (Roblox_UI_Bright_Click), Abschnitte gleiten weich herein.
 
-**Zum Testen** (nur in `TSGTrainingKonfig`): `Wartezeiten = false` überbrückt Spielzeit und Sperrfrist sofort (`true` = normal), `Testtrainings = true` zeigt in Studio Beispiel-Trainings, `TestRang = "LD"` (oder `"G"`, `"QD"`, …) tut in Studio so, als hätte man diesen Rang. Vor dem Veröffentlichen: `Wartezeiten = true`. Studio nutzt mit „Enable Studio Access to API Services“ dieselben DataStores wie das echte Spiel – Testergebnisse landen also in der echten Warteschlange.
+**Ein Hauptschalter** in `TSGTrainingKonfig`: `K.Echtzeit = true` = alles echt (Rang, XP, Spielzeit, Trainings aus der App, 4 Tage Sperre, Teleport, Speichern). `K.Echtzeit = false` = **Simulation von allem**: Start als Gast, XP, Spielzeit und Gruppe springen nach 10 Sekunden auf den nötigen Wert, die Sperre dauert 10 Sekunden, Beispiel-Trainings, „Join“ befördert nach 10 Sekunden in den nächsten Rang – nichts wird gelesen oder gespeichert. Vor dem Veröffentlichen immer `true`.
 
 ## Datenschutz & Nutzungsbedingungen
 
@@ -274,7 +274,7 @@ backend/              App-Server: Trainings, News, Bewerbungen, Chat, Shop, Eins
   server.js           Start mit Node.js (.env)
   .env.example        Alle Einstellungen mit Erklärung
 game/training/              Trainings im Spiel (siehe „Trainings im Spiel“)
-  TSGTrainingKonfig.lua     ModuleScript in ServerStorage: Anforderungen, Fragen, Ränge, Test-Schalter
+  TSGTrainingKonfig.lua     ModuleScript in ServerStorage: Hauptschalter Echtzeit/Simulation, Anforderungen, Fragen, Ränge
   TSGTraining.server.lua    Script in ServerScriptService: Rang, Anforderungen, Theorie, Warteschlange, Join
   TSGTraining.client.lua    LocalScript in StarterGui.Menu.container.Training: GUI, Animationen, Sounds
 game/TSGAppSync.server.lua  Roblox-Skript (Version 3): Server, Spieler, Teams („Extern“ als Attribut oder Werte-Objekt, Farbe, Zahl für die Reihenfolge – was ankommt, steht im Output), Coins, Züge und Strecken mit der App abgleichen, Käufe verbuchen

@@ -7,7 +7,7 @@
 
   Neue Anforderung oder Frage: einfach eine Zeile kopieren und anpassen.
   Anforderungen (Typ):
-    "Gruppe"     – Mitglied der Roblox-Gruppe (mit „Join Group“-Knopf im Menü, falls nicht)
+    "Gruppe"     – Mitglied der Roblox-Gruppe (Zeile antippen = der Gruppe beitreten)
     "XP"         – Menge = nötige XP (aus player.playerStats.Ehrfahrung, siehe K.XP)
     "Spielzeit"  – Stunden = nötige Spielzeit im Spiel (wird vom Server mitgezählt)
     "ImRang"     – Tage = so lange schon im aktuellen Rang
@@ -23,15 +23,13 @@
 
 local K = {}
 
--- ===== Nur zum Testen =====
--- true  = normal: Spielzeit-Anforderungen und die 4-Tage-Sperre nach nicht bestandener Theorie gelten.
--- false = alle Wartezeiten sofort überbrückt (Spielzeit gilt als erfüllt, keine Sperre). Vor dem Veröffentlichen auf true!
-K.Wartezeiten = true
--- true = nur in Studio Beispiel-Trainings zeigen (eins öffnet gleich, eins ist voll), um Assessment, Kalender und Join
--- ohne echte Trainings aus der App auszuprobieren. Im echten Spiel wirkt der Schalter nie.
-K.Testtrainings = false
--- z. B. "G", "LD", "QD", "PS" oder "CD": nur in Studio so tun, als hätte man diesen Rang (nil = echter Rang aus der Gruppe)
-K.TestRang = nil
+-- ===== Hauptschalter =====
+-- true  = Echtzeit: echter Rang aus der Gruppe, echte XP, echte Spielzeit, Trainings aus der App, 4 Tage Sperre,
+--         Teleport in den Trainingsserver, alles wird gespeichert.
+-- false = Simulation: ALLES wird simuliert und nichts gespeichert. Man startet als Gast, XP, Spielzeit und Gruppe
+--         springen nach 10 Sekunden auf den nötigen Wert, die Sperre dauert 10 Sekunden, Trainings sind Beispiele,
+--         „Join“ simuliert das Training und befördert nach 10 Sekunden in den nächsten Rang.
+K.Echtzeit = true
 
 K.GruppenId = 33684346
 K.Backend = "https://tsg-backend.lorismziray01.workers.dev" -- wie in assets/js/config.js → api
