@@ -169,8 +169,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `POST /api/chats/<id>/servers` | Server-Chat: privaten Server verbinden (`{ add, server: { join, link, access, relay, welcome } }`) oder lösen (`{ remove }`) |
 | `GET /api/pservers` · `PUT /api/pservers/<id>` | Private Server (eigene und sichtbare) · Einstellungen des Besitzers |
 | `GET /api/servers` · `GET /api/servers/<jobId>` | Laufende Server aus dem Spiel: Spieler, Rollen (Passenger … Supervisor), Profilbilder · ein Server mit allen Spielern und Zügen |
-| `GET /api/players/find?q=` · `POST /api/players/status` | Spieler auf Roblox suchen · verfolgte Spieler `{ ids }`: Name, Bild, Freund, ob und wo in Train Sim Germany |
-| `GET /api/players/friends` | Eigene Roblox-Freunde (angemeldet), wer davon gerade spielt, zuerst |
+| `GET /api/players/find?q=` · `POST /api/players/status` | Spieler auf Roblox suchen · verfolgte Spieler `{ ids }`: Name, Bild, ob und wo in Train Sim Germany |
 | `GET /api/gamestats` · `GET /api/me/stats` | Statistik aus dem Spiel (Fahrten, km, Pünktlichkeit, Spieler je Stunde) · eigene Statistik – ohne Meldungen alles 0 |
 | `POST /api/chats/<id>/claim` · `/close` | Anfrage annehmen · beenden |
 | `GET /api/push/key` · `POST /api/push/reminders` | Web-Push: öffentlicher Schlüssel · Erinnerungen für Trainings speichern |

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Baut die Flaticon-UIcons für die Seite.
 
-Durchsucht alle .html-Seiten und assets/js/*.js nach Icon-Klassen wie fi-rr-home,
-fi-sr-star oder fi-brands-discord, schneidet die UIcons-Schriften auf genau
+Durchsucht alle .html-Seiten und assets/js/*.js nach Icon-Klassen wie fi-rs-home,
+fi-ss-star oder fi-brands-discord, schneidet die UIcons-Schriften auf genau
 diese Icons zu und schreibt:
 
   assets/css/uicons.css
   assets/fonts/uicons-*.woff2
 
 Neues Icon: Namen auf https://www.flaticon.com/uicons suchen, die Klasse im
-HTML/JS verwenden (z. B. <i class="fi fi-rr-ticket ic"></i>) und dieses Skript
+HTML/JS verwenden (z. B. <i class="fi fi-rs-ticket ic"></i>) und dieses Skript
 erneut ausführen.
 
 Voraussetzungen:
@@ -30,8 +30,9 @@ PKG = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'node_modules/@
 
 # Kürzel -> (CSS-Datei im Paket, Schriftfamilie)
 STYLES = {
-    'rr': ('regular/rounded.css', 'uicons-regular-rounded'),
-    'sr': ('solid/rounded.css', 'uicons-solid-rounded'),
+    # Eckige Icons (straight) – sehen auf der Webseite klarer aus als die runden
+    'rs': ('regular/straight.css', 'uicons-regular-straight'),
+    'ss': ('solid/straight.css', 'uicons-solid-straight'),
     'brands': ('brands/all.css', 'uicons-brands'),
 }
 
@@ -42,7 +43,7 @@ def main():
 
     used = {style: set() for style in STYLES}
     for path in [*sorted(ROOT.glob('*.html')), *sorted((ROOT / 'assets/js').glob('*.js'))]:
-        for style, name in re.findall(r'fi-(rr|sr|brands)-([a-z0-9]+(?:-[a-z0-9]+)*)', path.read_text(encoding='utf-8')):
+        for style, name in re.findall(r'fi-(rs|ss|brands)-([a-z0-9]+(?:-[a-z0-9]+)*)', path.read_text(encoding='utf-8')):
             used[style].add(name)
 
     blocks = ['/* Flaticon UIcons (https://www.flaticon.com/uicons) – nur die genutzten Icons.\n'

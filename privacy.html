@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="lg">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -12,6 +12,7 @@
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/uicons.css">
   <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/site.css">
   <script>
     try { var t = localStorage.getItem('tsg-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
   </script>
@@ -19,29 +20,32 @@
 <body class="legal-page">
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-  <header class="topbar">
-    <div class="container topbar__inner">
-      <a class="brand" href="./#/" aria-label="Train Sim Germany – zur App">
-        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="56" height="28">
-        <span class="brand__name">Train Sim Germany</span>
+  <header class="nav lg-nav">
+    <div class="nav__bar">
+      <a class="nav__brand" href="./#/" aria-label="Train Sim Germany – zur Webseite">
+        <img class="nav__logo nav__logo--color" src="assets/img/logo.svg" alt="" width="52" height="26"><img class="nav__logo nav__logo--white" src="assets/img/logo-white.svg" alt="" width="52" height="26">
+        <span class="nav__name">Train Sim Germany</span>
       </a>
-      <a class="btn btn--soft btn--sm legal__app" href="./#/"><i class="fi fi-rr-arrow-left ic" aria-hidden="true"></i>Zur App</a>
+      <nav class="lg-switch" aria-label="Rechtliches">
+        <a href="terms.html">Nutzungsbedingungen</a>
+        <a href="privacy.html" aria-current="page">Datenschutz</a>
+      </nav>
+      <div class="nav__end"><a class="lg-back" href="./#/" aria-label="Zur Webseite" title="Zur Webseite"><i class="fi fi-rs-arrow-left ic" aria-hidden="true"></i></a></div>
     </div>
   </header>
 
   <main id="main" tabindex="-1">
-    <div class="page-head">
-      <div class="container legal__wrap">
-        <span class="appbar__label">Stand: <span data-legal="updated">1. November 2026</span></span>
-        <h1 class="appbar__value">Datenschutzerklärung</h1>
-        <p class="legal__lead">Hier steht, welche Daten Train Sim Germany verarbeitet, wofür und welche Rechte du hast. Kurz gesagt: Wir nutzen keine Werbung und kein Tracking. Die meisten Einstellungen bleiben nur auf deinem Gerät.</p>
+    <header class="site-head lines-bg lg-hero">
+      <div class="site-wrap">
+        <p class="cr-eyebrow">Datenschutzerklärung · Stand: <span data-legal="updated">1. November 2026</span></p>
+        <h1 class="mega mega--stack">Deine Daten.<br><span>Klar erklärt.</span></h1>
+        <p class="site-head__lead">Hier steht, welche Daten Train Sim Germany verarbeitet, wofür und welche Rechte du hast. Kurz gesagt: Wir nutzen keine Werbung und kein Tracking. Die meisten Einstellungen bleiben nur auf deinem Gerät.</p>
       </div>
-    </div>
+    </header>
 
-    <div class="sheet">
-      <div class="container legal__wrap">
-        <nav class="card legal__toc" aria-label="Inhalt">
-          <h2 class="card__title">Inhalt</h2>
+    <div class="site-wrap lg-body">
+        <nav class="lg-toc" aria-label="Inhalt">
+          <p class="lg-toc__title">Inhalt</p>
           <ol>
             <li><a href="#verantwortlicher">Verantwortlicher</a></li>
             <li><a href="#ueberblick">Überblick</a></li>
@@ -62,9 +66,9 @@
           </ol>
         </nav>
 
-        <article class="card legal">
+        <article class="lg-article legal">
           <section id="verantwortlicher">
-            <h2>1. Verantwortlicher</h2>
+            <h2><span class="lg-no">01</span>Verantwortlicher</h2>
             <p>Verantwortlich für die Datenverarbeitung auf dieser Website und in der Web-App „Train Sim Germany“ (zusammen „die App“) ist:</p>
             <address class="legal__address">
               <span data-legal="operator">Vor- und Nachname eintragen</span><br>
@@ -75,7 +79,7 @@
           </section>
 
           <section id="ueberblick">
-            <h2>2. Überblick</h2>
+            <h2><span class="lg-no">02</span>Überblick</h2>
             <ul>
               <li>Die App nutzt <strong>keine Cookies</strong> und <strong>keine Analyse- oder Werbedienste</strong>.</li>
               <li>Einstellungen wie Darstellung, Sprache oder gemerkte Trainings werden auf deinem Gerät gespeichert. Bist du mit Roblox angemeldet, speichert sie zusätzlich das Backend, damit sie auf all deinen Geräten gleich sind.</li>
@@ -88,7 +92,7 @@
           </section>
 
           <section id="hosting">
-            <h2>3. Hosting, Backend und Server-Protokolle</h2>
+            <h2><span class="lg-no">03</span>Hosting, Backend und Server-Protokolle</h2>
             <p>Die App wird über GitHub Pages bereitgestellt (GitHub, Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA). Beim Aufruf verarbeitet GitHub technisch notwendige Daten, insbesondere deine IP-Adresse, Datum und Uhrzeit des Abrufs, die aufgerufene Datei sowie Browser- und Systemangaben. Das ist nötig, um die Seite auszuliefern und vor Missbrauch zu schützen.</p>
             <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einem sicheren und funktionierenden Angebot). GitHub ist nach dem EU-US Data Privacy Framework zertifiziert. Mehr dazu in der <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">Datenschutzerklärung von GitHub</a>.</p>
             <p>Für Benachrichtigungen bei geschlossener App, Einstellungen auf mehreren Geräten, Bewerbungen sowie Trainings und Neuigkeiten des Teams nutzt die App einen eigenen Server (Backend). Er läuft bei <span data-legal="backendHost">Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA</span>; die Daten liegen dort in einem geschützten Speicher (Durable Object), auf den nur das Backend zugreift. Auch dort werden beim Aufruf technisch notwendige Daten wie deine IP-Adresse verarbeitet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; Anbieter in den USA sind nach dem EU-US Data Privacy Framework zertifiziert bzw. durch Standardvertragsklauseln gebunden.</p>
@@ -96,7 +100,7 @@
           </section>
 
           <section id="geraet">
-            <h2>4. Speicherung auf deinem Gerät</h2>
+            <h2><span class="lg-no">04</span>Speicherung auf deinem Gerät</h2>
             <p>Damit die App sich deine Einstellungen merkt, speichert sie Daten im lokalen Speicher deines Browsers (Local Storage):</p>
             <ul>
               <li>Darstellung (Hell, Dunkel, wie das Gerät), Sprache, Saison-Design, Animationen und haptisches Feedback (an oder aus)</li>
@@ -118,7 +122,7 @@
           </section>
 
           <section id="roblox-login">
-            <h2>5. Anmeldung mit Roblox (OAuth 2.0)</h2>
+            <h2><span class="lg-no">05</span>Anmeldung mit Roblox (OAuth 2.0)</h2>
             <p>Du kannst dich mit deinem Roblox-Konto anmelden. Dafür wirst du zu Roblox weitergeleitet und bestätigst dort, welche Daten die App erhalten darf. Abgefragt werden nur die Berechtigungen <code>openid</code> und <code>profile</code>. Dein Passwort gibst du nur bei Roblox ein, wir sehen es nie. Die Anmeldung läuft direkt zwischen deinem Browser und Roblox (Verfahren „PKCE“).</p>
             <p>Von Roblox erhalten wir:</p>
             <ul>
@@ -135,12 +139,12 @@
           </section>
 
           <section id="roblox-name">
-            <h2>6. Verbinden über den Roblox-Namen</h2>
+            <h2><span class="lg-no">06</span>Verbinden über den Roblox-Namen</h2>
             <p>Solange die Anmeldung mit Roblox nicht eingerichtet ist, kannst du stattdessen deinen Roblox-Namen eingeben. Die App lädt dann dein öffentliches Profil (Nutzer-ID, Anzeigename, Profilbild). Weil Roblox solche Abfragen aus dem Browser nicht direkt erlaubt, läuft das über den Dienst roproxy.com. Dabei werden deine IP-Adresse und der eingegebene Name an roproxy.com und Roblox übertragen. Das passiert nur, wenn du auf „Verbinden“ tippst. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.</p>
           </section>
 
           <section id="sichtbarkeit">
-            <h2>7. Öffentliches Profil und öffentliche Statistik</h2>
+            <h2><span class="lg-no">07</span>Öffentliches Profil und öffentliche Statistik</h2>
             <p>In den Einstellungen unter „Privatsphäre“ entscheidest du selbst:</p>
             <ul>
               <li><strong>Profil öffentlich:</strong> Andere Spieler sehen deinen Roblox-Namen, dein Profilbild und deinen Rang.</li>
@@ -150,7 +154,7 @@
           </section>
 
           <section id="benachrichtigungen">
-            <h2>8. Benachrichtigungen</h2>
+            <h2><span class="lg-no">08</span>Benachrichtigungen</h2>
             <p>Mit der Glocke kannst du dich an Trainings erinnern lassen. Beim ersten Mal fragt dein Browser bzw. dein Gerät, ob die App Benachrichtigungen senden darf. Die Benachrichtigung kommt, sobald der Trainingsserver öffnet (15 Minuten vor Beginn).</p>
             <p>Ist die App geöffnet oder im Hintergrund, zeigt sie die Benachrichtigung selbst an; welche Trainings du gewählt hast, bleibt dann nur auf deinem Gerät. Ist das Backend eingerichtet, kommen die Benachrichtigungen auch bei geschlossener App („Web-Push“). Dafür speichert das Backend die Push-Adresse deines Browsers mit den zugehörigen Schlüsseln und die gewählten Trainings mit Uhrzeit und Text der Benachrichtigung – höchstens bis zum Training, danach werden sie gelöscht. Zugestellt werden die Nachrichten über den Push-Dienst deines Browsers (z. B. Google bei Chrome und Android, Apple bei Safari und iPhone, Mozilla bei Firefox); der Inhalt ist dabei verschlüsselt.</p>
             <p><strong>Chat, Bewerbungen und Team:</strong> Schaltest du unter „Einstellungen → Benachrichtigungen“ die Benachrichtigungen ein und bist mit Roblox angemeldet, speichert das Backend die Push-Adresse dieses Geräts (mit den zugehörigen Schlüsseln) zu deinem Konto, dazu deine Auswahl (Chat-Nachrichten, Bewerbungen, für das Team neue Anfragen und Bewerbungen) und die Sprache – für bis zu 6 Geräte. Damit bekommst du auch bei geschlossener App Bescheid, wenn dir jemand im Chat schreibt, deine Anfrage angenommen wird oder das Ergebnis deiner Bewerbung da ist. Die Benachrichtigung enthält den Namen des Absenders und den Anfang der Nachricht. Beim Ausschalten oder Abmelden wird das Gerät wieder entfernt; Adressen, die der Push-Dienst nicht mehr kennt, löschen wir automatisch.</p>
@@ -158,8 +162,8 @@
           </section>
 
           <section id="bewerbungen">
-            <h2>9. Bewerbungen</h2>
-            <p>Über „Karriere“ kannst du dich für das Team bewerben. Dabei gibst du deinen Discord-Namen, deine E-Mail-Adresse, deine Spielzeit, deinen Rang und deine Antworten auf die Fragen an, bei manchen Stellen auch Links zu deinen Arbeiten. Ist das Backend eingerichtet, kommt dein angemeldetes Roblox-Konto dazu (Nutzer-ID, Name, Profilbild, Rolle in der Gruppe), damit das Team sieht, wer sich bewirbt.</p>
+            <h2><span class="lg-no">09</span>Bewerbungen</h2>
+            <p>Über „Karriere“ kannst du dich für das Team bewerben. Dabei gibst du deinen Discord-Namen, deine E-Mail-Adresse, deine Spielzeit, deinen Rang und deine Antworten auf sechs kurze Fragen an (zum Beispiel, warum du ins Team möchtest, welche Erfahrung du hast und wann du Zeit hast) und – freiwillig – einen Link zu deiner Arbeit. Ist das Backend eingerichtet, kommt dein angemeldetes Roblox-Konto dazu (Nutzer-ID, Name, Profilbild, Rolle in der Gruppe), damit das Team sieht, wer sich bewirbt.</p>
             <p>Das Backend speichert deine Bewerbung mit allen Angaben und Antworten. Prüfen können sie nur Mitglieder ab der Rolle Public Relations Department in der App; sie markieren sie als „bestanden“ oder „nicht bestanden“. Du selbst siehst deine gesendeten Angaben jederzeit wieder unter der Stelle („Deine Bewerbung ansehen“). Zusätzlich geht ein Hinweis mit deinen Angaben an einen nicht öffentlichen Discord-Kanal des Teams (Discord Inc., 444 De Haro Street, Suite 200, San Francisco, CA 94107, USA; <a href="https://discord.com/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Discord</a>). Als Schutz vor Spam merkt sich das Backend 24 Stunden lang, wann du dich auf welche Stelle beworben hast.</p>
             <p><strong>E-Mails:</strong> Nach dem Absenden schicken wir dir die ganze Bewerbung an die angegebene E-Mail-Adresse, nach der Auswertung das Ergebnis. Dafür nutzen wir einen E-Mail-Dienst als Auftragsverarbeiter: Brevo (Sendinblue SAS, 106 boulevard Haussmann, 75008 Paris, Frankreich; <a href="https://www.brevo.com/de/legal/privacypolicy/" target="_blank" rel="noopener">Datenschutzerklärung von Brevo</a>) oder – falls eingerichtet – Resend (Plus Five Five, Inc., USA, EU-US Data Privacy Framework bzw. Standardvertragsklauseln). Übermittelt werden deine E-Mail-Adresse, dein Name und der Inhalt der Bewerbung. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO.</p>
             <p><strong>Ergebnis:</strong> Die Person aus dem Public Relations Department, die deine Bewerbung auswertet, schickt dir das Ergebnis („PASSED“ oder „FAILED“) als Nachricht im Chat der App; ihr Name steht dabei. Du kannst dort direkt antworten (siehe Abschnitt 10).</p>
@@ -168,7 +172,7 @@
           </section>
 
           <section id="chat">
-            <h2>10. Chat, Gruppen und Moderation</h2>
+            <h2><span class="lg-no">10</span>Chat, Gruppen und Moderation</h2>
             <p>Im Chat kannst du anderen Spielern schreiben, Gruppen gründen oder ihnen beitreten und dem Team eine Anfrage schicken (mit Grund und Bereich). Dafür musst du mit Roblox angemeldet sein. Gespeichert werden im Backend: die Nachrichten mit Zeitpunkt, Fotos, Videos und Dateien, die du sendest, deine Roblox-Nutzer-ID, dein Name, Anzeigename, Profilbild und Rang; bei Gruppen außerdem Name, Beschreibung, Regeln, Einstellungen, Mitglieder und ihre Rollen, bei Anfragen Grund, Bereich, Status und wer sie angenommen hat. Andere Spieler findest du über ihren öffentlichen Roblox-Namen.</p>
             <p><strong>Wer sieht was?</strong> Ein privates Gespräch sehen die Beteiligten, eine private Gruppe ihre Mitglieder, eine öffentliche Gruppe alle angemeldeten Nutzer der App. Eine <strong>Anfrage</strong> sehen du und das zuständige Team; sobald jemand sie annimmt, schreiben nur noch ihr beide. Zum Schutz aller – besonders jüngerer Spieler – kann die <strong>Moderation</strong> (Teammitglieder ab dem Rang Supervisor) jedes Gespräch einsehen, auch ohne dass es die Beteiligten bemerken, oder sichtbar beitreten, Nachrichten löschen und Leute entfernen. Ausgenommen sind Gespräche mit Personen höheren Ranges. Jedes Einsehen wird mit Name und Zeitpunkt vermerkt (für die Moderation sichtbar). Meldest du ein Gespräch, sieht das Team für Meldungen deine Nachricht und das Gespräch.</p>
             <p><strong>Befehle</strong> wie /GetUser holen öffentliche Daten von Roblox (Profil, Rang in der Gruppe) und aus dem Spiel (laufende Server, wer gerade spielt); /Coins zeigt nur dir deinen eigenen Stand. Ein <strong>Gruppenbild</strong> wird verkleinert gespeichert und ist für alle sichtbar, die die Gruppe sehen.</p>
@@ -184,21 +188,21 @@
           </section>
 
           <section id="shop">
-            <h2>11. Shop: Coins, Züge und Strecken</h2>
+            <h2><span class="lg-no">11</span>Shop: Coins, Züge und Strecken</h2>
             <p>Der Shop zeigt deine Coins und welche Züge und Strecken dir im Spiel gehören. Dafür schickt das Spiel Train Sim Germany diese Angaben zusammen mit deiner Roblox-Nutzer-ID an das Backend, wenn sie sich ändern (beim Betreten und Verlassen des Spiels und während du spielst). Kaufst du in der App etwas, speichert das Backend den Kauf (Artikel, Preis, Zeitpunkt), bis das Spiel ihn verbucht hat; die letzten Käufe bleiben in deinem Verlauf.</p>
             <p>Es handelt sich nur um Spielwährung ohne Geldwert – echtes Geld oder Zahlungsdaten werden nie verarbeitet. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO (von dir gewünschte Funktion). Die Angaben bleiben gespeichert, solange du das Spiel nutzt; auf Wunsch löschen wir sie (siehe „Deine Rechte“). Ohne Backend zeigt die App nur einen Demo-Stand, der auf deinem Gerät bleibt.</p>
           </section>
 
           <section id="spiel">
-            <h2>12. Server, Spieler und Statistik aus dem Spiel</h2>
+            <h2><span class="lg-no">12</span>Server, Spieler und Statistik aus dem Spiel</h2>
             <p>Läuft Train Sim Germany, meldet das Spiel dem Backend etwa alle 30 Sekunden jeden Server: die Server-ID, die Zahl der Spieler und Plätze, die Version und für jeden Spieler die Roblox-Nutzer-ID, den Namen, den Anzeigenamen, die Rolle im Spiel (Team) und – soweit das Spiel es meldet – Zug, Linie, Ziel, nächsten Halt bzw. den Bahnhof. Das zeigt die App allen auf der Server-Seite und unter „Spieler“; bei privaten Servern nur, wenn ihr Besitzer den Server zeigt. Diese Angaben gelten nur, solange der Server läuft, und sind spätestens 10 Minuten nach der letzten Meldung weg.</p>
             <p><strong>Statistik:</strong> Für jeden Spieler merkt sich das Backend die Spielzeit (gesamt und je Tag der letzten 14 Tage), beendete Fahrten (Anzahl, Kilometer, Pünktlichkeit, Strecke, Zug) und wann er zuerst und zuletzt im Spiel war – bis 400 Tage nach dem letzten Spielen. Deine Statistik sehen andere nur, wenn du sie öffentlich machst (Abschnitt 7); unter „Spieler“ sehen andere aber, ob du gerade in Train Sim Germany bist und wann du zuletzt dort warst. Für alle zusammen speichert das Backend Fahrten je Tag (40 Tage) und die höchste Spielerzahl je Stunde (31 Tage). Was das Spiel nicht meldet, steht auf 0.</p>
-            <p><strong>Spieler verfolgen:</strong> Unter „Spieler“ kannst du Roblox-Spieler über ihren öffentlichen Namen suchen und verfolgen; die Liste liegt auf deinem Gerät und – angemeldet – in deinem Konto. Angezeigt wird nur, ob jemand in Train Sim Germany ist, nie andere Spiele. Ob jemand dein Freund ist, liest das Backend aus deiner Freundesliste bei Roblox (15 Minuten zwischengespeichert); Namen und Profilbilder kommen ebenfalls von Roblox (1 Tag bzw. 6 Stunden zwischengespeichert).</p>
+            <p><strong>Spieler verfolgen:</strong> Unter „Spieler“ kannst du Roblox-Spieler über ihren öffentlichen Namen suchen und verfolgen; die Liste liegt auf deinem Gerät und – angemeldet – in deinem Konto. Angezeigt wird nur, ob jemand in Train Sim Germany ist, nie andere Spiele. Deine Freundesliste bei Roblox wird dafür nicht abgefragt. Namen und Profilbilder kommen von Roblox (1 Tag bzw. 6 Stunden zwischengespeichert).</p>
             <p>Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO für deine eigene Statistik und deine Liste, sonst Art. 6 Abs. 1 lit. f DSGVO (Server und Mitspieler finden, gemeinsame Statistik). Auf Wunsch löschen wir deine Angaben (siehe „Deine Rechte“).</p>
           </section>
 
           <section id="dritte">
-            <h2>13. Inhalte von Drittanbietern</h2>
+            <h2><span class="lg-no">13</span>Inhalte von Drittanbietern</h2>
             <p><strong>YouTube:</strong> Manche Neuigkeiten enthalten YouTube-Videos. Sie werden erst geladen, wenn du auf „Abspielen“ tippst, und zwar über youtube-nocookie.com. Erst dann werden Daten (z. B. deine IP-Adresse) an Google Ireland Limited, Gordon House, Barrow Street, Dublin 4, Irland übertragen. Rechtsgrundlage ist deine Einwilligung durch das Antippen (Art. 6 Abs. 1 lit. a DSGVO). Mehr in der <a href="https://policies.google.com/privacy?hl=de" target="_blank" rel="noopener">Datenschutzerklärung von Google</a>. Eigene Videos liegen direkt auf unserem Server.</p>
             <p><strong>Trainings und Neuigkeiten des Teams:</strong> Trainings (ab Supervisor) und Neuigkeiten (ab Public Relations Department) werden im Backend gespeichert und allen angezeigt, zusammen mit dem Roblox-Namen der Person, die sie erstellt hat. Hochgeladene Bilder für Neuigkeiten liegen ebenfalls im Backend. Wer sie erstellt hat, kann sie wieder löschen; Trainings verschwinden nach ihrem Ende von selbst.</p>
             <p><strong>Echte Zahlen:</strong> Die Statistik zeigt öffentliche Zahlen: Mitglieder der Roblox-Gruppe (auch je Rolle), Spieler online, Besuche und Favoriten des Spiels sowie Mitglieder des Discord-Servers. Das Backend lädt sie alle 10 Minuten bei Roblox (über roproxy.com) und Discord. Ohne Backend fragt die App sie selbst bei roproxy.com und discord.com ab; dabei wird deine IP-Adresse an diese Dienste übertragen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (aktuelle Zahlen anzeigen).</p>
@@ -206,26 +210,32 @@
           </section>
 
           <section id="kinder">
-            <h2>14. Kinder und Jugendliche</h2>
+            <h2><span class="lg-no">14</span>Kinder und Jugendliche</h2>
             <p>Bist du jünger als 16 Jahre, frag bitte deine Eltern, bevor du dein Profil oder deine Statistik öffentlich machst, dich bewirbst oder den Chat nutzt. Für Einwilligungen braucht es in diesem Alter die Zustimmung der Eltern (Art. 8 DSGVO). Außerdem gelten die Altersregeln von Roblox.</p>
           </section>
 
           <section id="rechte">
-            <h2>15. Deine Rechte</h2>
+            <h2><span class="lg-no">15</span>Deine Rechte</h2>
             <p>Du hast das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20) und Widerspruch gegen Verarbeitungen auf Grundlage berechtigter Interessen (Art. 21). Eine Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen (Art. 7 Abs. 3).</p>
             <p>Schreib uns dafür einfach an <a data-legal-mail href="mailto:kontakt@beispiel.de">kontakt@beispiel.de</a>. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren, zum Beispiel bei der Behörde deines Bundeslandes.</p>
           </section>
 
           <section id="aenderungen">
-            <h2>16. Änderungen</h2>
+            <h2><span class="lg-no">16</span>Änderungen</h2>
             <p>Wenn neue Funktionen dazukommen, passen wir diese Datenschutzerklärung an. Es gilt immer die Fassung auf dieser Seite. Stand: <span data-legal="updated">1. November 2026</span>.</p>
           </section>
         </article>
 
-        <p class="legal__more"><a href="terms.html">Nutzungsbedingungen</a> · <a href="./#/">Zur App</a></p>
-      </div>
+        <aside class="lg-more">
+          <a href="terms.html"><small>Weiterlesen</small><b>Nutzungsbedingungen</b><i class="fi fi-rs-arrow-right ic" aria-hidden="true"></i></a>
+          <a href="./#/"><small>Zurück</small><b>Zur Webseite</b><i class="fi fi-rs-arrow-right ic" aria-hidden="true"></i></a>
+        </aside>
     </div>
   </main>
+
+  <footer class="lg-foot">
+    <div class="site-wrap">© 2026 Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation.</div>
+  </footer>
 
   <script src="assets/js/nozoom.js"></script>
   <script src="assets/js/config.js"></script>

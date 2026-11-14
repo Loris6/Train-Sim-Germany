@@ -21,7 +21,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" data-app-favicon>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" data-app-icon>
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/fonts/uicons-regular-rounded.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/uicons-regular-straight.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/uicons.css">
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/site.css">
@@ -36,15 +36,10 @@
   <!-- Navigation: schwebende Leiste oben; schmal öffnet „Menü“ neben dem Logo eine zweite Leiste im gleichen Stil -->
   <header class="nav" data-topbar data-nav-root>
     <div class="nav__bar">
-      <div class="nav__start">
-        <a class="nav__brand" href="#/" aria-label="Train Sim Germany – Startseite">
-          <img class="nav__logo nav__logo--color" src="assets/img/logo.svg" alt="" width="54" height="27"><img class="nav__logo nav__logo--white" src="assets/img/logo-white.svg" alt="" width="54" height="27">
-          <span class="nav__name">Train Sim Germany</span>
-        </a>
-        <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="nav-sub" aria-label="Menü öffnen">
-          <span class="nav__burger" aria-hidden="true"><i></i><i></i></span><span class="nav__toggle-text">Menü</span>
-        </button>
-      </div>
+      <a class="nav__brand" href="#/" aria-label="Train Sim Germany – Startseite">
+        <img class="nav__logo nav__logo--color" src="assets/img/logo.svg" alt="" width="54" height="27"><img class="nav__logo nav__logo--white" src="assets/img/logo-white.svg" alt="" width="54" height="27">
+        <span class="nav__name">Train Sim Germany</span>
+      </a>
       <nav class="nav__links" aria-label="Hauptnavigation" data-nav-links>
         <a href="#/netz" data-nav="netz">Netz</a>
         <a href="#/server" data-nav="server">Server</a>
@@ -54,22 +49,12 @@
         <a href="#/entwickler" data-nav="entwickler">Entwickler</a>
       </nav>
       <div class="nav__end" data-nav-account>
-        <button class="nav__login" type="button" data-open="profile"><i class="fi fi-rr-user ic" aria-hidden="true"></i>Anmelden<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></button>
+        <button class="nav__login" type="button" data-open="profile" aria-label="Anmelden"><i class="fi fi-rs-user ic" aria-hidden="true"></i></button>
       </div>
     </div>
-    <!-- Untermenü: dieselbe Leiste noch einmal, mit Abstand darunter -->
-    <div class="nav__sub" id="nav-sub" data-nav-sub hidden>
-      <nav class="nav__sub-links" aria-label="Seiten" data-nav-sublinks>
-        <a href="#/" data-nav="home">Start</a>
-        <a href="#/netz" data-nav="netz">Netz</a>
-        <a href="#/server" data-nav="server">Server</a>
-        <a href="#/news" data-nav="news">Neuigkeiten</a>
-        <a href="#/karriere" data-nav="karriere">Karriere</a>
-        <a href="#/faq" data-nav="faq">FAQ</a>
-        <a href="#/entwickler" data-nav="entwickler">Entwickler</a>
-      </nav>
-    </div>
-    <!-- Konto (nach der Anmeldung): ebenfalls als zweite Leiste -->
+    <!-- Schmale Bildschirme: die Seiten als zweite Leiste darunter (zum Wischen) – ohne Menü-Knopf -->
+    <nav class="nav__row" aria-label="Seiten" data-nav-row></nav>
+    <!-- Konto (nach der Anmeldung): als zweite Leiste -->
     <div class="nav__sub nav__sub--account" data-nav-acc hidden></div>
   </header>
 
@@ -82,7 +67,7 @@
         <video class="hero__video" data-hero-video src="assets/video/rheinstrecke.mp4" poster="assets/video/rheinstrecke.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
         <div class="hero__shade" aria-hidden="true"></div>
         <h1 class="hero__title">Deutschland<br>auf Schienen</h1>
-        <button class="hero__pause" type="button" data-hero-pause aria-label="Video anhalten"><i class="fi fi-sr-pause ic" aria-hidden="true"></i></button>
+        <button class="hero__pause" type="button" data-hero-pause aria-label="Video anhalten"><i class="fi fi-ss-pause ic" aria-hidden="true"></i></button>
       </div>
 
       <!-- Nächster Halt: Nachthimmel, Schiene mit Halten, Stadt -->
@@ -105,9 +90,9 @@
           <div class="quotes__foot">
             <div class="quotes__by"><span class="quotes__ava"><img src="assets/img/logo-white.svg" alt="" width="28" height="14"></span><span><b>@TrainSimGermany</b><small>Das Team</small></span></div>
             <div class="quotes__ctl">
-              <button class="ctl-btn" type="button" data-quote-prev aria-label="Vorheriger Satz"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
-              <button class="ctl-btn ctl-btn--main" type="button" data-quote-play aria-label="Pause"><i class="fi fi-sr-pause ic" aria-hidden="true"></i></button>
-              <button class="ctl-btn" type="button" data-quote-next aria-label="Nächster Satz"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
+              <button class="ctl-btn" type="button" data-quote-prev aria-label="Vorheriger Satz"><i class="fi fi-rs-angle-small-left ic" aria-hidden="true"></i></button>
+              <button class="ctl-btn ctl-btn--main" type="button" data-quote-play aria-label="Pause"><i class="fi fi-ss-pause ic" aria-hidden="true"></i></button>
+              <button class="ctl-btn" type="button" data-quote-next aria-label="Nächster Satz"><i class="fi fi-rs-angle-small-right ic" aria-hidden="true"></i></button>
               <span class="quotes__count" data-quote-count><b>01</b> / 04</span>
             </div>
           </div>
@@ -120,7 +105,7 @@
         <div class="site-wrap open-net__inner">
           <h2 id="h-open" class="open-net__title">Das Netz<br>ist offen.</h2>
           <p>Fahr, entdecke und betreibe das Netz von Train Sim Germany – jeden Tag, zusammen mit der Community.</p>
-          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
+          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
         </div>
       </section>
 
@@ -129,7 +114,7 @@
         <div class="site-wrap">
           <div class="mega-head">
             <h2 id="h-newsroom" class="mega">Neuigkeiten</h2>
-            <a class="more-link" href="#/news">Alle Beiträge<i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
+            <a class="more-link" href="#/news">Alle Beiträge<i class="fi fi-rs-arrow-small-right ic" aria-hidden="true"></i></a>
           </div>
           <div class="nr-grid" data-home-news></div>
         </div>
@@ -146,7 +131,7 @@
           <div class="faq__head">
             <h2 id="h-faq" class="mega mega--stack">Fragen,<br><span>beantwortet.</span></h2>
             <p>Nicht gefunden, was du suchst?</p>
-            <a class="ask-link" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Auf Discord fragen<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
+            <a class="ask-link" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Auf Discord fragen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
           </div>
           <div class="faq__list" data-faq="home"></div>
         </div>
@@ -164,7 +149,7 @@
             <div class="join__card">
               <span class="kicker">Wo du mithelfen kannst</span>
               <div class="tag-row"><span>Scripting</span><span>3D &amp; Weltenbau</span><span>UI &amp; UX</span></div>
-              <a class="site-btn site-btn--brand site-btn--block site-btn--split" href="#/karriere">Jetzt bewerben<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
+              <a class="site-btn site-btn--brand site-btn--block site-btn--split" href="#/karriere">Jetzt bewerben<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
             </div>
           </div>
         </div>
@@ -178,16 +163,16 @@
           <div class="appbar">
             <div class="appbar__title">
               <span class="appbar__label">Dein Rang</span>
-              <h1 class="appbar__value"><button type="button" data-open="rank"><i class="fi fi-sr-id-badge ic appbar__pin" aria-hidden="true"></i><span data-rank-name>Conductor</span><i class="fi fi-rr-angle-small-down ic" aria-hidden="true"></i></button></h1>
+              <h1 class="appbar__value"><button type="button" data-open="rank"><i class="fi fi-ss-id-badge ic appbar__pin" aria-hidden="true"></i><span data-rank-name>Conductor</span><i class="fi fi-rs-angle-small-down ic" aria-hidden="true"></i></button></h1>
             </div>
             <div class="appbar__actions">
-              <button class="btn btn--primary btn--sm appbar__add" type="button" data-open="training-new" data-can-train hidden><i class="fi fi-rr-plus ic" aria-hidden="true"></i><span>Training anbieten</span></button>
-              <button class="round-btn" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-sr-bell ic" aria-hidden="true"></i></button>
+              <button class="btn btn--primary btn--sm appbar__add" type="button" data-open="training-new" data-can-train hidden><i class="fi fi-rs-plus ic" aria-hidden="true"></i><span>Training anbieten</span></button>
+              <button class="round-btn" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-ss-bell ic" aria-hidden="true"></i></button>
             </div>
           </div>
           <div class="field field--button">
             <button class="field__btn" type="button" data-open="date">
-              <i class="fi fi-rr-calendar ic" aria-hidden="true"></i>
+              <i class="fi fi-rs-calendar ic" aria-hidden="true"></i>
               <span data-date-field>Trainingsdatum wählen</span>
             </button>
           </div>
@@ -200,9 +185,9 @@
               <div data-next-step="full"></div>
 
               <div class="day-tabs-wrap">
-                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
+                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="fi fi-rs-angle-small-left ic" aria-hidden="true"></i></button>
                 <div class="day-tabs" data-day-tabs role="tablist" aria-label="Tag wählen"></div>
-                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
+                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="fi fi-rs-angle-small-right ic" aria-hidden="true"></i></button>
               </div>
 
               <div class="rail rail--xs" data-day-trainings></div>
@@ -224,7 +209,7 @@
                   <li><b>Rang erhalten</b><span>Bestanden? Dein neuer Rang kommt automatisch.</span></li>
                 </ol>
                 <div class="btn-stack">
-                  <a class="btn btn--primary btn--block" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rr-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
+                  <a class="btn btn--primary btn--block" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rs-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
                   <a class="btn btn--discord btn--block" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord beitreten</a>
                 </div>
               </div>
@@ -239,61 +224,51 @@
     </section>
 
     <!-- ===================== SERVER ===================== -->
-    <section class="page" data-page="server" aria-label="Server" hidden>
-      <div class="page-head">
-        <div class="container">
-          <div class="appbar">
-            <div class="appbar__title">
-              <span class="appbar__label"><span data-bind="servers">0</span> Server online</span>
-              <h1 class="appbar__value">Server</h1>
-            </div>
-            <div class="appbar__actions">
-              <a class="btn btn--primary btn--sm" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-sr-play ic" aria-hidden="true"></i>Spielen</a>
-            </div>
-          </div>
-          <label class="field">
-            <i class="fi fi-rr-search ic" aria-hidden="true"></i>
-            <span class="field__input"><span class="sr-only">Server suchen</span><input type="search" placeholder="Server oder Strecke suchen" data-server-search></span>
-          </label>
-        </div>
-      </div>
-      <div class="sheet">
-        <div class="container">
-          <div class="stat-row" data-server-stats></div>
-          <div data-game-status></div>
-          <div class="chips chips--scroll chips--block" data-server-filter role="group" aria-label="Server filtern"></div>
-          <div class="server-grid" data-servers></div>
-          <div data-pservers></div>
-          <div class="info-banner">
-            <span class="info-banner__ic"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i></span>
-            <div>
-              <strong>Eigener VIP-Server</strong>
-              <p>Fahr mit Freunden auf deinem privaten Server – mit eigenem Fahrplan und Stellwerk.</p>
-            </div>
-            <a class="btn btn--outline btn--sm" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen</a>
+    <section class="page page--site" data-page="server" aria-label="Server" hidden>
+      <header class="site-head lines-bg sv-hero">
+        <div class="site-wrap">
+          <p class="cr-eyebrow sv-hero__live"><i class="live-dot"></i><span data-bind="servers">0</span>&nbsp;Server online</p>
+          <h1 class="mega mega--stack">Server.<br><span>Live aus dem Spiel.</span></h1>
+          <div class="sv-hero__bar">
+            <label class="sv-search">
+              <i class="fi fi-rs-search ic" aria-hidden="true"></i>
+              <span class="sr-only">Server suchen</span><input type="search" placeholder="Server, Spieler oder ID suchen" data-server-search>
+            </label>
+            <a class="site-btn site-btn--brand" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-ss-play ic" aria-hidden="true"></i>Spielen</a>
           </div>
         </div>
+      </header>
+      <div class="site-wrap sv-body">
+        <div class="sv-stats" data-server-stats></div>
+        <div data-game-status></div>
+        <div class="sv-filter" data-server-filter role="group" aria-label="Server filtern"></div>
+        <div class="sv-grid" data-servers></div>
+        <div data-pservers></div>
+        <aside class="sv-vip">
+          <span class="sv-vip__ic"><i class="fi fi-rs-lock ic" aria-hidden="true"></i></span>
+          <div>
+            <h2>Eigener privater Server</h2>
+            <p>Fahr mit Freunden auf deinem privaten Server – mit eigenem Fahrplan und Stellwerk. Starte ihn einmal in Roblox, dann erscheint er hier und du kannst ihn bearbeiten.</p>
+          </div>
+          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
+        </aside>
       </div>
     </section>
 
     <!-- ===================== SERVER-DETAILS (#/server/<id>) ===================== -->
-    <section class="page" data-page="server-detail" aria-label="Server-Details" hidden>
-      <div class="page-head">
-        <div class="container" data-sd-head></div>
-      </div>
-      <div class="sheet">
-        <div class="container" data-sd-body></div>
-      </div>
+    <section class="page page--site" data-page="server-detail" aria-label="Server-Details" hidden>
+      <header class="site-head lines-bg sd-hero">
+        <div class="site-wrap" data-sd-head></div>
+      </header>
+      <div class="site-wrap sv-body" data-sd-body></div>
     </section>
 
     <!-- ===================== SPIELER ===================== -->
-    <section class="page" data-page="spieler" aria-label="Spieler" hidden>
-      <div class="page-head">
-        <div class="container" data-players-head></div>
-      </div>
-      <div class="sheet">
-        <div class="container" data-players></div>
-      </div>
+    <section class="page page--site" data-page="spieler" aria-label="Spieler" hidden>
+      <header class="site-head lines-bg pl-hero">
+        <div class="site-wrap" data-players-head></div>
+      </header>
+      <div class="site-wrap sv-body" data-players></div>
     </section>
 
     <!-- ===================== STATISTIKEN ===================== -->
@@ -376,7 +351,7 @@
               <h1 class="appbar__value">Neuigkeiten</h1>
             </div>
             <div class="appbar__actions">
-              <button class="btn btn--primary btn--sm" type="button" data-open="news-new" data-can-pr hidden><i class="fi fi-rr-plus ic" aria-hidden="true"></i>Neuigkeit</button>
+              <button class="btn btn--primary btn--sm" type="button" data-open="news-new" data-can-pr hidden><i class="fi fi-rs-plus ic" aria-hidden="true"></i>Neuigkeit</button>
             </div>
           </div>
           <div class="head-tabs" role="tablist" aria-label="Kategorie" data-news-tabs>
@@ -465,11 +440,8 @@
     </section>
 
     <!-- ===================== KARRIERE ===================== -->
-    <section class="page" data-page="karriere" aria-labelledby="h-career" hidden>
-      <h1 class="sr-only" id="h-career">Karriere bei Train Sim Germany</h1>
-      <div class="sheet sheet--career">
-        <div class="container career" data-career></div>
-      </div>
+    <section class="page page--site" data-page="karriere" aria-label="Karriere" hidden>
+      <div class="career" data-career></div>
     </section>
     <!-- ===================== EINSTELLUNGEN ===================== -->
     <section class="page page--site" data-page="einstellungen" aria-label="Einstellungen" hidden>
@@ -517,19 +489,19 @@
           <span>Train Sim Germany</span>
         </a>
         <p>Die Bahnsimulation für ganz Deutschland auf Roblox – gebaut von und mit der Community.</p>
-        <button class="foot__install" type="button" data-install hidden><i class="fi fi-rr-download ic" aria-hidden="true"></i>App installieren</button>
+        <button class="foot__install" type="button" data-install hidden><i class="fi fi-rs-download ic" aria-hidden="true"></i>App installieren</button>
       </div>
       <div class="foot__col">
         <h3>Nächster Halt</h3>
         <a class="foot__big" href="#/netz">Unser Netz</a>
-        <a href="#/news">Neuigkeiten<i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
-        <a href="#/server">Server<i class="fi fi-rr-arrow-small-right ic" aria-hidden="true"></i></a>
+        <a href="#/news">Neuigkeiten<i class="fi fi-rs-arrow-small-right ic" aria-hidden="true"></i></a>
+        <a href="#/server">Server<i class="fi fi-rs-arrow-small-right ic" aria-hidden="true"></i></a>
       </div>
       <div class="foot__col">
         <h3>Entdecken</h3>
-        <a data-link="play" href="#" target="_blank" rel="noopener">Spielen<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
-        <a data-link="discord" href="#" target="_blank" rel="noopener">Discord<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
-        <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
+        <a data-link="play" href="#" target="_blank" rel="noopener">Spielen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
+        <a data-link="discord" href="#" target="_blank" rel="noopener">Discord<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
+        <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
         <a href="#/trainings">Trainings</a>
         <a href="#/shop">Shop</a>
         <a href="#/statistiken">Statistiken</a>
@@ -559,7 +531,6 @@
         <span class="loader__name" data-loader-name></span>
       </div>
       <div class="loader__bar"><span></span></div>
-      <p class="loader__text" data-loader-text></p>
     </div>
   </div>
 
@@ -570,7 +541,7 @@
       <div class="grip" aria-hidden="true"></div>
       <div class="sheet-modal__head">
         <h2 id="modal-title" data-modal-title></h2>
-        <button class="round-btn" type="button" data-modal-close aria-label="Schließen"><i class="fi fi-rr-cross-small ic" aria-hidden="true"></i></button>
+        <button class="round-btn" type="button" data-modal-close aria-label="Schließen"><i class="fi fi-rs-cross-small ic" aria-hidden="true"></i></button>
       </div>
       <div class="sheet-modal__body" data-modal-body></div>
     </div>

@@ -16,7 +16,7 @@
  *   game:teams       → letzter Stand der Teams aus dem Spiel { at, teams, names, script } (auch wenn gerade kein Server läuft)
  *   seen:<userId>    → 1, sobald jemand zum ersten Mal auf einem Server war (für „verschiedene Spieler“)
  *   hist:online      → [[Stunde seit 1970, höchste Spielerzahl], …] der letzten 31 Tage
- *   avatar:<userId>  → Profilbild (6 Std.), friends:<userId> → IDs der Freunde (15 Min.)
+ *   avatar:<userId>  → Profilbild (6 Std.)
  */
 import { clip } from './lib.js';
 import { usersApi, thumbsApi, getJson } from './roblox.js';
@@ -268,30 +268,6 @@ async function namesOf(store, env, ids) {
   }
   return out;
 }
-const friendsApi = (env) => (env.ROBLOX_FRIENDS_URL || 'https://friends.roblox.com').replace(/\/+$/, '');
-// Freunde eines Spielers (öffentliche Freundesliste auf Roblox). null = nicht abrufbar
-export async function friendIds(store, env, sub) {
-  const key = `friends:${sub}`;
-  const cached = await store.get(key);
-  if (cached) return new Set(cached);
-  let ids = null;
-  try {
-    ids = [];
-    let cursor = '';
-    for (let page = 0; page < 10; page++) {
-      const r = await getJson(`${friendsApi(env)}/v1/users/${sub}/friends/find?limit=50${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`);
-      ids.push(...(r.PageItems || r.data || []).map((x) => String(x.id)));
-      cursor = r.NextCursor || r.nextPageCursor || '';
-      if (!cursor) break;
-    }
-  } catch (e) {
-    try { ids = ((await getJson(`${friendsApi(env)}/v1/users/${sub}/friends`)).data || []).map((x) => String(x.id)); } catch (e2) { ids = null; }
-  }
-  if (!ids) return null;
-  await store.put(key, ids, { ttl: 900 });
-  return new Set(ids);
-}
-
 // ---------- Für die App ----------
 async function liveMap(store) {
   const all = (await store.get('game:servers')) || {};
@@ -411,12 +387,12 @@ export async function serverDetail(store, env, user, jobId) {
   return { server: sv, avatars: await avatarsOf(store, env, sv.people.map((x) => x.id)) };
 }
 
-// POST /api/players/status { ids } – verfolgte Spieler: Name, Bild, Freund, ob und wo im Spiel
+// POST /api/players/status { ids } – verfolgte Spieler: Name, Bild, ob und wo im Spiel
 export async function playersStatus(store, env, user, body) {
   const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String))].filter((x) => /^\d{1,20}$/.test(x)).slice(0, 100);
   const where = new Map();
   for (const x of await visibleServers(store, user)) (x.s.who || []).forEach((w) => { if (ids.includes(w.id)) where.set(w.id, { ...x, w }); });
-  const [names, avatars, friends] = await Promise.all([namesOf(store, env, ids), avatarsOf(store, env, ids), user ? friendIds(store, env, user.sub) : null]);
+  const [names, avatars] = await Promise.all([namesOf(store, env, ids), avatarsOf(store, env, ids)]);
   const out = [];
   for (const id of ids) {
     const n = names[id] || {};
@@ -424,7 +400,7 @@ export async function playersStatus(store, env, user, body) {
     const st = await store.get(`pstats:${id}`);
     const item = {
       userId: id, username: n.username || (hit && hit.w.name) || null, displayName: n.displayName || (hit && hit.w.dn) || n.username || null,
-      avatar: avatars[id] || null, friend: friends ? friends.has(id) : null, me: !!user && user.sub === id,
+      avatar: avatars[id] || null, me: !!user && user.sub === id,
       inGame: !!hit, lastSeen: hit ? Date.now() : (st && st.last) || null,
     };
     if (hit && hit.hidden) item.server = { private: true, hidden: true };
@@ -436,19 +412,7 @@ export async function playersStatus(store, env, user, body) {
     }
     out.push(item);
   }
-  return { players: out, friendsKnown: !!friends, at: Date.now() };
-}
-
-// GET /api/players/friends – eigene Freunde, die gerade in Train Sim Germany sind, zuerst
-export async function friendsStatus(store, env, user) {
-  const friends = await friendIds(store, env, user.sub);
-  if (!friends) return { players: [], friendsKnown: false, total: 0 };
-  const all = [...friends];
-  const live = new Set((await liveMap(store)).flatMap(([, s]) => s.online || []));
-  const first = [...all.filter((id) => live.has(id)), ...all.filter((id) => !live.has(id))].slice(0, 60);
-  const r = await playersStatus(store, env, user, { ids: first });
-  r.players.forEach((p) => { p.friend = true; });
-  return { ...r, total: all.length };
+  return { players: out, at: Date.now() };
 }
 
 // GET /api/gamestats – Statistik aus dem Spiel (alles 0, solange nichts gemeldet wurde)

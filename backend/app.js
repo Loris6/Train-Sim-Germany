@@ -71,7 +71,6 @@
  *   PUT    /api/pservers/<id>            Einstellungen des Besitzers { name, join, link, access, show, welcome, relay, chat }
  *   POST   /api/chats/<id>/claim         Anfrage annehmen (Team des Bereichs)
  *   POST   /api/chats/<id>/close         Gespräch beenden
- *   GET    /api/players/friends          Eigene Roblox-Freunde, wer davon gerade in Train Sim Germany ist
  *   POST   /api/invites                  { to } – Spieler ins Spiel einladen (Benachrichtigung mit „Beitreten“ und „Ablehnen“)
  *   GET    /api/invites/<id>             Einladung ansehen (Einladender oder Eingeladener)
  *   POST   /api/invites/<id>/answer      { answer: join | decline } – angemeldet oder mit Schlüssel { k } aus der Benachrichtigung
@@ -110,7 +109,7 @@ import {
 } from './chat.js';
 import { createInvite, getInvite, answerInvite } from './invites.js';
 import { listPrivateServers, updatePrivateServer } from './pservers.js';
-import { serversView, serverDetail, playersStatus, friendsStatus, gameStats, playerStats, recordOnline, liveOnline, dropStale } from './game.js';
+import { serversView, serverDetail, playersStatus, gameStats, playerStats, recordOnline, liveOnline, dropStale } from './game.js';
 import { putChunk, fileResponse } from './files.js';
 import { botPhotoResponse } from './bots.js';
 import { mailReady } from './mail.js';
@@ -475,7 +474,6 @@ export async function handle(req, env, store) {
     }
     const chunk = path.match(/^\/api\/files\/([\w-]+)\/(\d{1,4})$/);
     if (chunk && m === 'PUT') return json(req, env, await putChunk(store, user, chunk[1], +chunk[2], req));
-    if (path === '/api/players/friends' && m === 'GET') return json(req, env, await friendsStatus(store, env, user));
 
     // Benachrichtigungen auf diesem Gerät (auch bei geschlossener App)
     if (path === '/api/push/subscribe' && m === 'POST') {

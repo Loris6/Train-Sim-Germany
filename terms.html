@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="lg">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -12,6 +12,7 @@
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="assets/css/uicons.css">
   <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/site.css">
   <script>
     try { var t = localStorage.getItem('tsg-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
   </script>
@@ -19,29 +20,32 @@
 <body class="legal-page">
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-  <header class="topbar">
-    <div class="container topbar__inner">
-      <a class="brand" href="./#/" aria-label="Train Sim Germany – zur App">
-        <img class="brand__logo" src="assets/img/logo.svg" alt="" width="56" height="28">
-        <span class="brand__name">Train Sim Germany</span>
+  <header class="nav lg-nav">
+    <div class="nav__bar">
+      <a class="nav__brand" href="./#/" aria-label="Train Sim Germany – zur Webseite">
+        <img class="nav__logo nav__logo--color" src="assets/img/logo.svg" alt="" width="52" height="26"><img class="nav__logo nav__logo--white" src="assets/img/logo-white.svg" alt="" width="52" height="26">
+        <span class="nav__name">Train Sim Germany</span>
       </a>
-      <a class="btn btn--soft btn--sm legal__app" href="./#/"><i class="fi fi-rr-arrow-left ic" aria-hidden="true"></i>Zur App</a>
+      <nav class="lg-switch" aria-label="Rechtliches">
+        <a href="terms.html" aria-current="page">Nutzungsbedingungen</a>
+        <a href="privacy.html">Datenschutz</a>
+      </nav>
+      <div class="nav__end"><a class="lg-back" href="./#/" aria-label="Zur Webseite" title="Zur Webseite"><i class="fi fi-rs-arrow-left ic" aria-hidden="true"></i></a></div>
     </div>
   </header>
 
   <main id="main" tabindex="-1">
-    <div class="page-head">
-      <div class="container legal__wrap">
-        <span class="appbar__label">Stand: <span data-legal="updated">31. Oktober 2026</span></span>
-        <h1 class="appbar__value">Nutzungsbedingungen</h1>
-        <p class="legal__lead">Diese Bedingungen gelten für die Website und Web-App von Train Sim Germany. Bitte lies sie kurz durch – mit der Nutzung, spätestens mit der Anmeldung über Roblox, stimmst du ihnen zu.</p>
+    <header class="site-head lines-bg lg-hero">
+      <div class="site-wrap">
+        <p class="cr-eyebrow">Nutzungsbedingungen · Stand: <span data-legal="updated">31. Oktober 2026</span></p>
+        <h1 class="mega mega--stack">Die Regeln.<br><span>Fair für alle.</span></h1>
+        <p class="site-head__lead">Diese Bedingungen gelten für die Website und Web-App von Train Sim Germany. Bitte lies sie kurz durch – mit der Nutzung, spätestens mit der Anmeldung über Roblox, stimmst du ihnen zu.</p>
       </div>
-    </div>
+    </header>
 
-    <div class="sheet">
-      <div class="container legal__wrap">
-        <nav class="card legal__toc" aria-label="Inhalt">
-          <h2 class="card__title">Inhalt</h2>
+    <div class="site-wrap lg-body">
+        <nav class="lg-toc" aria-label="Inhalt">
+          <p class="lg-toc__title">Inhalt</p>
           <ol>
             <li><a href="#anbieter">Anbieter und Geltungsbereich</a></li>
             <li><a href="#fanprojekt">Fan-Projekt, kein offizielles Angebot</a></li>
@@ -60,9 +64,9 @@
           </ol>
         </nav>
 
-        <article class="card legal">
+        <article class="lg-article legal">
           <section id="anbieter">
-            <h2>1. Anbieter und Geltungsbereich</h2>
+            <h2><span class="lg-no">01</span>Anbieter und Geltungsbereich</h2>
             <p>Anbieter der Website und Web-App „Train Sim Germany“ (zusammen „die App“) ist:</p>
             <address class="legal__address">
               <span data-legal="operator">Vor- und Nachname eintragen</span><br>
@@ -73,19 +77,19 @@
           </section>
 
           <section id="fanprojekt">
-            <h2>2. Fan-Projekt, kein offizielles Angebot</h2>
+            <h2><span class="lg-no">02</span>Fan-Projekt, kein offizielles Angebot</h2>
             <p>Train Sim Germany ist ein nicht kommerzielles Fan-Projekt. Es ist nicht mit der Roblox Corporation oder der Deutschen Bahn AG verbunden und wird von ihnen weder unterstützt noch geprüft. „Roblox“ ist eine Marke der Roblox Corporation. Namen von Zügen, Linien und Bahnhöfen dienen nur der Beschreibung des Spiels.</p>
             <p>Für dein Roblox-Konto und alles, was du auf Roblox tust, gelten die <a href="https://www.roblox.com/info/terms" target="_blank" rel="noopener">Nutzungsbedingungen von Roblox</a>.</p>
           </section>
 
           <section id="konto">
-            <h2>3. Anmeldung mit Roblox</h2>
+            <h2><span class="lg-no">03</span>Anmeldung mit Roblox</h2>
             <p>Die App kannst du ohne Anmeldung nutzen. Für einige Funktionen meldest du dich mit deinem Roblox-Konto an (OAuth 2.0). Dabei gibst du dein Passwort nur bei Roblox ein. Welche Daten die App erhält, steht in der <a href="privacy.html">Datenschutzerklärung</a>.</p>
             <p>Melde dich nur mit deinem eigenen Konto an. Du kannst dich jederzeit im Profil abmelden. Die Verbindung kannst du außerdem in deinen Roblox-Einstellungen unter „Autorisierte Apps“ entfernen.</p>
           </section>
 
           <section id="regeln">
-            <h2>4. Verhaltensregeln</h2>
+            <h2><span class="lg-no">04</span>Verhaltensregeln</h2>
             <p>Damit alle Spaß haben, gilt in der App, im Spiel und auf Discord:</p>
             <ul>
               <li>Sei freundlich und respektvoll. Beleidigungen, Belästigung, Hetze und Diskriminierung sind verboten.</li>
@@ -98,68 +102,74 @@
           </section>
 
           <section id="bewerbungen">
-            <h2>5. Bewerbungen und Ränge</h2>
-            <p>Für eine Bewerbung meldest du dich mit deinem Roblox-Konto an, damit das Team sieht, wer sich bewirbt. Bewerbungen sind freiwillig. Es gibt keinen Anspruch auf Aufnahme ins Team, auf einen bestimmten Rang oder auf eine Begründung der Entscheidung. Das Ergebnis der Wissensfragen ist eine Hilfe für das Team, keine Zusage. Die Mitarbeit im Team ist ehrenamtlich und wird nicht bezahlt.</p>
+            <h2><span class="lg-no">05</span>Bewerbungen und Ränge</h2>
+            <p>Für eine Bewerbung meldest du dich mit deinem Roblox-Konto an, damit das Team sieht, wer sich bewirbt. Bewerbungen sind freiwillig. Es gibt keinen Anspruch auf Aufnahme ins Team, auf einen bestimmten Rang oder auf eine Begründung der Entscheidung. Deine Antworten sind eine Hilfe für das Team, keine Zusage. Die Mitarbeit im Team ist ehrenamtlich und wird nicht bezahlt.</p>
             <p>Ränge werden nach bestandenen Trainings in der Roblox-Gruppe von Train Sim Germany vergeben und können bei Verstößen gegen die Regeln wieder entzogen werden. Bist du angemeldet, übernimmt die App deine Rolle aus der Gruppe; wer nicht in der Gruppe ist, ist Gast.</p>
             <p>Nach dem Absenden bekommst du deine Bewerbung per E-Mail; gib deshalb eine E-Mail-Adresse an, die dir gehört. Das Ergebnis schickt dir das Team als Nachricht im Chat und per E-Mail. Stellen können eine Höchstzahl an Bewerbungen haben; ist sie erreicht, ist die Stelle geschlossen.</p>
             <p>Wer eine Bewerbung besteht, wird im Discord der Community beglückwünscht (Discord-Name, Roblox-Name und Stelle). Stellen können zeitlich begrenzt sein; wer vor dem Ende angefangen hat, darf seine Bewerbung noch absenden.</p>
           </section>
 
           <section id="chat">
-            <h2>6. Chat</h2>
+            <h2><span class="lg-no">06</span>Chat</h2>
             <p>Im Chat kannst du anderen Spielern schreiben, Gruppen gründen oder öffentlichen Gruppen beitreten und dem Team Fragen und Meldungen schicken. Bleib freundlich und sachlich: keine Beleidigungen, kein Spam, keine Werbung, keine persönlichen Daten anderer, keine Links zu schädlichen Seiten und keine Fotos oder Videos, die verletzend, anstößig oder nicht deine eigenen sind (Ausnahme: Beweise für eine Meldung an das Team). Wer eine Gruppe gründet, darf eigene Regeln festlegen – diese gelten zusätzlich zu diesen Bedingungen. Zur Sicherheit kann die Moderation (ab Supervisor) jedes Gespräch einsehen, Nachrichten löschen und Leute entfernen. Wähle bei Anfragen den passenden Bereich; das zuständige Team kann sie lesen und annehmen. Es gibt keinen Anspruch auf eine Antwort in einer bestimmten Zeit. Bei Verstößen kann das Team Gespräche beenden, Inhalte löschen und dich vom Chat ausschließen. Siehst du etwas, das nicht in Ordnung ist, melde das Gespräch über „Info → Gespräch melden“.</p>
             <p>Wer eine Gruppe leitet, kann eigene Bots anlegen und programmieren. Für Bots gelten dieselben Regeln wie für Nachrichten: Wer einen Bot einrichtet, ist für das verantwortlich, was er schreibt. Bots dürfen nicht spammen, niemanden belästigen und nicht vortäuschen, das Team oder der TSG-Bot zu sein. Das Team kann Bots abschalten oder löschen, wenn sie gegen diese Regeln verstoßen.</p>
           </section>
 
           <section id="shop">
-            <h2>7. Shop</h2>
+            <h2><span class="lg-no">07</span>Shop</h2>
             <p>Im Shop tauschst du Coins aus dem Spiel gegen Züge und Strecken. Coins sind reine Spielwährung: Sie haben keinen Geldwert, lassen sich nicht in echtes Geld tauschen und werden nicht mit echtem Geld gekauft. Ein Kauf in der App reserviert die Coins und wird im Spiel beim nächsten Abgleich verbucht; reichen die Coins dann nicht mehr, wird er abgebrochen. Verbuchte Käufe können nicht zurückgegeben werden. Preise und Angebote können sich ändern. Ohne Backend ist der Shop eine Demo, deren Stand nur auf deinem Gerät gilt.</p>
           </section>
 
           <section id="sichtbarkeit">
-            <h2>8. Öffentliches Profil und Statistik</h2>
+            <h2><span class="lg-no">08</span>Öffentliches Profil und Statistik</h2>
             <p>Dein Profil und deine Statistik sind privat, bis du sie in den Einstellungen öffentlich machst. Öffentliche Angaben können andere Spieler sehen. Du kannst sie jederzeit wieder auf privat stellen.</p>
           </section>
 
           <section id="inhalte">
-            <h2>9. Inhalte und Rechte</h2>
+            <h2><span class="lg-no">09</span>Inhalte und Rechte</h2>
             <p>Texte, Grafiken, Logos und Videos der App gehören dem Team von Train Sim Germany oder werden mit Erlaubnis genutzt. Die Icons stammen von <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a>, die Schrift Rubik steht unter der SIL Open Font License. Du darfst Inhalte für private Zwecke ansehen und teilen, aber nicht als eigene ausgeben oder verkaufen.</p>
             <p>Was du selbst einreichst, zum Beispiel Bewerbungstexte oder Links, darf das Team nutzen, um deine Bewerbung zu prüfen. Du versicherst, dass du die Rechte an eingereichten Inhalten hast.</p>
             <p>Teammitglieder, die Trainings (ab Supervisor) oder Neuigkeiten (ab Public Relations Department) erstellen, sind für deren Inhalt verantwortlich. Bilder, Videos und Links dürfen keine Rechte anderer verletzen und nur auf sichere Seiten (https) führen. Erstellte Inhalte erscheinen mit dem Roblox-Namen der Person und können von ihr wieder gelöscht werden.</p>
           </section>
 
           <section id="verfuegbarkeit">
-            <h2>10. Verfügbarkeit und Daten</h2>
+            <h2><span class="lg-no">10</span>Verfügbarkeit und Daten</h2>
             <p>Wir bemühen uns, dass die App gut funktioniert, können aber keine ständige Verfügbarkeit versprechen. Funktionen können sich ändern, wegfallen oder hinzukommen. Zahlen in der App (zum Beispiel Spieler, Züge, Statistiken) sind teilweise Beispielwerte oder Schätzungen und können vom Spiel abweichen. Fahrpläne und Verspätungen in der App gehören zum Spiel und haben nichts mit dem echten Bahnverkehr zu tun.</p>
           </section>
 
           <section id="haftung">
-            <h2>11. Haftung</h2>
+            <h2><span class="lg-no">11</span>Haftung</h2>
             <p>Die App ist kostenlos. Wir haften unbeschränkt bei Vorsatz und grober Fahrlässigkeit sowie bei Verletzung von Leben, Körper oder Gesundheit. Bei leichter Fahrlässigkeit haften wir nur für die Verletzung wesentlicher Pflichten und nur für den typischen, vorhersehbaren Schaden. Im Übrigen ist die Haftung ausgeschlossen.</p>
             <p>Für Inhalte externer Seiten, auf die wir verlinken (zum Beispiel Roblox, Discord oder YouTube), sind deren Betreiber verantwortlich.</p>
           </section>
 
           <section id="sperre">
-            <h2>12. Beenden und Sperren</h2>
+            <h2><span class="lg-no">12</span>Beenden und Sperren</h2>
             <p>Du kannst die App jederzeit nicht mehr nutzen und dich abmelden. Bei Verstößen gegen diese Bedingungen können wir Funktionen für dich einschränken, Bewerbungen ablehnen oder dich vom Team und von Trainings ausschließen.</p>
           </section>
 
           <section id="aenderungen">
-            <h2>13. Änderungen</h2>
+            <h2><span class="lg-no">13</span>Änderungen</h2>
             <p>Wir können diese Bedingungen anpassen, zum Beispiel wenn neue Funktionen dazukommen. Wesentliche Änderungen kündigen wir in den Neuigkeiten oder auf Discord an. Es gilt immer die Fassung auf dieser Seite. Stand: <span data-legal="updated">31. Oktober 2026</span>.</p>
           </section>
 
           <section id="recht">
-            <h2>14. Anwendbares Recht und Kontakt</h2>
+            <h2><span class="lg-no">14</span>Anwendbares Recht und Kontakt</h2>
             <p>Es gilt das Recht der Bundesrepublik Deutschland. Zwingende Verbraucherschutzvorschriften deines Wohnsitzlandes bleiben unberührt. Sollte eine Bestimmung unwirksam sein, bleiben die übrigen gültig.</p>
             <p>Fragen, Hinweise oder Meldungen schickst du an <a data-legal-mail href="mailto:kontakt@beispiel.de">kontakt@beispiel.de</a> oder über unseren Discord-Server.</p>
           </section>
         </article>
 
-        <p class="legal__more"><a href="privacy.html">Datenschutzerklärung</a> · <a href="./#/">Zur App</a></p>
-      </div>
+        <aside class="lg-more">
+          <a href="privacy.html"><small>Weiterlesen</small><b>Datenschutz</b><i class="fi fi-rs-arrow-right ic" aria-hidden="true"></i></a>
+          <a href="./#/"><small>Zurück</small><b>Zur Webseite</b><i class="fi fi-rs-arrow-right ic" aria-hidden="true"></i></a>
+        </aside>
     </div>
   </main>
+
+  <footer class="lg-foot">
+    <div class="site-wrap">© 2026 Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation.</div>
+  </footer>
 
   <script src="assets/js/nozoom.js"></script>
   <script src="assets/js/config.js"></script>
