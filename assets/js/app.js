@@ -371,6 +371,7 @@
     const g = G();
     const sv = liveMode() && live.data ? live.data.servers : null;
     const box = $('[data-kpis="home"]');
+    if (!box) { renderHomeNumbers(); return; }
     box.innerHTML = [
       kpi({ label: t('Spieler online'), num: state.online, ic: 'fi-rr-users-alt', live: !!state.liveOnline, spark: hourSeries(12).map((x) => x.value), bindKey: 'online' }),
       kpi({ label: t('Aktive Server'), num: sv ? sv.length : g.live.servers, ic: 'fi-rr-database', live: liveMode(), note: t('aus dem Spiel'), key: 'home-servers' }),
@@ -526,6 +527,7 @@
   // ---------- Strecken & News ----------
   // Einstieg und Rollen (Startseite)
   function renderRoles() {
+    if (!$('[data-roles]')) return;
     const rk = (name) => `<b class="rk" style="--rc:${rankOf(name).color}">${esc(name)}</b>`;
     const fill = (text, rank) => esc(t(text))
       .replace(/\{rank\}/g, rk(rank))
@@ -582,6 +584,7 @@
   const roleOfTeam = (name) => { const v = String(name || '').toLowerCase(); const hit = ROLE_WORDS.find(([, re]) => re.test(v)); return hit ? hit[0] : 'Passenger'; };
 
   function renderRoutes() {
+    if (!$('[data-routes]')) return;
     $('[data-routes]').innerHTML = D.routes.map((r) => {
       const fav = state.favs.has(r.title);
       return `<article class="scard">
@@ -600,7 +603,9 @@
   }
 
   function renderNews() {
-    $('[data-news]').innerHTML = newsItems().slice(0, 3).map(newsCard).join('');
+    const box = $('[data-news]');
+    if (box) box.innerHTML = newsItems().slice(0, 3).map(newsCard).join('');
+    renderHomeNews();
   }
 
   // ---------- Server ----------
@@ -1840,7 +1845,9 @@
     }
     $$('[data-can-pr]').forEach((b) => { b.hidden = !mayPR(); });
     const list = newsItems().filter((n) => state.newsCat === 'all' || n.cat === state.newsCat);
-    $('[data-news-feed]').innerHTML = list.length ? list.map(newsCard).join('') : `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`;
+    // Neueste groß, alle weiteren als Karten mit Lesezeit (ein Klick öffnet die Neuigkeit als eigene Seite)
+    $('[data-news-feed]').innerHTML = list.length ? `${newsTile(list[0], 'feature')}${list.length > 1 ? `<div class="nr-cards">${list.slice(1).map((n) => newsTile(n, 'card')).join('')}</div>` : ''}`
+      : `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`;
   }
 
   // ---------- Karriere ----------
@@ -2844,10 +2851,7 @@
     $$('[data-me-ring]').forEach((el) => el.style.setProperty('--rc', r.color));
     $$('[data-me-avatar]').forEach((el) => { el.innerHTML = avatarInner(p); });
     $$('.me').forEach((b) => b.setAttribute('aria-label', p ? t('Profil von {name}', { name: p.displayName || p.username }) : t('Profil öffnen und mit Roblox verbinden')));
-    $$('.tabbar__me').forEach((b) => b.setAttribute('aria-label', t('Profil')));
-    $('[data-drawer-me]').innerHTML = `${ringHTML(p, r, 'avatar-ring--lg')}
-      <span class="drawer__who"><b>${p ? esc(p.displayName || p.username) : t('Gast')}</b><small>${p ? `@${esc(p.username)}` : t('Mit Roblox verbinden')}</small></span>
-      ${rankPill(r)}`;
+    renderNavAccount();
   }
   // Öffentliches Roblox-Profil laden (Name, Anzeigename, Profilbild)
   async function fetchRoblox(name) {
@@ -4050,6 +4054,8 @@
     const l = chat.list;
     const n = l ? l.chats.filter(isUnread).length + l.queue.filter((x) => x.status === 'open').length : 0;
     $$('[data-chat-dot]').forEach((el) => { el.hidden = !n; });
+    // Ungelesenes zeigt die Leiste oben am Profilbild (nur neu zeichnen, wenn sich die Zahl ändert)
+    if (chatDot.last !== n) { chatDot.last = n; renderNavAccount(); }
   }
   // Team ab Supervisor: vom Backend oder direkt aus der Roblox-Gruppe (über den Proxy)
   // Jede Person nur einmal (höchster Rang, Profilbild von welchem Eintrag auch immer)
@@ -6875,6 +6881,308 @@
     } catch (e) { toast(chatError(e)); }
   }
 
+  // ---------- Website: Navigation, Startseite, Netz, FAQ, Team, Neuigkeit als eigene Seite ----------
+  // Oben eine schwebende Leiste (Logo, Seiten, Anmelden). Auf schmalen Bildschirmen öffnet „Menü“ neben dem Logo eine
+  // zweite Leiste im gleichen Stil darunter; angemeldet öffnet der Name rechts das Konto ebenso.
+  const navRoot = $('[data-nav-root]');
+  function navOpen(which) {
+    if (!navRoot) return;
+    const sub = $('[data-nav-sub]', navRoot);
+    const acc = $('[data-nav-acc]', navRoot);
+    const showSub = which === 'menu' && sub.hidden;
+    const showAcc = which === 'account' && acc.hidden;
+    [[sub, showSub], [acc, showAcc]].forEach(([el, on]) => {
+      if (on) { el.hidden = false; void el.offsetWidth; el.classList.add('is-open'); return; }
+      if (el.hidden) return;
+      el.classList.remove('is-open');
+      if (reducedMotion()) { el.hidden = true; return; }
+      setTimeout(() => { if (!el.classList.contains('is-open')) el.hidden = true; }, 220);
+    });
+    navRoot.classList.toggle('is-menu', showSub);
+    navRoot.classList.toggle('is-account', showAcc);
+    $$('[data-nav-toggle]', navRoot).forEach((b) => { b.setAttribute('aria-expanded', String(showSub)); b.setAttribute('aria-label', showSub ? t('Menü schließen') : t('Menü öffnen')); });
+    $$('[data-nav-me]', navRoot).forEach((b) => b.setAttribute('aria-expanded', String(showAcc)));
+  }
+  const navClose = () => navOpen(null);
+  // Rechts in der Leiste: „Anmelden“ oder (angemeldet) Profilbild und Name, dazu das Konto-Menü
+  function renderNavAccount() {
+    if (!navRoot) return;
+    const box = $('[data-nav-account]', navRoot);
+    const acc = $('[data-nav-acc]', navRoot);
+    const p = state.profile;
+    const r = rankOf(state.rank);
+    if (!p) {
+      box.innerHTML = `<button class="nav__login" type="button" data-open="profile">${loginReady() ? t('Anmelden') : t('Verbinden')}${icon('fi-rr-arrow-up-right')}</button>`;
+      acc.innerHTML = '';
+      return;
+    }
+    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
+    box.innerHTML = `<button class="nav__me" type="button" data-nav-me aria-expanded="false" aria-label="${esc(t('Konto von {name}', { name: p.displayName || p.username }))}">
+        <span class="nav__avatar" style="--rc:${r.color}">${avatarInner(p)}${unread ? '<i class="nav__dot"></i>' : ''}</span>
+        <span class="nav__who">${esc(p.displayName || p.username)}</span>${icon('fi-rr-angle-small-down', 'nav__chev')}</button>`;
+    const item = (href, ic, label, extra = '') => `<a href="${href}" class="nav__acc-link">${icon(ic)}<span>${label}</span>${extra}</a>`;
+    acc.innerHTML = `<div class="nav__acc-head">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${esc(p.displayName || p.username)}</b><small>@${esc(p.username)}</small></span>${rankPill(r)}</div>
+      <nav class="nav__acc-links" aria-label="${esc(t('Konto'))}">
+        ${item('#/chat', 'fi-rr-comments', t('Chat'), unread ? `<b class="nav__badge">${unread > 99 ? '99+' : unread}</b>` : '')}
+        ${item('#/trainings', 'fi-rr-calendar', t('Trainings'))}
+        ${item('#/shop', 'fi-rr-shopping-cart', t('Shop'))}
+        ${item('#/spieler', 'fi-rr-users', t('Spieler'))}
+        ${item('#/statistiken', 'fi-rr-chart-line-up', t('Statistiken'))}
+        ${item('#/einstellungen', 'fi-rr-settings', t('Einstellungen'))}
+        <button class="nav__acc-link" type="button" data-open="profile">${icon('fi-rr-user')}<span>${t('Profil')}</span></button>
+        <button class="nav__acc-link nav__acc-link--out" type="button" data-disconnect>${icon('fi-rr-sign-out-alt')}<span>${p.oauth ? t('Abmelden') : t('Trennen')}</span></button>
+      </nav>`;
+  }
+
+  // Sätze zum Durchblättern auf der Startseite
+  const QUOTES = [
+    'Train Sim Germany ist kein Spiel, das man nur nebenbei fährt – es ist ein Netz, das jeden Tag von echten Menschen betrieben wird.',
+    'Vom ersten Training als Learning Driver bis ins Stellwerk: Bei uns wächst du mit jeder Fahrt und jedem Rang.',
+    'Echte Bahnhöfe, echte Linien, echter Fahrplan – und eine Community, die pünktlich sein will.',
+    'Jeder Halt, jedes Signal und jede Ansage ist mit Liebe zum Detail gebaut. Und das Netz wächst weiter.',
+  ];
+  const quote = { i: 0, timer: null, paused: false };
+  function showQuote(i, dir = 1) {
+    const stage = $('[data-quote-stage]');
+    if (!stage) return;
+    quote.i = (i + QUOTES.length) % QUOTES.length;
+    stage.innerHTML = `<blockquote class="quotes__text" style="--dir:${dir}">${esc(t(QUOTES[quote.i]))}<span class="quotes__mark" aria-hidden="true">”</span></blockquote>`;
+    const c = $('[data-quote-count]');
+    if (c) c.textContent = `${pad(quote.i + 1)} · ${pad(QUOTES.length)}`;
+  }
+  function quoteAuto() {
+    clearInterval(quote.timer);
+    if (quote.paused || reducedMotion()) return;
+    quote.timer = setInterval(() => { if (state.page === 'home' && document.visibilityState === 'visible') showQuote(quote.i + 1); }, 7000);
+  }
+
+  // Titel: Schiene mit Halten, der nächste Halt wechselt
+  const HERO_STOPS = ['Magdeburg Hbf', 'Halle (Saale) Hbf', 'Leipzig Hbf', 'Lutherstadt Wittenberg', 'Berlin Hbf', 'Frankfurt (Oder)', 'Poznań Główny'];
+  const hero = { i: 4, timer: null };
+  function heroLine() {
+    const box = $('[data-hero-line]');
+    if (!box) return;
+    box.innerHTML = `<span class="hero__rule"></span>${HERO_STOPS.map((s, i) => `<i class="hero__stop${i === hero.i ? ' is-next' : i < hero.i ? ' is-past' : ''}" style="--x:${(i / (HERO_STOPS.length - 1)) * 100}%"></i>`).join('')}`;
+    const name = $('[data-hero-stop]');
+    if (name) name.textContent = HERO_STOPS[hero.i];
+    clearInterval(hero.timer);
+    if (reducedMotion()) return;
+    hero.timer = setInterval(() => {
+      if (state.page !== 'home' || document.visibilityState !== 'visible') return;
+      hero.i = (hero.i + 1) % HERO_STOPS.length;
+      $$('.hero__stop', box).forEach((el, i) => { el.classList.toggle('is-next', i === hero.i); el.classList.toggle('is-past', i < hero.i); });
+      if (name) { name.classList.remove('is-in'); void name.offsetWidth; name.textContent = HERO_STOPS[hero.i]; name.classList.add('is-in'); }
+    }, 3200);
+  }
+  function heroStars() {
+    const sky = $('[data-stars]');
+    if (!sky || sky.childElementCount) return;
+    let seed = 7;
+    const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+    sky.innerHTML = Array.from({ length: 70 }, () => `<i style="left:${(rnd() * 100).toFixed(2)}%;top:${(rnd() * 70).toFixed(2)}%;--s:${(1 + rnd() * 2).toFixed(1)}px;--d:${(rnd() * 4).toFixed(2)}s"></i>`).join('');
+  }
+
+  // Lesezeit: rund 200 Wörter pro Minute, mindestens 1 Minute
+  const readMinutes = (n) => Math.max(1, Math.round(String(t(n.text || '')).split(/\s+/).filter(Boolean).length / 200));
+  const readText = (n) => t('{n} Min. Lesezeit', { n: readMinutes(n) });
+  const newsHref = (n) => `#/news/${encodeURIComponent(n.id)}`;
+  const excerpt = (s, n = 140) => { const v = String(s || ''); return v.length > n ? `${v.slice(0, n).replace(/\s+\S*$/, '')} …` : v; };
+  const chipOf = (n) => `<span class="chip-cat" style="--cc:${newsCat(n.cat)[3]}">${esc(t(n.tag || newsCat(n.cat)[2]))}</span>`;
+  // Neuigkeit als Karte: groß (Bild als Fläche) oder als Zeile mit Kategorie, Datum, Titel, Auszug
+  function newsTile(n, kind = 'row') {
+    if (kind === 'feature') {
+      return `<a class="nr-feature" href="${newsHref(n)}">
+        <img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="nr-play">${icon('fi-sr-play')}</span>` : ''}
+        <span class="nr-feature__body"><span class="nr-meta">${chipOf(n)}<span>${newsDate(n)}</span><span>${readText(n)}</span></span>
+          <b class="nr-feature__title">${esc(t(n.title))}</b><span class="nr-feature__text">${esc(excerpt(t(n.text), 110))}</span></span>
+      </a>`;
+    }
+    if (kind === 'card') {
+      return `<a class="nr-card" href="${newsHref(n)}">
+        <span class="nr-card__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="nr-play">${icon('fi-sr-play')}</span>` : ''}</span>
+        <span class="nr-meta">${chipOf(n)}<span>${newsDate(n)}</span></span>
+        <b class="nr-card__title">${esc(t(n.title))}</b><span class="nr-card__text">${esc(excerpt(t(n.text)))}</span>
+        <span class="nr-card__read">${icon('fi-rr-clock-three')}${readText(n)}</span>
+      </a>`;
+    }
+    return `<a class="nr-row" href="${newsHref(n)}"><span class="nr-meta">${chipOf(n)}<span>${newsDate(n)}</span><span>${readText(n)}</span></span>
+      <b class="nr-row__title">${esc(t(n.title))}</b><span class="nr-row__text">${esc(excerpt(t(n.text)))}</span></a>`;
+  }
+  function renderHomeNews() {
+    const box = $('[data-home-news]');
+    if (!box) return;
+    const list = newsItems();
+    if (!list.length) { box.innerHTML = `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`; return; }
+    box.innerHTML = `${newsTile(list[0], 'feature')}<div class="nr-side">${list.slice(1, 4).map((n) => newsTile(n)).join('')}</div>`;
+  }
+
+  // Zahlen wie auf einer Anzeigetafel: jede Ziffer rollt an ihren Platz
+  function rollDigits(n) {
+    return String(fmt(Math.max(0, Math.round(n || 0)))).split('').map((ch, i) => (/\d/.test(ch)
+      ? `<span class="roll" style="--d:${ch};--i:${i}"><span>${'0123456789'.split('').map((d) => `<i>${d}</i>`).join('')}</span></span>`
+      : `<span class="roll-sep">${ch}</span>`)).join('');
+  }
+  function renderHomeNumbers() {
+    const box = $('[data-home-numbers]');
+    if (!box) return;
+    const s = D.stats;
+    const items = [[s.groupMembers, t('Gruppenmitglieder')], [s.visits, t('Besuche')], [Math.max(state.online || 0, (live.data && live.data.online) || 0), t('Gerade im Spiel')]];
+    const key = items.map((x) => Math.round(x[0] || 0)).join('|');
+    if (box.dataset.key === key) return;
+    box.dataset.key = key;
+    box.innerHTML = items.map(([n, label]) => `<div class="numbers__item"><b class="numbers__value" aria-label="${esc(fmt(Math.round(n || 0)))}">${rollDigits(n)}</b><span>${label}</span></div>`).join('');
+    // Erst rollen, wenn die Zahlen zu sehen sind
+    const go = () => box.classList.add('is-rolled');
+    box.classList.remove('is-rolled');
+    if (reducedMotion() || !('IntersectionObserver' in window)) { go(); return; }
+    const io = new IntersectionObserver((list) => { if (list.some((x) => x.isIntersecting)) { requestAnimationFrame(go); io.disconnect(); } }, { threshold: 0.3 });
+    io.observe(box);
+  }
+
+  // Häufige Fragen
+  const FAQ = [
+    ['Was ist Train Sim Germany?', 'Train Sim Germany ist eine Bahnsimulation auf Roblox. Du fährst Züge nach Fahrplan, fertigst Bahnhöfe ab, begleitest Züge oder stellst im Stellwerk die Fahrstraßen – zusammen mit anderen Spielern auf denselben Servern.'],
+    ['Brauche ich Roblox zum Spielen?', 'Ja. Roblox ist kostenlos und läuft auf PC, Mac, Handy, Tablet und Konsole. Über „Auf Roblox spielen“ kommst du direkt ins Spiel.'],
+    ['Wie bekomme ich einen höheren Rang?', 'Tritt der Roblox-Gruppe bei – dann startest du als Learning Driver. Weitere Ränge wie Qualified Driver, Platform Staff, Conductor oder Signaller bekommst du in Trainings. Termine stehen unter „Trainings“.'],
+    ['Was bringt mir die Anmeldung auf der Webseite?', 'Mit deinem Roblox-Konto siehst du deinen Rang, bekommst Erinnerungen an Trainings, kannst chatten, im Shop Züge und Strecken kaufen, dich bewerben und deine Statistik ansehen. Wir erhalten nie dein Passwort.'],
+    ['Wie kann ich im Team mitmachen?', 'Offene Stellen findest du unter „Karriere“ – vom Supervisor bis zum Game Developer. Die Bewerbung läuft direkt hier auf der Webseite.'],
+    ['Kostet das Spiel etwas?', 'Nein, Train Sim Germany ist kostenlos. Coins verdienst du im Spiel und gibst sie im Shop für Züge und Strecken aus.'],
+    ['Wo erfahre ich, was es Neues gibt?', 'Unter „Neuigkeiten“ und auf unserem Discord-Server. Dort kannst du auch Fragen stellen und das Team erreichen.'],
+  ];
+  function renderFaq(where) {
+    const box = $(`[data-faq="${where}"]`);
+    if (!box) return;
+    box.innerHTML = FAQ.map(([q, a], i) => `<details class="faq__item"${where === 'home' && i === 0 ? ' open' : ''}>
+        <summary><span>${esc(t(q))}</span><i class="faq__plus" aria-hidden="true"></i></summary>
+        <div class="faq__a"><p>${esc(t(a))}</p></div>
+      </details>`).join('');
+  }
+
+  function renderHome() {
+    heroStars();
+    heroLine();
+    if (!$('[data-quote-stage] blockquote')) showQuote(quote.i);
+    quoteAuto();
+    renderHomeNews();
+    renderHomeNumbers();
+    renderFaq('home');
+  }
+
+  // Netz: Kennzahlen, Linien als Bänder mit allen Halten, Strecken als Karten
+  function renderNet() {
+    const lines = Object.values(D.lines);
+    const stations = new Set(lines.flatMap((L) => L.stops.map(([n]) => n)));
+    const km = D.routes.reduce((n, r) => n + (r.km || 0), 0);
+    const stats = $('[data-net-stats]');
+    if (stats) {
+      stats.innerHTML = [[D.routes.length, t('Strecken')], [lines.length, t('Linien')], [stations.size, t('Bahnhöfe')], [km, t('Kilometer Strecke')]]
+        .map(([n, label]) => `<div class="net-stat"><b>${fmt(n)}</b><span>${label}</span></div>`).join('');
+    }
+    const lb = $('[data-net-lines]');
+    if (lb) {
+      lb.innerHTML = lines.map((L) => `<article class="net-line">
+          <header><span class="line line--${L.cat}">${esc(L.name)}</span><b>${esc(L.stops[0][0])} – ${esc(L.stops[L.stops.length - 1][0])}</b><small>${esc(L.train)} · ${t('alle {n} Min.', { n: L.every })}</small></header>
+          <ol class="net-line__stops" style="--n:${L.stops.length}">${L.stops.map(([n, m]) => `<li><i></i><span>${esc(n)}</span><small>${m ? `+${m}′` : t('ab')}</small></li>`).join('')}</ol>
+        </article>`).join('');
+    }
+    const rb = $('[data-net-routes]');
+    if (rb) {
+      rb.innerHTML = D.routes.map((r) => `<article class="net-route">
+          <span class="net-route__img"><img src="assets/img/${r.img}" alt="" loading="lazy"><span class="line line--${r.cat}">${esc(r.line)}</span></span>
+          <span class="net-route__body"><small>${esc(r.no)} · ${esc(t(r.tag || ''))}</small><b>${esc(t(r.title))}</b>
+          <span>${esc(r.from)} → ${esc(r.to)}</span><em>${fmt(r.km)} km · ${t('{d} Std.', { d: r.dur })} · ${t('{n} Halte', { n: r.stops })}</em></span>
+        </article>`).join('');
+    }
+  }
+
+  // Team: alle ab Supervisor aus der Roblox-Gruppe, nach Rang – mit „Anschreiben“ (Chat) und Roblox-Profil
+  function renderTeam() {
+    const box = $('[data-team]');
+    if (!box) return;
+    if (!chat.staff) { loadStaff().then(() => { if (state.page === 'entwickler') renderTeam(); }); box.innerHTML = loadingHtml(); return; }
+    const list = chat.staff;
+    if (!list.length) { box.innerHTML = `<p class="empty">${t('Gerade ist niemand im Team eingetragen.')}</p>`; return; }
+    const order = [...RANKS].filter((r) => r.staff || rankIdx(r.name) >= rankIdx('Supervisor')).reverse();
+    const groups = order.map((r) => [r, list.filter((p) => p.rank === r.name)]).filter(([, l]) => l.length);
+    const me = meSub();
+    box.innerHTML = groups.map(([r, l]) => `<section class="team-group">
+        <h2 class="site-h2"><i class="team-dot" style="--rc:${r.color}"></i>${esc(r.name)}<small>${esc(t(r.label))} · ${l.length}</small></h2>
+        <div class="team-grid">${l.map((p) => `<article class="team-card">
+          <span class="team-card__img">${p.avatar ? `<img src="${esc(p.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<b>${esc(initials(p.displayName || p.username))}</b>`}</span>
+          <b class="team-card__name">${esc(p.displayName || p.username)}</b>
+          <span class="team-card__role" style="--rc:${r.color}">${esc(r.name)}</span>
+          <small class="team-card__at">@${esc(p.username)}</small>
+          <a class="team-card__ext" href="https://www.roblox.com/users/${encodeURIComponent(p.userId)}/profile" target="_blank" rel="noopener" aria-label="${esc(t('Roblox-Profil von {name}', { name: p.username }))}">${icon('fi-rr-arrow-up-right')}</a>
+          <span class="team-card__btns">
+            ${String(p.userId) === me ? `<span class="team-card__me">${t('Das bist du')}</span>` : `<a class="site-btn site-btn--brand site-btn--sm" href="#/chat/an/${encodeURIComponent(p.userId)}">${icon('fi-rr-comment-alt')}${t('Anschreiben')}</a>`}
+          </span>
+        </article>`).join('')}</div>
+      </section>`).join('');
+  }
+
+  // Neuigkeit als eigene Seite: Kategorie, großer Titel, Datum, Autor, Lesezeit, Bild/Video, Text, Knöpfe, Teilen
+  function renderArticle() {
+    const box = $('[data-article]');
+    const n = newsItems().find((x) => String(x.id) === String(state.newsId));
+    if (!n) {
+      box.innerHTML = `<div class="site-wrap article__head"><a class="back-pill" href="#/news">${icon('fi-rr-arrow-left')}${t('Alle Neuigkeiten')}</a><h1 class="article__title">${t('Diese Neuigkeit gibt es nicht mehr.')}</h1></div>`;
+      return;
+    }
+    const url = `${location.origin}${location.pathname}${newsHref(n)}`;
+    const share = [
+      ['x', 'X', `https://x.com/intent/post?text=${encodeURIComponent(t(n.title))}&url=${encodeURIComponent(url)}`, 'fi-brands-twitter-alt'],
+      ['whatsapp', 'WhatsApp', `https://wa.me/?text=${encodeURIComponent(`${t(n.title)} ${url}`)}`, 'fi-brands-whatsapp'],
+      ['reddit', 'Reddit', `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(t(n.title))}`, 'fi-brands-reddit'],
+      ['facebook', 'Facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, 'fi-brands-facebook'],
+    ];
+    const others = newsItems().filter((x) => x.id !== n.id).slice(0, 3);
+    box.innerHTML = `<div class="site-wrap article__head">
+        <a class="back-pill" href="#/news">${icon('fi-rr-arrow-left')}${t('Alle Neuigkeiten')}</a>
+        ${chipOf(n)}
+        <h1 class="article__title">${esc(t(n.title))}</h1>
+        <p class="article__meta"><span>${newsDate(n)}</span>${n.author ? `<span>${t('Von {name}', { name: esc(n.author) })}</span>` : ''}<span>${icon('fi-rr-clock-three')}${readText(n)}</span>${n.edited ? `<span>${t('bearbeitet')}</span>` : ''}</p>
+      </div>
+      <div class="site-wrap article__media">${mediaHtml(n)}</div>
+      <div class="site-wrap site-wrap--narrow article__body">
+        ${String(t(n.text)).split(/\n{2,}/).map((para) => `<p>${esc(para)}</p>`).join('')}
+        <div class="article__btns">${newsButtons(n)}</div>
+        ${n.remote && isMine(n.authorId) ? `<div class="article__own"><button class="btn btn--soft" type="button" data-news-edit="${esc(n.id)}">${icon('fi-rr-pencil')}${t('Bearbeiten')}</button><button class="btn btn--danger" type="button" data-news-del="${esc(n.id)}">${icon('fi-rr-trash')}${t('Löschen')}</button></div>` : ''}
+        <div class="article__share"><b>${t('Beitrag teilen')}</b><span>
+          ${share.map(([k, name, href, ic]) => `<a class="share-btn" href="${esc(href)}" target="_blank" rel="noopener" aria-label="${esc(t('Auf {name} teilen', { name }))}" data-share="${k}">${icon(ic)}</a>`).join('')}
+          <button class="share-btn" type="button" data-copy="${esc(url)}" aria-label="${esc(t('Link kopieren'))}">${icon('fi-rr-link-alt')}</button>
+          ${navigator.share ? `<button class="share-btn" type="button" data-share-native="${esc(url)}" data-share-title="${esc(t(n.title))}" aria-label="${esc(t('Teilen'))}">${icon('fi-rr-share')}</button>` : ''}
+        </span></div>
+      </div>
+      ${others.length ? `<div class="site-wrap article__more"><div class="mega-head"><h2 class="display">${t('Weitere Neuigkeiten')}</h2><a class="more-link" href="#/news">${t('Alle Beiträge')}${icon('fi-rr-arrow-small-right')}</a></div>
+        <div class="nr-cards">${others.map((x) => newsTile(x, 'card')).join('')}</div></div>` : ''}`;
+  }
+
+  // ---------- Seitenwechsel: Streifen wischen über den Bildschirm, dann Ladebildschirm mit Logo ----------
+  const PAGE_NAMES = {
+    home: 'Start', netz: 'Unser Netz', server: 'Server', news: 'Neuigkeiten', karriere: 'Karriere', faq: 'Fragen', entwickler: 'Das Team',
+    trainings: 'Trainings', shop: 'Shop', chat: 'Chat', spieler: 'Spieler', statistiken: 'Statistiken', einstellungen: 'Einstellungen',
+  };
+  const loaderState = { busy: false, timers: [] };
+  function playLoader(text, swap, { splash = false } = {}) {
+    const el = $('[data-loader]');
+    if (!el || reducedMotion() || loaderState.busy) { swap(); return; }
+    loaderState.busy = true;
+    loaderState.timers.forEach(clearTimeout);
+    const name = $('[data-loader-name]', el);
+    if (name && !name.childElementCount) name.innerHTML = 'Train Sim Germany'.split('').map((ch, i) => `<span style="--i:${i}">${ch === ' ' ? '&nbsp;' : ch}</span>`).join('');
+    $('[data-loader-text]', el).textContent = text;
+    el.className = 'loader';
+    el.hidden = false;
+    void el.offsetWidth;
+    el.classList.add(splash ? 'is-splash' : 'is-in');
+    const at = (ms, fn) => loaderState.timers.push(setTimeout(fn, ms));
+    const cover = splash ? 0 : 460;
+    at(cover, () => { try { swap(); } finally { el.classList.add('is-loading'); } });
+    at(cover + 720, () => el.classList.add('is-out'));
+    at(cover + 1080, () => { el.hidden = true; el.className = 'loader'; loaderState.busy = false; });
+  }
+  const loaderText = (page) => t('Nächster Halt: {page}', { page: t(PAGE_NAMES[page] || 'Start') });
+
   // ---------- Bindings ----------
   function bind() {
     const s = D.stats;
@@ -6887,17 +7195,19 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'netz', 'faq', 'entwickler'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
     home() {
-      renderRoles(); renderNextSteps(); renderRoutes(); renderHomeKpis(); renderNews();
+      renderHome();
       loadGameStats();
       if (liveMode()) loadLive();
-      $('[data-open-jobs]').textContent = D.jobs.filter((x) => x.open).length;
     },
-    news() { renderNewsPage(); },
+    news() { if (state.newsId) renderArticle(); else renderNewsPage(); },
+    netz() { renderNet(); },
+    faq() { renderFaq('page'); },
+    entwickler() { renderTeam(); },
     shop() { renderShop(); loadShop(); },
     chat() { renderChat(); },
     karriere() { renderCareer(); },
@@ -6925,6 +7235,8 @@
     const jobView = !jobId ? null : jobId === 'pruefen' ? 'review' : jobId === 'verwalten' ? 'manage' : sub2 === 'bewerbung' ? 'mine' : jobApply ? 'apply' : 'detail';
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
+    // Neuigkeit als eigene Seite: #/news/<id>
+    const newsId = page === 'news' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
     const NEW_VIEWS = { spieler: 'new-dm', gruppe: 'new-group', server: 'new-server', anfrage: 'new-ticket', beitreten: 'join' };
     let chatView = chatSub === null ? null : { '': 'mine', anfragen: 'queue', team: 'team', gruppen: 'public', moderation: 'mod', discord: 'discord', neu: 'new', an: 'direct' }[chatSub] || 'conv';
@@ -6950,7 +7262,7 @@
     }
     if (chatView !== state.chatView || chatArg !== state.chatArg) { chat.side = false; chat.cmq = ''; chat.sideAuto = chatView === 'conv' && !kParam ? chatArg : null; }
     const settingsSub = page === 'einstellungen' ? (sub || '') : '';
-    const changed = page !== state.page || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
+    const changed = page !== state.page || newsId !== state.newsId || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
       || settingsSub !== (state.settingsSub || '');
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
@@ -6973,6 +7285,7 @@
     state.jobView = jobView;
     state.reviewId = reviewId;
     state.serverId = serverId;
+    state.newsId = newsId;
     state.chatView = chatView;
     state.chatArg = chatArg;
     state.settingsSub = settingsSub;
@@ -6983,7 +7296,7 @@
     }
     document.body.dataset.page = page;
     document.body.dataset.chatView = chatView || '';
-    const view = serverId ? 'server-detail' : page;
+    const view = serverId ? 'server-detail' : newsId ? 'news-article' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
     // Inhalt der neuen Seite gleitet nacheinander herein
@@ -7025,7 +7338,16 @@
   // Seitenwechsel mit Übergang (View Transitions): Richtung nach der Reihenfolge der Tab-Leiste
   const NAV_ORDER = ['home', 'news', 'trainings', 'spieler', 'shop', 'chat', 'server', 'karriere', 'statistiken', 'einstellungen'];
   function navigate() {
-    const next = (location.hash.replace(/^#\/?/, '').split(/[/?]/)[0]) || 'home';
+    const parts = location.hash.replace(/^#\/?/, '').split('?')[0].split('/');
+    const next = parts[0] || 'home';
+    const nextPage = PAGES.includes(next) ? next : 'home';
+    // Andere Seite oder eine Neuigkeit öffnen: Streifen und Ladebildschirm (Unterseiten im Chat usw. ohne)
+    const article = nextPage === 'news' && parts[1] ? decodeURIComponent(parts[1]) : null;
+    if (nextPage !== state.page || (article && article !== state.newsId)) {
+      navClose();
+      playLoader(loaderText(nextPage), route);
+      return;
+    }
     const from = NAV_ORDER.indexOf(state.page);
     const to = NAV_ORDER.indexOf(PAGES.includes(next) ? next : 'home');
     const sub = next === state.page;
@@ -7037,6 +7359,7 @@
   // ---------- Menü ----------
   const menu = $('[data-menu]');
   function openMenu() {
+    if (!menu) { navOpen('menu'); return; }
     if (menuCloseTimer) { clearTimeout(menuCloseTimer); menuCloseTimer = null; menu.classList.remove('is-closing'); }
     menu.hidden = false;
     document.body.classList.add('menu-open');
@@ -7046,7 +7369,8 @@
   }
   let menuCloseTimer = null;
   function closeMenu() {
-    if (menu.hidden || menuCloseTimer) return;
+    navClose();
+    if (!menu || menu.hidden || menuCloseTimer) return;
     document.body.classList.remove('menu-open');
     $$('[data-menu-open]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
     const finish = () => { menuCloseTimer = null; menu.classList.remove('is-closing'); menu.hidden = true; };
@@ -7067,6 +7391,30 @@
     $$('[data-modal-close]').forEach((b) => b.addEventListener('click', closeModal));
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeMenu(); closeModal(); } });
 
+
+    // Leiste oben: Menü und Konto als zweite Leiste, schließen mit Esc, Klick daneben oder Seitenwechsel
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('[data-nav-toggle]')) { navOpen('menu'); return; }
+      if (e.target.closest('[data-nav-me]')) { navOpen('account'); return; }
+      const open = navRoot && (navRoot.classList.contains('is-menu') || navRoot.classList.contains('is-account'));
+      if (open && (!navRoot.contains(e.target) || e.target.closest('.nav__sub a, .nav__sub button'))) navClose();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') navClose(); });
+    window.addEventListener('resize', () => { if (window.innerWidth >= 1080 && navRoot && navRoot.classList.contains('is-menu')) navClose(); });
+    // Startseite: Sätze vor und zurück, Pause; Teilen über das System
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-quote-prev], [data-quote-next], [data-quote-play], [data-share-native]');
+      if (!el) return;
+      const ds = el.dataset;
+      if ('quotePrev' in ds) { showQuote(quote.i - 1, -1); quoteAuto(); }
+      else if ('quoteNext' in ds) { showQuote(quote.i + 1, 1); quoteAuto(); }
+      else if ('quotePlay' in ds) {
+        quote.paused = !quote.paused;
+        el.innerHTML = icon(quote.paused ? 'fi-sr-play' : 'fi-sr-pause');
+        el.setAttribute('aria-label', quote.paused ? t('Abspielen') : t('Pause'));
+        quoteAuto();
+      } else if (ds.shareNative) navigator.share({ title: ds.shareTitle, url: ds.shareNative }).catch(() => {});
+    });
 
     const topbar = $('[data-topbar]');
     const onScroll = () => topbar.classList.toggle('is-scrolled', window.scrollY > 12);
@@ -7191,9 +7539,11 @@
 
     // Karussell-Pfeile
     const rail = $('[data-rail="routes"]');
-    const step = () => (rail.firstElementChild ? rail.firstElementChild.offsetWidth + 14 : 240);
-    $('[data-rail-prev="routes"]').addEventListener('click', () => rail.scrollBy({ left: -step() * 2, behavior: 'smooth' }));
-    $('[data-rail-next="routes"]').addEventListener('click', () => rail.scrollBy({ left: step() * 2, behavior: 'smooth' }));
+    const step = () => (rail && rail.firstElementChild ? rail.firstElementChild.offsetWidth + 14 : 240);
+    if (rail) {
+      $('[data-rail-prev="routes"]').addEventListener('click', () => rail.scrollBy({ left: -step() * 2, behavior: 'smooth' }));
+      $('[data-rail-next="routes"]').addEventListener('click', () => rail.scrollBy({ left: step() * 2, behavior: 'smooth' }));
+    }
     const tabs = $('[data-day-tabs]');
     $('[data-day-prev]').addEventListener('click', () => tabs.scrollBy({ left: -240, behavior: 'smooth' }));
     $('[data-day-next]').addEventListener('click', () => tabs.scrollBy({ left: 240, behavior: 'smooth' }));
@@ -7237,7 +7587,7 @@
       if (ds.newsCat) {
         state.newsCat = ds.newsCat;
         renderNewsPage();
-      } else if (ds.newsOpen) openModal('news', ds.newsOpen);
+      } else if (ds.newsOpen) location.hash = `#/news/${encodeURIComponent(ds.newsOpen)}`;
       else if (ds.sectorJump) $(`[data-sector="${ds.sectorJump}"]`).scrollIntoView({ behavior: 'smooth', block: 'start' });
       else if (ds.applyReset) {
         delete state.applications[ds.applyReset];
@@ -7968,7 +8318,8 @@
   }).then(() => {
     events();
     renderMe();
-    route();
+    // Beim Öffnen der Seite: kurzer Ladebildschirm mit Logo (ohne Streifen)
+    playLoader(loaderText((location.hash.replace(/^#\/?/, '').split(/[/?]/)[0]) || 'home'), route, { splash: true });
     if (loginNote === 'ok' && state.profile) {
       const r = rankOf(state.rank);
       toast(state.rankFromGroup ? t('Angemeldet als {name} · Rang: [{prefix}] {rank}', { name: state.profile.displayName, prefix: r.prefix, rank: r.name })

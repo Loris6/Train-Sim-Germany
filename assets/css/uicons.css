@@ -12,6 +12,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-arrow-small-down:before{content:"\f19c"}
 .fi-rr-arrow-small-right:before{content:"\f19e"}
 .fi-rr-arrow-small-up:before{content:"\f19f"}
+.fi-rr-arrow-up-right:before{content:"\f1b4"}
 .fi-rr-arrow-up-right-from-square:before{content:"\f1b3"}
 .fi-rr-badge-check:before{content:"\f1eb"}
 .fi-rr-ban:before{content:"\f205"}
@@ -27,6 +28,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-clip:before{content:"\f437"}
 .fi-rr-clock-three:before{content:"\f453"}
 .fi-rr-coins:before{content:"\f494"}
+.fi-rr-comment-alt:before{content:"\f4a1"}
 .fi-rr-comments:before{content:"\f4bc"}
 .fi-rr-comments-question:before{content:"\f4bb"}
 .fi-rr-copy:before{content:"\f4dd"}
@@ -52,7 +54,6 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-hastag:before{content:"\f77c"}
 .fi-rr-heart:before{content:"\f7a0"}
 .fi-rr-home:before{content:"\f7b8"}
-.fi-rr-house-blank:before{content:"\f7cd"}
 .fi-rr-id-badge:before{content:"\f7f7"}
 .fi-rr-info:before{content:"\f80b"}
 .fi-rr-interrogation:before{content:"\f81e"}
@@ -79,6 +80,7 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-search:before{content:"\fbba"}
 .fi-rr-settings:before{content:"\fbd2"}
 .fi-rr-settings-sliders:before{content:"\fbd1"}
+.fi-rr-share:before{content:"\fbd5"}
 .fi-rr-shield-check:before{content:"\fbdb"}
 .fi-rr-shop:before{content:"\fbf5"}
 .fi-rr-shopping-cart:before{content:"\fbfc"}
@@ -119,21 +121,22 @@ i[class^=fi-sr-]:before,i[class*=" fi-sr-"]:before,span[class^=fi-sr-]:before,sp
 .fi-sr-coins:before{content:"\f48c"}
 .fi-sr-comments:before{content:"\f4b4"}
 .fi-sr-heart:before{content:"\f794"}
-.fi-sr-house-blank:before{content:"\f7c2"}
 .fi-sr-id-badge:before{content:"\f7eb"}
 .fi-sr-marker:before{content:"\f8ef"}
-.fi-sr-newspaper:before{content:"\f994"}
+.fi-sr-pause:before{content:"\f9fc"}
 .fi-sr-play:before{content:"\fa7f"}
 .fi-sr-settings:before{content:"\fbac"}
-.fi-sr-shopping-cart:before{content:"\fbd6"}
-.fi-sr-signal-alt-2:before{content:"\fbeb"}
 .fi-sr-user:before{content:"\fe78"}
 
 @font-face{font-family:uicons-brands;src:url(../fonts/uicons-brands.woff2) format("woff2");font-display:block}
 i[class^=fi-brands-]:before,i[class*=" fi-brands-"]:before,span[class^=fi-brands-]:before,span[class*=fi-brands-]:before{font-family:uicons-brands!important;font-style:normal;font-weight:400!important;font-variant:normal;text-transform:none;line-height:1;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .fi-brands-discord:before{content:"\f144"}
+.fi-brands-facebook:before{content:"\f14f"}
 .fi-brands-github:before{content:"\f15d"}
 .fi-brands-instagram:before{content:"\f16e"}
+.fi-brands-reddit:before{content:"\f19d"}
 .fi-brands-tik-tok:before{content:"\f1b9"}
 .fi-brands-twitch:before{content:"\f1bd"}
+.fi-brands-twitter-alt:before{content:"\f1c0"}
+.fi-brands-whatsapp:before{content:"\f1d2"}
 .fi-brands-youtube:before{content:"\f1dc"}

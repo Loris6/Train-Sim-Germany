@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMin slice">
+  <!-- Hintergrund: ein Netz aus Linien mit Halten, wie auf einem Liniennetzplan (eigene Zeichnung für Train Sim Germany) -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="5">
+    <path d="M-40 160H360q40 0 68 28l150 150q28 28 68 28H1020q40 0 68-28l120-120q28-28 68-28H1660" stroke="#C9D6E6"/>
+    <path d="M220 -40V240q0 40 28 68l180 180q28 28 28 68V940" stroke="#D6DEEA"/>
+    <path d="M-40 640H520q40 0 68-28l160-160q28-28 68-28H1180q40 0 68 28l140 140q28 28 68 28H1660" stroke="#C9D6E6"/>
+    <path d="M1280 -40V180q0 40-28 68L1080 420q-28 28-28 68V940" stroke="#F2C9CD"/>
+    <path d="M760 940V760q0-40 28-68l120-120q28-28 68-28h360" stroke="#D6DEEA"/>
+  </g>
+  <g fill="#F7F9FC" stroke-width="4">
+    <circle cx="360" cy="160" r="11" stroke="#AFC2DA"/><circle cx="646" cy="366" r="11" stroke="#AFC2DA"/>
+    <circle cx="1020" cy="366" r="11" stroke="#AFC2DA"/><circle cx="1276" cy="190" r="11" stroke="#AFC2DA"/>
+    <circle cx="220" cy="240" r="11" stroke="#BCCBDF"/><circle cx="456" cy="556" r="11" stroke="#BCCBDF"/>
+    <circle cx="520" cy="640" r="11" stroke="#AFC2DA"/><circle cx="816" cy="424" r="11" stroke="#AFC2DA"/>
+    <circle cx="1180" cy="424" r="11" stroke="#AFC2DA"/><circle cx="1456" cy="640" r="11" stroke="#AFC2DA"/>
+    <circle cx="1080" cy="420" r="11" stroke="#E7A9B0"/><circle cx="1052" cy="700" r="11" stroke="#E7A9B0"/>
+    <circle cx="788" cy="692" r="11" stroke="#BCCBDF"/><circle cx="1336" cy="544" r="11" stroke="#BCCBDF"/>
+  </g>
+  <rect x="1000" y="352" width="44" height="28" rx="14" fill="#F7F9FC" stroke="#AFC2DA" stroke-width="4"/>
+</svg>
