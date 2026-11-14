@@ -1754,8 +1754,8 @@
   function renderNextSteps() {
     const home = $('[data-next-step="home"]');
     const full = $('[data-next-step="full"]');
-    if (state.page === 'home') home.innerHTML = nextStepHTML('h3');
-    if (state.page === 'trainings') full.innerHTML = nextStepHTML('h2');
+    if (state.page === 'home' && home) home.innerHTML = nextStepHTML('h3');
+    if (state.page === 'trainings' && full) full.innerHTML = nextStepHTML('h2');
   }
 
   const bellBtn = (tn, cls) => {
