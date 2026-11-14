@@ -28,7 +28,6 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-clip:before{content:"\f437"}
 .fi-rr-clock-three:before{content:"\f453"}
 .fi-rr-coins:before{content:"\f494"}
-.fi-rr-comment-alt:before{content:"\f4a1"}
 .fi-rr-comments:before{content:"\f4bc"}
 .fi-rr-comments-question:before{content:"\f4bb"}
 .fi-rr-copy:before{content:"\f4dd"}
@@ -91,7 +90,6 @@ i[class^=fi-rr-]:before,i[class*=" fi-rr-"]:before,span[class^=fi-rr-]:before,sp
 .fi-rr-sparkles:before{content:"\fc84"}
 .fi-rr-spinner:before{content:"\fc8f"}
 .fi-rr-star:before{content:"\fce9"}
-.fi-rr-sun:before{content:"\fd17"}
 .fi-rr-terminal:before{content:"\fd78"}
 .fi-rr-ticket:before{content:"\fd9d"}
 .fi-rr-time-fast:before{content:"\fda4"}

@@ -38,14 +38,14 @@
     <div class="nav__bar">
       <div class="nav__start">
         <a class="nav__brand" href="#/" aria-label="Train Sim Germany – Startseite">
-          <img class="nav__logo" src="assets/img/logo-white.svg" alt="" width="48" height="24">
+          <img class="nav__logo nav__logo--color" src="assets/img/logo.svg" alt="" width="54" height="27"><img class="nav__logo nav__logo--white" src="assets/img/logo-white.svg" alt="" width="54" height="27">
           <span class="nav__name">Train Sim Germany</span>
         </a>
         <button class="nav__toggle" type="button" data-nav-toggle aria-expanded="false" aria-controls="nav-sub" aria-label="Menü öffnen">
           <span class="nav__burger" aria-hidden="true"><i></i><i></i></span><span class="nav__toggle-text">Menü</span>
         </button>
       </div>
-      <nav class="nav__links" aria-label="Hauptnavigation">
+      <nav class="nav__links" aria-label="Hauptnavigation" data-nav-links>
         <a href="#/netz" data-nav="netz">Netz</a>
         <a href="#/server" data-nav="server">Server</a>
         <a href="#/news" data-nav="news">Neuigkeiten</a>
@@ -54,12 +54,12 @@
         <a href="#/entwickler" data-nav="entwickler">Entwickler</a>
       </nav>
       <div class="nav__end" data-nav-account>
-        <button class="nav__login" type="button" data-open="profile">Anmelden<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></button>
+        <button class="nav__login" type="button" data-open="profile"><i class="fi fi-rr-user ic" aria-hidden="true"></i>Anmelden<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></button>
       </div>
     </div>
     <!-- Untermenü: dieselbe Leiste noch einmal, mit Abstand darunter -->
     <div class="nav__sub" id="nav-sub" data-nav-sub hidden>
-      <nav class="nav__sub-links" aria-label="Seiten">
+      <nav class="nav__sub-links" aria-label="Seiten" data-nav-sublinks>
         <a href="#/" data-nav="home">Start</a>
         <a href="#/netz" data-nav="netz">Netz</a>
         <a href="#/server" data-nav="server">Server</a>
@@ -77,54 +77,50 @@
 
     <!-- ===================== START ===================== -->
     <section class="page page--site" data-page="home" aria-label="Start">
-      <!-- Titel: Nachthimmel, Schiene mit Halten, Stadt am Horizont -->
-      <div class="hero" data-hero>
-        <div class="hero__sky" aria-hidden="true" data-stars></div>
-        <div class="site-wrap hero__inner">
-          <p class="eyebrow eyebrow--light">Die Bahnsimulation auf Roblox</p>
-          <h1 class="hero__title">Deutschland<br>auf Schienen.</h1>
-          <p class="hero__lead">Fahr ICE, Regionalzüge und S-Bahnen nach echtem Fahrplan – von Magdeburg über Leipzig und Berlin bis nach Warschau.</p>
-          <div class="hero__btns">
-            <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
-            <a class="site-btn site-btn--ghost" href="#/server">Server ansehen</a>
-          </div>
-        </div>
-        <div class="hero__track" aria-hidden="true">
-          <div class="hero__line" data-hero-line></div>
-          <p class="hero__next">Nächster Halt: <b data-hero-stop>Berlin Hbf</b></p>
-        </div>
-        <svg class="hero__city" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 220V150h40v-30h26v30h22V96h34v54h18v-40h30v40h24V70h12V50h8v20h12v80h30v-36h44v36h26V120h20v-26h30v26h18v56h40V84h22V60h16v24h22v92h28v-50h38v50h34V110h26v-18h18v18h26v66h30V72h40v104h22v-46h34v46h30V100h18V80h24v20h18v76h36v-64h44v64h26V90h30v-30h12v30h18v86h34v-58h40v58h28V112h24v-24h26v24h22v64h30V70h44v106h24v-40h36v40h30V96h20v-22h22v22h18v80h40V128h30v48h20V220z" fill="currentColor"/>
-        </svg>
-        <div class="hero__rail" aria-hidden="true"></div>
+      <!-- Titel: Video im Hintergrund, die Leiste liegt darüber -->
+      <div class="hero" data-tone="dark">
+        <video class="hero__video" data-hero-video src="assets/video/rheinstrecke.mp4" poster="assets/video/rheinstrecke.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
+        <div class="hero__shade" aria-hidden="true"></div>
+        <h1 class="hero__title">Deutschland<br>auf Schienen</h1>
+        <button class="hero__pause" type="button" data-hero-pause aria-label="Video anhalten"><i class="fi fi-sr-pause ic" aria-hidden="true"></i></button>
       </div>
 
-      <!-- Highlights: große Sätze zum Durchblättern -->
-      <section class="quotes" aria-label="Was dich erwartet" data-quotes>
+      <!-- Nächster Halt: Nachthimmel, Schiene mit Halten, Stadt -->
+      <section class="nexthalt" data-tone="dark" aria-label="Nächster Halt">
+        <div class="nexthalt__sky" aria-hidden="true" data-stars></div>
+        <div class="nexthalt__wires" aria-hidden="true"></div>
+        <div class="nexthalt__line" aria-hidden="true" data-hero-line></div>
+        <p class="nexthalt__next">Nächster Halt: <b data-hero-stop>Berlin Hbf</b></p>
+        <svg class="nexthalt__city" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0 220V150h40v-30h26v30h22V96h34v54h18v-40h30v40h24V70h12V50h8v20h12v80h30v-36h44v36h26V120h20v-26h30v26h18v56h40V84h22V60h16v24h22v92h28v-50h38v50h34V110h26v-18h18v18h26v66h30V72h40v104h22v-46h34v46h30V100h18V80h24v20h18v76h36v-64h44v64h26V90h30v-30h12v30h18v86h34v-58h40v58h28V112h24v-24h26v24h22v64h30V70h44v106h24v-40h36v40h30V96h20v-22h22v22h18v80h40V128h30v48h20V220z" fill="currentColor"/>
+        </svg>
+        <div class="nexthalt__lights" aria-hidden="true"><i style="left:12%;top:58%"></i><i style="left:21%;top:66%"></i><i style="left:37%;top:61%"></i><i style="left:48%;top:70%"></i><i style="left:63%;top:57%"></i><i style="left:71%;top:68%"></i><i style="left:84%;top:63%"></i><i class="is-signal" style="left:62%;top:46%"></i></div>
+        <div class="nexthalt__rail" aria-hidden="true"></div>
+      </section>
+
+      <!-- Sätze zum Durchblättern -->
+      <section class="quotes" data-tone="dark" aria-label="Was dich erwartet" data-quotes>
         <div class="site-wrap">
           <div class="quotes__stage" data-quote-stage aria-live="polite"></div>
           <div class="quotes__foot">
-            <div class="quotes__by"><img src="assets/img/logo-white.svg" alt="" width="40" height="20"><span><b>Train Sim Germany</b><small>Das Team</small></span></div>
+            <div class="quotes__by"><span class="quotes__ava"><img src="assets/img/logo-white.svg" alt="" width="28" height="14"></span><span><b>@TrainSimGermany</b><small>Das Team</small></span></div>
             <div class="quotes__ctl">
               <button class="ctl-btn" type="button" data-quote-prev aria-label="Vorheriger Satz"><i class="fi fi-rr-angle-small-left ic" aria-hidden="true"></i></button>
               <button class="ctl-btn ctl-btn--main" type="button" data-quote-play aria-label="Pause"><i class="fi fi-sr-pause ic" aria-hidden="true"></i></button>
               <button class="ctl-btn" type="button" data-quote-next aria-label="Nächster Satz"><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></button>
-              <span class="quotes__count" data-quote-count>01 · 04</span>
+              <span class="quotes__count" data-quote-count><b>01</b> / 04</span>
             </div>
           </div>
         </div>
       </section>
 
       <!-- Das Netz ist offen -->
-      <section class="open-net" aria-labelledby="h-open">
+      <section class="open-net" data-tone="dark" aria-labelledby="h-open">
         <img class="open-net__img" src="assets/img/route-city.svg" alt="" loading="lazy">
         <div class="site-wrap open-net__inner">
-          <h2 id="h-open" class="display">Das Netz<br>ist offen.</h2>
-          <p>Fahr, entdecke und betreibe das Netz von Train Sim Germany – jeden Tag, mit Spielern aus der ganzen Community.</p>
-          <div class="hero__btns">
-            <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
-            <a class="site-btn site-btn--ghost" href="#/netz">Strecken ansehen</a>
-          </div>
+          <h2 id="h-open" class="open-net__title">Das Netz<br>ist offen.</h2>
+          <p>Fahr, entdecke und betreibe das Netz von Train Sim Germany – jeden Tag, zusammen mit der Community.</p>
+          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
         </div>
       </section>
 
@@ -140,7 +136,7 @@
       </section>
 
       <!-- Zahlen -->
-      <section class="numbers" aria-label="Train Sim Germany in Zahlen">
+      <section class="numbers" data-tone="dark" aria-label="Train Sim Germany in Zahlen">
         <div class="site-wrap numbers__grid" data-home-numbers></div>
       </section>
 
@@ -166,9 +162,9 @@
               <p>Hilf mit, Züge, Strecken und Systeme für die nächste Generation von Train Sim Germany zu bauen.</p>
             </div>
             <div class="join__card">
-              <span class="kicker">Wo du helfen kannst</span>
-              <div class="tag-row"><span>Scripting</span><span>3D &amp; Weltenbau</span><span>UI &amp; UX</span><span>Community</span></div>
-              <a class="site-btn site-btn--brand site-btn--block" href="#/karriere">Jetzt bewerben<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
+              <span class="kicker">Wo du mithelfen kannst</span>
+              <div class="tag-row"><span>Scripting</span><span>3D &amp; Weltenbau</span><span>UI &amp; UX</span></div>
+              <a class="site-btn site-btn--brand site-btn--block site-btn--split" href="#/karriere">Jetzt bewerben<i class="fi fi-rr-arrow-up-right ic" aria-hidden="true"></i></a>
             </div>
           </div>
         </div>
@@ -419,7 +415,6 @@
     <section class="page page--site" data-page="netz" aria-label="Netz" hidden>
       <div class="site-head lines-bg">
         <div class="site-wrap">
-          <p class="eyebrow">Strecken und Linien</p>
           <h1 class="mega">Unser Netz.</h1>
           <p class="site-head__lead">Vom Harz bis an die Oder: Diese Strecken fährst du in Train Sim Germany – mit echten Bahnhöfen, Linien und Fahrplänen.</p>
         </div>
@@ -439,7 +434,6 @@
     <section class="page page--site" data-page="faq" aria-label="Fragen" hidden>
       <div class="site-head lines-bg">
         <div class="site-wrap">
-          <p class="eyebrow">Hilfe</p>
           <h1 class="mega mega--stack">Fragen,<br><span>beantwortet.</span></h1>
           <p class="site-head__lead">Alles Wichtige zu Train Sim Germany, Rängen, Trainings und der App. Nicht dabei? <a data-link="discord" href="#" target="_blank" rel="noopener">Frag auf Discord</a>.</p>
         </div>
@@ -455,10 +449,10 @@
     <section class="page page--site" data-page="entwickler" aria-label="Entwickler und Team" hidden>
       <div class="site-head lines-bg">
         <div class="site-wrap">
-          <p class="eyebrow">Das Team hinter Train Sim Germany</p>
-          <h1 class="mega">Lerne das<br>Team kennen.</h1>
+                    <h1 class="mega">Lerne das<br>Team kennen.</h1>
           <p class="site-head__lead">Entwicklung, Leitung und Aufsicht – hier findest du alle und kannst ihnen direkt schreiben.</p>
         </div>
+        <div class="team-strip" data-team-strip aria-hidden="true"></div>
       </div>
       <div class="site-body">
         <div class="site-wrap" data-team></div>
@@ -478,96 +472,36 @@
       </div>
     </section>
     <!-- ===================== EINSTELLUNGEN ===================== -->
-    <section class="page" data-page="einstellungen" aria-label="Einstellungen" hidden>
-      <div class="page-head">
-        <div class="container container--narrow">
-          <div class="appbar" data-settings-head>
-            <div class="appbar__title">
-              <span class="appbar__label">App</span>
-              <h1 class="appbar__value">Einstellungen</h1>
-            </div>
-          </div>
+    <section class="page page--site" data-page="einstellungen" aria-label="Einstellungen" hidden>
+      <div class="site-head lines-bg">
+        <div class="site-wrap site-wrap--narrow">
+          <h1 class="mega">Einstellungen</h1>
         </div>
       </div>
-      <div class="sheet">
-        <div class="container container--narrow settings" data-settings>
-          <nav class="set-menu" data-settings-menu aria-label="Einstellungen"></nav>
-          <section class="card set-card" aria-labelledby="h-theme" data-set-sec="darstellung">
-            <h2 class="card__title" id="h-theme">Darstellung</h2>
-            <p class="card__sub">So sieht Train Sim Germany bei dir aus.</p>
-            <div class="theme-picker" role="group" aria-label="Farbschema">
-              <button type="button" data-theme-set="light" aria-pressed="false">
-                <span class="theme-picker__preview theme-picker__preview--light" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-picker__text"><span class="theme-picker__label"><i class="fi fi-rr-sun ic" aria-hidden="true"></i>Hell</span><small>Immer helles Design</small></span>
+      <div class="site-body">
+        <div class="site-wrap site-wrap--narrow settings-one" data-settings>
+          <section class="set-block" aria-labelledby="h-theme">
+            <h2 class="set-block__title" id="h-theme">Themes</h2>
+            <p class="set-block__sub">So sieht Train Sim Germany bei dir aus.</p>
+            <div class="theme-cards" role="group" aria-label="Farbschema">
+              <button type="button" class="theme-card" data-theme-set="light" aria-pressed="false">
+                <span class="theme-card__preview theme-card__preview--light" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-card__label">Hell</span>
               </button>
-              <button type="button" data-theme-set="dark" aria-pressed="false">
-                <span class="theme-picker__preview theme-picker__preview--dark" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-picker__text"><span class="theme-picker__label"><i class="fi fi-rr-moon ic" aria-hidden="true"></i>Dunkel</span><small>Immer dunkles Design</small></span>
+              <button type="button" class="theme-card" data-theme-set="dark" aria-pressed="false">
+                <span class="theme-card__preview theme-card__preview--dark" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-card__label">Dunkel</span>
               </button>
-              <button type="button" data-theme-set="system" aria-pressed="false">
-                <span class="theme-picker__preview theme-picker__preview--system" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="theme-picker__text"><span class="theme-picker__label"><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i>Mit Gerät synchronisieren</span><small>Hell oder dunkel – genau wie dein Gerät eingestellt ist</small></span>
+              <button type="button" class="theme-card" data-theme-set="system" aria-pressed="false">
+                <span class="theme-card__preview theme-card__preview--system" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span class="theme-card__label">Automatisch</span>
               </button>
             </div>
           </section>
-
-          <section class="card set-card" aria-labelledby="h-skin" data-set-sec="themes">
-            <h2 class="card__title" id="h-skin">Themes</h2>
-            <p class="card__sub">Ein ganzes Design für die App – mit Hintergrund, Farben und Effekten.</p>
-            <div class="skin-picker" data-skin-picker></div>
-            <div class="toggles toggles--season" data-season-set></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-icon" data-set-sec="app-symbol">
-            <h2 class="card__title" id="h-icon">App-Symbol</h2>
-            <p class="card__sub">Such dir aus, wie Train Sim Germany auf deinem Gerät aussieht.</p>
-            <div class="icon-picker" data-icon-picker></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-fx" data-set-sec="bewegung">
-            <h2 class="card__title" id="h-fx">Bewegung &amp; Haptik</h2>
-            <p class="card__sub">Wie sich Train Sim Germany anfühlt.</p>
-            <div class="toggles" data-fx></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-lang" data-set-sec="sprache">
-            <h2 class="card__title" id="h-lang">Sprache</h2>
-            <p class="card__sub">In welcher Sprache möchtest du Train Sim Germany nutzen?</p>
-            <div class="dropdown" data-lang-picker></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-notify" data-set-sec="benachrichtigungen">
-            <h2 class="card__title" id="h-notify">Benachrichtigungen</h2>
-            <p class="card__sub">Chat, Bewerbungen und Trainings – als echte Benachrichtigung, auch wenn die App zu ist.</p>
-            <div class="toggles" data-notify></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-privacy" data-set-sec="privacy">
-            <h2 class="card__title" id="h-privacy">Privatsphäre</h2>
-            <p class="card__sub">Lege fest, was andere Spieler von dir sehen.</p>
+          <section class="set-block" aria-labelledby="h-privacy">
+            <h2 class="set-block__title" id="h-privacy">Präferenzen</h2>
+            <p class="set-block__sub">Was andere Spieler von dir sehen dürfen.</p>
             <div class="toggles" data-privacy></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-account" data-set-sec="konto">
-            <h2 class="card__title" id="h-account">Roblox-Konto</h2>
-            <div class="set-account" data-settings-account></div>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-app" data-set-sec="app">
-            <h2 class="card__title" id="h-app">App</h2>
-            <p class="card__sub">Train Sim Germany lässt sich wie eine App installieren und funktioniert dann auch offline.</p>
-            <div class="btn-row set-actions">
-              <button class="btn btn--primary" type="button" data-install hidden><i class="fi fi-rr-download ic" aria-hidden="true"></i>App installieren</button>
-            </div>
-            <p class="menu__hint" data-install-ios hidden><i class="fi fi-rr-smartphone ic" aria-hidden="true"></i><span>In Safari auf „Teilen“ und dann „Zum Home-Bildschirm“ tippen.</span></p>
-          </section>
-
-          <section class="card set-card" aria-labelledby="h-legal" data-set-sec="rechtliches">
-            <h2 class="card__title" id="h-legal">Rechtliches</h2>
-            <div class="set-links">
-              <a href="privacy.html"><i class="fi fi-rr-shield-check ic" aria-hidden="true"></i><span>Datenschutzerklärung</span><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></a>
-              <a href="terms.html"><i class="fi fi-rr-document ic" aria-hidden="true"></i><span>Nutzungsbedingungen</span><i class="fi fi-rr-angle-small-right ic" aria-hidden="true"></i></a>
-            </div>
           </section>
         </div>
       </div>
@@ -575,7 +509,7 @@
   </main>
 
   <!-- Fußzeile -->
-  <footer class="foot">
+  <footer class="foot" data-tone="dark">
     <div class="site-wrap foot__grid">
       <div class="foot__brand">
         <a class="foot__logo" href="#/" aria-label="Train Sim Germany – Startseite">

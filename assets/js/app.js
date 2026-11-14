@@ -1876,7 +1876,9 @@
     $$('[data-can-pr]').forEach((b) => { b.hidden = !mayPR(); });
     const list = newsItems().filter((n) => state.newsCat === 'all' || n.cat === state.newsCat);
     // Neueste groß, alle weiteren als Karten mit Lesezeit (ein Klick öffnet die Neuigkeit als eigene Seite)
-    $('[data-news-feed]').innerHTML = list.length ? `${newsTile(list[0], 'feature')}${list.length > 1 ? `<div class="nr-cards">${list.slice(1).map((n) => newsTile(n, 'card')).join('')}</div>` : ''}`
+    $('[data-news-feed]').innerHTML = list.length
+      ? `<div class="nr-grid">${newsTile(list[0], 'feature')}<div class="nr-side">${list.slice(1, 4).map((n) => newsTile(n)).join('')}</div></div>
+        ${list.length > 4 ? `<div class="nr-cards">${list.slice(4).map((n) => newsTile(n, 'card')).join('')}</div>` : ''}`
       : `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`;
   }
 
@@ -2846,15 +2848,10 @@
   // Hinweis im Profil- und Statistik-Dialog
   const visibilityNote = (on, onText, offText) => `<p class="vis-note">${icon(on ? 'fi-rr-eye' : 'fi-rr-lock')}<span>${on ? onText : offText}</span><a href="#/einstellungen">${t('Ändern')}</a></p>`;
   function renderSettings() {
-    renderSettingsNav();
-    renderSkinPicker();
-    renderIconPicker();
-    renderLangPicker();
+    // Eine Seite: Themes (Hell, Dunkel, Automatisch) und Präferenzen (was öffentlich ist)
     renderPrivacy();
-    renderFxSettings();
-    renderSeasonSettings();
-    renderNotify();
     $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === themeMode())));
+    if (!$('[data-settings-account]')) return;
     const p = state.profile;
     const r = rankOf(state.rank);
     $('[data-settings-account]').innerHTML = `${ringHTML(p, r, 'avatar-ring--lg')}
@@ -6949,34 +6946,61 @@
     $$('[data-nav-me]', navRoot).forEach((b) => b.setAttribute('aria-expanded', String(showAcc)));
   }
   const navClose = () => navOpen(null);
-  // Rechts in der Leiste: „Anmelden“ oder (angemeldet) Profilbild und Name, dazu das Konto-Menü
+  // Seiten in der Leiste: Gäste sehen die Webseite, angemeldet kommen Trainings, Shop und Spieler dazu (Chat und
+  // Einstellungen nicht – Einstellungen und Statistiken stehen im Konto rechts)
+  const NAV_GUEST = [['netz', 'Netz'], ['server', 'Server'], ['news', 'Neuigkeiten'], ['karriere', 'Karriere'], ['faq', 'FAQ'], ['entwickler', 'Entwickler']];
+  const NAV_AUTH = [['netz', 'Netz'], ['server', 'Server'], ['news', 'Neuigkeiten'], ['trainings', 'Trainings'], ['karriere', 'Karriere'], ['shop', 'Shop'], ['spieler', 'Spieler'], ['faq', 'FAQ'], ['entwickler', 'Entwickler']];
+  function renderNavLinks() {
+    if (!navRoot) return;
+    const list = state.profile ? NAV_AUTH : NAV_GUEST;
+    const link = ([id, label]) => `<a href="#/${id}" data-nav="${id}"${state.page === id ? ' aria-current="page"' : ''}>${esc(t(label))}</a>`;
+    const bar = $('[data-nav-links]', navRoot);
+    const sub = $('[data-nav-sublinks]', navRoot);
+    if (bar) bar.innerHTML = list.map(link).join('');
+    if (sub) sub.innerHTML = [['', 'Start'], ...list].map(([id, label]) => `<a href="#/${id}" data-nav="${id || 'home'}"${state.page === (id || 'home') ? ' aria-current="page"' : ''}>${esc(t(label))}</a>`).join('');
+    navRoot.classList.toggle('is-auth', !!state.profile);
+  }
+  // Rechts in der Leiste: „Anmelden“ oder (angemeldet) Profilbild und Name, dazu das Konto
   function renderNavAccount() {
     if (!navRoot) return;
+    renderNavLinks();
     const box = $('[data-nav-account]', navRoot);
     const acc = $('[data-nav-acc]', navRoot);
     const p = state.profile;
     const r = rankOf(state.rank);
     if (!p) {
-      box.innerHTML = `<button class="nav__login" type="button" data-open="profile">${loginReady() ? t('Anmelden') : t('Verbinden')}${icon('fi-rr-arrow-up-right')}</button>`;
+      box.innerHTML = `<button class="nav__login" type="button" data-open="profile">${icon('fi-rr-user')}${loginReady() ? t('Anmelden') : t('Verbinden')}${icon('fi-rr-arrow-up-right')}</button>`;
       acc.innerHTML = '';
       return;
     }
-    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
     box.innerHTML = `<button class="nav__me" type="button" data-nav-me aria-expanded="false" aria-label="${esc(t('Konto von {name}', { name: p.displayName || p.username }))}">
-        <span class="nav__avatar" style="--rc:${r.color}">${avatarInner(p)}${unread ? '<i class="nav__dot"></i>' : ''}</span>
+        <span class="nav__avatar" style="--rc:${r.color}">${avatarInner(p)}</span>
         <span class="nav__who">${esc(p.displayName || p.username)}</span>${icon('fi-rr-angle-small-down', 'nav__chev')}</button>`;
-    const item = (href, ic, label, extra = '') => `<a href="${href}" class="nav__acc-link">${icon(ic)}<span>${label}</span>${extra}</a>`;
     acc.innerHTML = `<div class="nav__acc-head">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${esc(p.displayName || p.username)}</b><small>@${esc(p.username)}</small></span>${rankPill(r)}</div>
       <nav class="nav__acc-links" aria-label="${esc(t('Konto'))}">
-        ${item('#/chat', 'fi-rr-comments', t('Chat'), unread ? `<b class="nav__badge">${unread > 99 ? '99+' : unread}</b>` : '')}
-        ${item('#/trainings', 'fi-rr-calendar', t('Trainings'))}
-        ${item('#/shop', 'fi-rr-shopping-cart', t('Shop'))}
-        ${item('#/spieler', 'fi-rr-users', t('Spieler'))}
-        ${item('#/statistiken', 'fi-rr-chart-line-up', t('Statistiken'))}
-        ${item('#/einstellungen', 'fi-rr-settings', t('Einstellungen'))}
-        <button class="nav__acc-link" type="button" data-open="profile">${icon('fi-rr-user')}<span>${t('Profil')}</span></button>
+        <a href="#/einstellungen" class="nav__acc-link">${icon('fi-rr-settings')}<span>${t('Einstellungen')}</span></a>
+        <a href="#/statistiken" class="nav__acc-link">${icon('fi-rr-chart-line-up')}<span>${t('Statistiken')}</span></a>
         <button class="nav__acc-link nav__acc-link--out" type="button" data-disconnect>${icon('fi-rr-sign-out-alt')}<span>${p.oauth ? t('Abmelden') : t('Trennen')}</span></button>
       </nav>`;
+  }
+  // Farbe und Deckkraft der Leiste nach dem, was gerade darunter liegt: auf dunklen Flächen (Video, Nachthimmel,
+  // Zahlen, Fußzeile) durchscheinend mit weißer Schrift, auf hellen Flächen weiß
+  let toneFrame = 0;
+  function navTone() {
+    if (!navRoot || toneFrame) return;
+    toneFrame = requestAnimationFrame(() => {
+      toneFrame = 0;
+      const bar = $('.nav__bar', navRoot);
+      const r = bar.getBoundingClientRect();
+      const y = r.top + r.height / 2;
+      let dark = false;
+      for (const el of $$('[data-tone="dark"]')) {
+        if (el === navRoot || el.closest('[hidden]')) continue;
+        const b = el.getBoundingClientRect();
+        if (b.height && b.top <= y && b.bottom >= y) { dark = true; break; }
+      }
+      navRoot.dataset.tone = dark ? 'dark' : 'light';
+    });
   }
 
   // Sätze zum Durchblättern auf der Startseite
@@ -6993,7 +7017,7 @@
     quote.i = (i + QUOTES.length) % QUOTES.length;
     stage.innerHTML = `<blockquote class="quotes__text" style="--dir:${dir}">${esc(t(QUOTES[quote.i]))}<span class="quotes__mark" aria-hidden="true">”</span></blockquote>`;
     const c = $('[data-quote-count]');
-    if (c) c.textContent = `${pad(quote.i + 1)} · ${pad(QUOTES.length)}`;
+    if (c) c.innerHTML = `<b>${pad(quote.i + 1)}</b> / ${pad(QUOTES.length)}`;
   }
   function quoteAuto() {
     clearInterval(quote.timer);
@@ -7140,28 +7164,37 @@
     }
   }
 
-  // Team: alle ab Supervisor aus der Roblox-Gruppe, nach Rang – mit „Anschreiben“ (Chat) und Roblox-Profil
+  // Team: alle ab Supervisor aus der Roblox-Gruppe in drei Gruppen (Leitung, Manager, Aufsicht). Jede Karte: Bild auf
+  // zartem Rot, Name, Rang, @Name und ↗ – das öffnet den Chat mit der Person.
+  const TEAM_GROUPS = [
+    ['Leitung', ['Chief Engineer', 'Community Director', 'Operation Manager', 'Project Engineer']],
+    ['Manager', ['Public Relations Department', 'Signaller Manager', 'Conductor Manager', 'Platform Staff Manager', 'Driver Manager']],
+    ['Aufsicht', ['Supervisor', 'Junior Supervisor']],
+  ];
   function renderTeam() {
     const box = $('[data-team]');
+    const strip = $('[data-team-strip]');
     if (!box) return;
     if (!chat.staff) { loadStaff().then(() => { if (state.page === 'entwickler') renderTeam(); }); box.innerHTML = loadingHtml(); return; }
     const list = chat.staff;
+    if (strip) strip.innerHTML = list.filter((p) => p.avatar).slice(0, 14).map((p, i) => `<img src="${esc(p.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer" style="--i:${i}">`).join('');
     if (!list.length) { box.innerHTML = `<p class="empty">${t('Gerade ist niemand im Team eingetragen.')}</p>`; return; }
-    const order = [...RANKS].filter((r) => r.staff || rankIdx(r.name) >= rankIdx('Supervisor')).reverse();
-    const groups = order.map((r) => [r, list.filter((p) => p.rank === r.name)]).filter(([, l]) => l.length);
+    const known = new Set(TEAM_GROUPS.flatMap(([, ranks]) => ranks));
+    const groups = TEAM_GROUPS.map(([title, ranks]) => [title, list.filter((p) => ranks.includes(p.rank)).sort((a, b) => rankIdx(b.rank) - rankIdx(a.rank))]);
+    const rest = list.filter((p) => !known.has(p.rank));
+    if (rest.length) groups.push(['Team', rest]);
     const me = meSub();
-    box.innerHTML = groups.map(([r, l]) => `<section class="team-group">
-        <h2 class="site-h2"><i class="team-dot" style="--rc:${r.color}"></i>${esc(r.name)}<small>${esc(t(r.label))} · ${l.length}</small></h2>
-        <div class="team-grid">${l.map((p) => `<article class="team-card">
+    box.innerHTML = groups.filter(([, l]) => l.length).map(([title, l]) => `<section class="team-group">
+        <h2 class="team-group__title">${esc(t(title))}</h2>
+        <div class="team-grid">${l.map((p) => {
+          const own = String(p.userId) === me;
+          return `<article class="team-card">
           <span class="team-card__img">${p.avatar ? `<img src="${esc(p.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<b>${esc(initials(p.displayName || p.username))}</b>`}</span>
           <b class="team-card__name">${esc(p.displayName || p.username)}</b>
-          <span class="team-card__role" style="--rc:${r.color}">${esc(r.name)}</span>
-          <small class="team-card__at">@${esc(p.username)}</small>
-          <a class="team-card__ext" href="https://www.roblox.com/users/${encodeURIComponent(p.userId)}/profile" target="_blank" rel="noopener" aria-label="${esc(t('Roblox-Profil von {name}', { name: p.username }))}">${icon('fi-rr-arrow-up-right')}</a>
-          <span class="team-card__btns">
-            ${String(p.userId) === me ? `<span class="team-card__me">${t('Das bist du')}</span>` : `<a class="site-btn site-btn--brand site-btn--sm" href="#/chat/an/${encodeURIComponent(p.userId)}">${icon('fi-rr-comment-alt')}${t('Anschreiben')}</a>`}
-          </span>
-        </article>`).join('')}</div>
+          <span class="team-card__role">${esc(p.rank)}</span>
+          <span class="team-card__foot"><small>@${esc(p.username)}</small>${own ? '' : `<a class="team-card__go" href="#/chat/an/${encodeURIComponent(p.userId)}" aria-label="${esc(t('{name} anschreiben', { name: p.displayName || p.username }))}" title="${esc(t('Anschreiben'))}">${icon('fi-rr-arrow-up-right')}</a>`}</span>
+        </article>`;
+        }).join('')}</div>
       </section>`).join('');
   }
 
@@ -7208,6 +7241,7 @@
     trainings: 'Trainings', shop: 'Shop', chat: 'Chat', spieler: 'Spieler', statistiken: 'Statistiken', einstellungen: 'Einstellungen',
   };
   const loaderState = { busy: false, timers: [] };
+  const LOADER_HOLD = 2000;
   function playLoader(text, swap, { splash = false } = {}) {
     const el = $('[data-loader]');
     if (!el || reducedMotion() || loaderState.busy) { swap(); return; }
@@ -7219,12 +7253,14 @@
     el.className = 'loader';
     el.hidden = false;
     void el.offsetWidth;
+    // Einfädeln: Streifen gelb, hellrot, rot von rechts (beim Öffnen der Seite liegt alles schon da)
     el.classList.add(splash ? 'is-splash' : 'is-in');
     const at = (ms, fn) => loaderState.timers.push(setTimeout(fn, ms));
-    const cover = splash ? 0 : 460;
-    at(cover, () => { try { swap(); } finally { el.classList.add('is-loading'); } });
-    at(cover + 720, () => el.classList.add('is-out'));
-    at(cover + 1080, () => { el.hidden = true; el.className = 'loader'; loaderState.busy = false; });
+    const cover = splash ? 0 : 560;
+    at(cover, () => { try { swap(); } finally { el.classList.add('is-loading'); navTone(); } });
+    // Ausfädeln nach rund 2 Sekunden: erst die rote Fläche, dann die Streifen nach links hinaus
+    at(cover + LOADER_HOLD, () => el.classList.add('is-out'));
+    at(cover + LOADER_HOLD + 900, () => { el.hidden = true; el.className = 'loader'; loaderState.busy = false; });
   }
   const loaderText = (page) => t('Nächster Halt: {page}', { page: t(PAGE_NAMES[page] || 'Start') });
 
@@ -7356,6 +7392,10 @@
     $$('[data-nav]').forEach((a) => {
       if (a.dataset.nav === page) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
+    navTone();
+    // Video oben nur abspielen, solange die Startseite offen ist
+    const hv = $('[data-hero-video]');
+    if (hv) { if (page === 'home' && !reducedMotion() && !hv.dataset.userPaused) hv.play().catch(() => {}); else hv.pause(); }
     document.title = TITLES[page];
     closeMenu();
     closeModal();
@@ -7459,6 +7499,18 @@
         el.setAttribute('aria-label', quote.paused ? t('Abspielen') : t('Pause'));
         quoteAuto();
       } else if (ds.shareNative) navigator.share({ title: ds.shareTitle, url: ds.shareNative }).catch(() => {});
+    });
+
+    window.addEventListener('scroll', navTone, { passive: true });
+    window.addEventListener('resize', navTone);
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-hero-pause]');
+      if (!b) return;
+      const v = $('[data-hero-video]');
+      if (!v) return;
+      v.dataset.userPaused = v.paused ? '' : '1';
+      if (v.paused) { v.play().catch(() => {}); b.innerHTML = icon('fi-sr-pause'); b.setAttribute('aria-label', t('Video anhalten')); }
+      else { v.pause(); b.innerHTML = icon('fi-sr-play'); b.setAttribute('aria-label', t('Video abspielen')); }
     });
 
     const topbar = $('[data-topbar]');

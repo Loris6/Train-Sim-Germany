@@ -62,13 +62,17 @@ Das App-Icon ist gleichzeitig das Spielbild auf Roblox. Vorlage ist `assets/img/
 
 ## Navigation & Profil
 
-- **Webseite statt App-Leisten:** Oben schwebt eine dunkle, abgerundete Leiste mit Abstand zum Rand: links Logo und „Train Sim Germany“, in der Mitte Netz, Server, Neuigkeiten, Karriere, FAQ und Entwickler, rechts **Anmelden** (führt zur Roblox-Anmeldung). Unten gibt es keine Leiste mehr.
-- **Schmale Bildschirme:** Die Seiten verschwinden aus der Leiste, neben dem Logo erscheint „Menü“. Ein Klick öffnet darunter – mit Abstand – eine zweite Leiste im gleichen Stil und mit gleichen Ecken, die mit einer Animation aufgeht.
-- **Angemeldet:** Rechts stehen Profilbild (mit Punkt bei ungelesenen Nachrichten) und Name; ein Klick öffnet das Konto ebenfalls als zweite Leiste: Chat, Trainings, Shop, Spieler, Statistiken, Einstellungen, Profil, Abmelden.
-- **Seitenwechsel:** Streifen in TSG-Rot und TSG-Blau wischen schräg über den Bildschirm, dann zeigt ein blauer Ladebildschirm das Logo (der Zug wird gezeichnet, die Buchstaben erscheinen nacheinander), einen Ladebalken und „Nächster Halt: …“ mit dem Namen der Seite. Beim Öffnen der Webseite kommt der Ladebildschirm kurz ohne Streifen. Mit „Animationen aus“ bzw. „Bewegung reduzieren“ entfällt beides.
-- **Fußzeile:** dunkel mit großem Logo und den Spalten „Nächster Halt“, „Entdecken“ und „Informationen“ (alle weiteren Seiten, Datenschutz, Nutzungsbedingungen).
-- Alle bisherigen Seiten (Server, Karriere, Trainings, Shop, Chat, Spieler, Statistiken, Einstellungen) haben den neuen Stil: helle, kühle Fläche mit Liniennetz im Hintergrund, sehr große Überschriften, runde Karten mit weichem Schatten; das Design liegt in `assets/css/site.css` über `style.css`.
-- **Mit Roblox anmelden:** Ist in `assets/js/config.js` die Client-ID eingetragen, führt „Anmelden“ zum Roblox-Login (siehe „Roblox-Login“). Ohne Client-ID heißt der Knopf „Verbinden“: Nach Eingabe des Roblox-Namens lädt die Webseite Anzeigenamen und Profilbild.
+- **Aufbau wie das Vorbild, Farben der Deutschen Bahn:** Was dort blau ist, ist hier DB-Rot (#EC0016); dunkle Flächen in DB-Dunkelgrau, helle Flächen Cool Gray, Gelb nur im Seitenwechsel und an der Linie über der Fußzeile.
+- **Leiste oben:** weiß, abgerundet, mit Abstand zum Rand (74 px hoch, auf dem Handy 64 px). Links Logo und „Train Sim Germany“, in der Mitte die Seiten, rechts **Anmelden** (zur Roblox-Anmeldung). Über dunklen Flächen (Video, Nachthimmel, Zahlen-Band, Fußzeile) wird sie durchscheinend mit weißer Schrift, über hellen Flächen weiß mit dunkler Schrift – Farbe und Deckkraft wechseln beim Scrollen weich.
+- **Seiten in der Leiste:** als Gast Netz, Server, Neuigkeiten, Karriere, FAQ, Entwickler; angemeldet zusätzlich Trainings, Shop und Spieler (Chat und Einstellungen stehen nicht im Menü).
+- **Konto (angemeldet):** Profilbild und Name rechts öffnen eine zweite Leiste mit nur **Einstellungen, Statistiken und Abmelden**.
+- **Schmale Bildschirme:** Die Seiten verschwinden aus der Leiste, neben dem Logo erscheint „Menü“ und öffnet darunter – mit Abstand – eine zweite Leiste im gleichen Stil und mit gleichen Ecken.
+- **Seitenwechsel:** Streifen in Gelb, Hellrot und Rot **fädeln** schräg von rechts **ein**, ein roter Ladebildschirm zeigt das Logo (der Zug wird gezeichnet, die Buchstaben erscheinen nacheinander), einen Ladebalken und „Nächster Halt: …“. Nach rund **2 Sekunden fädeln** rote Fläche und Streifen nach links **aus**. Beim Öffnen der Seite kommt der Ladebildschirm ohne Einfädeln. Mit „Bewegung reduzieren“ des Geräts entfällt beides.
+- **Startseite:** Video im Hintergrund mit großem Titel (Knopf zum Anhalten), „Nächster Halt“ mit Nachthimmel, Schiene und Stadt, Sätze zum Durchblättern, „Das Netz ist offen.“, Neuigkeiten (groß links, Liste rechts), Zahlen-Band in DB-Rot, Fragen, „Werde Teil des Teams“.
+- **Entwickler:** Gruppen Leitung, Manager, Aufsicht; jede Karte mit Profilbild auf zartem Rot, Name, Rang in Rot, @Name und ↗ – das öffnet den Chat mit der Person.
+- **Einstellungen:** eine einzige Seite mit **Themes** (Hell, Dunkel, Automatisch) und **Präferenzen** (Profil öffentlich, Statistik öffentlich).
+- Alle weiteren Seiten haben denselben Stil (kleinere große Überschriften, Liniennetz im Hintergrund, Karten mit feinem Rand); das Design liegt in `assets/css/site.css` über `style.css`.
+- **Mit Roblox anmelden:** Ist in `assets/js/config.js` die Client-ID eingetragen, führt „Anmelden“ zum Roblox-Login (siehe „Roblox-Login“). Ohne Client-ID heißt der Knopf „Verbinden“.
 
 ## Roblox-Login: nur die Client-ID eintragen
 
