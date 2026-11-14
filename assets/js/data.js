@@ -208,9 +208,11 @@ window.TSG = {
     { name: 'Signaller', img: 'training.svg', text: 'Fahrstraßen stellen und Züge sicher durchs Stellwerk leiten.' },
   ],
 
-  // Startseite: Rollen-Karten. {rank} = Rangname in seiner Farbe, {group} = Link zur Roblox-Gruppe
+  // Startseite: eine Karte je Team aus Studio (Reihenfolge, Name und Farbe kommen aus dem Spiel). Hier stehen Bild und Text
+  // je Rolle; das Team wird über seinen Namen zugeordnet (z. B. „Driver“ → Qualified Driver, „Passengers“ → Passenger).
+  // {rank} = Rangname, {team} = Teamname aus Studio, beide in der Teamfarbe. Ohne Backend erscheinen die Karten mit Rang.
   roleCards: [
-    { rank: 'Learning Driver', img: 'route-city.svg', title: 'Starte als {rank}.', text: 'Tritt der {group} bei und du startest als {rank}. Fahr deine ersten Züge durch den Osten – von Magdeburg über Halle und Leipzig bis Berlin und weiter nach Warschau.' },
+    { rank: 'Passenger', img: 'route-coast.svg', title: 'Fahr als {team} mit.', text: 'Ganz ohne Training: Steig an einem Bahnhof ein, fahr durch den Osten von Magdeburg bis Warschau und schau den Teams bei der Arbeit zu.' },
     { rank: 'Qualified Driver', img: 'play.svg', title: 'Fahr Züge als {rank} durchs ganze Netz.', text: 'Besuche ein {rank}-Training. Danach fährst du ICE, Intercity, Regionalzüge und S-Bahnen nach echtem Fahrplan.' },
     { rank: 'Platform Staff', img: 'role-platform.svg', title: 'Sorg als {rank} für pünktliche Abfahrten.', text: 'Sichere den Bahnsteig, lenke die Fahrgäste und gib mit der Kelle den Abfahrtsauftrag. Nach dem Training bist du als {rank} an jedem großen Bahnhof gefragt.' },
     { rank: 'Conductor', img: 'role-conductor.svg', title: 'Begleite Züge als {rank}.', text: 'Schließ die Türen, prüf die Fahrkarten und mach die Ansagen. Als {rank} bist du das Gesicht des Zuges und sorgst für eine pünktliche Abfahrt.' },

@@ -528,9 +528,10 @@
   // Einstieg und Rollen (Startseite)
   function renderRoles() {
     if (!$('[data-roles]')) return;
-    const rk = (name) => `<b class="rk" style="--rc:${rankOf(name).color}">${esc(name)}</b>`;
-    const fill = (text, rank) => esc(t(text))
-      .replace(/\{rank\}/g, rk(rank))
+    const rk = (name, color) => `<b class="rk" style="--rc:${esc(color || rankOf(name).color)}">${esc(name)}</b>`;
+    const fill = (text, rank, color, team = rank) => esc(t(text))
+      .replace(/\{rank\}/g, rk(rank, color))
+      .replace(/\{team\}/g, rk(team, color))
       .replace('{group}', `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Train Sim Germany Gruppe auf Roblox')}${icon('fi-rr-arrow-up-right-from-square')}</a>`);
     const start = `<article class="role-card role-card--start">
       <div class="role-card__media"><img src="assets/img/group.svg" alt="${esc(t('Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug'))}" loading="lazy"></div>
@@ -546,17 +547,38 @@
         </div>
       </div>
     </article>`;
-    $('[data-roles]').innerHTML = start + D.roleCards.map((c) => {
-      const x = inGameRole(c.rank);
+    // Eine Karte je Team aus Studio (Attribut „Extern“), in der Reihenfolge aus Studio, mit Name, TeamColor und Spielerzahl.
+    // Text und Bild kommen aus data.js → roleCards (passend zum Team, z. B. „Driver“ → Qualified Driver).
+    // Ohne Teams aus dem Spiel (kein Backend): die Karten aus data.js mit den Rollen.
+    const teams = liveTeams();
+    const karten = teams.length
+      ? teams.map((tm) => ({ c: cardOf(tm.name), name: tm.name, color: teamColor(tm), n: tm.n || 0, team: true }))
+      : D.roleCards.map((c) => { const x = inGameRole(c.rank); return { c, name: c.rank, color: x.color, n: x.n, team: false }; });
+    $('[data-roles]').innerHTML = start + karten.map(({ c, name, color, n, team }) => {
+      const chip = team ? `<span class="role-card__team" style="--rc:${esc(color)};--ink:${inkOn(color)}" title="${esc(t('Team im Spiel'))}"><i aria-hidden="true"></i>${esc(name)}</span>` : '';
+      const zahl = team ? t('<b>{n}</b> gerade im Team {team}', { n: fmt(n), team: esc(name) }) : t('<b>{n}</b> gerade im Spiel als {rank}', { n: fmt(n), rank: esc(name) });
       return `<article class="role-card">
-      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy"></div>
+      <div class="role-card__media"><img src="assets/img/${c.img}" alt="" loading="lazy">${chip}</div>
       <div class="role-card__body">
-        <h3>${fill(c.title, c.rank)}</h3>
-        <p>${fill(c.text, c.rank)}</p>
-        <span class="count-pill count-pill--live" style="--rc:${esc(x.color)}"><i class="count-pill__dot" aria-hidden="true"></i>${t('<b>{n}</b> gerade im Spiel als {rank}', { n: fmt(x.n), rank: esc(x.name) })}</span>
+        <h3>${fill(c.title, c.rank || name, color, name)}</h3>
+        <p>${fill(c.text, c.rank || name, color, name)}</p>
+        <span class="count-pill count-pill--live" style="--rc:${esc(color)}"><i class="count-pill__dot" aria-hidden="true"></i>${zahl}</span>
       </div>
     </article>`;
     }).join('');
+  }
+  // Teams aus dem Spiel (live oder zuletzt bekannt), sortiert nach ihrer Zahl in Studio
+  function liveTeams() {
+    if (!liveMode()) return [];
+    const L = G().live || {};
+    const teams = (live.data && live.data.teams) || L.teams || [];
+    return [...teams].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9));
+  }
+  // Text und Bild für ein Team: Karte der passenden Rolle, sonst eine allgemeine Karte mit dem Teamnamen
+  function cardOf(teamName) {
+    const role = roleOfTeam(teamName);
+    return D.roleCards.find((c) => c.rank === role)
+      || { rank: null, img: 'hero.svg', title: 'Spiel im Team {team}.', text: 'Wähle im Spiel das Team {team} und leg los.' };
   }
   // Wie viele gerade im Spiel diese Rolle haben: Team mit dem Namen der Rolle (Farbe aus dem Spiel), sonst aus dem
   // Teamnamen abgeleitet (z. B. „Driver“ → Qualified Driver). Ohne Backend: die Demo-Server.
@@ -569,11 +591,20 @@
     const L = G().live || {};
     const teams = (live.data && live.data.teams) || L.teams || [];
     const team = teams.find((x) => sameTeam(x.name, rank));
-    if (team) return { name: team.name, color: teamColor(team), n: team.n || 0 };
+    if (team) return { name: team.name, team: team.name, color: teamColor(team), n: team.n || 0 };
     // Teams, deren Name zur Rolle passt (z. B. „Driver“ → Qualified Driver): Farbe aus dem Spiel, Spieler zusammen
     const near = teams.filter((x) => roleOfTeam(x.name) === rank);
-    if (near.length) return { name: rank, color: teamColor(near[0]), n: near.reduce((n, x) => n + (x.n || 0), 0) };
+    if (near.length) return { name: rank, team: near.map((x) => x.name).join(' · '), color: teamColor(near[0]), n: near.reduce((n, x) => n + (x.n || 0), 0) };
     return { ...fallback, n: (L.roles && L.roles[rank]) || 0 };
+  }
+  // Lesbare Schrift auf einer Teamfarbe (helle Farben wie Gold → dunkle Schrift)
+  function inkOn(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
+    if (!m) return '#fff';
+    const n = parseInt(m[1], 16);
+    const lin = (v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    const lum = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+    return lum > 0.42 ? '#131821' : '#fff';
   }
   // Wie backend/game.js → gameRole: Teamname aus dem Spiel → feste Rolle
   const ROLE_WORDS = [
@@ -927,8 +958,6 @@
         <div class="svc__count"><b>${countHtml(c.players, 'fmt', `sv-${c.id}`)}</b><small>/${fmt(c.max)} ${t('Spieler')}</small></div>
       </header>
       <div class="svc__bar bar bar--${level}"><span style="width:${Math.min(100, ratio * 100)}%"></span></div>
-      <ul class="svc__roles" aria-label="${esc(t('Rollen'))}">${(c.teams && c.teams.length ? c.teams.map((x) => [x.name, teamColor(x), x.n || 0]) : GAME_ROLES.map((r) => [r, roleRank(r).color, c.roles[r] || 0]))
-        .map(([name, color, n]) => `<li class="${n ? '' : 'is-zero'}" style="--rc:${esc(color)}"><i></i><span>${esc(name)}</span><b>${fmt(n)}</b></li>`).join('')}</ul>
       <footer class="svc__foot">
         <button class="svc__people" type="button" data-server-people="${esc(c.id)}"${c.players ? '' : ' disabled'} aria-label="${esc(t('Alle Spieler ansehen'))}">
           <span class="avatars">${shown.map((p) => personPic(p, c.avatars)).join('')}${more ? `<span class="avatar avatar--more">+${more > 99 ? '99' : more}</span>` : ''}</span>
@@ -1625,6 +1654,7 @@
       const b = berlinOf(x.start);
       return {
         id: x.id, type: x.type, title: x.title, host: x.host, hostName: x.hostName, hostAvatar: x.hostAvatar, hostId: x.hostId, server: x.server, slots: x.slots, taken: 0, dur: x.dur, text: x.text,
+        helpers: Array.isArray(x.helpers) ? x.helpers : [],
         day: b.day, start: b.abs, end: b.abs + x.dur, time: hhmm(b.abs), req: reqFor(x.type),
         img: (typeOf(x.type) || {}).img || 'training.svg', color: rankOf(x.type).color, remote: true,
       };
@@ -2996,12 +3026,17 @@
   async function syncGroupRank({ force = false } = {}) {
     const p = state.profile;
     if (!p || !p.oauth || !RBX.groupId) return;
+    // Angemeldet mit Backend: der Rang kommt vom Backend (/api/me). Der Proxy ist dafür zu unzuverlässig –
+    // eine leere oder gedrosselte Antwort darf niemanden zum Gast machen.
+    if (apiReady() && sessionToken()) { await loadMe(); return; }
     const last = store.get('tsg-group', null);
     if (!force && last && last.userId === p.userId && Date.now() - last.at < 10 * 60000) return;
     try {
       const res = await fetch(`${D.roblox.groupsApi}/v2/users/${encodeURIComponent(p.userId)}/groups/roles`);
       if (!res.ok) throw new Error('groups');
-      const hit = ((await res.json()).data || []).find((x) => String(x.group && x.group.id) === String(RBX.groupId));
+      const json = await res.json();
+      if (!json || !Array.isArray(json.data)) throw new Error('groups'); // keine echte Antwort: alten Rang behalten
+      const hit = json.data.find((x) => String(x.group && x.group.id) === String(RBX.groupId));
       const role = hit ? { name: hit.role.name, rank: hit.role.rank } : null;
       store.set('tsg-group', { userId: p.userId, role, rank: rankFromRole(role), at: Date.now() });
       applyGroupRank();
@@ -3032,7 +3067,11 @@
     if (raw) headers['Content-Type'] = type;
     const res = await fetch(API + path, { method, headers, body: raw || (body === undefined ? undefined : JSON.stringify(body)) });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 && token) store.set('tsg-session', null);
+    if (res.status === 401 && token) {
+      // Sitzung ungültig: nicht still weitermachen, sondern einmal deutlich sagen, was zu tun ist
+      store.set('tsg-session', null);
+      if (!api.hinweis) { api.hinweis = true; toast(t('Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.')); }
+    }
     if (!res.ok) throw Object.assign(new Error(data.error || 'api'), { status: res.status });
     return data;
   }
@@ -3093,8 +3132,11 @@
   const canBackend = () => apiReady() && !!sessionToken() && state.rankFromGroup;
   const canTrain = () => canBackend() && rankIdx(state.rank) >= rankIdx('Supervisor');
   const canPR = () => canBackend() && rankIdx(state.rank) >= rankIdx('Public Relations Department');
-  // Darf es laut Rang? Dann sind die Knöpfe sichtbar – auch wenn das Backend noch fehlt (dann kommt die Anleitung).
-  const isTeam = (min) => state.rankFromGroup && rankIdx(state.rank) >= rankIdx(min);
+  // Mit Roblox angemeldet, aber das Backend kennt die Sitzung nicht mehr (abgelaufen oder auf einem anderen Gerät abgemeldet)
+  const needsReLogin = () => apiReady() && !!(state.profile && state.profile.oauth) && !sessionToken();
+  // Darf es laut Rang? Dann sind die Knöpfe sichtbar – auch wenn das Backend noch fehlt (dann kommt die Anleitung)
+  // oder die Sitzung weg ist (dann kommt „Bitte neu anmelden“ mit Anmelde-Knopf statt gar nichts).
+  const isTeam = (min) => (state.rankFromGroup || needsReLogin()) && rankIdx(state.rank) >= rankIdx(min);
   const mayTrain = () => isTeam('Supervisor');
   const mayPR = () => isTeam('Public Relations Department');
   const BACKEND_GUIDE = 'https://github.com/Loris6/Train-Sim-Germany/blob/main/backend/README.md';
@@ -3104,9 +3146,9 @@
     return `<div class="setup">
       <span class="setup__ic">${icon('fi-rr-database')}</span>
       <h3>${reLogin ? t('Bitte neu anmelden') : t('Der App-Server fehlt noch')}</h3>
-      <p>${reLogin ? t('Melde dich einmal ab und wieder mit Roblox an, damit der Server dich erkennt.')
+      <p>${reLogin ? t('Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.')
         : t('Als {rank} darfst du das. Damit Trainings, Neuigkeiten, Bewerbungen und der Chat bei allen ankommen, braucht die App ihren Server (Backend). Er ist noch nicht verbunden.', { rank: `<b>[${esc(r.prefix)}] ${esc(r.name)}</b>` })}</p>
-      ${reLogin ? '' : `<ol class="setup__steps">
+      ${reLogin ? `<button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('fi-rr-sign-in-alt')}${t('Mit Roblox anmelden')}</button>` : `<ol class="setup__steps">
         <li>${t('Bei Cloudflare ein kostenloses Konto anlegen und einen API-Token erstellen.')}</li>
         <li>${t('Auf GitHub unter Settings → Secrets die Werte CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID eintragen.')}</li>
         <li>${t('Unter Actions „Backend veröffentlichen“ starten – die Adresse wird automatisch eingetragen.')}</li>
@@ -3163,6 +3205,7 @@
         <div class="f"><label class="f__label" for="tn-slots">${t('Plätze')}</label><input id="tn-slots" name="slots" type="number" inputmode="numeric" min="1" max="50" value="12"></div>
       </div>
       <div class="f"><label class="f__label" for="tn-server">${t('Server')}</label><div class="select"><select id="tn-server" name="server">${D.servers.map((x) => `<option${x.type === 'training' ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>${icon('fi-rr-angle-small-down')}</div></div>
+      <div class="f"><label class="f__label" for="tn-helpers">${t('Supervisors (optional)')}</label><input id="tn-helpers" name="helpers" maxlength="140" autocomplete="off" spellcheck="false" placeholder="${esc(t('Roblox-Namen, mit Komma getrennt'))}"></div>
       <div class="f"><label class="f__label" for="tn-text">${t('Beschreibung (optional)')}</label><textarea id="tn-text" name="text" maxlength="500" rows="3" placeholder="${esc(t('Was lernen die Teilnehmer?'))}"></textarea></div>
       <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rr-plus')}${t('Training anbieten')}</button>
       <p class="sheet-note">${t('Löschen kannst du nur deine eigenen Trainings.')}</p>
@@ -3178,6 +3221,7 @@
     try {
       await api('/api/trainings', { method: 'POST', body: {
         type: f.get('type'), title: f.get('title').trim(), start, dur: +f.get('dur'), slots: +f.get('slots'), server: f.get('server'), text: f.get('text').trim(),
+        helpers: String(f.get('helpers') || '').split(/[\s,;]+/).map((x) => x.replace(/^@/, '')).filter(Boolean),
       } });
       closeModal();
       toast(t('Training angeboten'));
@@ -6421,6 +6465,7 @@
             <div><dt>${icon('fi-rr-clock-three')}${t('Uhrzeit')}</dt><dd>${t('{time} Uhr', { time: `${tn.time} – ${hhmm(tn.end)}` })}</dd></div>
             <div><dt>${icon('fi-rr-database')}${t('Server')}</dt><dd>${esc(t(tn.server || '–'))}</dd></div>
             <div><dt>${icon('fi-rr-users-alt')}${t('Leitung')}</dt><dd>${hostHtml(tn, 'host--sm')}</dd></div>
+            ${tn.helpers && tn.helpers.length ? `<div><dt>${icon('fi-rr-users')}${t('Supervisors')}</dt><dd>${tn.helpers.map(esc).join(', ')}</dd></div>` : ''}
             ${tn.remote ? `<div><dt>${icon('fi-sr-user')}${t('Plätze')}</dt><dd>${t('max. {n}', { n: tn.slots })}</dd></div>` : ''}
           </dl>
           ${tn.remote ? '' : `<div class="occ">
@@ -8325,6 +8370,7 @@
       toast(state.rankFromGroup ? t('Angemeldet als {name} · Rang: [{prefix}] {rank}', { name: state.profile.displayName, prefix: r.prefix, rank: r.name })
         : t('Angemeldet als {name}', { name: state.profile.displayName }));
     } else if (loginNote) toast(loginNote);
+    else if (needsReLogin()) toast(t('Deine Anmeldung ist abgelaufen. Bitte melde dich neu mit Roblox an.'));
     remindersTick();
     // Echte Daten: Inhalte und Einstellungen vom Backend, Zahlen von Roblox und Discord
     loadContent();
