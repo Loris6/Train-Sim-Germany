@@ -34,6 +34,6 @@ window.TSG_CONFIG = {
     email: 'kontakt@beispiel.de',
     // Wo das Backend läuft (Anbieter mit Anschrift), z. B. Cloudflare
     backendHost: 'Cloudflare, Inc., 101 Townsend St., San Francisco, CA 94107, USA',
-    updated: '14. November 2026',
+    updated: '15. November 2026',
   },
 };

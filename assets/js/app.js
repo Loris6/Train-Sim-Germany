@@ -391,7 +391,7 @@
     }
     const box = $('[data-kpis="stats"]');
     box.innerHTML = [
-      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L && !s.restricted, note: t('vom Spiel gezählt'), ic: 'fi-rs-gamepad', key: 'st-visits' }),
+      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L && !s.restricted, note: s.restricted ? t('verschiedene Spieler') : t('laut Roblox'), ic: 'fi-rs-gamepad', key: 'st-visits' }),
       kpi({ label: t('Favoriten'), num: s.favorites, format: 'exact', live: L, ic: 'fi-rs-star', key: 'st-favs' }),
       kpi({ label: t('Gruppenmitglieder'), num: s.groupMembers, format: 'compact', live: L, ic: 'fi-rs-users-alt', key: 'st-group' }),
       kpi({ label: 'Discord', num: s.discordMembers, format: 'compact', live: L, ic: 'fi-brands-discord', key: 'st-discord' }),
@@ -475,7 +475,7 @@
     $('[data-chart-sub]').textContent = state.range === '24' ? t('Letzte 24 Stunden, stündlich') : t('Letzte {n} Tage, Tageshöchstwert', { n: state.range });
   }
 
-  // Zuggattungen für „Fahrten nach Zuggattung“ (Gattung aus dem Spiel bzw. aus dem Zug im Shop)
+  // Zuggattungen für „Fahrten nach Zuggattung“ (Gattung aus dem Spiel bzw. aus dem Fahrzeug)
   const TRAIN_SHARE = [['ICE', ['ice']], ['Eurocity', ['ec']], ['Intercity', ['ic']], ['Regional-Express', ['ire', 're']], ['Regionalbahn', ['rb']], ['S-Bahn', ['s']], ['Güterverkehr', ['g']]];
   function renderBars() {
     const g = G();
@@ -917,8 +917,8 @@
     return '';
   }
   const lineByName = (name) => (name ? Object.values(D.lines).find((L) => L.name.replace(/\s+/g, '') === String(name).replace(/\s+/g, '')) : null);
-  const catOfTrain = (veh) => { const x = veh && D.shop.trains.find((tr) => tr.id === veh); return x ? x.cat : null; };
-  const trainName = (veh) => { const x = veh && D.shop.trains.find((tr) => tr.id === veh); return x ? x.name : veh || ''; };
+  const catOfTrain = (veh) => { const x = veh && D.trains.find((tr) => tr.id === veh); return x ? x.cat : null; };
+  const trainName = (veh) => { const x = veh && D.trains.find((tr) => tr.id === veh); return x ? x.name : veh || ''; };
 
   // Einheitliche Karte für Demo- und Live-Server
   function serverCardModel(s) {
@@ -1782,22 +1782,24 @@
   // Leitung des Trainings: Profilbild und daneben der Name
   const hostHtml = (tn, cls = '') => `<span class="host ${cls}">${tn.hostAvatar
     ? `<span class="avatar"><img src="${esc(tn.hostAvatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(tn.host)}<span class="host__name"><b>${esc(tn.hostName || tn.host)}</b>${tn.hostName && tn.hostName !== tn.host ? `<small>@${esc(tn.host)}</small>` : ''}</span></span>`;
+  // Training als Zeile wie auf der Abfahrtstafel: Uhrzeit, Rolle und Titel, Leitung, Server, Plätze, Glocke
   function tcard(tn) {
     const st = trainingState(tn);
-    return `<article class="tcard">
-      <button class="tcard__main" type="button" data-detail="${tn.id}">
-        <div class="tcard__media">
-          <img src="assets/img/${tn.img}" alt="" loading="lazy">
+    const ss = serverStatus(tn);
+    return `<article class="tg-card${ss.open ? ' is-open' : ''}" style="--rc:${tn.color}">
+      <button class="tg-card__main" type="button" data-detail="${tn.id}">
+        <span class="tg-card__time"><b>${tn.time}</b><small>${t('{n} Min.', { n: tn.dur })}</small></span>
+        <span class="tg-card__body">
+          <span class="tg-card__role"><i></i>${esc(tn.type)}</span>
+          <b class="tg-card__title">${esc(t(tn.title))}</b>
+          ${hostHtml(tn, 'host--sm')}
+        </span>
+        <span class="tg-card__side">
           ${serverPill(tn)}
-          <span class="tcard__role" style="--rc:${tn.color}"><i></i>${esc(tn.type)}</span>
-        </div>
-        <div class="tcard__body">
-          <h3>${esc(t(tn.title))}</h3>
-          ${hostHtml(tn)}
-          <div class="tcard__row"><span>${t('{time} Uhr', { time: tn.time })}</span><span class="tcard__slots${st.cls === 'bad' ? ' is-full' : ''}">${icon('fi-ss-user')}${tn.remote ? t('max. {n}', { n: tn.slots }) : `${tn.taken}/${tn.slots}`}</span></div>
-        </div>
+          <span class="tg-card__slots pill-state pill-state--${st.cls}">${icon(st.cls === 'lock' ? 'fi-rs-lock' : 'fi-ss-user')}${st.cls === 'lock' ? st.text : tn.remote ? t('max. {n}', { n: tn.slots }) : `${tn.taken}/${tn.slots}`}</span>
+        </span>
       </button>
-      ${bellBtn(tn, 'tcard__bell')}
+      ${bellBtn(tn, 'tg-card__bell')}
     </article>`;
   }
 
@@ -1806,31 +1808,33 @@
     const list = trainingsList();
     const me = rankOf(state.rank);
 
-    // Passt der Rangname nicht in die Zeile (z. B. Public Relations Department), steht dort das Kürzel
     const rankName = $('[data-rank-name]');
     rankName.textContent = me.name;
     rankName.title = me.name;
-    if (rankName.scrollWidth > rankName.clientWidth + 1) rankName.textContent = `[${me.prefix}]`;
+    const dot = $('[data-rank-dot]');
+    if (dot) { dot.style.setProperty('--rc', me.color); dot.textContent = me.prefix; }
     $$('[data-can-train]').forEach((b) => { b.hidden = !mayTrain(); });
-    $('[data-bell]').setAttribute('aria-pressed', String(state.bell));
+    const bell = $('[data-bell]');
+    bell.setAttribute('aria-pressed', String(state.bell));
+    bell.classList.toggle('is-on', !!state.bell);
     const types = myTrainingTypes();
     $('[data-all-title]').textContent = !types ? t('Alle kommenden Trainings') : types.length ? t('Kommende {type}-Trainings', { type: types[0] }) : t('Keine weiteren Trainings');
 
-    // Tagesleiste: 14 Tage, roter Punkt = an diesem Tag gibt es Trainings
+    // Tage: 14 Tage, Punkt = an diesem Tag gibt es Trainings
     const days = Array.from({ length: 14 }, (_, i) => now.day + i);
     if (state.trainingDay === null || !days.includes(state.trainingDay)) state.trainingDay = list.length ? list[0].day : now.day;
     const tabs = $('[data-day-tabs]');
     tabs.innerHTML = days.map((d) => {
-      const has = list.some((tn) => tn.day === d);
-      const label = d === now.day ? t('Heute') : d === now.day + 1 ? t('Morgen') : `${wdShort(d)} ${dtf({ day: 'numeric' }).format(dateOf(d))}`;
-      return `<button class="day-tab${has ? ' has-trainings' : ''}" type="button" role="tab" aria-selected="${d === state.trainingDay}" data-day="${d}" aria-label="${dayName(d, { long: true })}${has ? `, ${t('Trainings geplant')}` : ''}">${label}<i></i></button>`;
+      const n = list.filter((tn) => tn.day === d).length;
+      const top = d === now.day ? t('Heute') : d === now.day + 1 ? t('Morgen') : wdShort(d);
+      return `<button class="tg-dayb${n ? ' has-trainings' : ''}" type="button" role="tab" aria-selected="${d === state.trainingDay}" data-day="${d}" aria-label="${dayName(d, { long: true })}${n ? `, ${t('{n} Trainings', { n })}` : ''}">
+        <small>${top}</small><b>${dtf({ day: 'numeric' }).format(dateOf(d))}</b><i>${n ? n : ''}</i></button>`;
     }).join('');
     const sel = $('[aria-selected="true"]', tabs);
     if (sel) tabs.scrollTo({ left: sel.offsetLeft - tabs.clientWidth / 2 + sel.clientWidth / 2, behavior: 'instant' });
 
     const field = $('[data-date-field]');
     field.textContent = dayName(state.trainingDay, { long: true });
-    field.parentElement.classList.add('is-set');
 
     // Trainings am gewählten Tag
     const ofDay = list.filter((tn) => tn.day === state.trainingDay);
@@ -1838,26 +1842,31 @@
     $('[data-day-trainings]').innerHTML = ofDay.length
       ? ofDay.map(tcard).join('')
       : types && !types.length
-        ? `<div class="rail-empty">${icon('fi-rs-check-circle')}<span>${t('Für deinen Rang gibt es keine weiteren Trainings.')}</span></div>`
-        : `<div class="rail-empty">${icon('fi-rs-calendar')}<span>${t('An diesem Tag ist kein Training geplant.')}${nextDay ? ` ${t('Nächstes:')} <button class="link-more" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
+        ? `<div class="tg-empty">${icon('fi-rs-check-circle')}<span>${t('Für deinen Rang gibt es keine weiteren Trainings.')}</span></div>`
+        : `<div class="tg-empty">${icon('fi-rs-calendar')}<span>${t('An diesem Tag ist kein Training geplant.')}${nextDay ? ` ${t('Nächstes:')} <button class="more-link" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
 
-    // Alle kommenden Trainings (klein)
+    // Alle kommenden Trainings als Tafel
     const shown = state.showAll ? list : list.slice(0, 6);
     $('[data-all-trainings]').innerHTML = shown.length ? shown.map((tn) => {
       const st = trainingState(tn);
-      return `<li><button type="button" data-detail="${tn.id}">
-        <div class="tdate${tn.day === now.day ? ' is-today' : ''}"><span>${wdShort(tn.day)}</span><b>${dateOf(tn.day).getUTCDate()}</b></div>
-        <div><h3>${esc(t(tn.title))}</h3><p><i style="--rc:${tn.color}"></i>${esc(tn.type)} · ${t('{time} Uhr', { time: tn.time })} · ${esc(tn.host)}</p></div>
-        <span class="tlist__end">${isReminded(tn) ? `<span class="tlist__bell" title="${esc(t('Benachrichtigung an'))}">${icon('fi-ss-bell-ring')}</span>` : ''}<span class="pill-state pill-state--${st.cls}">${st.text}</span></span>
+      return `<li><button type="button" data-detail="${tn.id}" style="--rc:${tn.color}">
+        <span class="tg-board__date${tn.day === now.day ? ' is-today' : ''}"><small>${wdShort(tn.day)}</small><b>${dateOf(tn.day).getUTCDate()}</b></span>
+        <span class="tg-board__time">${tn.time}</span>
+        <span class="tg-board__main"><b>${esc(t(tn.title))}</b><small><i></i>${esc(tn.type)} · ${esc(tn.hostName || tn.host)}</small></span>
+        <span class="tg-board__end">${isReminded(tn) ? `<span class="tlist__bell" title="${esc(t('Benachrichtigung an'))}">${icon('fi-ss-bell-ring')}</span>` : ''}<span class="pill-state pill-state--${st.cls}">${st.text}</span>${icon('fi-rs-angle-small-right')}</span>
       </button></li>`;
-    }).join('') : `<li class="board-empty">${types && !types.length ? t('Für deinen Rang gibt es keine weiteren Trainings.') : t('Gerade sind keine Trainings geplant.')}</li>`;
+    }).join('') : `<li class="tg-empty">${types && !types.length ? t('Für deinen Rang gibt es keine weiteren Trainings.') : t('Gerade sind keine Trainings geplant.')}</li>`;
     const toggle = $('[data-all-toggle]');
     toggle.hidden = list.length <= 6;
     toggle.textContent = state.showAll ? t('Weniger anzeigen') : t('Alle anzeigen');
 
-    // Ränge in der Seitenleiste
+    // Ausbildungsweg als Linie mit Halten (nur die Ausbildungsränge bis Signaller, danach das Team)
     const cur = rankIdx(state.rank);
-    $('[data-rank-ladder]').innerHTML = RANKS.map((r, i) => `<li class="${i === cur ? 'is-current' : i < cur ? 'is-done' : ''}" style="--rc:${r.color}"><i></i><b>${esc(r.name)}</b><span>${esc(t(r.label))}</span></li>`).join('');
+    const path = RANKS.filter((r) => !r.staff);
+    $('[data-rank-ladder]').innerHTML = path.map((r) => {
+      const i = rankIdx(r.name);
+      return `<li class="${i === cur ? 'is-current' : i < cur ? 'is-done' : ''}" style="--rc:${r.color}"><i></i><b>${esc(r.name)}</b><small>${esc(t(r.label))}</small>${i === cur ? `<em>${t('Du bist hier')}</em>` : ''}</li>`;
+    }).join('') + `<li class="${cur >= rankIdx('Junior Supervisor') ? 'is-done' : ''} is-team"><i></i><b>${t('Team')}</b><small>${t('ab Junior Supervisor über die Karriere')}</small></li>`;
 
     renderNextSteps();
   }
@@ -2543,12 +2552,11 @@
       { key: 'regio', title: t('Regio'), cat: 're', cats: ['ire', 're', 'rb'] },
       { key: 'sbahn', title: t('S-Bahn'), cat: 's', cats: ['s'] },
     ].map((g) => {
-      const rows = D.shop.trains.filter((x) => g.cats.includes(x.cat)).map((x) => ({ label: x.name, value: s.vehicles[x.id] || 0 })).sort((a, b) => b.value - a.value);
+      const rows = D.trains.filter((x) => g.cats.includes(x.cat)).map((x) => ({ label: x.name, value: s.vehicles[x.id] || 0 })).sort((a, b) => b.value - a.value);
       return { ...g, rows, total: rows.reduce((n, r) => n + r.value, 0) };
     });
     const routes = D.routes.map((r) => ({ route: r, value: s.routes[r.no] || 0 })).sort((a, b) => b.value - a.value);
     const fav = routes[0] && routes[0].value ? routes[0].route : null;
-    const w = shop.data && shop.data.wallet;
     return {
       week, groups, routes, trips: s.trips,
       tiles: [
@@ -2557,7 +2565,6 @@
         { ic: 'fi-rs-clock-three', label: t('Pünktlichkeit'), value: countHtml(s.trips ? (s.punctual / s.trips) * 100 : 0, 'pct', 'my-punct') },
         { ic: 'fi-rs-time-fast', label: t('Spielzeit'), value: t('{n} Std.', { n: nf1.format(Math.round(s.minutes / 6) / 10) }) },
         { ic: 'fi-rs-calendar', label: t('Trainings'), value: t('{n} bestanden', { n: fmt(trainingsPassed()) }) },
-        { ic: 'fi-rs-coins', label: t('Coins'), value: countHtml(w && !w.demo ? w.coins : 0, 'fmt', 'my-coins') },
         { ic: 'fi-rs-user-add', label: t('Dabei seit'), value: s.first ? dtf({ month: 'short', year: 'numeric' }).format(new Date(s.first)) : '–' },
         { ic: 'fi-rs-gamepad', label: t('Zuletzt gespielt'), value: s.last ? agoText(s.last) : '–' },
         { ic: 'fi-rs-heart', label: t('Lieblingsstrecke'), value: fav ? `${routeNo(fav)}${esc(t(fav.title))}` : '–', wide: true },
@@ -3374,400 +3381,6 @@
     }
   }
 
-  // ---------- Shop: Coins, Züge und Strecken ----------
-  // Mit Backend kommen Katalog, Coins und Besitz vom Server (Stand aus dem Spiel); ohne Backend ist es eine Demo.
-  const shop = { data: null, at: 0, tab: 'trains', filter: 'all', cat: 'all', sort: 'price', loading: false, view: 'home', menu: false };
-  const ART = Object.fromEntries(D.shop.trains.map((x) => [x.id, x.art]));
-  let artN = 0;
-  const coins = (n) => `<span class="coins">${icon('fi-ss-coins')}${fmt(n)}</span>`;
-  // Seitenansicht eines Zuges als SVG
-  function trainArt(id) {
-    const a = ART[id] || { nose: 'round', body: '#F4F6F8', stripe: '#EC0016', window: '#2B313B' };
-    const clip = `ta-${id}-${(artN += 1)}`;
-    const deck = a.deck === 2;
-    const x0 = 14;
-    const x1 = a.short ? 236 : a.long ? 314 : 290;
-    const bottom = 92;
-    const top = deck ? 30 : 44;
-    const noseLen = a.nose === 'ice' ? 54 : a.nose === 'round' ? 26 : 12;
-    const n = x1 - noseLen;
-    const body = a.nose === 'ice'
-      ? `M${x0},${top + 6} Q${x0},${top} ${x0 + 6},${top} H${n} C${n + 30},${top} ${x1 - 6},${bottom - 26} ${x1},${bottom - 8} Q${x1 + 1},${bottom} ${x1 - 8},${bottom} H${x0} Z`
-      : a.nose === 'round'
-        ? `M${x0},${top + 6} Q${x0},${top} ${x0 + 6},${top} H${n} Q${x1 - 2},${top} ${x1},${top + 18} L${x1},${bottom - 6} Q${x1},${bottom} ${x1 - 6},${bottom} H${x0} Z`
-        : `M${x0},${top + 6} Q${x0},${top} ${x0 + 6},${top} H${x1 - 8} Q${x1},${top} ${x1},${top + 8} L${x1},${bottom - 4} Q${x1},${bottom} ${x1 - 4},${bottom} H${x0} Z`;
-    const winEnd = n - (a.nose === 'ice' ? 4 : 10);
-    const band = (y) => `<rect x="${x0 + 12}" y="${y}" width="${winEnd - x0 - 12}" height="11" rx="4" fill="${a.window}"/>`;
-    const cab = a.nose === 'ice'
-      ? `<path d="M${n + 2},${top + 8} C${n + 22},${top + 8} ${x1 - 16},${top + 24} ${x1 - 10},${top + 34} H${n + 2} Z" fill="${a.window}"/>`
-      : `<rect x="${x1 - 16}" y="${top + 9}" width="12" height="${deck ? 18 : 14}" rx="3" fill="${a.window}"/>`;
-    const doors = [];
-    for (let x = x0 + 44; x < winEnd - 20; x += a.short ? 90 : 78) doors.push(`<rect x="${x}" y="${deck ? top + 33 : top + 7}" width="13" height="${bottom - (deck ? top + 33 : top + 7) - 5}" rx="2" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="1.2"/>`);
-    const bogie = (x) => `<g><rect x="${x - 20}" y="${bottom - 2}" width="40" height="7" rx="3" fill="#3A3F48"/><circle cx="${x - 10}" cy="${bottom + 7}" r="6" fill="#2A2E35"/><circle cx="${x + 10}" cy="${bottom + 7}" r="6" fill="#2A2E35"/></g>`;
-    return `<svg class="train-art" viewBox="0 0 330 112" role="img" aria-hidden="true">
-      <ellipse cx="${(x0 + x1) / 2}" cy="106" rx="${(x1 - x0) / 2}" ry="4" fill="rgba(0,0,0,.12)"/>
-      <rect x="0" y="103" width="330" height="3" rx="1.5" fill="rgba(0,0,0,.18)"/>
-      ${bogie(x0 + 40)}${bogie(x1 - 44)}
-      <path d="${body}" fill="${a.body}" stroke="rgba(0,0,0,.14)" stroke-width="1"/>
-      ${a.top ? `<clipPath id="${clip}"><path d="${body}"/></clipPath><rect x="0" y="${top}" width="330" height="24" fill="${a.top}" clip-path="url(#${clip})"/>` : ''}
-      ${a.lower ? `<rect x="${x0 + 1}" y="${bottom - 12}" width="${n - x0}" height="11" fill="${a.lower}"/>` : ''}
-      ${deck ? band(top + 8) + band(top + 34) : band(top + 10)}
-      ${cab}
-      <rect x="${x0 + 1}" y="${bottom - (a.lower ? 18 : 14)}" width="${n - x0 + (a.nose === 'flat' ? noseLen - 2 : 0)}" height="5" fill="${a.stripe}"/>
-      ${doors.join('')}
-    </svg>`;
-  }
-  const demoWallet = () => {
-    const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
-    return { coins: w.coins, available: w.coins, trains: w.trains, routes: w.routes, pending: [], syncedAt: null, demo: true };
-  };
-  async function loadShop(force = false) {
-    if (shop.loading || (!force && shop.data && Date.now() - shop.at < 20000)) return;
-    shop.loading = true;
-    try {
-      shop.data = apiReady() ? await api('/api/shop') : { catalog: { trains: D.shop.trains, routes: D.shop.routes }, wallet: demoWallet(), demo: true };
-    } catch (e) {
-      shop.data = shop.data || { catalog: { trains: D.shop.trains, routes: D.shop.routes }, wallet: null, error: true };
-    } finally {
-      shop.loading = false;
-      shop.at = Date.now();
-    }
-    if (state.page === 'shop') renderShop();
-    if (modalView && modalView.name === 'buy') refreshModal();
-  }
-  const routeByNo = (no) => D.routes.find((r) => r.no === no);
-  function shopItems(kind) {
-    const c = shop.data ? shop.data.catalog : { trains: D.shop.trains, routes: D.shop.routes };
-    return kind === 'routes' ? c.routes.map((x) => ({ ...x, route: routeByNo(x.id) })).filter((x) => x.route) : c.trains;
-  }
-  function itemStatus(kind, item) {
-    const w = shop.data && shop.data.wallet;
-    if (!w) return item.starter ? 'owned' : 'locked';
-    const owned = (kind === 'routes' ? w.routes : w.trains) || [];
-    if (owned.includes(item.id) || item.starter) return 'owned';
-    if ((w.pending || []).some((p) => p.item === item.id)) return 'pending';
-    return w.available >= item.price ? 'buy' : 'short';
-  }
-  function shopNote() {
-    const d = shop.data;
-    if (!d) return '';
-    if (d.demo) return `<p class="shop-note">${icon('fi-rs-info')}<span>${t('Demo: Coins und Käufe gelten nur auf diesem Gerät. Mit dem App-Server kommen sie direkt aus dem Spiel.')}</span></p>`;
-    if (!d.wallet) {
-      return `<div class="shop-note shop-note--cta">${icon('fi-rs-sign-in-alt')}<span>${t('Melde dich mit Roblox an, um deine Coins und Züge aus dem Spiel zu sehen und hier einzukaufen.')}</span>
-        <button class="btn btn--primary btn--sm" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
-    }
-    if (!d.wallet.syncedAt) return `<p class="shop-note">${icon('fi-rs-gamepad')}<span>${t('Noch keine Daten aus dem Spiel. Starte Train Sim Germany einmal – danach stehen hier deine Coins.')}</span></p>`;
-    return '';
-  }
-  const SHOP_CATS = [['s', 'S-Bahn'], ['rb', 'RB'], ['re', 'RE'], ['ic', 'IC'], ['ice', 'ICE'], ['ec', 'EC']];
-  const catName = (c) => (CATS.find((x) => x.id === c) || { name: String(c).toUpperCase() }).name;
-  const itemName = (kind, item) => (kind === 'routes' ? `${item.route.no} ${t(item.route.title)}` : item.name);
-  // Kaufknopf bzw. Zustand eines Artikels
-  function shopAction(kind, item, { big = false } = {}) {
-    const st = itemStatus(kind, item);
-    const w = shop.data && shop.data.wallet;
-    if (st === 'owned') return `<span class="sx-own">${icon('fi-ss-check-circle')}${t('Im Besitz')}</span>`;
-    if (st === 'pending') return `<span class="sx-own sx-own--wait">${icon('fi-rs-time-fast')}${t('Wird im Spiel freigeschaltet')}</span>`;
-    if (st === 'locked') return `<span class="sx-price">${coins(item.price)}</span>`;
-    const off = w && w.syncedAt === null && !w.demo;
-    return `<button class="btn ${st === 'buy' ? 'btn--primary' : 'btn--soft'} sx-buy${big ? ' btn--lg btn--block' : ''}" type="button" data-buy="${kind}:${esc(item.id)}"${off ? ' disabled' : ''}>${coins(item.price)}</button>`;
-  }
-  // Wie weit bin ich (für Artikel, die noch zu teuer sind)
-  function shortBar(item) {
-    const w = shop.data && shop.data.wallet;
-    if (!w || itemStatus(shop.tab, item) !== 'short') return '';
-    const p = Math.max(2, Math.min(100, (w.available / item.price) * 100));
-    return `<span class="sx-short"><span class="sx-short__bar"><i style="width:${p}%"></i></span><small>${t('Noch {n} Coins', { n: fmt(item.price - w.available) })}</small></span>`;
-  }
-  function shopTrainCard(item) {
-    const st = itemStatus('trains', item);
-    return `<article class="sx-card is-${st}">
-      <button class="sx-card__open" type="button" data-shop-item="trains:${esc(item.id)}" aria-label="${esc(t('{name} ansehen', { name: item.name }))}"></button>
-      <div class="sx-stage sx-stage--${item.cat}">${trainArt(item.id)}<span class="line line--${item.cat}">${esc(catName(item.cat))}</span>${st === 'owned' ? `<span class="sx-badge">${icon('fi-ss-check-circle')}</span>` : ''}</div>
-      <div class="sx-card__body">
-        <span class="sx-kicker">${esc(item.series)}</span>
-        <h3>${esc(item.name)}</h3>
-        <span class="sx-specs"><span>${icon('fi-rs-dashboard')}${t('{n} km/h', { n: item.vmax })}</span></span>
-        ${shortBar(item)}
-        <div class="sx-card__foot">${shopAction('trains', item)}</div>
-      </div>
-    </article>`;
-  }
-  // Linienverlauf einer Strecke (Halte aus der Linie in data.js, zwischen Start und Ziel)
-  function routeStops(r) {
-    const L = lineByName(r.line);
-    if (!L) return [];
-    const names = L.stops.map(([n]) => n);
-    let a = names.indexOf(r.from);
-    let b = names.indexOf(r.to);
-    if (a < 0 || b < 0) return [];
-    const list = a <= b ? names.slice(a, b + 1) : names.slice(b, a + 1).reverse();
-    return list;
-  }
-  function shopRouteCard(item) {
-    const r = item.route;
-    const st = itemStatus('routes', item);
-    const stops = routeStops(r);
-    const dots = Math.min(8, Math.max(2, stops.length || r.stops));
-    return `<article class="rt-card is-${st}">
-      <button class="sx-card__open" type="button" data-shop-item="routes:${esc(item.id)}" aria-label="${esc(t('{name} ansehen', { name: t(r.title) }))}"></button>
-      <div class="rt-card__media"><img src="assets/img/${r.img}" alt="" loading="lazy"><span class="route-no">${esc(r.no)}</span><span class="line line--${r.cat}">${esc(r.line)}</span>${st === 'owned' ? `<span class="sx-badge">${icon('fi-ss-check-circle')}</span>` : ''}</div>
-      <div class="rt-card__body">
-        <h3>${esc(t(r.title))}</h3>
-        <div class="rt-way" style="--c:var(--c-${r.cat})">
-          <span class="rt-way__end"><b>${esc(r.from)}</b></span>
-          <span class="rt-way__line" aria-hidden="true">${'<i></i>'.repeat(dots)}</span>
-          <span class="rt-way__end rt-way__end--to"><b>${esc(r.to)}</b></span>
-        </div>
-        <p class="rt-meta"><span>${icon('fi-rs-route')}${fmt(r.km)} km</span><span>${icon('fi-rs-clock-three')}${t('{d} Std.', { d: r.dur })}</span><span>${icon('fi-rs-marker')}${t('{n} Halte', { n: r.stops })}</span></p>
-        ${shortBar(item)}
-        <div class="sx-card__foot">${r.tag ? `<span class="rt-tag">${esc(t(r.tag))}</span>` : ''}${shopAction('routes', item)}</div>
-      </div>
-    </article>`;
-  }
-  // Als Nächstes: der günstigste Artikel, den man noch nicht hat
-  function nextUp(kind, all) {
-    const open = all.filter((x) => ['buy', 'short', 'locked'].includes(itemStatus(kind, x))).sort((a, b) => a.price - b.price);
-    const item = open.find((x) => itemStatus(kind, x) === 'buy') || open[0];
-    if (!item) return '';
-    const w = shop.data && shop.data.wallet;
-    const st = itemStatus(kind, item);
-    const p = w ? Math.max(2, Math.min(100, (w.available / item.price) * 100)) : 0;
-    const media = kind === 'routes' ? `<img src="assets/img/${item.route.img}" alt="">` : trainArt(item.id);
-    return `<section class="sx-next sx-next--${kind === 'routes' ? item.route.cat : item.cat}">
-      <div class="sx-next__media">${media}</div>
-      <div class="sx-next__body">
-        <span class="sx-next__kicker">${icon('fi-rs-sparkles')}${st === 'buy' ? t('Kannst du dir leisten') : t('Dein nächstes Ziel')}</span>
-        <h2>${esc(itemName(kind, item))}</h2>
-        ${st === 'buy' || !w ? '' : `<span class="sx-short sx-short--lg"><span class="sx-short__bar"><i style="width:${p}%"></i></span><small>${t('{a} von {b} Coins', { a: fmt(w.available), b: fmt(item.price) })}</small></span>`}
-        <div class="sx-next__actions">${shopAction(kind, item)}<button class="btn btn--ghost btn--sm" type="button" data-shop-item="${kind}:${esc(item.id)}">${t('Ansehen')}</button></div>
-      </div>
-    </section>`;
-  }
-  function shopHistory() {
-    const w = shop.data && shop.data.wallet;
-    if (!w || w.demo) return '';
-    const rows = [...(w.pending || []).map((p) => ({ ...p, wait: true })), ...(w.history || [])];
-    if (!rows.length) return '';
-    const name = (x) => {
-      const it = shopItems(x.kind === 'route' ? 'routes' : 'trains').find((i) => i.id === x.item);
-      return it ? itemName(x.kind === 'route' ? 'routes' : 'trains', it) : x.item;
-    };
-    return `<section class="sx-history"><h2 class="sx-sec">${icon('fi-rs-receipt')}${t('Deine Käufe')}</h2><ul>${rows.slice(0, 12).map((x) => `<li>
-      <span class="sx-history__ic${x.wait ? ' is-wait' : x.ok ? ' is-ok' : ' is-bad'}">${icon(x.wait ? 'fi-rs-time-fast' : x.ok ? 'fi-rs-check' : 'fi-rs-cross-small')}</span>
-      <span class="sx-history__main"><b>${esc(name(x))}</b><small>${x.wait ? t('Wartet auf das Spiel') : x.ok ? t('Im Spiel freigeschaltet') : t('Abgelehnt – Coins zurück')} · ${fmtWhen(x.doneAt || x.at)}</small></span>
-      <span class="sx-history__price">${coins(x.price)}</span></li>`).join('')}</ul></section>`;
-  }
-  // ---------- Shop wie eine moderne Store-App ----------
-  // Kopf: ×, „Shop“, Coins, Herz (Wunschliste), Menü. Darunter ein großes Banner, Sammlungen zum Wischen mit
-  // „Alle kaufen“ und „Finde deinen Stil“ als Raster. Herz = auf die Wunschliste (auf allen Geräten).
-  const shopWish = () => new Set(store.get('tsg-wish', []) || []);
-  function toggleWish(key) {
-    const w = shopWish();
-    if (w.has(key)) w.delete(key); else w.add(key);
-    store.set('tsg-wish', [...w]);
-    settingsChanged();
-    haptic('select');
-    return w.has(key);
-  }
-  const shopName = (kind, x) => (kind === 'routes' ? t(x.route.title) : x.name);
-  const shopKey = (kind, x) => `${kind}:${x.id}`;
-  function shxBadge(kind, x) {
-    const st = itemStatus(kind, x);
-    if (st === 'owned') return `<span class="shx-badge shx-badge--own">${icon('fi-ss-check-circle')}${t('Im Besitz')}</span>`;
-    if (st === 'pending') return `<span class="shx-badge">${icon('fi-rs-time-fast')}${t('Im Spiel')}</span>`;
-    if (!x.price) return `<span class="shx-badge">${t('Gratis')}</span>`;
-    if (st === 'short') return `<span class="shx-badge">${t('Noch {n}', { n: compact(x.price - ((shop.data && shop.data.wallet && shop.data.wallet.available) || 0)) })}</span>`;
-    return '';
-  }
-  function shxArt(kind, x) {
-    if (kind === 'routes') return `<img src="assets/img/${esc(x.route.img)}" alt="" loading="lazy"><span class="route-no">${esc(x.route.no)}</span>`;
-    return `<span class="shx-train sx-stage--${esc(x.cat)}">${trainArt(x.id)}</span>`;
-  }
-  function shxCard(kind, x, { wide = false } = {}) {
-    const st = itemStatus(kind, x);
-    const wished = shopWish().has(shopKey(kind, x));
-    return `<article class="shx-card${wide ? ' shx-card--grid' : ''} is-${st}">
-      <button class="shx-card__open" type="button" data-shop-item="${kind}:${esc(x.id)}" aria-label="${esc(t('{name} ansehen', { name: shopName(kind, x) }))}"></button>
-      <div class="shx-card__art">${shxArt(kind, x)}${shxBadge(kind, x)}
-        <button class="shx-heart${wished ? ' is-on' : ''}" type="button" data-shop-wish="${kind}:${esc(x.id)}" aria-pressed="${wished}" aria-label="${esc(t('Auf die Wunschliste'))}">${icon(wished ? 'fi-ss-heart' : 'fi-rs-heart')}</button></div>
-      <div class="shx-card__body"><b>${esc(shopName(kind, x))}</b>
-        <span class="shx-price">${st === 'owned' ? `<span class="shx-owned">${t('Gehört dir')}</span>` : `${icon('fi-ss-coins')}${x.price ? fmt(x.price) : t('Gratis')}`}<small>${esc(kind === 'routes' ? `${x.route.no} · ${fmt(x.route.km)} km` : `${x.series} · ${x.vmax} km/h`)}</small></span></div>
-    </article>`;
-  }
-  // „Alle kaufen“: alles aus der Sammlung, was man noch nicht hat
-  const buyable = (kind, list) => list.filter((x) => itemStatus(kind, x) === 'buy' || itemStatus(kind, x) === 'short');
-  function shxSection(id, title, kind, list) {
-    if (!list.length) return '';
-    const open = buyable(kind, list);
-    return `<section class="shx-sec"><div class="shx-sec__head"><h2>${esc(title)}</h2>${open.length ? `<button class="shx-all" type="button" data-shop-all="${id}">${t('Alle kaufen')}</button>` : ''}</div>
-      <div class="shx-row">${list.map((x) => shxCard(kind, x)).join('')}</div></section>`;
-  }
-  function shopSections() {
-    const trains = shopItems('trains');
-    const routes = shopItems('routes');
-    return {
-      fern: { title: t('Fernverkehr'), kind: 'trains', list: trains.filter((x) => ['ice', 'ic', 'ec'].includes(x.cat)) },
-      regio: { title: t('Regional & S-Bahn'), kind: 'trains', list: trains.filter((x) => ['re', 'rb', 's'].includes(x.cat)) },
-      strecken: { title: t('Strecken'), kind: 'routes', list: routes },
-    };
-  }
-  async function buyAll(id) {
-    const sec = shopSections()[id];
-    if (!sec || !shop.data || !shop.data.wallet) return;
-    const open = buyable(sec.kind, sec.list);
-    const sum = open.reduce((n, x) => n + x.price, 0);
-    if (!open.length) return;
-    if (sum > shop.data.wallet.available) { haptic('error'); toast(t('Für alle zusammen fehlen dir {n} Coins.', { n: fmt(sum - shop.data.wallet.available) })); return; }
-    if (!confirm(t('{n} Artikel aus „{name}“ für zusammen {sum} Coins kaufen?', { n: open.length, name: sec.title, sum: fmt(sum) }))) return;
-    let ok = 0;
-    for (const x of open) {
-      try {
-        if (shop.data.demo) {
-          const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
-          w.coins -= x.price;
-          w[sec.kind === 'routes' ? 'routes' : 'trains'] = [...w[sec.kind === 'routes' ? 'routes' : 'trains'], x.id];
-          store.set('tsg-wallet', w);
-          shop.data.wallet = demoWallet();
-        } else shop.data.wallet = await api('/api/shop/buy', { method: 'POST', body: { kind: sec.kind === 'routes' ? 'route' : 'train', id: x.id } });
-        ok += 1;
-      } catch (e) { break; }
-    }
-    haptic(ok === open.length ? 'success' : 'warn');
-    toast(ok === open.length ? t('{n} Artikel gekauft', { n: ok }) : t('{a} von {b} gekauft – der Rest ging gerade nicht.', { a: ok, b: open.length }));
-    renderShop();
-  }
-  function renderShop() {
-    if (!shop.data) loadShop();
-    const d = shop.data;
-    const w = d && d.wallet;
-    const view = shop.view || 'home';
-    const unread = chat.list ? chat.list.chats.filter(isUnread).length : 0;
-    $('[data-shop-head]').innerHTML = `<div class="shx-top">
-        <a class="shx-x" href="#/" aria-label="${esc(t('Schließen'))}">${icon('fi-rs-cross')}${unread ? `<i>${unread > 99 ? '99' : unread}</i>` : ''}</a>
-        <h1>${view === 'wish' ? t('Wunschliste') : view === 'owned' ? t('Im Besitz') : view === 'trains' ? t('Alle Züge') : view === 'routes' ? t('Alle Strecken') : t('Shop')}</h1>
-        <span class="shx-coins" title="${esc(t('Deine Coins'))}">${icon('fi-ss-coins')}${countHtml(w ? w.coins : 0, 'fmt', 'wallet')}</span>
-        <button class="shx-ibtn${view === 'wish' ? ' is-on' : ''}" type="button" data-shop-view="${view === 'wish' ? 'home' : 'wish'}" aria-label="${esc(t('Wunschliste'))}">${icon(view === 'wish' ? 'fi-ss-heart' : 'fi-ss-heart')}</button>
-        <button class="shx-ibtn" type="button" data-shop-menu aria-label="${esc(t('Menü'))}" aria-expanded="${!!shop.menu}">${icon('fi-rs-burger-menu')}</button>
-      </div>
-      ${shop.menu ? `<div class="shx-menu" role="menu">${[['home', 'fi-rs-shop', t('Startseite')], ['trains', 'fi-rs-train-side', t('Alle Züge')], ['routes', 'fi-rs-route', t('Alle Strecken')], ['owned', 'fi-ss-check-circle', t('Im Besitz')], ['wish', 'fi-rs-heart', t('Wunschliste')], ['history', 'fi-rs-time-past', t('Kaufverlauf')]]
-        .map(([id, ic, label]) => `<button type="button" role="menuitem" data-shop-view="${id}"${view === id ? ' aria-current="true"' : ''}>${icon(ic)}${label}</button>`).join('')}</div>` : ''}`;
-    countUp($('[data-shop-head]'));
-    const trains = shopItems('trains');
-    const routes = shopItems('routes');
-    const all = [...trains.map((x) => ['trains', x]), ...routes.map((x) => ['routes', x])];
-    const grid = (items) => (items.length ? `<div class="shx-grid">${items.map(([k, x]) => shxCard(k, x, { wide: true })).join('')}</div>` : `<p class="shx-empty">${view === 'wish' ? t('Tippe bei einem Zug oder einer Strecke auf das Herz – dann landet er hier.') : t('Hier ist gerade nichts.')}</p>`);
-    let body = '';
-    if (view === 'wish') body = grid(all.filter(([k, x]) => shopWish().has(shopKey(k, x))));
-    else if (view === 'owned') body = grid(all.filter(([k, x]) => ['owned', 'pending'].includes(itemStatus(k, x))));
-    else if (view === 'trains') body = grid(trains.map((x) => ['trains', x]));
-    else if (view === 'routes') body = grid(routes.map((x) => ['routes', x]));
-    else if (view === 'history') body = shopHistory() || `<p class="shx-empty">${t('Noch keine Käufe.')}</p>`;
-    else {
-      // Großes Banner: das Highlight, das man noch nicht hat
-      const hero = trains.filter((x) => !['owned', 'pending'].includes(itemStatus('trains', x))).sort((a, b) => b.price - a.price)[0] || trains[trains.length - 1];
-      const secs = shopSections();
-      const style = all.filter(([k, x]) => !['owned', 'pending'].includes(itemStatus(k, x))).sort((a, b) => a[1].price - b[1].price);
-      body = `${hero ? `<button class="shx-hero sx-stage--${esc(hero.cat)}" type="button" data-shop-item="trains:${esc(hero.id)}">
-          <span class="shx-hero__text"><small>${t('Highlight')}</small><b>${esc(hero.name)}</b><span>${esc(hero.series)} · ${hero.vmax} km/h</span>
-            <span class="shx-hero__price">${itemStatus('trains', hero) === 'owned' ? t('Gehört dir') : `${icon('fi-ss-coins')}${fmt(hero.price)}`}</span></span>
-          <span class="shx-hero__art">${trainArt(hero.id)}</span></button>` : ''}
-        ${shxSection('fern', secs.fern.title, 'trains', secs.fern.list)}
-        ${shxSection('regio', secs.regio.title, 'trains', secs.regio.list)}
-        ${shxSection('strecken', secs.strecken.title, 'routes', secs.strecken.list)}
-        ${style.length ? `<section class="shx-sec"><div class="shx-sec__head"><h2>${t('Finde deinen Stil')}</h2><button class="shx-info" type="button" data-shop-view="trains" aria-label="${esc(t('Alle ansehen'))}">${icon('fi-rs-info')}</button></div>${grid(style.slice(0, 8))}</section>` : ''}`;
-    }
-    $('[data-shop]').innerHTML = `${shopNote()}${body}`;
-  }
-  // Detailansicht eines Artikels
-  function itemView(arg) {
-    const [kind, id] = String(arg).split(':');
-    const item = shopItems(kind).find((x) => x.id === id);
-    if (!item) return `<p class="muted">${t('Diesen Artikel gibt es nicht mehr.')}</p>`;
-    if (kind === 'routes') {
-      const r = item.route;
-      const stops = routeStops(r);
-      const trains = D.shop.trains.filter((x) => Object.values(D.lines).some((L) => L.name === r.line && L.train === x.name));
-      return `<div class="sx-detail">
-        <div class="sx-detail__media sx-detail__media--img"><img src="assets/img/${r.img}" alt=""><span class="route-no">${esc(r.no)}</span></div>
-        <div class="sx-detail__title"><span class="line line--${r.cat}">${esc(r.line)}</span><h3>${esc(t(r.title))}</h3></div>
-        <dl class="sx-facts">
-          <div><dt>${icon('fi-rs-route')}${t('Länge')}</dt><dd>${fmt(r.km)} km</dd></div>
-          <div><dt>${icon('fi-rs-clock-three')}${t('Fahrzeit')}</dt><dd>${t('{d} Std.', { d: r.dur })}</dd></div>
-          <div><dt>${icon('fi-rs-marker')}${t('Halte')}</dt><dd>${r.stops}</dd></div>
-        </dl>
-        ${stops.length ? `<ol class="sx-stops" style="--c:var(--c-${r.cat})">${stops.map((n, i) => `<li class="${i === 0 || i === stops.length - 1 ? 'is-end' : ''}"><i></i><span>${esc(n)}</span></li>`).join('')}</ol>` : ''}
-        ${trains.length ? `<p class="sx-fits">${icon('fi-rs-train-side')}<span>${t('Im Fahrplan mit: {list}', { list: trains.map((x) => esc(x.name)).join(', ') })}</span></p>` : ''}
-        <div class="sx-detail__buy">${shortBar(item)}${shopAction('routes', item, { big: true })}</div>
-      </div>`;
-    }
-    const lines = Object.values(D.lines).filter((L) => L.train === item.name);
-    const seen = new Set();
-    const lineList = lines.filter((L) => !seen.has(L.name) && seen.add(L.name));
-    return `<div class="sx-detail">
-      <div class="sx-detail__media sx-stage sx-stage--${item.cat}">${trainArt(item.id)}</div>
-      <div class="sx-detail__title"><span class="line line--${item.cat}">${esc(catName(item.cat))}</span><h3>${esc(item.name)}</h3><small>${esc(item.series)}</small></div>
-      <dl class="sx-facts">
-        <div><dt>${icon('fi-rs-dashboard')}${t('Spitze')}</dt><dd>${t('{n} km/h', { n: item.vmax })}</dd></div>
-        <div><dt>${icon('fi-rs-train-side')}${t('Gattung')}</dt><dd>${esc(catName(item.cat))}</dd></div>
-        <div><dt>${icon('fi-rs-coins')}${t('Preis')}</dt><dd>${item.price ? coins(item.price) : t('Gratis')}</dd></div>
-      </dl>
-      ${lineList.length ? `<p class="sx-fits">${icon('fi-rs-route')}<span>${t('Fährt im Fahrplan auf')}</span>${lineList.map(lineBadge).join('')}</p>` : ''}
-      <div class="sx-detail__buy">${shortBar(item)}${shopAction('trains', item, { big: true })}</div>
-    </div>`;
-  }
-  function buyView(arg) {
-    const [kind, id] = String(arg).split(':');
-    const item = shopItems(kind).find((x) => x.id === id);
-    if (!item) return `<p class="muted">${t('Diesen Artikel gibt es nicht mehr.')}</p>`;
-    const w = shop.data && shop.data.wallet;
-    const st = itemStatus(kind, item);
-    const name = itemName(kind, item);
-    if (st === 'owned' || st === 'pending') return `<p class="muted">${t('{name} gehört dir schon.', { name: esc(name) })}</p>`;
-    const after = w ? w.available - item.price : 0;
-    return `<div class="buy">
-      <div class="buy__media${kind === 'routes' ? '' : ` sx-stage sx-stage--${item.cat}`}">${kind === 'routes' ? `<img src="assets/img/${item.route.img}" alt="">` : trainArt(item.id)}</div>
-      <h3>${esc(name)}</h3>
-      <dl class="buy__sum">
-        <div><dt>${t('Preis')}</dt><dd>${coins(item.price)}</dd></div>
-        <div><dt>${t('Deine Coins')}</dt><dd>${coins(w ? w.available : 0)}</dd></div>
-        <div class="buy__after${after < 0 ? ' is-short' : ''}"><dt>${t('Danach')}</dt><dd>${coins(after)}</dd></div>
-      </dl>
-      ${after < 0 ? `<p class="f__note">${t('Dir fehlen noch {n} Coins. Coins verdienst du im Spiel mit pünktlichen Fahrten.', { n: fmt(-after) })}</p>`
-        : `<button class="btn btn--primary btn--lg btn--block" type="button" data-buy-confirm="${esc(arg)}">${icon('fi-rs-shopping-cart')}${t('Jetzt kaufen')}</button>
-          <p class="f__note">${shop.data.demo ? t('Demo: Der Kauf gilt nur auf diesem Gerät.') : t('Die Coins werden reserviert. Im Spiel wird der Kauf beim nächsten Abgleich verbucht – meist innerhalb einer Minute, sonst beim nächsten Spielstart.')}</p>`}
-    </div>`;
-  }
-  async function confirmBuy(arg, btn) {
-    const [kind, id] = String(arg).split(':');
-    const item = shopItems(kind).find((x) => x.id === id);
-    if (!item) return;
-    const r = btn ? btn.getBoundingClientRect() : null;
-    if (shop.data.demo) {
-      const w = store.get('tsg-wallet', null) || { ...D.shop.demo };
-      if (w.coins < item.price) return;
-      w.coins -= item.price;
-      w[kind === 'routes' ? 'routes' : 'trains'] = [...w[kind === 'routes' ? 'routes' : 'trains'], id];
-      store.set('tsg-wallet', w);
-      shop.data.wallet = demoWallet();
-    } else {
-      try {
-        shop.data.wallet = await api('/api/shop/buy', { method: 'POST', body: { kind: kind === 'routes' ? 'route' : 'train', id } });
-      } catch (e) {
-        haptic('error');
-        toast(e.status === 402 ? t('Dafür reichen deine Coins nicht.') : e.status === 409 && e.message === 'not_synced'
-          ? t('Starte zuerst einmal das Spiel, damit deine Coins hier ankommen.') : e.status === 409 ? t('Das gehört dir schon.') : errorText(e));
-        if (btn) btn.disabled = false;
-        return;
-      }
-    }
-    if (r) coinBurst(r.left + r.width / 2, r.top + r.height / 2);
-    haptic('success');
-    closeModal();
-    renderShop();
-    toast(t('Gekauft: {name}', { name: kind === 'routes' ? t(item.route.title) : item.name }));
-  }
-
   // ---------- Chat ----------
   // Gespräche: Anfragen ans Team, Nachrichten an jeden Spieler und Gruppen (privat oder öffentlich) mit eigenen Regeln,
   // Fotos, Videos, Dateien und Befehlen wie /GetGroupData. Ab Supervisor gibt es die Moderation: jedes Gespräch
@@ -3794,9 +3407,8 @@
     { id: 'getstats', usage: '/GetStats', desc: 'Spieler, Besuche, Favoriten, Discord' },
     { id: 'gettrainings', usage: '/GetTrainings', desc: 'Die nächsten Trainings' },
     { id: 'getnews', usage: '/GetNews', desc: 'Die neuesten Neuigkeiten' },
-    { id: 'getteam', usage: '/GetTeam', desc: 'Das Team ab Supervisor nach Rang' },
+    { id: 'getteam', usage: '/GetTeam', desc: 'Das Team ab Junior Supervisor nach Rang' },
     { id: 'members', usage: '/Members', desc: 'Wer in diesem Chat ist' },
-    { id: 'coins', usage: '/Coins', desc: 'Deine Coins und Züge aus dem Spiel (nur du siehst die Antwort)' },
     { id: 'play', usage: '/Play', desc: 'Spiel starten und Gruppe beitreten' },
     { id: 'discord', usage: '/Discord', desc: 'Zum Discord der Community' },
     { id: 'time', usage: '/Time', desc: 'Spielzeit (Uhrzeit in Deutschland)' },
@@ -3805,7 +3417,7 @@
   ];
   // Knöpfe unter Antworten des TSG-Bots: nur Links in die App, zu Roblox und zu Discord, nur diese Icons
   const BOT_ICONS = ['fi-rs-users-alt', 'fi-ss-play', 'fi-rs-user', 'fi-rs-paper-plane', 'fi-rs-signal-alt-2', 'fi-rs-calendar', 'fi-rs-newspaper',
-    'fi-rs-shopping-cart', 'fi-rs-chart-line-up', 'fi-rs-user-add', 'fi-brands-discord'];
+    'fi-rs-chart-line-up', 'fi-rs-user-add', 'fi-brands-discord'];
   const safeBotUrl = (u) => /^#\/[\w/-]*$/.test(u) || /^https:\/\/(www\.)?(roblox\.com|discord\.gg)\//.test(u);
   const botButtons = (m) => (m.buttons || []).filter((b) => b && safeBotUrl(String(b.url))).map((b) => {
     const ext = !b.url.startsWith('#');
@@ -3946,7 +3558,7 @@
     const n = l ? l.chats.filter(isUnread).length + l.queue.filter((x) => x.status === 'open').length : 0;
     $$('[data-chat-dot]').forEach((el) => { el.hidden = !n; });
     // Ungelesenes zeigt die Leiste oben am Profilbild (nur neu zeichnen, wenn sich die Zahl ändert)
-    if (chatDot.last !== n) { chatDot.last = n; renderNavAccount(); }
+    if (chatDot.last !== n) { chatDot.last = n; const dot = $('.nav__me-dot', navRoot || document); if (dot) dot.classList.toggle('is-unread', n > 0); }
   }
   // Team ab Supervisor: vom Backend oder direkt aus der Roblox-Gruppe (über den Proxy)
   // Jede Person nur einmal (höchster Rang, Profilbild von welchem Eintrag auch immer)
@@ -3962,7 +3574,7 @@
   }
   async function loadStaff() {
     if (chat.staff && Date.now() - chat.staffAt < 30 * 60000) return;
-    const cached = store.get('tsg-staff', null);
+    const cached = store.get('tsg-staff3', null);
     if (!chat.staff && cached && Date.now() - cached.at < 30 * 60000) { chat.staff = uniqueStaff(cached.list); chat.staffAt = cached.at; return; }
     try {
       let list;
@@ -3971,7 +3583,7 @@
         const R = D.roblox;
         const j = (u) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
         const roles = ((await j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles`)).roles || [])
-          .map((r) => ({ ...r, rankName: rankFromRole(r) })).filter((r) => r.rank > 0 && rankIdx(r.rankName) >= rankIdx('Supervisor'));
+          .map((r) => ({ ...r, rankName: rankFromRole(r) })).filter((r) => r.rank > 0 && rankIdx(r.rankName) >= rankIdx('Junior Supervisor'));
         list = [];
         for (const r of roles) {
           const res = await j(`${R.groupsApi}/v1/groups/${RBX.groupId}/roles/${r.id}/users?limit=100&sortOrder=Asc`);
@@ -3987,7 +3599,7 @@
       list = uniqueStaff(list);
       chat.staff = list;
       chat.staffAt = Date.now();
-      store.set('tsg-staff', { at: chat.staffAt, list });
+      store.set('tsg-staff3', { at: chat.staffAt, list });
     } catch (e) {
       chat.staff = chat.staff || (cached && cached.list) || [];
       chat.staffAt = Date.now() - 25 * 60000;
@@ -5557,38 +5169,36 @@
     renderPlayers();
   }
 
-  // Status in einer Zeile: in Train Sim Germany (mit Zug oder Rolle) oder nicht
-  function statusLine(p) {
+  // Zugfahrt eines verfolgten Spielers: Linie, Zug, Ziel, nächster Halt (sonst nichts)
+  const tripCat = (tr) => { const L = lineByName(tr.line); return L ? L.cat : catOfTrain(tr.veh) || 're'; };
+  function tripLine(p) {
     if (!p) return `<span class="pstat">${t('Wird geladen …')}</span>`;
-    if (p.inGame) {
-      const a = p.activity;
-      const what = a && (a.line || a.train) ? `${a.line ? `${esc(a.line)} ` : ''}${a.dest ? t('nach {to}', { to: esc(a.dest) }) : esc(a.train || '')}` : a ? esc(a.role) : t('privater Server');
-      return `<span class="pstat pstat--on"><i></i>${t('In Train Sim Germany')}${what ? ` · ${what}` : ''}</span>`;
-    }
-    return `<span class="pstat">${t('Nicht in Train Sim Germany')}${p.lastSeen ? ` · ${t('zuletzt {when}', { when: agoText(p.lastSeen) })}` : ''}</span>`;
+    const tr = p.trip;
+    if (!tr) return `<span class="pstat">${t('Gerade keine Zugfahrt')}</span>`;
+    return `<span class="pstat pstat--on"><i></i>${tr.line ? `${esc(tr.line)} ` : ''}${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || t('unterwegs'))}</span>`;
   }
   const playerPic = (p, cls = '') => (p && p.avatar
     ? `<span class="avatar avatar--img ${cls}" aria-hidden="true"><img src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>`
     : avatar((p && (p.username || p.displayName)) || '?', cls));
-  // Spielerkarte: großes Bild auf zartem Rot (wie beim Team), Name, @Name, Status
+  // Karte: Bild, Name und – falls unterwegs – die Fahrt mit Linie, Ziel und nächstem Halt
   function playerCard(id) {
     const p = pl.data[id];
     const name = p ? p.displayName || p.username || id : id;
-    const pic = p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : `<b>${esc(initials(name))}</b>`;
-    return `<article class="pl-card${p && p.inGame ? ' is-ingame' : ''}">
-      <button class="pl-card__open" type="button" data-player="${esc(id)}" aria-label="${esc(name)}">
-        <span class="pl-card__img">${pic}${p && p.inGame ? `<span class="pl-card__live"><i></i>${t('Im Spiel')}</span>` : ''}</span>
-        <span class="pl-card__name">${esc(name)}${p && p.me ? ` <em>${t('Du')}</em>` : ''}</span>
-        ${p && p.username ? `<small class="pl-card__user">@${esc(p.username)}</small>` : ''}
-        <span class="pl-card__status">${statusLine(p)}</span>
+    const tr = p && p.trip;
+    return `<article class="tr-card${tr ? ' is-driving' : ''}">
+      <button class="tr-card__open" type="button" data-player="${esc(id)}" aria-label="${esc(name)}">
+        <span class="tr-card__who">${playerPic(p, 'avatar--lg')}<span><b>${esc(name)}${p && p.me ? ` <em>${t('Du')}</em>` : ''}</b>${p && p.username ? `<small>@${esc(p.username)}</small>` : ''}</span></span>
+        ${tr ? `<span class="tr-card__trip">
+            <span class="tr-card__line"><span class="line line--${tripCat(tr)}">${esc(tr.line || tr.train || '')}</span>${tr.train && tr.line ? `<small>${esc(tr.train)}</small>` : ''}</span>
+            <b class="tr-card__dest">${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : t('unterwegs')}</b>
+            ${tr.next ? `<span class="tr-card__next">${icon('fi-rs-marker')}${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span>` : ''}
+            ${tr.veh ? `<small class="tr-card__veh">${icon('fi-rs-train-side')}${esc(trainName(tr.veh))}</small>` : ''}
+          </span>` : `<span class="tr-card__idle">${icon('fi-rs-train-side')}${t('Gerade keine Zugfahrt')}</span>`}
       </button>
       ${p && p.me ? '' : `<button class="pl-card__unfollow" type="button" data-track="${esc(id)}" aria-pressed="true" aria-label="${esc(t('Nicht mehr verfolgen'))}" title="${esc(t('Nicht mehr verfolgen'))}">${icon('fi-rs-cross-small')}</button>`}
     </article>`;
   }
-  const playersSorted = (ids) => [...ids].sort((a, b) => {
-    const x = pl.data[a] || {}; const y = pl.data[b] || {};
-    return (!!y.inGame - !!x.inGame) || ((y.lastSeen || 0) - (x.lastSeen || 0));
-  });
+  const playersSorted = (ids) => [...ids].sort((a, b) => (!!(pl.data[b] || {}).trip - !!(pl.data[a] || {}).trip));
 
   function renderPlayers() {
     const head = $('[data-players-head]');
@@ -5597,16 +5207,16 @@
     // Kopf nur einmal bauen (sonst verschwindet beim Aktualisieren, was man gerade ins Suchfeld tippt)
     if (head.dataset.lang !== lang) {
       head.dataset.lang = lang;
-      head.innerHTML = `<p class="cr-eyebrow">${t('Auf Roblox verfolgen')}</p>
+      head.innerHTML = `<p class="cr-eyebrow">${t('Zugfahrten verfolgen')}</p>
         <h1 class="mega mega--stack">${t('Spieler.')}<br><span>${t('Wer fährt gerade?')}</span></h1>
-        <p class="site-head__lead">${t('Such nach einem Roblox-Namen und verfolge ihn. Dann siehst du, ob er gerade in Train Sim Germany ist – mit Server, Rolle und Zug.')}</p>
+        <p class="site-head__lead">${t('Such nach einem Roblox-Namen und verfolge ihn. Dann siehst du hier seine Zugfahrt: Linie, Zug, Ziel und den nächsten Halt.')}</p>
         <form class="sv-hero__bar pl-search" data-player-search novalidate>
           <label class="sv-search">${icon('fi-rs-search')}<span class="sr-only">${t('Roblox-Name oder ID')}</span><input name="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name oder ID'))}"></label>
           <button class="site-btn site-btn--brand" type="submit">${t('Suchen')}</button>
         </form>`;
     }
     if (!apiReady()) {
-      body.innerHTML = `<div class="sv-empty"><span class="sv-empty__ic">${icon('fi-rs-database')}</span><h3>${t('Der App-Server fehlt noch')}</h3><p>${t('Spieler verfolgen und sehen, wer gerade im Spiel ist – das geht nur mit dem Server der App.')}</p></div>`;
+      body.innerHTML = `<div class="sv-empty"><span class="sv-empty__ic">${icon('fi-rs-database')}</span><h3>${t('Der App-Server fehlt noch')}</h3><p>${t('Zugfahrten verfolgen geht nur mit dem Server der App.')}</p></div>`;
       return;
     }
     let found = '';
@@ -5618,84 +5228,57 @@
       const on = isTracked(id);
       found = `<div class="pl-found">
           <span class="pl-found__pic">${playerPic(p, 'avatar--lg')}</span>
-          <span class="pl-found__main"><small>${t('Gefunden')}</small><b>${esc(p.displayName || p.username || id)}</b>${p.username ? `<span>@${esc(p.username)}</span>` : ''}${pl.data[id] ? statusLine(pl.data[id]) : ''}</span>
+          <span class="pl-found__main"><small>${t('Gefunden')}</small><b>${esc(p.displayName || p.username || id)}</b>${p.username ? `<span>@${esc(p.username)}</span>` : ''}${pl.data[id] ? tripLine(pl.data[id]) : ''}</span>
           <span class="pl-found__btns">
-            <button class="site-btn site-btn--ghost site-btn--sm" type="button" data-player="${esc(id)}">${t('Ansehen')}</button>
             ${p.me ? '' : `<button class="site-btn ${on ? 'site-btn--ghost' : 'site-btn--brand'} site-btn--sm" type="button" data-track="${esc(id)}" aria-pressed="${on}">${icon(on ? 'fi-rs-check' : 'fi-rs-eye')}${on ? t('Wird verfolgt') : t('Verfolgen')}</button>`}
           </span>
         </div>`;
     }
     let list;
     if (!pl.track.length) {
-      list = `<div class="sv-empty"><span class="sv-empty__ic">${icon('fi-rs-eye')}</span><h3>${t('Noch niemand verfolgt')}</h3><p>${t('Suche oben nach einem Roblox-Namen und tippe auf „Verfolgen“. Dann siehst du hier, ob er gerade in Train Sim Germany ist – mit Server, Rolle und Zug.')}</p></div>`;
+      list = `<div class="sv-empty"><span class="sv-empty__ic">${icon('fi-rs-train-side')}</span><h3>${t('Noch niemand verfolgt')}</h3><p>${t('Suche oben nach einem Roblox-Namen und tippe auf „Verfolgen“. Sobald er einen Zug fährt, siehst du hier Linie, Ziel und den nächsten Halt.')}</p></div>`;
     } else {
       if (!pl.at) loadTracked();
       const sorted = playersSorted(pl.track);
-      const inGame = sorted.filter((id) => pl.data[id] && pl.data[id].inGame);
-      const off = sorted.filter((id) => !(pl.data[id] && pl.data[id].inGame));
+      const driving = sorted.filter((id) => pl.data[id] && pl.data[id].trip);
+      const idle = sorted.filter((id) => !(pl.data[id] && pl.data[id].trip));
       const group = (title, ids, live) => (ids.length ? `<section class="pl-group">
           <h2 class="pl-group__title">${live ? '<i class="pl-group__dot"></i>' : ''}${title}<small>${ids.length}</small></h2>
-          <div class="pl-grid" data-reveal>${ids.map(playerCard).join('')}</div>
+          <div class="tr-grid" data-reveal>${ids.map(playerCard).join('')}</div>
         </section>` : '');
       list = `<div class="sv-stats pl-stats">
           <div class="sv-stat"><b>${fmt(pl.track.length)}</b><span>${t('Verfolgt')}</span></div>
-          <div class="sv-stat"><b>${fmt(inGame.length)}</b><span>${t('Gerade im Spiel')}</span></div>
-          <div class="sv-stat"><b>${fmt(off.length)}</b><span>${t('Offline')}</span></div>
+          <div class="sv-stat"><b>${fmt(driving.length)}</b><span>${t('Gerade unterwegs')}</span></div>
+          <div class="sv-stat"><b>${fmt(idle.length)}</b><span>${t('Keine Zugfahrt')}</span></div>
         </div>
-        ${group(t('Gerade im Spiel'), inGame, true)}${group(t('Offline'), off, false)}`;
+        ${group(t('Gerade unterwegs'), driving, true)}${group(t('Keine Zugfahrt'), idle, false)}`;
     }
     body.innerHTML = found + list;
     $$('[data-reveal]', body).forEach((x) => reveal(x));
   }
 
-  // Sheet eines Spielers
+  // Fenster eines Spielers: nur seine Zugfahrt mit den weiteren Halten
   function playerView(id) {
     const p = pl.data[id];
     if (!p || Date.now() - (p.at || 0) > 30000) loadStatus([id], () => { if (modalView && modalView.name === 'player' && modalView.arg === id) refreshModal(); if (state.page === 'spieler') renderPlayers(); });
     if (!p) return `<div class="sheet-loading">${icon('fi-rs-spinner')}<span>${t('Wird geladen …')}</span></div>`;
-    const a = p.activity;
-    const sv = p.server;
-    let status;
-    if (p.inGame && sv && !sv.hidden) {
-      const ps0 = sv.pserver;
-      const join = sv.private ? (ps0 && ps0.canJoin && ps0.link ? ps0.link : null) : joinUrl({ id: sv.id });
-      const L = a && lineByName(a.line);
-      const cat = L ? L.cat : (a && catOfTrain(a.veh)) || 're';
-      status = `<section class="pstatus is-on">
-        <p class="pstatus__title"><span class="live-dot"></span>${t('Gerade in Train Sim Germany')}</p>
-        <div class="pstatus__server">${icon(sv.private ? 'fi-rs-lock' : 'fi-rs-signal-alt-2')}<span><b>${sv.private ? esc(ps0 ? ps0.name : t('Privater Server')) : t('Öffentlicher Server')}</b><small>ID ${esc(shortId(sv.id))} · ${t('{n} Spieler', { n: `${sv.players}/${sv.max}` })}</small></span></div>
-        ${a ? `<div class="pstatus__role"><span class="role-dot" style="--rc:${esc(a.teamColor || roleRank(a.role).color)}">${esc(a.team ? initials(a.team) : roleRank(a.role).prefix)}</span><span>${esc(a.team || a.role)}<small>${esc(t(roleRank(a.role).label))}</small></span></div>` : ''}
-        ${a && (a.line || a.train) ? `<div class="pstatus__train">
-          ${a.line ? `<span class="line line--${cat}">${esc(a.line)}</span>` : ''}
-          <span><b>${a.dest ? t('nach {to}', { to: esc(a.dest) }) : esc(a.train || '')}</b><small>${[a.train, trainName(a.veh)].filter(Boolean).map(esc).join(' · ')}</small>
-          ${a.next ? `<small>${icon('fi-rs-marker')}${t('Nächster Halt')}: ${esc(a.next)}</small>` : ''}</span></div>`
-          : a && a.at ? `<div class="pstatus__train">${icon('fi-rs-train-station')}<span><b>${esc(a.at)}</b><small>${t('Bahnhof')}</small></span></div>` : ''}
-        <div class="pstatus__actions">
-          ${join ? `<a class="btn btn--primary" href="${esc(join)}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Beitreten')}</a>` : `<span class="ps-note">${icon('fi-rs-lock')}${t('Beitreten nur über Roblox')}</span>`}
-          <a class="btn btn--outline" href="#/server/${encodeURIComponent(sv.id)}">${icon('fi-rs-eye')}${t('Server ansehen')}</a>
-        </div>
-      </section>`;
-    } else if (p.inGame) {
-      status = `<section class="pstatus is-on"><p class="pstatus__title"><span class="live-dot"></span>${t('Gerade in Train Sim Germany')}</p><p class="muted">${t('Auf einem privaten Server, den sein Besitzer nicht zeigt.')}</p></section>`;
-    } else {
-      status = `<section class="pstatus"><p class="pstatus__title">${icon('fi-rs-moon')}${t('Gerade nicht in Train Sim Germany')}</p>
-        <p class="muted">${p.lastSeen ? t('Zuletzt im Spiel: {when}', { when: agoText(p.lastSeen) }) : t('Noch nicht in Train Sim Germany gesehen.')}</p></section>`;
-    }
+    const tr = p.trip;
     const tracked = isTracked(id);
+    const trip = tr ? `<section class="trip-box">
+        <div class="trip-box__head"><span class="line line--${tripCat(tr)}">${esc(tr.line || tr.train || '')}</span>
+          <span><b>${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : t('unterwegs')}</b><small>${[tr.train, trainName(tr.veh)].filter(Boolean).map(esc).join(' · ')}</small></span></div>
+        ${tr.next ? `<p class="train__now">${icon('fi-rs-marker')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
+        ${liveStopsHtml(tr)}
+      </section>`
+      : `<section class="trip-box is-idle">${icon('fi-rs-train-side')}<p>${t('Gerade keine Zugfahrt. Sobald {name} einen Zug fährt, steht die Fahrt hier.', { name: esc(p.displayName || p.username || '') })}</p></section>`;
     return `<div class="profile-box profile-box--player">
-        <span class="pbig${p.inGame ? ' is-ingame' : ''}">${playerPic(p, 'avatar--xl')}</span>
+        <span class="pbig${tr ? ' is-ingame' : ''}">${playerPic(p, 'avatar--xl')}</span>
         <h3>${esc(p.displayName || p.username || id)}</h3>
         ${p.username ? `<p>@${esc(p.username)}</p>` : ''}
-        ${p.me ? `<div class="pbadges"><span class="pill">${t('Das bist du')}</span></div>` : ''}
       </div>
-      ${status}
-      <div class="sheet-actions">
-        ${p.me ? '' : `<button class="btn ${tracked ? 'btn--soft' : 'btn--primary'} btn--lg btn--block" type="button" data-track="${esc(id)}" aria-pressed="${tracked}">${icon(tracked ? 'fi-rs-check' : 'fi-rs-eye')}${tracked ? t('Wird verfolgt – beenden') : t('Verfolgen')}</button>`}
-        ${p.me || !sessionToken() ? '' : `<button class="btn btn--outline btn--lg btn--block" type="button" data-invite-player="${esc(id)}" data-invite-name="${esc(p.displayName || p.username || '')}">${icon('fi-ss-play')}${t('Ins Spiel einladen')}</button>
-        <a class="btn btn--outline btn--lg btn--block" href="#/chat/an/${encodeURIComponent(id)}">${icon('fi-rs-paper-plane')}${t('Nachricht schreiben')}</a>`}
-        <a class="btn btn--soft btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(id)}/profile" target="_blank" rel="noopener">${icon('fi-rs-arrow-up-right-from-square')}${t('Roblox-Profil ansehen')}</a>
-      </div>
-      <p class="sheet-note">${t('Angezeigt wird nur, ob jemand in Train Sim Germany ist – nie andere Spiele.')}</p>`;
+      ${trip}
+      ${p.me ? '' : `<div class="sheet-actions"><button class="btn ${tracked ? 'btn--soft' : 'btn--primary'} btn--lg btn--block" type="button" data-track="${esc(id)}" aria-pressed="${tracked}">${icon(tracked ? 'fi-rs-check' : 'fi-rs-eye')}${tracked ? t('Wird verfolgt – beenden') : t('Verfolgen')}</button></div>`}
+      <p class="sheet-note">${t('Angezeigt wird nur die Zugfahrt in Train Sim Germany – nichts anderes.')}</p>`;
   }
 
   // Push-Nachrichten erscheinen immer als Benachrichtigung des Geräts (sw.js). Ist die App offen, meldet der
@@ -6016,9 +5599,10 @@
   function applyStats(s) {
     const st = D.stats;
     ['groupMembers', 'visits', 'favorites', 'discordMembers', 'discordOnline'].forEach((k) => { if (Number.isFinite(s[k])) st[k] = s[k]; });
-    // Roblox verbirgt Besuche bei privaten bzw. nicht freigegebenen Spielen: dann zählt das Spiel selbst (jeder Beitritt)
+    // Roblox verbirgt Besuche bei privaten bzw. nicht freigegebenen Spielen: dann zählt das Backend selbst – jede
+    // Roblox-Nutzer-ID nur einmal (wer zehnmal beitritt, ist ein Besuch)
     st.restricted = !!s.restricted;
-    if (s.counted && Number.isFinite(s.counted.visits)) st.visits = Math.max(st.visits || 0, s.counted.visits);
+    if (s.counted && Number.isFinite(s.counted.players) && (st.restricted || !Number.isFinite(s.visits))) st.visits = s.counted.players;
     if (Number.isFinite(s.playing)) { st.online = s.playing; state.online = s.playing; state.liveOnline = true; }
     if (Array.isArray(s.roles)) {
       const counts = {};
@@ -6067,7 +5651,7 @@
   const settingsAt = () => store.get('tsg-settings-at', 0);
   const currentSettings = () => ({
     theme: themeMode(), lang: langSetting(), bell: state.bell, remind: [...remind.ids], remindOff: [...remind.off], favs: [...state.favs],
-    track: pl.track, haptics: fx.haptics, motion: fx.motion, season: fx.season, skin: fx.skin, icon: fx.icon, wish: [...shopWish()], updatedAt: settingsAt(),
+    track: pl.track, haptics: fx.haptics, motion: fx.motion, season: fx.season, skin: fx.skin, icon: fx.icon, updatedAt: settingsAt(),
   });
   let settingsTimer = null;
   let applyingSettings = false;
@@ -6334,14 +5918,6 @@
         const n = (remote.news || []).find((x) => x.id === id);
         return n && isMine(n.authorId) ? newsForm(n) : `<p class="muted">${t('Diese Neuigkeit gibt es nicht mehr.')}</p>`;
       },
-    },
-    buy: {
-      title: () => t('Kaufen'),
-      render: (arg) => buyView(arg),
-    },
-    item: {
-      title: (arg) => (String(arg).startsWith('routes:') ? t('Strecke') : t('Zug')),
-      render: (arg) => itemView(arg),
     },
     'job-edit': {
       title: () => t('Stelle bearbeiten'),
@@ -6936,60 +6512,94 @@
   }
 
   // ---------- Website: Navigation, Startseite, Netz, FAQ, Team, Neuigkeit als eigene Seite ----------
-  // Oben eine schwebende weiße Leiste (Logo, Seiten, Anmelden-Kreis). Auf schmalen Bildschirmen stehen die Seiten in
-  // einer zweiten, wischbaren Leiste im gleichen Stil darunter – kein Menü-Knopf. Angemeldet öffnet das Profilbild
-  // rechts das Konto als Leiste darunter.
+  // Oben eine schwebende weiße Leiste: links Logo und „TSG“, rechts das Profil-Symbol und das Menü-Symbol. Das Menü
+  // öffnet darunter eine Karte mit allen Seiten (Symbol und Name), Trennlinie und Sprache; angemeldet zeigt das
+  // Profil-Symbol das eigene Bild und öffnet das Konto in derselben Karte.
   const navRoot = $('[data-nav-root]');
+  const NAV_SVG = {
+    menu: '<svg class="nav__svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6h14.5M2.5 12h11.5M2.5 18h19"/></svg>',
+    close: '<svg class="nav__svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>',
+    user: '<svg class="nav__svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.6"/><path d="M5.2 21.2v-3.4c0-3.4 3-6 6.8-6s6.8 2.6 6.8 6v3.4z"/></svg>',
+  };
+  let navMode = null;
   function navOpen(which) {
     if (!navRoot) return;
-    const acc = $('[data-nav-acc]', navRoot);
-    if (!acc) return;
-    const show = which === 'account' && acc.hidden;
-    if (show) { acc.hidden = false; void acc.offsetWidth; acc.classList.add('is-open'); }
-    else if (!acc.hidden) {
-      acc.classList.remove('is-open');
-      if (reducedMotion()) acc.hidden = true;
-      else setTimeout(() => { if (!acc.classList.contains('is-open')) acc.hidden = true; }, 220);
+    const panel = $('[data-nav-panel]', navRoot);
+    if (!panel) return;
+    const show = which && which !== navMode ? which : null;
+    navMode = show;
+    if (show) {
+      panel.innerHTML = show === 'account' ? navAccountHtml() : navMenuHtml();
+      panel.dataset.mode = show;
+      panel.hidden = false;
+      void panel.offsetWidth;
+      panel.classList.add('is-open');
+    } else if (!panel.hidden) {
+      panel.classList.remove('is-open');
+      if (reducedMotion()) panel.hidden = true;
+      else setTimeout(() => { if (!panel.classList.contains('is-open')) panel.hidden = true; }, 220);
     }
-    navRoot.classList.toggle('is-account', show);
-    $$('[data-nav-me]', navRoot).forEach((b) => b.setAttribute('aria-expanded', String(show)));
+    navRoot.classList.toggle('is-menu', show === 'menu');
+    navRoot.classList.toggle('is-account', show === 'account');
+    const menuBtn = $('[data-nav-menu]', navRoot);
+    if (menuBtn) {
+      menuBtn.innerHTML = show === 'menu' ? NAV_SVG.close : NAV_SVG.menu;
+      menuBtn.setAttribute('aria-expanded', String(show === 'menu'));
+      menuBtn.setAttribute('aria-label', show === 'menu' ? t('Menü schließen') : t('Menü öffnen'));
+    }
+    $$('[data-nav-me]', navRoot).forEach((x) => x.setAttribute('aria-expanded', String(show === 'account')));
+    if (show) { const first = $('a, button', panel); if (first) first.focus({ preventScroll: true }); }
   }
   const navClose = () => navOpen(null);
-  // Seiten in der Leiste: Gäste sehen die Webseite, angemeldet kommen Trainings, Shop und Spieler dazu (Chat und
-  // Einstellungen nicht – Einstellungen und Statistiken stehen im Konto rechts)
-  const NAV_GUEST = [['netz', 'Netz'], ['server', 'Server'], ['news', 'Neuigkeiten'], ['karriere', 'Karriere'], ['faq', 'FAQ'], ['entwickler', 'Entwickler']];
-  const NAV_AUTH = [['netz', 'Netz'], ['server', 'Server'], ['news', 'Neuigkeiten'], ['trainings', 'Trainings'], ['karriere', 'Karriere'], ['shop', 'Shop'], ['spieler', 'Spieler'], ['faq', 'FAQ'], ['entwickler', 'Entwickler']];
+  // Seiten im Menü: Gäste sehen die Webseite, angemeldet kommen Trainings und Spieler dazu
+  const NAV_GUEST = [['', 'Startseite', 'fi-rs-home'], ['netz', 'Netz', 'fi-rs-map'], ['server', 'Server', 'fi-rs-database'], ['news', 'Neuigkeiten', 'fi-rs-newspaper'],
+    ['karriere', 'Karriere', 'fi-rs-rocket-lunch'], ['entwickler', 'Team', 'fi-rs-users-alt'], ['faq', 'FAQ', 'fi-rs-interrogation']];
+  const NAV_AUTH = [['', 'Startseite', 'fi-rs-home'], ['netz', 'Netz', 'fi-rs-map'], ['server', 'Server', 'fi-rs-database'], ['trainings', 'Trainings', 'fi-rs-calendar'],
+    ['spieler', 'Spieler', 'fi-rs-train-side'], ['news', 'Neuigkeiten', 'fi-rs-newspaper'], ['karriere', 'Karriere', 'fi-rs-rocket-lunch'], ['entwickler', 'Team', 'fi-rs-users-alt'], ['faq', 'FAQ', 'fi-rs-interrogation']];
+  function navMenuHtml() {
+    const list = state.profile ? NAV_AUTH : NAV_GUEST;
+    const cur = (id) => state.page === (id || 'home');
+    const other = lang === 'de' ? ['en', 'English'] : ['de', 'Deutsch'];
+    return `<nav class="nav__menu-list" aria-label="${esc(t('Hauptnavigation'))}">
+        ${list.map(([id, label, ic]) => `<a class="nav__item" href="#/${id}" data-nav="${id || 'home'}"${cur(id) ? ' aria-current="page"' : ''}>${icon(ic)}<span>${esc(t(label))}</span></a>`).join('')}
+      </nav>
+      <hr class="nav__sep">
+      <button class="nav__item" type="button" data-lang-set="${other[0]}" lang="${other[0]}">${icon('fi-rs-globe')}<span>${other[1]}</span></button>`;
+  }
+  function navAccountHtml() {
+    const p = state.profile;
+    if (!p) return '';
+    const r = rankOf(state.rank);
+    return `<div class="nav__acc-head">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${esc(p.displayName || p.username)}</b><small>@${esc(p.username)}</small></span>${rankPill(r)}</div>
+      <nav class="nav__menu-list" aria-label="${esc(t('Konto'))}">
+        ${rankIdx(state.rank) >= rankIdx('Junior Supervisor') && meSub() ? `<a class="nav__item" href="#/entwickler/${encodeURIComponent(meSub())}">${icon('fi-rs-id-badge')}<span>${t('Mein Steckbrief')}</span></a>` : ''}
+        <a class="nav__item" href="#/einstellungen"${state.page === 'einstellungen' ? ' aria-current="page"' : ''}>${icon('fi-rs-settings')}<span>${t('Einstellungen')}</span></a>
+        <a class="nav__item" href="#/statistiken"${state.page === 'statistiken' ? ' aria-current="page"' : ''}>${icon('fi-rs-chart-line-up')}<span>${t('Statistiken')}</span></a>
+      </nav>
+      <hr class="nav__sep">
+      <button class="nav__item nav__item--out" type="button" data-disconnect>${icon('fi-rs-sign-out-alt')}<span>${p.oauth ? t('Abmelden') : t('Trennen')}</span></button>`;
+  }
+  // Menü-Inhalt neu zeichnen, wenn es offen ist (Seitenwechsel, Anmeldung, Sprache)
   function renderNavLinks() {
     if (!navRoot) return;
-    const list = state.profile ? NAV_AUTH : NAV_GUEST;
-    const link = ([id, label]) => `<a href="#/${id}" data-nav="${id}"${state.page === id ? ' aria-current="page"' : ''}>${esc(t(label))}</a>`;
-    const bar = $('[data-nav-links]', navRoot);
-    const row = $('[data-nav-row]', navRoot);
-    if (bar) bar.innerHTML = list.map(link).join('');
-    if (row) row.innerHTML = [['', 'Start'], ...list].map(([id, label]) => `<a href="#/${id}" data-nav="${id || 'home'}"${state.page === (id || 'home') ? ' aria-current="page"' : ''}>${esc(t(label))}</a>`).join('');
     navRoot.classList.toggle('is-auth', !!state.profile);
-    document.documentElement.classList.toggle('nav-auth', !!state.profile);
+    const panel = $('[data-nav-panel]', navRoot);
+    if (panel && navMode && !panel.hidden) panel.innerHTML = navMode === 'account' ? navAccountHtml() : navMenuHtml();
   }
-  // Rechts in der Leiste: „Anmelden“ oder (angemeldet) Profilbild und Name, dazu das Konto
+  // Rechts in der Leiste: Profil-Symbol (Gast) bzw. eigenes Bild mit rotem Ring (angemeldet), daneben das Menü
   function renderNavAccount() {
     if (!navRoot) return;
-    renderNavLinks();
     const box = $('[data-nav-account]', navRoot);
-    const acc = $('[data-nav-acc]', navRoot);
     const p = state.profile;
-    const r = rankOf(state.rank);
     if (!p) {
-      box.innerHTML = `<button class="nav__login" type="button" data-open="profile" aria-label="${esc(loginReady() ? t('Anmelden') : t('Verbinden'))}" title="${esc(loginReady() ? t('Anmelden') : t('Verbinden'))}">${icon('fi-rs-user')}</button>`;
-      acc.innerHTML = '';
-      return;
+      if (navMode === 'account') navClose();
+      box.innerHTML = `<button class="nav__icon nav__profile" type="button" data-open="profile" aria-label="${esc(loginReady() ? t('Anmelden') : t('Verbinden'))}" title="${esc(loginReady() ? t('Anmelden') : t('Verbinden'))}">${NAV_SVG.user}</button>`;
+    } else {
+      const unread = chatDot.last > 0;
+      box.innerHTML = `<button class="nav__icon nav__me" type="button" data-nav-me aria-expanded="${navMode === 'account'}" aria-label="${esc(t('Konto von {name}', { name: p.displayName || p.username }))}" title="${esc(p.displayName || p.username)}">
+        <span class="nav__me-pic">${avatarInner(p)}</span><i class="nav__me-dot${unread ? ' is-unread' : ''}" aria-hidden="true"></i></button>`;
     }
-    box.innerHTML = `<button class="nav__me" type="button" data-nav-me aria-expanded="false" aria-label="${esc(t('Konto von {name}', { name: p.displayName || p.username }))}" title="${esc(p.displayName || p.username)}">${avatarInner(p)}</button>`;
-    acc.innerHTML = `<div class="nav__acc-head">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${esc(p.displayName || p.username)}</b><small>@${esc(p.username)}</small></span>${rankPill(r)}</div>
-      <nav class="nav__acc-links" aria-label="${esc(t('Konto'))}">
-        <a href="#/einstellungen" class="nav__acc-link">${icon('fi-rs-settings')}<span>${t('Einstellungen')}</span></a>
-        <a href="#/statistiken" class="nav__acc-link">${icon('fi-rs-chart-line-up')}<span>${t('Statistiken')}</span></a>
-        <button class="nav__acc-link nav__acc-link--out" type="button" data-disconnect>${icon('fi-rs-sign-out-alt')}<span>${p.oauth ? t('Abmelden') : t('Trennen')}</span></button>
-      </nav>`;
+    renderNavLinks();
   }
   // Deckkraft der Leiste nach dem, was gerade darunter liegt: auf dunklen Flächen (Video, Nachthimmel, Zahlen,
   // Fußzeile) etwas durchscheinender mit stärkerem Schatten, auf hellen Flächen deckend weiß – Schrift immer schwarz
@@ -7121,9 +6731,9 @@
     ['Was ist Train Sim Germany?', 'Train Sim Germany ist eine Bahnsimulation auf Roblox. Du fährst Züge nach Fahrplan, fertigst Bahnhöfe ab, begleitest Züge oder stellst im Stellwerk die Fahrstraßen – zusammen mit anderen Spielern auf denselben Servern.'],
     ['Brauche ich Roblox zum Spielen?', 'Ja. Roblox ist kostenlos und läuft auf PC, Mac, Handy, Tablet und Konsole. Über „Auf Roblox spielen“ kommst du direkt ins Spiel.'],
     ['Wie bekomme ich einen höheren Rang?', 'Tritt der Roblox-Gruppe bei – dann startest du als Learning Driver. Weitere Ränge wie Qualified Driver, Platform Staff, Conductor oder Signaller bekommst du in Trainings. Termine stehen unter „Trainings“.'],
-    ['Was bringt mir die Anmeldung auf der Webseite?', 'Mit deinem Roblox-Konto siehst du deinen Rang, bekommst Erinnerungen an Trainings, kannst chatten, im Shop Züge und Strecken kaufen, dich bewerben und deine Statistik ansehen. Wir erhalten nie dein Passwort.'],
+    ['Was bringt mir die Anmeldung auf der Webseite?', 'Mit deinem Roblox-Konto siehst du deinen Rang, bekommst Erinnerungen an Trainings, kannst chatten, Spieler auf ihrer Zugfahrt verfolgen, dich bewerben und deine Statistik ansehen. Wir erhalten nie dein Passwort.'],
     ['Wie kann ich im Team mitmachen?', 'Offene Stellen findest du unter „Karriere“ – vom Supervisor bis zum Game Developer. Die Bewerbung läuft direkt hier auf der Webseite.'],
-    ['Kostet das Spiel etwas?', 'Nein, Train Sim Germany ist kostenlos. Coins verdienst du im Spiel und gibst sie im Shop für Züge und Strecken aus.'],
+    ['Kostet das Spiel etwas?', 'Nein, Train Sim Germany ist kostenlos.'],
     ['Wo erfahre ich, was es Neues gibt?', 'Unter „Neuigkeiten“ und auf unserem Discord-Server. Dort kannst du auch Fragen stellen und das Team erreichen.'],
   ];
   function renderFaq(where) {
@@ -7191,19 +6801,125 @@
     const groups = TEAM_GROUPS.map(([title, ranks]) => [title, list.filter((p) => ranks.includes(p.rank)).sort((a, b) => rankIdx(b.rank) - rankIdx(a.rank))]);
     const rest = list.filter((p) => !known.has(p.rank));
     if (rest.length) groups.push(['Team', rest]);
-    const me = meSub();
     box.innerHTML = groups.filter(([, l]) => l.length).map(([title, l]) => `<section class="team-group">
         <h2 class="team-group__title">${esc(t(title))}</h2>
-        <div class="team-grid">${l.map((p) => {
-          const own = String(p.userId) === me;
-          return `<article class="team-card">
+        <div class="team-grid">${l.map((p) => `<a class="team-card" href="#/entwickler/${encodeURIComponent(p.userId)}" aria-label="${esc(t('Steckbrief von {name}', { name: p.displayName || p.username }))}">
           <span class="team-card__img">${p.avatar ? `<img src="${esc(p.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<b>${esc(initials(p.displayName || p.username))}</b>`}</span>
           <b class="team-card__name">${esc(p.displayName || p.username)}</b>
           <span class="team-card__role">${esc(p.rank)}</span>
-          <span class="team-card__foot"><small>@${esc(p.username)}</small>${own ? '' : `<a class="team-card__go" href="#/chat/an/${encodeURIComponent(p.userId)}" aria-label="${esc(t('{name} anschreiben', { name: p.displayName || p.username }))}" title="${esc(t('Anschreiben'))}">${icon('fi-rs-arrow-up-right')}</a>`}</span>
-        </article>`;
-        }).join('')}</div>
+          <span class="team-card__foot"><small>@${esc(p.username)}</small><span class="team-card__go" aria-hidden="true">${icon('fi-rs-arrow-up-right')}</span></span>
+        </a>`).join('')}</div>
       </section>`).join('');
+  }
+
+  // ---------- Steckbrief eines Teammitglieds (#/entwickler/<userId>) ----------
+  // Immer sichtbar: Name, Rang, seit wann im Rang, Beitrittsdaten. Den Rest (Über mich, Angaben, Statistik) nur,
+  // wenn die Person ihr Profil bzw. ihre Statistik in den Einstellungen öffentlich gemacht hat. Die Person selbst
+  // sieht alles und kann ihren Steckbrief hier bearbeiten.
+  const team = { members: {}, at: {}, editing: false };
+  const MEMBER_FIELDS = [
+    ['area', 'Bereich im Team', 'z. B. Trainings Signaller', 60],
+    ['motto', 'Motto', 'Ein Satz, der zu dir passt', 120],
+    ['favRoute', 'Lieblingsstrecke', 'z. B. Magdeburg – Berlin', 80],
+    ['favTrain', 'Lieblingszug', 'z. B. Desiro HC', 60],
+    ['languages', 'Sprachen', 'z. B. Deutsch, Englisch', 80],
+    ['timezone', 'Meist online', 'z. B. abends ab 18 Uhr', 40],
+    ['discord', 'Discord', 'z. B. lokfuehrer_max', 40],
+  ];
+  function loadMember(id, force = false) {
+    if (!force && team.members[id] && Date.now() - (team.at[id] || 0) < 60000) return Promise.resolve(team.members[id]);
+    team.at[id] = Date.now();
+    const local = () => {
+      const m = (chat.staff || []).find((x) => String(x.userId) === String(id));
+      return m ? { member: m, basics: {}, own: String(id) === meSub(), public: false, statsPublic: false, profile: null, stats: null, local: true } : { error: 404 };
+    };
+    const job = apiReady()
+      ? api(`/api/team/${encodeURIComponent(id)}`).catch((e) => (e.status === 404 ? { error: 404 } : local()))
+      : loadStaff().then(local);
+    return job.then((r) => {
+      team.members[id] = r;
+      if (state.page === 'entwickler' && state.memberId === String(id)) renderMember();
+      return r;
+    });
+  }
+  const dateLong = (v) => { if (!v) return '–'; const d = new Date(v); return Number.isNaN(+d) ? '–' : dtf({ day: 'numeric', month: 'long', year: 'numeric' }).format(d); };
+  function renderMember() {
+    const box = $('[data-member]');
+    if (!box) return;
+    const id = state.memberId;
+    const r = team.members[id];
+    const back = `<a class="back-pill" href="#/entwickler">${icon('fi-rs-arrow-left')}${t('Das Team')}</a>`;
+    if (!r) { loadMember(id); box.innerHTML = `<div class="site-wrap mb-wrap">${back}${loadingHtml()}</div>`; return; }
+    if (r.error) { box.innerHTML = `<div class="site-wrap mb-wrap">${back}<h1 class="mega">${t('Nicht im Team')}</h1><p class="site-head__lead">${t('Diese Person gehört nicht (mehr) zum Team.')}</p></div>`; return; }
+    const m = r.member;
+    const b = r.basics || {};
+    const rr = rankOf(m.rank);
+    const name = m.displayName || m.username;
+    const p = r.profile || {};
+    const fact = (ic, label, value) => `<div class="mb-fact">${icon(ic)}<span><small>${label}</small><b>${value}</b></span></div>`;
+    const facts = [
+      fact('fi-rs-id-badge', t('Rang'), esc(m.rank)),
+      fact('fi-rs-calendar', t('Im Rang seit'), b.rankSince ? dateLong(b.rankSince) : t('noch nicht bekannt')),
+      fact('fi-rs-user-add', t('Roblox-Konto seit'), dateLong(b.robloxJoined)),
+      fact('fi-rs-gamepad', t('Zum ersten Mal gespielt'), dateLong(b.firstPlayed)),
+      ...(b.lastPlayed ? [fact('fi-rs-time-fast', t('Zuletzt gespielt'), agoText(b.lastPlayed))] : []),
+      ...(b.appSince ? [fact('fi-rs-sign-in-alt', t('In der App seit'), dateLong(b.appSince))] : []),
+    ].join('');
+    const details = MEMBER_FIELDS.filter(([k]) => p[k]).map(([k, label]) => `<div><dt>${t(label)}</dt><dd>${esc(p[k])}</dd></div>`).join('');
+    const st = r.stats;
+    const stats = st ? `<section class="mb-sec"><h2>${t('Im Spiel')}</h2><div class="mb-stats">
+        <div><b>${fmt(Math.round((st.minutes || 0) / 60))}</b><span>${t('Stunden gespielt')}</span></div>
+        <div><b>${fmt(st.trips || 0)}</b><span>${t('Fahrten')}</span></div>
+        <div><b>${fmt(Math.round(st.km || 0))}</b><span>${t('Kilometer')}</span></div>
+        <div><b>${st.trips ? `${Math.round(((st.punctual || 0) / st.trips) * 100)} %` : '–'}</b><span>${t('pünktlich')}</span></div>
+      </div></section>` : '';
+    const hidden = !r.own && !r.public;
+    const edit = r.own && team.editing ? `<form class="mb-edit" data-member-form novalidate>
+        <div class="f"><label class="f__label" for="mb-about">${t('Über mich')}</label><textarea id="mb-about" name="about" maxlength="600" rows="4" placeholder="${esc(t('Wer bist du, was machst du im Team?'))}">${esc(p.about || '')}</textarea></div>
+        <div class="mb-edit__grid">${MEMBER_FIELDS.map(([k, label, ph, max]) => `<div class="f"><label class="f__label" for="mb-${k}">${t(label)}</label><input id="mb-${k}" name="${k}" maxlength="${max}" value="${esc(p[k] || '')}" placeholder="${esc(t(ph))}"></div>`).join('')}</div>
+        <p class="cr-side__small">${r.public ? t('Dein Profil ist öffentlich – alle sehen deinen Steckbrief.') : t('Dein Profil ist privat – andere sehen nur Rang und Beitrittsdaten.')} <a href="#/einstellungen">${t('In den Einstellungen ändern')}</a></p>
+        <div class="mb-edit__btns"><button class="site-btn site-btn--ghost" type="button" data-member-cancel>${t('Abbrechen')}</button><button class="site-btn site-btn--brand" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button></div>
+      </form>` : '';
+    box.innerHTML = `<header class="site-head lines-bg mb-hero">
+        <div class="site-wrap">
+          ${back}
+          <div class="mb-head">
+            <span class="mb-pic" style="--rc:${rr.color}">${m.avatar ? `<img src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(name))}</b>`}</span>
+            <div class="mb-head__text">
+              <p class="cr-eyebrow">${esc(m.rank)}</p>
+              <h1 class="mega">${esc(name)}</h1>
+              <p class="mb-head__user">@${esc(m.username)}${p.motto && !hidden ? ` · „${esc(p.motto)}“` : ''}</p>
+              <div class="mb-head__btns">
+                ${r.own ? `<button class="site-btn site-btn--brand" type="button" data-member-edit>${icon('fi-rs-pencil')}${t('Steckbrief bearbeiten')}</button>`
+                  : `<a class="site-btn site-btn--brand" href="#/chat/an/${encodeURIComponent(m.userId)}">${icon('fi-rs-paper-plane')}${t('Anschreiben')}</a>`}
+                <a class="site-btn site-btn--ghost" href="https://www.roblox.com/users/${encodeURIComponent(m.userId)}/profile" target="_blank" rel="noopener">${t('Roblox-Profil')}${icon('fi-rs-arrow-up-right')}</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div class="site-wrap mb-body">
+        ${edit}
+        <section class="mb-sec"><h2>${t('Das Wichtigste')}</h2><div class="mb-facts">${facts}</div></section>
+        ${hidden ? `<p class="cr-note">${icon('fi-rs-lock')}<span>${t('{name} hat das Profil nicht öffentlich gemacht. Zu sehen sind nur Rang und Beitrittsdaten.', { name: esc(name) })}</span></p>` : ''}
+        ${!hidden && (p.about || details) ? `<section class="mb-sec"><h2>${t('Steckbrief')}</h2>${p.about ? `<p class="mb-about">${esc(p.about)}</p>` : ''}${details ? `<dl class="cr-dl">${details}</dl>` : ''}</section>` : ''}
+        ${!hidden && !p.about && !details && r.own && !team.editing ? `<p class="cr-note">${icon('fi-rs-info')}<span>${t('Dein Steckbrief ist noch leer. Tippe auf „Steckbrief bearbeiten“.')}</span></p>` : ''}
+        ${stats}
+      </div>`;
+  }
+  async function saveMember(form) {
+    const body = Object.fromEntries(['about', ...MEMBER_FIELDS.map(([k]) => k)].map((k) => [k, form.elements[k].value.trim()]));
+    const btn = $('button[type="submit"]', form);
+    btn.disabled = true;
+    try {
+      await api('/api/team/me', { method: 'PUT', body });
+      team.editing = false;
+      await loadMember(state.memberId, true);
+      toast(t('Steckbrief gespeichert'));
+    } catch (e) {
+      btn.disabled = false;
+      toast(e.status === 400 ? t('Bitte prüfe den Discord-Namen (nur Buchstaben, Zahlen, Punkt und _).') : e.status === 403 ? t('Nur Teammitglieder haben einen Steckbrief.') : t('Speichern hat nicht geklappt. Bitte versuch es noch einmal.'));
+    }
   }
 
   // Neuigkeit als eigene Seite: Kategorie, großer Titel, Datum, Autor, Lesezeit, Bild/Video, Text, Knöpfe, Teilen
@@ -7246,30 +6962,90 @@
   // ---------- Seitenwechsel: Streifen wischen über den Bildschirm, dann Ladebildschirm mit Logo ----------
   const PAGE_NAMES = {
     home: 'Train Sim Germany', netz: 'Unser Netz', server: 'Server', news: 'Neuigkeiten', karriere: 'Karriere', faq: 'Fragen', entwickler: 'Das Team',
-    trainings: 'Trainings', shop: 'Shop', chat: 'Chat', spieler: 'Spieler', statistiken: 'Statistiken', einstellungen: 'Einstellungen',
+    trainings: 'Trainings', chat: 'Chat', spieler: 'Spieler', statistiken: 'Statistiken', einstellungen: 'Einstellungen',
   };
   const loaderState = { busy: false, timers: [] };
   const LOADER_HOLD = 2000;
-  function playLoader(text, swap, { splash = false } = {}) {
+  // Ladebildschirm beim Seitenwechsel. Optionen:
+  //   sub     – kleine Zeile unter dem Namen (z. B. die ganze Server-ID)
+  //   steps   – Schritte unter der Leiste („Lade Spieler …“) mit geschätzter Restzeit
+  //   ready   – Promise: ausgefädelt wird erst, wenn die Daten da sind (höchstens 8 Sekunden)
+  //   theme   – 'vip' (Rot wird nach dem Einfädeln zu Dunkelblau) oder 'member' (Rot wird zu Hellblau)
+  //   avatar  – Profilbild in der Mitte über dem Namen (Teammitglied)
+  function playLoader(text, swap, { splash = false, sub = '', steps = null, ready = null, theme = '', avatar = '' } = {}) {
     const el = $('[data-loader]');
     if (!el || reducedMotion() || loaderState.busy) { swap(); return; }
     loaderState.busy = true;
     loaderState.timers.forEach(clearTimeout);
+    loaderState.timers = [];
     const name = $('[data-loader-name]', el);
     if (name) name.innerHTML = String(text).split('').map((ch, i) => `<span style="--i:${i}">${ch === ' ' ? '&nbsp;' : esc(ch)}</span>`).join('');
+    const subEl = $('[data-loader-sub]', el);
+    if (subEl) { subEl.textContent = sub; subEl.hidden = !sub; }
+    const pic = $('[data-loader-avatar]', el);
+    if (pic) { pic.hidden = !avatar; if (avatar) pic.src = avatar; else pic.removeAttribute('src'); }
+    const status = $('[data-loader-status]', el);
+    if (status) { status.textContent = ''; status.hidden = !steps; }
     el.className = 'loader';
+    el.style.removeProperty('--p');
+    if (theme) el.classList.add(`is-${theme}`);
+    if (avatar) el.classList.add('is-person');
+    if (steps) el.classList.add('is-steps');
     el.hidden = false;
     void el.offsetWidth;
     // Einfädeln: Streifen gelb, hellrot, rot von rechts (beim Öffnen der Seite liegt alles schon da)
     el.classList.add(splash ? 'is-splash' : 'is-in');
     const at = (ms, fn) => loaderState.timers.push(setTimeout(fn, ms));
     const cover = splash ? 0 : 560;
+    const start = Date.now();
+    let done = !ready;
+    if (ready) Promise.resolve(ready).catch(() => {}).finally(() => { done = true; });
     at(cover, () => { try { swap(); } finally { el.classList.add('is-loading'); navTone(); } });
-    // Ausfädeln nach rund 2 Sekunden: erst die rote Fläche, dann die Streifen nach links hinaus
-    at(cover + LOADER_HOLD, () => el.classList.add('is-out'));
-    at(cover + LOADER_HOLD + 900, () => { el.hidden = true; el.className = 'loader'; loaderState.busy = false; });
+    // Nach dem Einfädeln wechselt die Farbe (VIP: Dunkelblau, Teammitglied: Hellblau)
+    if (theme) at(cover + 250, () => el.classList.add('is-shift'));
+    const finish = () => {
+      el.classList.add('is-out');
+      at(900, () => { el.hidden = true; el.className = 'loader'; loaderState.busy = false; });
+    };
+    if (!steps) { at(cover + LOADER_HOLD, finish); return; }
+    // Schritte: Fortschritt nach Zeit, der letzte wartet auf die Daten; dazu „noch ca. … Sek.“
+    const total = LOADER_HOLD + cover;
+    const tick = () => {
+      const ms = Date.now() - start;
+      const f = Math.min(done ? 1 : 0.92, ms / total);
+      const i = Math.min(steps.length - 1, Math.floor(f * steps.length));
+      el.style.setProperty('--p', `${Math.round(f * 100)}%`);
+      const left = Math.max(0, Math.ceil((total - ms) / 1000));
+      status.innerHTML = `<b>${esc(steps[i])}</b><span>${f >= 1 ? t('Fertig') : left > 0 ? t('noch ca. {n} Sek.', { n: left }) : t('gleich fertig …')}</span>`;
+      if ((f >= 1 && ms >= total) || ms > 8000) { el.style.setProperty('--p', '100%'); at(250, finish); return; }
+      at(120, tick);
+    };
+    tick();
   }
   const loaderText = (page) => t(PAGE_NAMES[page] || 'Train Sim Germany');
+  // Server: ID statt nur „Server“, Schritte beim Laden; private Server als „VIP – ID“ auf Dunkelblau
+  function serverLoader(id) {
+    const ls = liveServer(id);
+    const demo = !liveMode() && serverById(id);
+    const vip = !!((ls && ls.private) || (demo && demo.type === 'vip'));
+    const ready = liveMode() ? loadLiveDetail(id, true) : null;
+    return {
+      text: vip ? `VIP – ${shortId(id).toUpperCase()}` : t('Server {id}', { id: shortId(id) }),
+      opts: {
+        sub: String(id), ready, theme: vip ? 'vip' : '',
+        steps: [t('Verbinde mit dem Server …'), t('Lade Spieler …'), t('Lade Spieldaten …'), t('Lade Züge und Fahrpläne …')],
+      },
+    };
+  }
+  // Teammitglied: Profilbild in der Mitte, Name darunter, Rot wird zu Hellblau
+  function memberLoader(id) {
+    const m = (chat.staff || []).find((x) => String(x.userId) === String(id));
+    const ready = loadMember(id);
+    return {
+      text: m ? m.displayName || m.username : t('Steckbrief'),
+      opts: { sub: m ? m.rank : '', avatar: m && m.avatar ? m.avatar : '', theme: 'member', ready, steps: [t('Lade Steckbrief …'), t('Lade Rang und Beitritt …'), t('Lade Statistik …')] },
+    };
+  }
 
   // ---------- Bindings ----------
   function bind() {
@@ -7283,7 +7059,7 @@
   }
 
   // ---------- Routing ----------
-  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'shop', 'chat', 'karriere', 'statistiken', 'einstellungen', 'netz', 'faq', 'entwickler'];
+  const PAGES = ['home', 'trainings', 'news', 'server', 'spieler', 'chat', 'karriere', 'statistiken', 'einstellungen', 'netz', 'faq', 'entwickler'];
   // Die App heißt überall nur „Train Sim Germany“
   const TITLES = Object.fromEntries(PAGES.map((p) => [p, 'Train Sim Germany']));
   const RENDER = {
@@ -7295,8 +7071,7 @@
     news() { if (state.newsId) renderArticle(); else renderNewsPage(); },
     netz() { renderNet(); },
     faq() { renderFaq('page'); },
-    entwickler() { renderTeam(); },
-    shop() { renderShop(); loadShop(); },
+    entwickler() { if (state.memberId) renderMember(); else renderTeam(); },
     chat() { renderChat(); },
     karriere() { renderCareer(); },
     trainings() { renderTrainings(); },
@@ -7323,6 +7098,7 @@
     const jobView = !jobId ? null : jobId === 'pruefen' ? 'review' : jobId === 'verwalten' ? 'manage' : sub2 === 'bewerbung' ? 'mine' : jobApply ? 'apply' : 'detail';
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
+    const memberId = page === 'entwickler' && sub ? decodeURIComponent(sub) : null;
     // Neuigkeit als eigene Seite: #/news/<id>
     const newsId = page === 'news' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
@@ -7350,7 +7126,7 @@
     }
     if (chatView !== state.chatView || chatArg !== state.chatArg) { chat.side = false; chat.cmq = ''; chat.sideAuto = chatView === 'conv' && !kParam ? chatArg : null; }
     const settingsSub = page === 'einstellungen' ? (sub || '') : '';
-    const changed = page !== state.page || newsId !== state.newsId || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId
+    const changed = page !== state.page || newsId !== state.newsId || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId || memberId !== state.memberId
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
       || settingsSub !== (state.settingsSub || '');
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
@@ -7360,7 +7136,7 @@
     if (['new-group', 'new-server'].includes(chatView) && state.chatView !== chatView) chat.members = [];
     if (chatView === 'new-server' || (page === 'server' && !serverId)) loadPservers(true);
     // Server-Details beim Öffnen frisch laden (wer gerade in welchem Team ist)
-    if (page === 'server' && liveMode()) { if (serverId) loadLiveDetail(serverId, serverId !== state.serverId); else loadLive(); }
+    if (page === 'server' && liveMode()) { if (serverId) loadLiveDetail(serverId, serverId !== state.serverId && Date.now() - (live.detailAt[serverId] || 0) > 3000); else loadLive(); }
     // Info öffnen: Gespräch frisch laden (Mitglieder, Rechte)
     if (chatView === 'info' && chatArg && chat.conv[chatArg] && !chat.conv[chatArg].error) openConv(chatArg);
     if (reviewId !== state.reviewId) review.answers = 'all';
@@ -7372,19 +7148,20 @@
     state.jobApply = jobApply;
     state.jobView = jobView;
     state.reviewId = reviewId;
+    if (memberId !== state.memberId) team.editing = false;
     state.serverId = serverId;
+    state.memberId = memberId;
     state.newsId = newsId;
     state.chatView = chatView;
     state.chatArg = chatArg;
     state.settingsSub = settingsSub;
-    if (page === 'shop') { const v = new URLSearchParams(query || '').get('v'); if (v) shop.view = v; }
     // Gespräch aus dem Speicher: gleich auf neuen Stand bringen
     if (chatView === 'conv' && chat.conv[chatArg] && !chat.conv[chatArg].error && changed) {
       if (chat.conv[chatArg].updated) openConv(chatArg, { since: chat.conv[chatArg].updated });
     }
     document.body.dataset.page = page;
     document.body.dataset.chatView = chatView || '';
-    const view = serverId ? 'server-detail' : newsId ? 'news-article' : page;
+    const view = serverId ? 'server-detail' : newsId ? 'news-article' : memberId ? 'member' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
     // Inhalt der neuen Seite gleitet nacheinander herein
@@ -7428,13 +7205,27 @@
   }
 
   // Seitenwechsel mit Übergang (View Transitions): Richtung nach der Reihenfolge der Tab-Leiste
-  const NAV_ORDER = ['home', 'news', 'trainings', 'spieler', 'shop', 'chat', 'server', 'karriere', 'statistiken', 'einstellungen'];
+  const NAV_ORDER = ['home', 'news', 'trainings', 'spieler', 'chat', 'server', 'karriere', 'statistiken', 'einstellungen'];
   function navigate() {
     const parts = location.hash.replace(/^#\/?/, '').split('?')[0].split('/');
     const next = parts[0] || 'home';
     const nextPage = PAGES.includes(next) ? next : 'home';
     // Andere Seite oder eine Neuigkeit öffnen: Streifen und Ladebildschirm (Unterseiten im Chat usw. ohne)
     const article = nextPage === 'news' && parts[1] ? decodeURIComponent(parts[1]) : null;
+    const server = nextPage === 'server' && parts[1] ? decodeURIComponent(parts[1]) : null;
+    const member = nextPage === 'entwickler' && parts[1] ? decodeURIComponent(parts[1]) : null;
+    if (server && server !== state.serverId) {
+      navClose();
+      const x = serverLoader(server);
+      playLoader(x.text, route, x.opts);
+      return;
+    }
+    if (member && member !== state.memberId) {
+      navClose();
+      const x = memberLoader(member);
+      playLoader(x.text, route, x.opts);
+      return;
+    }
     if (nextPage !== state.page || (article && article !== state.newsId)) {
       navClose();
       playLoader(loaderText(nextPage), route);
@@ -7488,17 +7279,11 @@
     // Leiste oben: Menü und Konto als zweite Leiste, schließen mit Esc, Klick daneben oder Seitenwechsel
     document.addEventListener('click', (e) => {
       if (e.target.closest('[data-nav-me]')) { navOpen('account'); return; }
-      const open = navRoot && navRoot.classList.contains('is-account');
-      if (open && (!navRoot.contains(e.target) || e.target.closest('.nav__sub a, .nav__sub button'))) navClose();
+      if (e.target.closest('[data-nav-menu]')) { navOpen('menu'); return; }
+      if (navMode && (!navRoot.contains(e.target) || e.target.closest('.nav__panel a, .nav__panel button'))) navClose();
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') navClose(); });
-    // Aktuelle Seite in der wischbaren Leiste sichtbar halten
-    const rowIntoView = () => {
-      const a = $('[data-nav-row] [aria-current="page"]', navRoot || document);
-      const row = a && a.parentElement;
-      if (row && row.scrollWidth > row.clientWidth) row.scrollTo({ left: a.offsetLeft - (row.clientWidth - a.offsetWidth) / 2, behavior: reducedMotion() ? 'auto' : 'smooth' });
-    };
-    window.addEventListener('hashchange', () => setTimeout(rowIntoView, 60));
+
     // Startseite: Sätze vor und zurück, Pause; Teilen über das System
     document.addEventListener('click', (e) => {
       const el = e.target.closest('[data-quote-prev], [data-quote-next], [data-quote-play], [data-share-native]');
@@ -7761,6 +7546,17 @@
       if (e.target.name !== 'join' || !e.target.closest('form[data-pserver-form]')) return;
       const box = $('[data-pe-link]', e.target.closest('form'));
       if (box) box.hidden = e.target.value !== 'app';
+    });
+    // Steckbrief bearbeiten
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('[data-member-edit]')) { team.editing = true; renderMember(); const f = $('[data-member-form] textarea'); if (f) f.focus(); }
+      else if (e.target.closest('[data-member-cancel]')) { team.editing = false; renderMember(); }
+    });
+    document.addEventListener('submit', (e) => {
+      const f = e.target.closest('form[data-member-form]');
+      if (!f) return;
+      e.preventDefault();
+      saveMember(f);
     });
     // YouTube erst nach dem Antippen laden
     document.addEventListener('click', (e) => {
@@ -8159,31 +7955,6 @@
       if (!sw) return;
       const job = D.jobs.find((x) => x.id === sw.dataset.jobToggle);
       if (job) putJob(job.id, jobBody(job, { open: sw.checked }), sw.checked ? t('{name} ist jetzt offen', { name: t(job.title) }) : t('{name} ist jetzt geschlossen', { name: t(job.title) }));
-    });
-    // Shop
-    document.addEventListener('click', (e) => {
-      const el = e.target.closest('[data-shop-tab], [data-shop-filter], [data-shop-cat], [data-shop-item], [data-buy], [data-buy-confirm], [data-shop-wish], [data-shop-view], [data-shop-menu], [data-shop-all]');
-      if (!el) { if (shop.menu && !e.target.closest('.shx-menu')) { shop.menu = false; if (state.page === 'shop') renderShop(); } return; }
-      const ds = el.dataset;
-      if (ds.shopWish) {
-        const on = toggleWish(ds.shopWish);
-        toast(on ? t('Auf der Wunschliste') : t('Von der Wunschliste entfernt'));
-        if (state.page === 'shop') renderShop();
-        return;
-      }
-      if (ds.shopMenu !== undefined) { shop.menu = !shop.menu; renderShop(); return; }
-      if (ds.shopView) { shop.view = ds.shopView; shop.menu = false; renderShop(); window.scrollTo({ top: 0, behavior: 'instant' }); return; }
-      if (ds.shopAll) { buyAll(ds.shopAll); return; }
-      if (ds.shopTab) { if (shop.tab !== ds.shopTab) { shop.tab = ds.shopTab; shop.filter = 'all'; shop.cat = 'all'; renderShop(); } }
-      else if (ds.shopFilter) { shop.filter = ds.shopFilter; renderShop(); }
-      else if (ds.shopCat) { shop.cat = ds.shopCat; renderShop(); }
-      else if (ds.buy) openModal('buy', ds.buy, { stack: !!el.closest('[data-modal]') });
-      else if (ds.shopItem) openModal('item', ds.shopItem);
-      else if (ds.buyConfirm) { el.disabled = true; confirmBuy(ds.buyConfirm, el); }
-    });
-    document.addEventListener('change', (e) => {
-      const sel = e.target.closest('[data-shop-sort]');
-      if (sel) { shop.sort = sel.value; renderShop(); }
     });
     // Bewerbungen prüfen
     document.addEventListener('click', (e) => {

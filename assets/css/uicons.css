@@ -29,13 +29,11 @@ i[class^=fi-rs-]:before,i[class*=" fi-rs-"]:before,span[class^=fi-rs-]:before,sp
 .fi-rs-circle:before{content:"\f42e"}
 .fi-rs-clip:before{content:"\f43a"}
 .fi-rs-clock-three:before{content:"\f456"}
-.fi-rs-coins:before{content:"\f497"}
 .fi-rs-comment:before{content:"\f4bb"}
 .fi-rs-comments:before{content:"\f4bf"}
 .fi-rs-comments-question:before{content:"\f4be"}
 .fi-rs-compress:before{content:"\f4cb"}
 .fi-rs-copy:before{content:"\f4e0"}
-.fi-rs-cross:before{content:"\f4f9"}
 .fi-rs-cross-small:before{content:"\f4f8"}
 .fi-rs-crossed-eye:before{content:"\f4fa"}
 .fi-rs-crown:before{content:"\f4fc"}
@@ -64,9 +62,9 @@ i[class^=fi-rs-]:before,i[class*=" fi-rs-"]:before,span[class^=fi-rs-]:before,sp
 .fi-rs-link-alt:before{content:"\f8ba"}
 .fi-rs-list-check:before{content:"\f8c5"}
 .fi-rs-lock:before{content:"\f8da"}
+.fi-rs-map:before{content:"\f901"}
 .fi-rs-marker:before{content:"\f903"}
 .fi-rs-megaphone:before{content:"\f91c"}
-.fi-rs-moon:before{content:"\f976"}
 .fi-rs-newspaper:before{content:"\f9a9"}
 .fi-rs-palette:before{content:"\f9f1"}
 .fi-rs-paper-plane:before{content:"\f9fb"}
@@ -76,9 +74,9 @@ i[class^=fi-rs-]:before,i[class*=" fi-rs-"]:before,span[class^=fi-rs-]:before,sp
 .fi-rs-play:before{content:"\faa2"}
 .fi-rs-plus:before{content:"\fab0"}
 .fi-rs-plus-small:before{content:"\faaf"}
-.fi-rs-receipt:before{content:"\fb19"}
 .fi-rs-rewind:before{content:"\fb57"}
 .fi-rs-robot:before{content:"\fb64"}
+.fi-rs-rocket-lunch:before{content:"\fb66"}
 .fi-rs-rotate-right:before{content:"\fb6d"}
 .fi-rs-route:before{content:"\fb72"}
 .fi-rs-rules:before{content:"\fb7e"}
@@ -87,8 +85,6 @@ i[class^=fi-rs-]:before,i[class*=" fi-rs-"]:before,span[class^=fi-rs-]:before,sp
 .fi-rs-settings-sliders:before{content:"\fbd4"}
 .fi-rs-share:before{content:"\fbd8"}
 .fi-rs-shield-check:before{content:"\fbde"}
-.fi-rs-shop:before{content:"\fbf8"}
-.fi-rs-shopping-cart:before{content:"\fbff"}
 .fi-rs-sign-in-alt:before{content:"\fc0e"}
 .fi-rs-sign-out-alt:before{content:"\fc0f"}
 .fi-rs-signal-alt-2:before{content:"\fc14"}
@@ -99,7 +95,6 @@ i[class^=fi-rs-]:before,i[class*=" fi-rs-"]:before,span[class^=fi-rs-]:before,sp
 .fi-rs-terminal:before{content:"\fd79"}
 .fi-rs-ticket:before{content:"\fd9e"}
 .fi-rs-time-fast:before{content:"\fda5"}
-.fi-rs-time-past:before{content:"\fdab"}
 .fi-rs-traffic-light:before{content:"\fddd"}
 .fi-rs-train-side:before{content:"\fde0"}
 .fi-rs-train-station:before{content:"\fde2"}
@@ -123,10 +118,8 @@ i[class^=fi-ss-]:before,i[class*=" fi-ss-"]:before,span[class^=fi-ss-]:before,sp
 .fi-ss-bell-ring:before{content:"\f235"}
 .fi-ss-calendar:before{content:"\f33a"}
 .fi-ss-check-circle:before{content:"\f3c4"}
-.fi-ss-coins:before{content:"\f495"}
 .fi-ss-comments:before{content:"\f4bd"}
 .fi-ss-heart:before{content:"\f7a1"}
-.fi-ss-id-badge:before{content:"\f7f1"}
 .fi-ss-marker:before{content:"\f8f4"}
 .fi-ss-pause:before{content:"\fa03"}
 .fi-ss-play:before{content:"\fa94"}

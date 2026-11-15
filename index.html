@@ -33,29 +33,22 @@
 <body data-page="home">
   <a class="skip-link" href="#main">Zum Inhalt springen</a>
 
-  <!-- Navigation: schwebende Leiste oben; schmal öffnet „Menü“ neben dem Logo eine zweite Leiste im gleichen Stil -->
+  <!-- Navigation: schwebende weiße Leiste oben – links Logo und TSG, rechts Profil und Menü -->
   <header class="nav" data-topbar data-nav-root>
     <div class="nav__bar">
       <a class="nav__brand" href="#/" aria-label="Train Sim Germany – Startseite">
         <img class="nav__logo nav__logo--color" src="assets/img/logo.svg" alt="" width="54" height="27"><img class="nav__logo nav__logo--white" src="assets/img/logo-white.svg" alt="" width="54" height="27">
-        <span class="nav__name">Train Sim Germany</span>
+        <span class="nav__name" data-no-t>TSG</span>
       </a>
-      <nav class="nav__links" aria-label="Hauptnavigation" data-nav-links>
-        <a href="#/netz" data-nav="netz">Netz</a>
-        <a href="#/server" data-nav="server">Server</a>
-        <a href="#/news" data-nav="news">Neuigkeiten</a>
-        <a href="#/karriere" data-nav="karriere">Karriere</a>
-        <a href="#/faq" data-nav="faq">FAQ</a>
-        <a href="#/entwickler" data-nav="entwickler">Entwickler</a>
-      </nav>
-      <div class="nav__end" data-nav-account>
-        <button class="nav__login" type="button" data-open="profile" aria-label="Anmelden"><i class="fi fi-rs-user ic" aria-hidden="true"></i></button>
+      <div class="nav__end">
+        <span class="nav__account" data-nav-account>
+          <button class="nav__icon nav__profile" type="button" data-open="profile" aria-label="Anmelden"><svg class="nav__svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7" r="3.6"/><path d="M5.2 21.2v-3.4c0-3.4 3-6 6.8-6s6.8 2.6 6.8 6v3.4z"/></svg></button>
+        </span>
+        <button class="nav__icon nav__menu" type="button" data-nav-menu aria-expanded="false" aria-controls="nav-panel" aria-label="Menü öffnen"><svg class="nav__svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 6h14.5M2.5 12h11.5M2.5 18h19"/></svg></button>
       </div>
     </div>
-    <!-- Schmale Bildschirme: die Seiten als zweite Leiste darunter (zum Wischen) – ohne Menü-Knopf -->
-    <nav class="nav__row" aria-label="Seiten" data-nav-row></nav>
-    <!-- Konto (nach der Anmeldung): als zweite Leiste -->
-    <div class="nav__sub nav__sub--account" data-nav-acc hidden></div>
+    <!-- Menü und Konto: Karte unter der Leiste -->
+    <div class="nav__panel" id="nav-panel" data-nav-panel hidden></div>
   </header>
 
   <main id="main" tabindex="-1">
@@ -157,69 +150,65 @@
     </section>
 
     <!-- ===================== TRAININGS ===================== -->
-    <section class="page" data-page="trainings" aria-label="Trainings" hidden>
-      <div class="page-head">
-        <div class="container">
-          <div class="appbar">
-            <div class="appbar__title">
-              <span class="appbar__label">Dein Rang</span>
-              <h1 class="appbar__value"><button type="button" data-open="rank"><i class="fi fi-ss-id-badge ic appbar__pin" aria-hidden="true"></i><span data-rank-name>Conductor</span><i class="fi fi-rs-angle-small-down ic" aria-hidden="true"></i></button></h1>
-            </div>
-            <div class="appbar__actions">
-              <button class="btn btn--primary btn--sm appbar__add" type="button" data-open="training-new" data-can-train hidden><i class="fi fi-rs-plus ic" aria-hidden="true"></i><span>Training anbieten</span></button>
-              <button class="round-btn" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-ss-bell ic" aria-hidden="true"></i></button>
-            </div>
-          </div>
-          <div class="field field--button">
-            <button class="field__btn" type="button" data-open="date">
-              <i class="fi fi-rs-calendar ic" aria-hidden="true"></i>
-              <span data-date-field>Trainingsdatum wählen</span>
+    <section class="page page--site" data-page="trainings" aria-label="Trainings" hidden>
+      <header class="site-head lines-bg tg-hero">
+        <div class="site-wrap">
+          <p class="cr-eyebrow">Trainings</p>
+          <h1 class="mega mega--stack">Ausbildung.<br><span>Dein nächster Rang.</span></h1>
+          <p class="site-head__lead">Hier stehen alle Trainings für deinen nächsten Rang. Der Server öffnet 15 Minuten vor Beginn – mit der Glocke sagen wir dir rechtzeitig Bescheid.</p>
+          <div class="tg-hero__row">
+            <button class="tg-rank" type="button" data-open="rank">
+              <span class="tg-rank__dot" data-rank-dot></span>
+              <span class="tg-rank__text"><small>Dein Rang</small><b data-rank-name>Conductor</b></span>
+              <i class="fi fi-rs-angle-small-down ic" aria-hidden="true"></i>
             </button>
+            <button class="site-btn site-btn--ghost tg-bell" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-ss-bell ic" aria-hidden="true"></i><span>Erinnerungen</span></button>
+            <button class="site-btn site-btn--brand" type="button" data-open="training-new" data-can-train hidden><i class="fi fi-rs-plus ic" aria-hidden="true"></i><span>Training anbieten</span></button>
           </div>
         </div>
-      </div>
-      <div class="sheet">
-        <div class="container">
-          <div class="layout-aside">
-            <div class="train-main">
-              <div data-next-step="full"></div>
+      </header>
+      <div class="site-wrap tg-body">
+        <div class="tg-next" data-next-step="full"></div>
 
-              <div class="day-tabs-wrap">
-                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="fi fi-rs-angle-small-left ic" aria-hidden="true"></i></button>
-                <div class="day-tabs" data-day-tabs role="tablist" aria-label="Tag wählen"></div>
-                <button class="round-btn round-btn--soft day-tabs__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="fi fi-rs-angle-small-right ic" aria-hidden="true"></i></button>
-              </div>
-
-              <div class="rail rail--xs" data-day-trainings></div>
-
-              <div class="sec-head sec-head--tight">
-                <h2 data-all-title>Alle kommenden Trainings</h2>
-                <button class="link-more" type="button" data-all-toggle>Alle anzeigen</button>
-              </div>
-              <ul class="tlist" data-all-trainings></ul>
-            </div>
-
-            <aside class="stack">
-              <div class="card">
-                <h3 class="card__title">So läuft ein Training ab</h3>
-                <ol class="steps">
-                  <li><b>Gruppe beitreten</b><span>Ränge werden über die Roblox-Gruppe vergeben.</span></li>
-                  <li><b>Server joinen</b><span>Der Server öffnet 15 Min. vor Beginn – dann auf „Join Now“ tippen.</span></li>
-                  <li><b>Theorie &amp; Praxis</b><span>Signale, Fahrplan, Funk – danach eine Prüfung.</span></li>
-                  <li><b>Rang erhalten</b><span>Bestanden? Dein neuer Rang kommt automatisch.</span></li>
-                </ol>
-                <div class="btn-stack">
-                  <a class="btn btn--primary btn--block" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rs-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
-                  <a class="btn btn--discord btn--block" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord beitreten</a>
-                </div>
-              </div>
-              <div class="card">
-                <h3 class="card__title">Ränge</h3>
-                <ul class="rank-ladder" data-rank-ladder></ul>
-              </div>
-            </aside>
+        <section class="tg-sec">
+          <div class="tg-sec__head">
+            <h2 class="site-h2">Fahrplan</h2>
+            <button class="tg-date" type="button" data-open="date"><i class="fi fi-rs-calendar ic" aria-hidden="true"></i><span data-date-field>Trainingsdatum wählen</span></button>
           </div>
-        </div>
+          <div class="tg-days">
+            <button class="tg-days__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="fi fi-rs-angle-small-left ic" aria-hidden="true"></i></button>
+            <div class="tg-days__list" data-day-tabs role="tablist" aria-label="Tag wählen"></div>
+            <button class="tg-days__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="fi fi-rs-angle-small-right ic" aria-hidden="true"></i></button>
+          </div>
+          <div class="tg-day" data-day-trainings></div>
+        </section>
+
+        <section class="tg-sec">
+          <div class="tg-sec__head">
+            <h2 class="site-h2" data-all-title>Alle kommenden Trainings</h2>
+            <button class="more-link" type="button" data-all-toggle>Alle anzeigen</button>
+          </div>
+          <ul class="tg-board" data-all-trainings></ul>
+        </section>
+
+        <section class="tg-sec">
+          <h2 class="site-h2">Dein Ausbildungsweg</h2>
+          <ol class="tg-line" data-rank-ladder></ol>
+        </section>
+
+        <section class="tg-sec">
+          <h2 class="site-h2">So läuft ein Training ab</h2>
+          <ol class="cr-how tg-how">
+            <li><span class="cr-how__no">1</span><i class="fi fi-rs-user-add ic" aria-hidden="true"></i><b>Gruppe beitreten</b><p>Ränge werden über die Roblox-Gruppe vergeben.</p></li>
+            <li><span class="cr-how__no">2</span><i class="fi fi-ss-play ic" aria-hidden="true"></i><b>Server joinen</b><p>Der Server öffnet 15 Min. vor Beginn – dann auf „Join Now“ tippen.</p></li>
+            <li><span class="cr-how__no">3</span><i class="fi fi-rs-train-side ic" aria-hidden="true"></i><b>Theorie &amp; Praxis</b><p>Signale, Fahrplan, Funk – danach eine Prüfung.</p></li>
+            <li><span class="cr-how__no">4</span><i class="fi fi-rs-id-badge ic" aria-hidden="true"></i><b>Rang erhalten</b><p>Bestanden? Dein neuer Rang kommt automatisch.</p></li>
+          </ol>
+          <div class="tg-links">
+            <a class="site-btn site-btn--brand" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rs-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
+            <a class="site-btn site-btn--ghost" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord beitreten</a>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -366,16 +355,6 @@
       </div>
     </section>
 
-    <!-- ===================== SHOP ===================== -->
-    <section class="page" data-page="shop" aria-label="Shop" hidden>
-      <div class="page-head page-head--shop">
-        <div class="container" data-shop-head></div>
-      </div>
-      <div class="sheet">
-        <div class="container" data-shop></div>
-      </div>
-    </section>
-
     <!-- ===================== CHAT ===================== -->
     <section class="page" data-page="chat" aria-label="Chat" hidden>
       <div class="page-head">
@@ -425,13 +404,18 @@
       <div class="site-head lines-bg">
         <div class="site-wrap">
                     <h1 class="mega">Lerne das<br>Team kennen.</h1>
-          <p class="site-head__lead">Entwicklung, Leitung und Aufsicht – hier findest du alle und kannst ihnen direkt schreiben.</p>
+          <p class="site-head__lead">Leitung, Manager und Aufsicht – alle ab Junior Supervisor. Tippe auf eine Person für ihren Steckbrief.</p>
         </div>
         <div class="team-strip" data-team-strip aria-hidden="true"></div>
       </div>
       <div class="site-body">
         <div class="site-wrap" data-team></div>
       </div>
+    </section>
+
+    <!-- ===================== STECKBRIEF (#/entwickler/<id>) ===================== -->
+    <section class="page page--site" data-page="member" aria-label="Steckbrief" hidden>
+      <div data-member></div>
     </section>
 
     <!-- ===================== NEUIGKEIT (#/news/<id>) ===================== -->
@@ -503,7 +487,6 @@
         <a data-link="discord" href="#" target="_blank" rel="noopener">Discord<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
         <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
         <a href="#/trainings">Trainings</a>
-        <a href="#/shop">Shop</a>
         <a href="#/statistiken">Statistiken</a>
       </div>
       <div class="foot__col">
@@ -522,6 +505,7 @@
   <div class="loader" data-loader aria-hidden="true" hidden>
     <div class="loader__stripes"><i></i><i></i><i></i></div>
     <div class="loader__screen">
+      <img class="loader__avatar" data-loader-avatar alt="" referrerpolicy="no-referrer" hidden>
       <div class="loader__brand">
         <svg class="loader__logo" viewBox="0 0 400 200" aria-hidden="true">
           <path class="loader__train" d="M56 24H248C316 24 366 64 394 134C400 150 390 168 372 168H28C16 168 9 157 12 146L46 32C48 27 51 24 56 24Z"/>
@@ -530,7 +514,9 @@
         </svg>
         <span class="loader__name" data-loader-name></span>
       </div>
+      <span class="loader__sub" data-loader-sub hidden></span>
       <div class="loader__bar"><span></span></div>
+      <p class="loader__status" data-loader-status aria-live="polite" hidden></p>
     </div>
   </div>
 

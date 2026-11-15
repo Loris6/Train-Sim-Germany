@@ -1,10 +1,8 @@
 --[[
-  Train Sim Germany – Verbindung zur App (Coins, Züge, Strecken)
+  Train Sim Germany – Verbindung zur App (Server, Spieler, Teams, Fahrten)
 
   Was das Skript macht:
-    • meldet der App alle 30 Sekunden (und beim Betreten/Verlassen) Coins, Züge und Strecken der Spieler,
-      aber nur, wenn sich etwas geändert hat
-    • holt Käufe aus der App ab und verbucht sie im Spiel (Coins abziehen, Zug bzw. Strecke freischalten)
+    • meldet der App alle 30 Sekunden (und beim Betreten/Verlassen), wer auf dem Server ist
     • meldet den Server (Spieler, Plätze, Version) – für die Server-Seite der App und /GetServers, /GetOnline, /GetUser im Chat
     • meldet, was jeder Spieler gerade macht: Rolle (Team), Zug, Linie, Ziel, Bahnhof (siehe Activity.read) –
       daraus zeigt die App die Rollen je Server, die Züge und unter „Spieler“, wo jemand gerade ist
@@ -30,15 +28,14 @@
        Dashboard nicht): {"tsg_game_key": ["DEIN_WERT", "tsg-backend.lorismziray01.workers.dev"]}
        Im Output steht dann „[TSG] Mit der App verbunden“ – oder was noch fehlt.
     4. CONFIG.Backend unten muss die Adresse des Backends sein (wie in assets/js/config.js → api).
-    5. Economy.read und Economy.apply an euer Spiel anpassen, falls Coins und Besitz anders gespeichert sind.
-    6. Optional: Activity.read anpassen und Fahrten melden (siehe unten), damit Züge und Statistik in der App erscheinen.
+    5. Optional: Activity.read anpassen und Fahrten melden (siehe unten), damit Züge und Statistik in der App erscheinen.
 
   Fahrten melden (für die Statistik): Dieses Skript legt in ServerStorage das BindableEvent „TSGTripDone“ an.
   Euer Spiel ruft es am Ende einer Fahrt auf:
     game.ServerStorage:WaitForChild("TSGTripDone"):Fire(player, { route = "R001", vehicle = "talent2", km = 142, delay = 2 })
-  route = Strecke (R001 …), vehicle = Zug-ID aus dem Shop, km = gefahrene Kilometer, delay = Verspätung am Ziel in Minuten.
+  route = Strecke (R001 …), vehicle = Zug-ID, km = gefahrene Kilometer, delay = Verspätung am Ziel in Minuten.
 
-  Die IDs der Züge und Strecken müssen mit dem Shop übereinstimmen (backend/shop.js → CATALOG):
+  Die IDs der Züge und Strecken müssen mit der App übereinstimmen (backend/sync.js → VEHICLES, assets/js/data.js):
     Züge: talent2, br481, flirt3, lint41, kiss, desirohc, dosto, ic2, ic1, ice-t, eu44, ice4
     Strecken: R001 … R010
 ]]
@@ -51,7 +48,7 @@ local TextService = game:GetService("TextService")
 local Teams = game:GetService("Teams")
 
 -- Version dieses Skripts (die App zeigt dem Team, wenn ein Server noch eine alte Version nutzt)
-local SCRIPT_VERSION = 3
+local SCRIPT_VERSION = 4
 
 local CONFIG = {
 	Backend = "https://tsg-backend.lorismziray01.workers.dev",
@@ -66,68 +63,10 @@ local CONFIG = {
 	TeamOrderNames = { "Order", "Reihenfolge", "Position", "Pos", "Index", "Sort", "Nummer", "Number", "Nr", "Prio", "Priority", "Rang", "Rank", "Layer", "Level", "Id", "ID" },
 }
 
--- ===== Anpassen: so speichert euer Spiel Coins und Besitz =====
--- Standard: leaderstats.Coins (IntValue) und Ordner „OwnedTrains“ / „OwnedRoutes“ im Spieler mit je einem BoolValue pro ID.
-local Economy = {}
-
-local function ownedList(player, folderName)
-	local out = {}
-	local folder = player:FindFirstChild(folderName)
-	if folder then
-		for _, value in ipairs(folder:GetChildren()) do
-			if value:IsA("BoolValue") and value.Value then
-				table.insert(out, value.Name)
-			end
-		end
-	end
-	return out
-end
-
-function Economy.read(player)
-	local stats = player:FindFirstChild("leaderstats")
-	local coins = stats and stats:FindFirstChild("Coins")
-	return {
-		coins = coins and coins.Value or 0,
-		trains = ownedList(player, "OwnedTrains"),
-		routes = ownedList(player, "OwnedRoutes"),
-	}
-end
-
--- Kauf aus der App verbuchen. true = erledigt, false = abgelehnt (z. B. inzwischen zu wenig Coins)
-function Economy.apply(player, purchase)
-	local stats = player:FindFirstChild("leaderstats")
-	local coins = stats and stats:FindFirstChild("Coins")
-	if not coins then
-		return false
-	end
-	local folderName = purchase.kind == "route" and "OwnedRoutes" or "OwnedTrains"
-	local folder = player:FindFirstChild(folderName)
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = folderName
-		folder.Parent = player
-	end
-	local owned = folder:FindFirstChild(purchase.item)
-	if owned and owned.Value then
-		return true -- gehört schon dem Spieler: nichts abziehen
-	end
-	if coins.Value < purchase.price then
-		return false
-	end
-	coins.Value -= purchase.price
-	if not owned then
-		owned = Instance.new("BoolValue")
-		owned.Name = purchase.item
-		owned.Parent = folder
-	end
-	owned.Value = true
-	return true
-end
-
 -- Was der Spieler gerade macht. Standard: Rolle = Name seines Teams (Passenger, Qualified Driver, Signaller, …),
 -- alles andere aus Attributen, die euer Spiel am Spieler setzt, z. B. player:SetAttribute("TSG_Line", "RE 1"):
 --   TSG_Line (Linie), TSG_Train (Zugnummer, z. B. „RE 3105“), TSG_Destination (Ziel), TSG_NextStop (nächster Halt),
---   TSG_Vehicle (Zug-ID aus dem Shop, z. B. „desirohc“), TSG_Station (Bahnhof, an dem er gerade arbeitet oder wartet)
+--   TSG_Vehicle (Zug-ID, z. B. „desirohc“), TSG_Station (Bahnhof, an dem er gerade arbeitet oder wartet)
 local Activity = {}
 function Activity.read(player)
 	local function attr(name)
@@ -351,8 +290,6 @@ local function explain(ok, res)
 	return "Backend nicht erreichbar: " .. msg
 end
 
-local lastSent = {} -- userId → zuletzt gemeldeter Stand
-local done = {} -- verbuchte Käufe für den nächsten Abgleich
 local trips = {} -- beendete Fahrten für den nächsten Abgleich
 local busy = false
 
@@ -380,16 +317,6 @@ local function activity(player)
 	data.userId = tostring(player.UserId)
 	data.name = player.Name
 	data.displayName = player.DisplayName
-	return data
-end
-
-local function snapshot(player)
-	local ok, data = pcall(Economy.read, player)
-	if not ok then
-		warn("[TSG] Economy.read: " .. tostring(data))
-		return nil
-	end
-	data.userId = tostring(player.UserId)
 	return data
 end
 
@@ -502,31 +429,17 @@ local function serverInfo(closing)
 	return info
 end
 
-local function sync(extra, closing)
+local function sync(closing)
 	local header = authHeader()
 	if not header then
 		return
 	end
-	local players, online, doing = {}, {}, {}
+	local online, doing = {}, {}
 	for _, player in ipairs(Players:GetPlayers()) do
-		local id = tostring(player.UserId)
-		table.insert(online, id)
+		table.insert(online, tostring(player.UserId))
 		table.insert(doing, activity(player))
-		local snap = snapshot(player)
-		if snap then
-			local encoded = HttpService:JSONEncode(snap)
-			if lastSent[id] ~= encoded then
-				table.insert(players, snap)
-				lastSent[id] = encoded
-			end
-		end
-	end
-	for _, snap in ipairs(extra or {}) do
-		table.insert(players, snap)
 	end
 	local teamsNow, teamNames = teamList()
-	local sending = done
-	done = {}
 	local sendingTrips = trips
 	trips = {}
 
@@ -536,9 +449,7 @@ local function sync(extra, closing)
 			Method = "POST",
 			Headers = { ["Content-Type"] = "application/json", ["Authorization"] = header },
 			Body = HttpService:JSONEncode({
-				players = players,
 				online = online,
-				done = sending,
 				server = serverInfo(closing),
 				activity = doing,
 				teams = teamsNow,
@@ -549,14 +460,8 @@ local function sync(extra, closing)
 	end)
 	if not ok or not res.Success then
 		state("warn", explain(ok, res))
-		for _, d in ipairs(sending) do
-			table.insert(done, d)
-		end
 		for _, trip in ipairs(sendingTrips) do
 			table.insert(trips, trip)
-		end
-		for _, snap in ipairs(players) do
-			lastSent[snap.userId] = nil
 		end
 		return
 	end
@@ -566,19 +471,6 @@ local function sync(extra, closing)
 	if body.config then
 		applyConfig(body.config)
 	end
-	for userId, list in pairs(body.pending or {}) do
-		local player = Players:GetPlayerByUserId(tonumber(userId))
-		if player then
-			for _, purchase in ipairs(list) do
-				local okApply, applied = pcall(Economy.apply, player, purchase)
-				if not okApply then
-					warn("[TSG] Economy.apply: " .. tostring(applied))
-				end
-				table.insert(done, { id = purchase.id, userId = userId, ok = okApply and applied == true })
-			end
-			lastSent[userId] = nil -- neuen Stand gleich mitschicken
-		end
-	end
 end
 
 local function run()
@@ -587,9 +479,6 @@ local function run()
 	end
 	busy = true
 	sync()
-	if #done > 0 then
-		sync() -- verbuchte Käufe sofort melden
-	end
 	busy = false
 end
 
@@ -611,23 +500,19 @@ Players.PlayerAdded:Connect(function(player)
 	if appConfig and not checkAccess(player) then
 		return
 	end
-	task.wait(5) -- Spielstand laden lassen
+	task.wait(5) -- Spieler kurz ankommen lassen
 	run()
 	if appConfig and player.Parent then
 		greet(player)
 	end
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-	local snap = snapshot(player)
-	lastSent[tostring(player.UserId)] = nil
-	if snap then
-		task.spawn(sync, { snap })
-	end
+Players.PlayerRemoving:Connect(function()
+	task.delay(1, run) -- Spieler ist weg: Server gleich neu melden
 end)
 
 game:BindToClose(function()
-	sync(nil, true) -- Server meldet sich ab (Käufe werden trotzdem noch gemeldet)
+	sync(true) -- Server meldet sich ab
 end)
 
 task.spawn(function()

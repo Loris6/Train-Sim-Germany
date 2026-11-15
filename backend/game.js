@@ -387,7 +387,8 @@ export async function serverDetail(store, env, user, jobId) {
   return { server: sv, avatars: await avatarsOf(store, env, sv.people.map((x) => x.id)) };
 }
 
-// POST /api/players/status { ids } – verfolgte Spieler: Name, Bild, ob und wo im Spiel
+// POST /api/players/status { ids } – verfolgte Spieler: Name, Bild und ihre Zugfahrt (Linie, Zug, Ziel, nächster Halt).
+// Mehr nicht: kein Server, keine Rolle, kein „zuletzt gesehen“. Fahrten auf versteckten privaten Servern bleiben verborgen.
 export async function playersStatus(store, env, user, body) {
   const ids = [...new Set((Array.isArray(body.ids) ? body.ids : []).map(String))].filter((x) => /^\d{1,20}$/.test(x)).slice(0, 100);
   const where = new Map();
@@ -397,20 +398,12 @@ export async function playersStatus(store, env, user, body) {
   for (const id of ids) {
     const n = names[id] || {};
     const hit = where.get(id);
-    const st = await store.get(`pstats:${id}`);
-    const item = {
-      userId: id, username: n.username || (hit && hit.w.name) || null, displayName: n.displayName || (hit && hit.w.dn) || n.username || null,
+    const w = hit && !hit.hidden ? hit.w : null;
+    out.push({
+      userId: id, username: n.username || (w && w.name) || null, displayName: n.displayName || (w && w.dn) || n.username || null,
       avatar: avatars[id] || null, me: !!user && user.sub === id,
-      inGame: !!hit, lastSeen: hit ? Date.now() : (st && st.last) || null,
-    };
-    if (hit && hit.hidden) item.server = { private: true, hidden: true };
-    else if (hit) {
-      const sv = serverOut(hit.jobId, hit.s, hit.p, false);
-      item.server = { id: sv.id, private: sv.private, players: sv.players, max: sv.max, pserver: sv.pserver || null };
-      const tm = (hit.s.teams || []).find((x) => sameTeam(x.name, hit.w.team));
-      item.activity = { ...person(hit.w), teamColor: tm ? tm.color : null };
-    }
-    out.push(item);
+      trip: w && (w.line || w.train) ? { line: w.line || null, train: w.train || null, dest: w.dest || null, next: w.next || null, veh: w.veh || null } : null,
+    });
   }
   return { players: out, at: Date.now() };
 }

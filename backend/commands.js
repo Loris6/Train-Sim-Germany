@@ -8,7 +8,6 @@
  */
 import { liveStats } from './stats.js';
 import { getContent } from './content.js';
-import { walletView } from './shop.js';
 import { findPlayer, groupRole, namesOf, robloxUrl, groupIdOf } from './roblox.js';
 import { rankLabel, matchRank, atLeast } from './ranks.js';
 
@@ -27,7 +26,6 @@ export const COMMANDS = [
   { id: 'getnews', usage: '/GetNews', desc: 'Die neuesten Neuigkeiten' },
   { id: 'getteam', usage: '/GetTeam', desc: 'Das Team ab Supervisor nach Rang' },
   { id: 'members', usage: '/Members', desc: 'Wer in diesem Chat ist' },
-  { id: 'coins', usage: '/Coins', desc: 'Deine Coins und Züge aus dem Spiel (nur du siehst die Antwort)' },
   { id: 'play', usage: '/Play', desc: 'Spiel starten und Gruppe beitreten' },
   { id: 'discord', usage: '/Discord', desc: 'Zum Discord der Community' },
   { id: 'time', usage: '/Time', desc: 'Spielzeit (Uhrzeit in Deutschland)' },
@@ -36,7 +34,7 @@ export const COMMANDS = [
 ];
 export const COMMAND_IDS = COMMANDS.map((c) => c.id);
 // Befehle, die es seit der ersten Fassung gibt (für ältere Gruppen-Einstellungen)
-export const FIRST_COMMANDS = ['help', 'rules', 'getgroupdata', 'getuser', 'getrank', 'getservers', 'getonline', 'getstats', 'gettrainings', 'coins'];
+export const FIRST_COMMANDS = ['help', 'rules', 'getgroupdata', 'getuser', 'getrank', 'getservers', 'getonline', 'getstats', 'gettrainings'];
 const ALIAS = {
   hilfe: 'help', befehle: 'help', regeln: 'rules', server: 'getservers', online: 'isonline', stats: 'getstats', trainings: 'gettrainings',
   user: 'getuser', rank: 'getrank', group: 'getgroupdata', gruppe: 'getgroupdata', getroles: 'getgroupdata', roles: 'getgroupdata', rollen: 'getgroupdata',
@@ -101,7 +99,7 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
         title: 'Roblox-Gruppe Train Sim Germany',
         rows: [['Gruppen-ID', groupIdOf(env)], ['Mitglieder', num(s.groupMembers)], ['Rollen', String(roles.length)], ['Team ab Supervisor', num(team)],
           ...roles.map((r) => [r.name, num(r.memberCount)])],
-        buttons: [btn('Gruppe öffnen', L.group, 'fi-rr-users-alt', true), btn('Spiel starten', L.game, 'fi-sr-play')],
+        buttons: [btn('Gruppe öffnen', L.group, 'fi-rs-users-alt', true), btn('Spiel starten', L.game, 'fi-ss-play')],
       };
     }
     case 'getuser':
@@ -111,13 +109,13 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
       if (!cmd.arg) return only('Name fehlt', `So geht es: /${how} Roblox-Name`);
       const p = await player();
       if (!p) return only('Nicht gefunden', `Den Roblox-Namen „${cmd.arg}“ gibt es nicht.`);
-      const buttons = [btn('Roblox-Profil', L.profile(p.userId), 'fi-rr-user', true), btn('Anschreiben', `#/chat/an/${p.userId}`, 'fi-rr-paper-plane')];
+      const buttons = [btn('Roblox-Profil', L.profile(p.userId), 'fi-rs-user', true), btn('Anschreiben', `#/chat/an/${p.userId}`, 'fi-rs-paper-plane')];
       const server = (await liveServers(store)).find((s) => (s.online || []).includes(p.userId));
       if (cmd.id === 'isonline') {
         return {
           title: `${p.displayName} (@${p.username})`, avatar: p.avatar,
           text: server ? `Ist gerade im Spiel – ${server.private ? 'auf einem privaten Server' : `Server ${server.jobId.slice(0, 8)}`}.` : 'Ist gerade nicht im Spiel.',
-          buttons: server && !server.private ? [btn('Auch beitreten', L.join(server.jobId), 'fi-sr-play', true), ...buttons] : buttons,
+          buttons: server && !server.private ? [btn('Auch beitreten', L.join(server.jobId), 'fi-ss-play', true), ...buttons] : buttons,
         };
       }
       let role = null;
@@ -133,22 +131,22 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
     }
     case 'getservers': {
       const list = (await liveServers(store)).sort((a, b) => b.players - a.players);
-      if (!list.length) return { title: 'Server im Spiel', text: 'Gerade meldet sich kein Server. Läuft das Skript TSGAppSync im Spiel?', buttons: [btn('Spiel starten', L.game, 'fi-sr-play', true)] };
+      if (!list.length) return { title: 'Server im Spiel', text: 'Gerade meldet sich kein Server. Läuft das Skript TSGAppSync im Spiel?', buttons: [btn('Spiel starten', L.game, 'fi-ss-play', true)] };
       const open = list.filter((s) => !s.private && (!s.max || s.players < s.max));
       return {
         title: `Server im Spiel · ${list.length}`,
         rows: list.slice(0, 15).map((s) => [`${s.private ? 'Privat' : 'Server'} ${s.jobId.slice(0, 8)}`, `${s.players}/${s.max} Spieler${s.version ? ` · v${s.version}` : ''}`]),
-        buttons: [...open.slice(0, 3).map((s, i) => btn(`Beitreten ${s.jobId.slice(0, 8)}`, L.join(s.jobId), 'fi-sr-play', i === 0)), btn('Alle Server', '#/server', 'fi-rr-signal-alt-2')],
+        buttons: [...open.slice(0, 3).map((s, i) => btn(`Beitreten ${s.jobId.slice(0, 8)}`, L.join(s.jobId), 'fi-ss-play', i === 0)), btn('Alle Server', '#/server', 'fi-rs-signal-alt-2')],
       };
     }
     case 'getprivateservers': {
       const { serversOfChat } = await import('./pservers.js');
       const list = c.kind === 'group' ? await serversOfChat(store, c, user) : [];
-      if (!list.length) return { title: 'Private Server', text: 'Dieser Chat ist mit keinem privaten Server verbunden. Server-Chats verbindet der Besitzer eines privaten Servers unter „Info“.', buttons: [btn('Server in der App', '#/server', 'fi-rr-signal-alt-2')] };
+      if (!list.length) return { title: 'Private Server', text: 'Dieser Chat ist mit keinem privaten Server verbunden. Server-Chats verbindet der Besitzer eines privaten Servers unter „Info“.', buttons: [btn('Server in der App', '#/server', 'fi-rs-signal-alt-2')] };
       return {
         title: `Private Server · ${list.length}`,
         rows: list.map((p) => [p.name, p.online ? `Online · ${p.players}/${p.max} Spieler` : 'Offline']),
-        buttons: list.filter((p) => p.canJoin && p.link).slice(0, 3).map((p, i) => btn(`Beitreten: ${p.name}`, p.link, 'fi-sr-play', i === 0)),
+        buttons: list.filter((p) => p.canJoin && p.link).slice(0, 3).map((p, i) => btn(`Beitreten: ${p.name}`, p.link, 'fi-ss-play', i === 0)),
         text: list.some((p) => p.join === 'roblox') ? 'Bei manchen Servern geht das Beitreten nur über Roblox selbst.' : '',
       };
     }
@@ -160,7 +158,7 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
       return {
         title: `Im Spiel: ${num(Number.isFinite(s.playing) ? s.playing : ids.length)}`,
         text: names.length ? names.map((u) => `@${u.username}`).join(', ') + (ids.length > names.length ? ` und ${ids.length - names.length} weitere` : '') : 'Die Namen kommen, sobald ein Server über TSGAppSync meldet.',
-        buttons: [btn('Mitspielen', L.game, 'fi-sr-play', true)],
+        buttons: [btn('Mitspielen', L.game, 'fi-ss-play', true)],
       };
     }
     case 'getstats': {
@@ -169,18 +167,18 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
         title: 'Train Sim Germany in Zahlen',
         rows: [['Spieler online', num(s.playing)], ['Besuche', num(s.visits)], ['Favoriten', num(s.favorites)], ['Gruppe', num(s.groupMembers)],
           ['Discord', `${num(s.discordMembers)} (${num(s.discordOnline)} online)`]],
-        buttons: [btn('Spiel öffnen', L.game, 'fi-sr-play', true), btn('Statistiken', '#/statistiken', 'fi-rr-chart-line-up'), btn('Discord', L.discord, 'fi-brands-discord')],
+        buttons: [btn('Spiel öffnen', L.game, 'fi-ss-play', true), btn('Statistiken', '#/statistiken', 'fi-rs-chart-line-up'), btn('Discord', L.discord, 'fi-brands-discord')],
       };
     }
     case 'gettrainings': {
       const list = (await getContent(store)).trainings.filter((x) => x.start > Date.now() - x.dur * 60000).slice(0, 6);
-      const buttons = [btn('Alle Trainings', '#/trainings', 'fi-rr-calendar', true)];
+      const buttons = [btn('Alle Trainings', '#/trainings', 'fi-rs-calendar', true)];
       if (!list.length) return { title: 'Nächste Trainings', text: 'Gerade ist kein Training geplant. Alle Termine stehen in der App unter Trainings.', buttons };
       return { title: 'Nächste Trainings', rows: list.map((x) => [when(x.start), `${x.title} · ${x.hostName || x.host}`]), buttons };
     }
     case 'getnews': {
       const list = (await getContent(store)).news.slice(0, 4);
-      const buttons = [btn('Alle Neuigkeiten', '#/news', 'fi-rr-newspaper', true)];
+      const buttons = [btn('Alle Neuigkeiten', '#/news', 'fi-rs-newspaper', true)];
       if (!list.length) return { title: 'Neuigkeiten', text: 'Die neuesten Neuigkeiten stehen in der App unter News.', buttons };
       return { title: 'Neuigkeiten', rows: list.map((n) => [n.date ? when(Date.parse(n.date), { day: '2-digit', month: '2-digit' }) : '', n.title]), buttons };
     }
@@ -190,9 +188,9 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
       const counts = new Map();
       staff.forEach((p) => counts.set(p.rank, [...(counts.get(p.rank) || []), p.displayName || p.username]));
       return {
-        title: `Team ab Supervisor · ${staff.length}`,
+        title: `Team ab Junior Supervisor · ${staff.length}`,
         rows: [...counts].map(([rank, names]) => [rankLabel(rank), names.slice(0, 6).join(', ') + (names.length > 6 ? ` +${names.length - 6}` : '')]),
-        buttons: [btn('Team anschreiben', '#/chat/team', 'fi-rr-users-alt', true)],
+        buttons: [btn('Team anschreiben', '#/chat/team', 'fi-rs-users-alt', true)],
       };
     }
     case 'members': {
@@ -200,14 +198,8 @@ export async function runCommand(store, env, user, c, cmd, enabled) {
       const list = c.kind === 'group' ? Object.values(c.members || {}) : [c.from, c.to, c.claimedBy].filter(Boolean);
       return { title: `Im Chat · ${list.length}`, rows: list.slice(0, 50).map((p) => [`${p.displayName || p.username} (@${p.username})`, ROLE[p.role] || (p.rank ? rankLabel(p.rank) : 'Mitglied')]) };
     }
-    case 'coins': {
-      const w = await walletView(store, user.sub);
-      const buttons = [btn('Zum Shop', '#/shop', 'fi-rr-shopping-cart', true)];
-      if (!w.syncedAt) return only('Deine Coins', 'Noch kein Stand aus dem Spiel. Spiel einmal Train Sim Germany, dann erscheinen deine Coins hier.', [], [btn('Spiel starten', L.game, 'fi-sr-play', true)]);
-      return only('Deine Coins', '', [['Coins', num(w.coins)], ['Verfügbar', num(w.available)], ['Züge', String(w.trains.length)], ['Strecken', String(w.routes.length)], ['Stand', when(w.syncedAt)]], buttons);
-    }
     case 'play':
-      return { title: 'Train Sim Germany spielen', text: 'Steig ein – die Bahnsimulation für ganz Deutschland auf Roblox.', buttons: [btn('Spielen', L.game, 'fi-sr-play', true), btn('Gruppe beitreten', L.group, 'fi-rr-user-add')] };
+      return { title: 'Train Sim Germany spielen', text: 'Steig ein – die Bahnsimulation für ganz Deutschland auf Roblox.', buttons: [btn('Spielen', L.game, 'fi-ss-play', true), btn('Gruppe beitreten', L.group, 'fi-rs-user-add')] };
     case 'discord': {
       const s = await liveStats(store, env, robloxUrl);
       return { title: 'Discord-Community', text: `${num(s.discordMembers)} Mitglieder, ${num(s.discordOnline)} gerade online.`, buttons: [btn('Discord beitreten', L.discord, 'fi-brands-discord', true)] };

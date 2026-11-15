@@ -25,7 +25,8 @@
  *   chat:<id>       → Gespräch mit Nachrichten (die letzten 500)
  *   chats:index     → Übersicht aller Gespräche (eigene, Anfragen, öffentliche Gruppen, Moderation)
  *   chats:of:<id>   → Gesprächs-IDs eines Nutzers (Rückfall für ältere Gespräche)
- *   cache:staff2    → Teamliste aus der Roblox-Gruppe (30 Minuten)
+ *   cache:staff3    → Teamliste aus der Roblox-Gruppe ab Junior Supervisor (30 Minuten)
+ *   rsince:<userId> → { rank, since } seit wann die App die Person mit diesem Rang kennt
  *
  * Gespräche werden 180 Tage nach der letzten Nachricht automatisch gelöscht.
  */
@@ -50,7 +51,7 @@ const NEW_PER_DAY = 15;
 const KEEP = 180 * 86400;
 const INDEX_MAX = 800;
 
-export const REASONS = ['training', 'rank', 'bug', 'report', 'application', 'shop', 'other'];
+export const REASONS = ['training', 'rank', 'bug', 'report', 'application', 'other'];
 const REASON_LABEL = { training: 'Frage zu einem Training', rank: 'Rang oder Beförderung', bug: 'Fehler im Spiel', report: 'Spieler melden', application: 'Bewerbung', shop: 'Coins, Züge, Strecken', other: 'Etwas anderes' };
 const AREA_LABEL = { driver: 'Qualified Driver', platform: 'Platform Staff', conductor: 'Conductor', signaller: 'Signaller', career: 'Karriere & Bewerbungen', tech: 'Technik & Fehler', report: 'Meldungen', other: 'Allgemein' };
 // Wer eine Anfrage annehmen darf: ab Supervisor, je nach Bereich. Leitung (OM, CDR, CEN) darf alles.
@@ -1184,14 +1185,14 @@ async function getJson(url) {
   return res.json();
 }
 export async function staffList(store, env) {
-  const cached = await store.get('cache:staff2');
+  const cached = await store.get('cache:staff3');
   if (cached && Date.now() - cached.at < 30 * 60000) return cached.list;
   const group = String(env.ROBLOX_GROUP_ID || '33684346');
   const groups = (env.ROBLOX_GROUPS_URL || 'https://groups.roblox.com').replace(/\/+$/, '');
   const thumbs = (env.ROBLOX_THUMBNAILS_URL || 'https://thumbnails.roblox.com').replace(/\/+$/, '');
   try {
     const roles = ((await getJson(`${groups}/v1/groups/${group}/roles`)).roles || [])
-      .map((r) => ({ ...r, rankName: matchRank(r) })).filter((r) => r.rank > 0 && atLeast(r.rankName, 'Supervisor'));
+      .map((r) => ({ ...r, rankName: matchRank(r) })).filter((r) => r.rank > 0 && atLeast(r.rankName, 'Junior Supervisor'));
     // Jede Person nur einmal – taucht jemand bei mehreren Rollen auf, zählt der höchste Rang
     const byId = new Map();
     for (const r of roles) {
@@ -1214,7 +1215,13 @@ export async function staffList(store, env) {
       (r.data || []).forEach((img) => { const p = byId.get(String(img.targetId)); if (p && img.state === 'Completed') p.avatar = img.imageUrl; });
     }
     list.sort((a, b) => level(b.rank) - level(a.rank) || a.username.localeCompare(b.username));
-    await store.put('cache:staff2', { at: Date.now(), list });
+    // Seit wann jemand diesen Rang hat (die App merkt sich den ersten Stand und jeden Wechsel)
+    const t0 = Date.now();
+    for (const p of list) {
+      const had = await store.get(`rsince:${p.userId}`);
+      if (!had || had.rank !== p.rank) await store.put(`rsince:${p.userId}`, { rank: p.rank, since: t0 });
+    }
+    await store.put('cache:staff3', { at: Date.now(), list });
     return list;
   } catch (e) {
     if (cached) return cached.list;

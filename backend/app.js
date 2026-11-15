@@ -38,10 +38,10 @@
  *   POST   /api/applications/announce    { ids } Bestandene an Discord senden (ab PRD)
  *   GET    /api/push/key                 Öffentlicher Schlüssel für Web-Push
  *   POST   /api/push/reminders           { subscription, reminders } – Erinnerungen für Trainings
- *   GET    /api/shop                     Züge, Strecken, Preise; angemeldet auch eigene Coins und Besitz
- *   POST   /api/shop/buy                 { kind: train | route, id } – Kauf, wird beim nächsten Abgleich im Spiel verbucht
  *   POST   /api/game/sync                Abgleich mit dem Spiel (Schlüssel GAME_API_KEY): Coins, Besitz, Käufe
- *   GET    /api/staff                    Team ab Supervisor aus der Roblox-Gruppe (für den Chat)
+ *   GET    /api/staff                    Team ab Junior Supervisor aus der Roblox-Gruppe (Teamseite, Chat)
+ *   GET    /api/team/<userId>            Steckbrief eines Teammitglieds (Umfang nach seinen Privatsphäre-Einstellungen)
+ *   PUT    /api/team/me                  Eigenen Steckbrief speichern (nur Team)
  *   GET    /api/chats?view=1             Eigene Gespräche und – fürs Team – offene Anfragen des Bereichs
  *   GET    /api/chats/public?q=          Öffentliche Gruppen
  *   GET    /api/chats/moderation?q=&kind= Alle Gespräche zum Beobachten (ab Supervisor)
@@ -99,7 +99,8 @@ import { matchRank, atLeast } from './ranks.js';
 import { getContent, addTraining, deleteTraining, addNews, updateNews, deleteNews, saveMedia, mediaResponse, setJob } from './content.js';
 import { submitApplication, listApplications, getApplication, setStatus, announce, ownView } from './applications.js';
 import { liveStats } from './stats.js';
-import { shopState, buy, gameAuthorized, gameSync } from './shop.js';
+import { gameAuthorized, gameSync } from './sync.js';
+import { teamMember, saveTeamProfile } from './team.js';
 import {
   listChats, publicChats, moderationChats, createChat, readChat, postMessage, deleteMessage, claimChat, closeChat, updateChat, addMembers,
   joinChat, leaveChat, removeMember, setRole, muteChat, hideChat, deleteChat, reportChat, startChatUpload, staffList, findPlayer,
@@ -333,7 +334,7 @@ export async function handle(req, env, store) {
     if (path === '/api/stats' && m === 'GET') {
       // Roblox-Zahlen plus das, was das Spiel selbst meldet (Spieler online, gezählte Besuche)
       const [s, online, total] = await Promise.all([liveStats(store, env, robloxUrl), liveOnline(store), store.get('gstats:total')]);
-      return json(req, env, { ...s, playing: Math.max(s.playing || 0, online), counted: { visits: (total && total.visits) || 0, players: (total && total.players) || 0 } });
+      return json(req, env, { ...s, playing: Math.max(s.playing || 0, online), counted: { visits: (total && total.players) || 0, joins: (total && total.visits) || 0, players: (total && total.players) || 0 } });
     }
     if (path === '/api/gamestats' && m === 'GET') return json(req, env, await gameStats(store));
     if (path === '/api/game/status' && m === 'GET') {
@@ -341,7 +342,7 @@ export async function handle(req, env, store) {
       const live = Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).length;
       const teams = await store.get('game:teams');
       const scripts = [...new Set(Object.values(servers || {}).filter((x) => Date.now() - x.at < 180000).map((x) => x.script || 1))];
-      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live, teams: teams || null, scripts, script: 3 });
+      return json(req, env, { configured: !!env.GAME_API_KEY, lastSync: last ? last.at : null, lastReject: reject || null, live, teams: teams || null, scripts, script: 4 });
     }
     const file = path.match(/^\/api\/files\/([\w-]+)$/);
     if (file && m === 'GET') return await fileResponse(req, env, store, file[1], url, cors(req, env));
@@ -392,9 +393,10 @@ export async function handle(req, env, store) {
       return json(req, env, { ok: true });
     }
     if (!path.startsWith('/api/')) return json(req, env, { error: 'not_found' }, 404);
-    if (path === '/api/shop' && m === 'GET') return json(req, env, await shopState(store, user));
     if (path === '/api/pservers' && m === 'GET') return json(req, env, await listPrivateServers(store, user));
     if (path === '/api/servers' && m === 'GET') return json(req, env, await serversView(store, env, user));
+    const teamM = path.match(/^\/api\/team\/(\d{1,20})$/);
+    if (teamM && m === 'GET') return json(req, env, await teamMember(store, env, user, teamM[1], await staffList(store, env)));
     const liveServer = path.match(/^\/api\/servers\/([\w-]{1,64})$/);
     if (liveServer && m === 'GET') return json(req, env, await serverDetail(store, env, user, liveServer[1]));
     if (path === '/api/players/status' && m === 'POST') return json(req, env, await playersStatus(store, env, user, await readJson(req, 5000)));
@@ -403,8 +405,6 @@ export async function handle(req, env, store) {
     if (inviteAnswer && m === 'POST') return json(req, env, await answerInvite(store, env, user, inviteAnswer[1], await readJson(req, 2000)));
     if (!user) return json(req, env, { error: 'unauthorized' }, 401);
 
-    // Shop
-    if (path === '/api/shop/buy' && m === 'POST') return json(req, env, await buy(store, user, await readJson(req, 1000)));
 
     // Chat
     if (path === '/api/chats' && m === 'GET') return json(req, env, await listChats(store, await freshUser(env, store, user), url.searchParams.get('view') === '1'));
@@ -496,6 +496,7 @@ export async function handle(req, env, store) {
       await store.put(`user:${user.sub}`, user);
       return json(req, env, { privacy: user.privacy });
     }
+    if (path === '/api/team/me' && m === 'PUT') return json(req, env, { profile: await saveTeamProfile(store, user, await readJson(req, 5000), await staffList(store, env)) });
     if (path === '/api/me/settings' && m === 'PUT') {
       const next = cleanSettings(await readJson(req, 20000));
       // Nur übernehmen, wenn neuer als der gespeicherte Stand (mehrere Geräte)

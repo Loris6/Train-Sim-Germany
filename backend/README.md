@@ -8,7 +8,7 @@ Die Anmeldung mit Roblox braucht **kein** Backend – dafür reicht die Client-I
 - **Chat** – Spieler an Spieler, Gruppen (privat oder öffentlich, mit Regeln, Rechten und Befehlen), Anfragen ans Team, Fotos/Videos/PDFs; Moderation ab Supervisor
 - **Benachrichtigungen, auch bei geschlossener App** – neue Chat-Nachrichten (für beide Seiten), Ergebnis einer Bewerbung, fürs Team neue Anfragen und Bewerbungen, Trainings
 - **E-Mails an Bewerber** – nach dem Absenden die ganze Bewerbung, nach der Auswertung das Ergebnis (Brevo oder Resend)
-- **Shop** – Coins, Züge und Strecken aus dem Spiel; Käufe in der App verbucht das Spiel (Skript `game/TSGAppSync.server.lua`)
+- **Team-Steckbriefe** – Teamliste ab Junior Supervisor, „im Rang seit“, Beitrittsdaten und vom Teammitglied gepflegte Angaben (je nach Privatsphäre)
 - **Einstellungen auf allen Geräten** – Darstellung, Sprache, gemerkte Trainings und Glocken
 - **Echte Zahlen** – Gruppenmitglieder (auch je Rolle), Spieler online, Besuche, Favoriten, Discord-Mitglieder
 - **Benachrichtigungen für Trainings per Web-Push**, auch wenn die App geschlossen ist
@@ -40,7 +40,7 @@ npx wrangler login
 npx wrangler deploy                                   # Speicher (Durable Object) wird automatisch angelegt
 npx wrangler secret put DISCORD_WEBHOOK_URL           # optional: Webhook 1 – neue Bewerbungen
 npx wrangler secret put DISCORD_RESULTS_WEBHOOK_URL   # optional: Webhook 2 – Glückwünsche
-npx wrangler secret put GAME_API_KEY                  # optional: Abgleich mit dem Spiel (Shop)
+npx wrangler secret put GAME_API_KEY                  # optional: Abgleich mit dem Spiel (Server, Spieler, Fahrten)
 ```
 
 Danach die Adresse (`https://tsg-backend.<name>.workers.dev`) in `assets/js/config.js` bei `api` eintragen.
@@ -59,16 +59,15 @@ node server.js           # läuft auf http://localhost:8787
 
 Daten liegen in `data/store.json`, fällige Benachrichtigungen gehen jede Minute raus. `.env` und `data/` stehen in `.gitignore` und werden nie hochgeladen. Für Web-Push muss das Backend über **https** erreichbar sein.
 
-## Shop: Abgleich mit dem Spiel
+## Abgleich mit dem Spiel
 
-Das Spiel bleibt die Quelle für Coins und Besitz. Das Skript [`game/TSGAppSync.server.lua`](../game/TSGAppSync.server.lua) kommt nach *ServerScriptService* und
+Das Skript [`game/TSGAppSync.server.lua`](../game/TSGAppSync.server.lua) (Version 4) kommt nach *ServerScriptService* und
 
-- meldet alle 30 Sekunden (und beim Betreten/Verlassen) Coins, Züge und Strecken der Spieler – nur wenn sich etwas geändert hat,
-- holt Käufe aus der App ab, zieht die Coins im Spiel ab und schaltet Zug bzw. Strecke frei.
+- meldet alle 30 Sekunden (und beim Betreten/Verlassen) den Server, wer darauf ist und was jeder gerade macht (Team, Zug, Linie, Ziel, nächster Halt, Bahnhof),
+- meldet die Teams mit „Extern“ und beendete Fahrten für die Statistik,
+- setzt bei privaten Servern die Einstellungen aus der App um (Zutritt, Begrüßung, Chat im Spiel).
 
-Einrichten: HTTP-Anfragen im Spiel erlauben, im Creator Dashboard unter *Secrets* das Secret `tsg_game_key` mit demselben Wert wie `GAME_API_KEY` anlegen (Domain: die Adresse des Backends, z. B. `tsg-backend.lorismziray01.workers.dev`) und oben im Skript die Adresse des Backends eintragen. Secrets aus dem Dashboard gelten nur auf echten Servern; zum Testen in Studio zusätzlich unter *Game Settings → Security → Secrets* eintragen. Im Output steht dann „[TSG] Mit der App verbunden“ oder was noch fehlt; das Team sieht den Stand auch auf der Server-Seite der App (mit Knopf „Skript kopieren“). Speichert euer Spiel Coins und Besitz anders als in `leaderstats.Coins` bzw. den Ordnern `OwnedTrains`/`OwnedRoutes`, die beiden Funktionen `Economy.read` und `Economy.apply` anpassen. Preise und IDs stehen in `shop.js` (`CATALOG`) – sie müssen zu den IDs im Spiel passen.
-
-In der App werden gekaufte Coins sofort **reserviert**; bis das Spiel den Kauf verbucht hat, steht dort „Wird im Spiel freigeschaltet“. Reichen die Coins im Spiel inzwischen nicht mehr, lehnt das Spiel den Kauf ab und die Reservierung verfällt.
+Einrichten: HTTP-Anfragen im Spiel erlauben, im Creator Dashboard unter *Secrets* das Secret `tsg_game_key` mit demselben Wert wie `GAME_API_KEY` anlegen (Domain: die Adresse des Backends, z. B. `tsg-backend.lorismziray01.workers.dev`) und oben im Skript die Adresse des Backends eintragen. Secrets aus dem Dashboard gelten nur auf echten Servern; zum Testen in Studio zusätzlich unter *Game Settings → Security → Secrets* eintragen. Im Output steht dann „[TSG] Mit der App verbunden“ oder was noch fehlt; das Team sieht den Stand auch auf der Server-Seite der App (mit Knopf „Skript kopieren“). Die Fahrzeug-IDs für die Statistik stehen in `sync.js` (`VEHICLES`) – sie müssen zu den IDs im Spiel passen. Den früheren Shop (Coins, Käufe) gibt es nicht mehr; ältere Skripte, die noch Coins schicken, stören nicht.
 
 ## E-Mails an Bewerber
 
@@ -100,7 +99,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 
 - **Gespräche:** Jeder angemeldete Spieler kann jedem Roblox-Spieler schreiben (per Name). Gibt es schon ein offenes Gespräch zwischen den beiden, geht es dort weiter.
 - **Gruppen** (bis 50 Leute): privat (nur auf Einladung) oder öffentlich (unter *Gruppen* zu finden, jeder kann beitreten). Inhaber und Admins stellen ein: Name, Beschreibung, Farbe, **Regeln**, wer Leute hinzufügen darf (Inhaber / Admins / alle), wer schreiben darf (alle / nur Admins), Fotos und Videos, Langsam-Modus (5 s bis 5 min) und **Befehle** (für alle / nur Admins / aus, einzeln wählbar). Rollen: Inhaber, Admin, Mitglied. Wer entfernt wurde, kann einer öffentlichen Gruppe nicht wieder beitreten, bis ihn jemand einlädt. Verlässt der Inhaber die Gruppe, wird ein Admin (oder das älteste Mitglied) Inhaber.
-- **Befehle** (`commands.js`): `/help`, `/rules`, `/GetGroupData` (alle Rollen der Gruppe), `/GetUser <Name>`, `/GetRank <Name>`, `/Online <Name>`, `/GetServers`, `/GetPrivateServers`, `/GetOnline`, `/GetStats`, `/GetTrainings`, `/GetNews`, `/GetTeam`, `/Members`, `/Coins`, `/Play`, `/Discord`, `/Time`, `/Roll <Zahl>`, `/Ping` (dazu deutsche Kurzformen wie `/hilfe`, `/regeln`, `/würfeln`). Die Antwort schreibt der **TSG-Bot** als Karte mit Knöpfen (nur Links zu roblox.com, discord.gg oder in die App); Fehler und persönliche Antworten (`/Coins`) sieht nur, wer gefragt hat. In Gruppen lassen sich Befehle einzeln abschalten – neue Befehle sind automatisch an. `/GetServers`, `/GetOnline`, `/Online` und „Im Spiel“ bei `/GetUser` brauchen das Spiel-Skript `game/TSGAppSync.server.lua` – es meldet alle 30 Sekunden seinen Server.
+- **Befehle** (`commands.js`): `/help`, `/rules`, `/GetGroupData` (alle Rollen der Gruppe), `/GetUser <Name>`, `/GetRank <Name>`, `/Online <Name>`, `/GetServers`, `/GetPrivateServers`, `/GetOnline`, `/GetStats`, `/GetTrainings`, `/GetNews`, `/GetTeam`, `/Members`, `/Play`, `/Discord`, `/Time`, `/Roll <Zahl>`, `/Ping` (dazu deutsche Kurzformen wie `/hilfe`, `/regeln`, `/würfeln`). Die Antwort schreibt der **TSG-Bot** als Karte mit Knöpfen (nur Links zu roblox.com, discord.gg oder in die App); Fehler sieht nur, wer gefragt hat. In Gruppen lassen sich Befehle einzeln abschalten – neue Befehle sind automatisch an. `/GetServers`, `/GetOnline`, `/Online` und „Im Spiel“ bei `/GetUser` brauchen das Spiel-Skript `game/TSGAppSync.server.lua` – es meldet alle 30 Sekunden seinen Server.
 - **Gruppenbild:** wird in der App auf 256 × 256 zugeschnitten (JPEG, höchstens 300 KB) und unter `/media/chat/<id>` ausgeliefert. Wer es ändern darf, stellt der Inhaber ein (Inhaber / Admins / alle).
 - **Live aus dem Spiel** (`game.js`): Bei jedem Abgleich meldet das Spiel-Skript, wer auf dem Server ist und was er macht (Rolle = Team, Zug, Linie, Ziel, nächster Halt, Bahnhof – siehe `Activity.read` im Skript), dazu alle **Teams mit „Extern“** (`teams: [{ name, color, order }]` und alle Teamnamen in `teamNames` – „Extern“ und die Zahl als Attribut oder als Werte-Objekt im Team, Groß-/Kleinschreibung egal; Farbe aus `TeamColor`; das Team mit `order` 2 fertigt ab). Der letzte Stand liegt in `game:teams` und gilt auch für Server mit altem Skript; `GET /api/game/status` zeigt ihn dem Team samt Skript-Version der laufenden Server. Besuche zählt das Backend zusätzlich selbst (jeder Beitritt, `gstats:total.visits`, verschiedene Spieler `players`) – Roblox verbirgt Besuche bei privaten oder nicht freigegebenen Spielen (`restricted` in `/api/stats`) und beendete Fahrten (`ServerStorage.TSGTripDone:Fire(player, { route, vehicle, km, delay })`). Daraus entstehen die Server-Seite, „Spieler“ und die Statistik; die Spielzeit zählt das Backend selbst. Neue private Server sind in der App für alle sichtbar, bis der Besitzer das ändert. Der Zeitplan merkt sich alle 2 Minuten die Spielerzahl je Stunde und räumt Server ohne Meldung nach 10 Minuten weg.
 - **Benachrichtigungen**: Nachrichten von Personen kommen als „[TSG] Name“ mit der Nachricht darunter; wer schreiben darf, bekommt einen signierten Antwort-Link (7 Tage) und kann direkt in der Benachrichtigung antworten (`POST /api/chats/<id>/reply`). @Name erwähnt jemanden – auch bei stummgeschaltetem Gespräch. Alle anderen Benachrichtigungen zeigt der Service Worker als „Train Sim Germany“ mit Linie, Betreff und Nachricht.
@@ -112,7 +111,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 - **Verbindung zum Spiel**: `GET /api/game/status` zeigt, ob `GAME_API_KEY` gesetzt ist, wann sich das Spiel zuletzt gemeldet hat und ob Meldungen abgelehnt wurden (falscher oder fehlender Schlüssel). **Ohne `GAME_API_KEY` erscheinen keine Server in der App** – den Schlüssel als GitHub-Secret `GAME_API_KEY` und mit demselben Wert als Roblox-Secret `tsg_game_key` anlegen, dann „Backend veröffentlichen“ starten.
 - **Server-Chats und private Server** (`pservers.js`): Läuft ein privater Server, meldet das Spiel seine ID und den Besitzer. Der Besitzer sieht ihn in der App (Server-Seite) und stellt ein: Name, **Beitreten über die App** (mit dem Link zum privaten Server aus Roblox, nur roblox.com) oder **nur über Roblox**, wer auf den Server darf (jeder mit Link / nur Mitglieder des Server-Chats), wer ihn in der App sieht (alle / Chat-Mitglieder / nur er), Begrüßung im Spiel und ob Nachrichten aus dem Server-Chat im Spiel erscheinen. Ein Server-Chat ist eine Gruppe, mit der ein oder mehrere private Server verbunden sind. Beim Abgleich bekommt der Server seine Einstellungen zurück – das Spiel weist dann Nicht-Mitglieder ab, zeigt Begrüßung und Regeln und die Chat-Nachrichten (von Roblox gefiltert; Befehle werden nicht weitergegeben). Dafür im Spiel zusätzlich `game/TSGAppChat.client.lua` als LocalScript einsetzen.
 - **Fotos, Videos, PDFs** (`files.js`): Fotos verkleinert die App vorher (max. 1920 px), Videos bis 80 MB, PDFs bis 20 MB, bis 10 Dateien je Nachricht, 300 MB pro Person und Tag. Hochgeladen wird in Stücken zu 1 MB; abgerufen wird über signierte Links (nur wer das Gespräch sehen darf bekommt sie; gültig bis Ende des nächsten Tages), Videos lassen sich vorspulen. Gespeichert wird alles im Durable Object (Bytes unter `blob:`), gelöscht mit der Nachricht, dem Gespräch oder nach 180 Tagen.
-- **Anfrage ans Team:** Grund (Training, Rang, Fehler, Spieler melden, Bewerbung, Shop, Sonstiges) und Bereich wählen. Alle, die den Bereich betreuen, sehen sie unter *Anfragen*; nicht angenommene stehen oben (wer am längsten wartet, zuerst). Wer annimmt, steht im Gespräch – danach schreiben nur noch Spieler und diese Person.
+- **Anfrage ans Team:** Grund (Training, Rang, Fehler, Spieler melden, Bewerbung, Sonstiges) und Bereich wählen. Alle, die den Bereich betreuen, sehen sie unter *Anfragen*; nicht angenommene stehen oben (wer am längsten wartet, zuerst). Wer annimmt, steht im Gespräch – danach schreiben nur noch Spieler und diese Person.
 - **Wer betreut was** (`AREAS` in `chat.js`): Qualified Driver / Platform Staff / Conductor / Signaller → Supervisor und der jeweilige Manager · Karriere → Public Relations Department · Technik → Project Engineer · Meldungen → alle ab Supervisor · Allgemein → Supervisor und PRD. Operation Manager, Community Director und Chief Engineer sehen alles.
 - **Moderation (alle über Junior Supervisor, also ab Supervisor):** Reiter *Moderation* mit allen Gesprächen (Suche, Filter, gemeldete zuerst). Jedes Gespräch lässt sich **unsichtbar beobachten** oder **sichtbar beitreten** (alle sehen dann „… (Moderation) ist beigetreten“); Moderation kann Nachrichten löschen, Leute entfernen und Gespräche für alle löschen. Ausgenommen sind Gespräche mit jemandem, der einen **höheren Rang** hat. Jedes Beobachten und Beitreten wird im Gespräch vermerkt (nur für die Moderation sichtbar).
 - **Melden:** Im Gespräch unter *Info → Gespräch melden* – daraus wird eine Anfrage an „Meldungen“ mit Link auf das Gespräch.
@@ -141,7 +140,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `GET /api/applications` · `GET /api/applications/<id>` | Bewerbungen prüfen (ab PRD; die eigene sieht jeder) |
 | `PUT /api/applications/<id>` | `{ "status": "passed" \| "failed" \| "new" }` (ab PRD) |
 | `POST /api/applications/announce` | `{ ids }` – Bestandene an Discord senden und gratulieren (ab PRD) |
-| `GET /api/shop` · `POST /api/shop/buy` | Katalog, eigene Coins und Besitz · `{ kind: "train" \| "route", id }` kaufen |
+| `GET /api/team/<id>` · `PUT /api/team/me` | Steckbrief eines Teammitglieds (Umfang nach seiner Privatsphäre) · eigenen Steckbrief speichern (nur Team) |
 | `GET /api/game/status` | Verbindung zum Spiel: Schlüssel gesetzt, letzte Meldung, letzte abgelehnte Meldung |
 | `POST /api/invites` · `GET /api/invites/<id>` · `POST /api/invites/<id>/answer` | Einladung ins Spiel senden, ansehen, annehmen/ablehnen (angemeldet oder mit Schlüssel aus der Benachrichtigung) |
 | `POST /api/chats/<id>/reply` | Antwort direkt aus der Benachrichtigung (signiert, ohne Sitzung) |
@@ -156,7 +155,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `GET/PUT/DELETE /api/chats/<id>/bots/<bot>` | Bot mit Regeln `{ name, desc, on, prefix, rules }` · ändern · löschen |
 | `PUT/DELETE /api/chats/<id>/bots/<bot>/photo` · `GET /media/bot/<chat>/<bot>` | Bild des Bots |
 | `POST /api/game/sync` | Abgleich mit dem Spiel (`Authorization: Bearer <GAME_API_KEY>`) |
-| `GET /api/staff` | Team ab Supervisor aus der Roblox-Gruppe |
+| `GET /api/staff` | Team ab Junior Supervisor aus der Roblox-Gruppe |
 | `GET /api/chats` · `POST /api/chats` | Eigene Gespräche und offene Anfragen des Bereichs · neue Anfrage, Direktnachricht oder Gruppe |
 | `GET /api/chats/public` · `GET /api/chats/moderation` | Öffentliche Gruppen · alle Gespräche für die Moderation (ab Supervisor) |
 | `GET /api/chats/<id>?since=<ms>` | Gespräch lesen (mit `since` nur, wenn sich etwas geändert hat; `observe=1` = Moderation schaut zu) |
@@ -169,7 +168,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `POST /api/chats/<id>/servers` | Server-Chat: privaten Server verbinden (`{ add, server: { join, link, access, relay, welcome } }`) oder lösen (`{ remove }`) |
 | `GET /api/pservers` · `PUT /api/pservers/<id>` | Private Server (eigene und sichtbare) · Einstellungen des Besitzers |
 | `GET /api/servers` · `GET /api/servers/<jobId>` | Laufende Server aus dem Spiel: Spieler, Rollen (Passenger … Supervisor), Profilbilder · ein Server mit allen Spielern und Zügen |
-| `GET /api/players/find?q=` · `POST /api/players/status` | Spieler auf Roblox suchen · verfolgte Spieler `{ ids }`: Name, Bild, ob und wo in Train Sim Germany |
+| `GET /api/players/find?q=` · `POST /api/players/status` | Spieler auf Roblox suchen · verfolgte Spieler `{ ids }`: Name, Bild und nur die laufende Zugfahrt |
 | `GET /api/gamestats` · `GET /api/me/stats` | Statistik aus dem Spiel (Fahrten, km, Pünktlichkeit, Spieler je Stunde) · eigene Statistik – ohne Meldungen alles 0 |
 | `POST /api/chats/<id>/claim` · `/close` | Anfrage annehmen · beenden |
 | `GET /api/push/key` · `POST /api/push/reminders` | Web-Push: öffentlicher Schlüssel · Erinnerungen für Trainings speichern |
@@ -196,7 +195,7 @@ Auf dem iPhone/iPad gehen Benachrichtigungen nur in der installierten App (Safar
 | `RESEND_API_KEY` | statt Brevo | **Geheim.** Schlüssel von Resend (braucht eine eigene Domain) |
 | `EMAIL_FROM` | für E-Mails | Absenderadresse (bei Brevo bestätigt) |
 | `EMAIL_FROM_NAME` · `EMAIL_REPLY_TO` | nein | Absendername (Standard: Train Sim Germany) · Antwortadresse |
-| `GAME_API_KEY` | für den Shop | **Geheim.** Schlüssel, mit dem sich das Spiel beim Abgleich ausweist (im Spiel als Secret `tsg_game_key`) |
+| `GAME_API_KEY` | für den Abgleich mit dem Spiel | **Geheim.** Schlüssel, mit dem sich das Spiel beim Abgleich ausweist (im Spiel als Secret `tsg_game_key`) |
 | `PUSH_CONTACT` | nein | Kontakt für Web-Push (`mailto:` oder `https:`), sonst `APP_URL` |
 | `SESSION_SECRET` | nein | Eigener Schlüssel für Sitzungen (sonst erzeugt das Backend einen) |
 
