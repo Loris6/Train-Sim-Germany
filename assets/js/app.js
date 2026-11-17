@@ -9,8 +9,8 @@
   // ---------- Hilfsfunktionen ----------
   const pad = (n) => String(n).padStart(2, '0');
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  // Flaticon UIcons, z. B. icon('fi-rs-home')
-  const icon = (name, cls = '') => `<i class="fi ${name} ic ${cls}" aria-hidden="true"></i>`;
+  // Flaticon UIcons, z. B. icon('ph-house')
+  const icon = (name, cls = '') => `<i class="i ${name} ic ${cls}" aria-hidden="true"></i>`;
   const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ß/g, 'ss');
 
   const store = {
@@ -66,7 +66,7 @@
     if (!box) return;
     const sysReduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
     const row = (attr, title, text, on, off, note) => `<label class="toggle${off ? ' is-disabled' : ''}">
-        <span class="toggle__text"><b>${title}</b><small>${text}</small>${note ? `<small class="toggle__note">${icon('fi-rs-info')}${note}</small>` : ''}</span>
+        <span class="toggle__text"><b>${title}</b><small>${text}</small>${note ? `<small class="toggle__note">${icon('ph-info')}${note}</small>` : ''}</span>
         <input type="checkbox" role="switch" ${attr}${on ? ' checked' : ''}${off ? ' disabled' : ''}>
         <span class="toggle__ui" aria-hidden="true"></span>
       </label>`;
@@ -372,10 +372,10 @@
     const box = $('[data-kpis="home"]');
     if (!box) { renderHomeNumbers(); return; }
     box.innerHTML = [
-      kpi({ label: t('Spieler online'), num: state.online, ic: 'fi-rs-users-alt', live: !!state.liveOnline, spark: hourSeries(12).map((x) => x.value), bindKey: 'online' }),
-      kpi({ label: t('Aktive Server'), num: sv ? sv.length : g.live.servers, ic: 'fi-rs-database', live: liveMode(), note: t('aus dem Spiel'), key: 'home-servers' }),
-      kpi({ label: t('Züge unterwegs'), num: sv ? sv.reduce((n, s) => n + (s.trains || 0), 0) : g.live.trains, ic: 'fi-rs-train-side', live: liveMode(), note: t('aus dem Spiel'), key: 'home-trains' }),
-      kpi({ label: t('Pünktlichkeit'), num: punctualPct(g.today), format: 'pct', ic: 'fi-rs-clock-three', note: t('heute · {n} Fahrten', { n: fmt(g.today.trips) }), key: 'home-punct' }),
+      kpi({ label: t('Spieler online'), num: state.online, ic: 'ph-users-three', live: !!state.liveOnline, spark: hourSeries(12).map((x) => x.value), bindKey: 'online' }),
+      kpi({ label: t('Aktive Server'), num: sv ? sv.length : g.live.servers, ic: 'ph-hard-drives', live: liveMode(), note: t('aus dem Spiel'), key: 'home-servers' }),
+      kpi({ label: t('Züge unterwegs'), num: sv ? sv.reduce((n, s) => n + (s.trains || 0), 0) : g.live.trains, ic: 'ph-train', live: liveMode(), note: t('aus dem Spiel'), key: 'home-trains' }),
+      kpi({ label: t('Pünktlichkeit'), num: punctualPct(g.today), format: 'pct', ic: 'ph-clock', note: t('heute · {n} Fahrten', { n: fmt(g.today.trips) }), key: 'home-punct' }),
     ].join('');
     countUp(box);
   }
@@ -391,12 +391,12 @@
     }
     const box = $('[data-kpis="stats"]');
     box.innerHTML = [
-      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L && !s.restricted, note: s.restricted ? t('verschiedene Spieler') : t('laut Roblox'), ic: 'fi-rs-gamepad', key: 'st-visits' }),
-      kpi({ label: t('Favoriten'), num: s.favorites, format: 'exact', live: L, ic: 'fi-rs-star', key: 'st-favs' }),
-      kpi({ label: t('Gruppenmitglieder'), num: s.groupMembers, format: 'compact', live: L, ic: 'fi-rs-users-alt', key: 'st-group' }),
-      kpi({ label: 'Discord', num: s.discordMembers, format: 'compact', live: L, ic: 'fi-brands-discord', key: 'st-discord' }),
-      kpi({ label: t('Gefahrene km'), num: g.total.km, format: 'km', note: t('gesamt'), ic: 'fi-rs-route', key: 'st-km' }),
-      kpi({ label: t('Fahrten heute'), num: g.today.trips, note: t('heute'), ic: 'fi-rs-train-side', key: 'st-trips' }),
+      kpi({ label: t('Besuche gesamt'), num: s.visits, format: 'exact', live: L && !s.restricted, note: s.restricted ? t('verschiedene Spieler') : t('laut Roblox'), ic: 'ph-game-controller', key: 'st-visits' }),
+      kpi({ label: t('Favoriten'), num: s.favorites, format: 'exact', live: L, ic: 'ph-star', key: 'st-favs' }),
+      kpi({ label: t('Gruppenmitglieder'), num: s.groupMembers, format: 'compact', live: L, ic: 'ph-users-three', key: 'st-group' }),
+      kpi({ label: 'Discord', num: s.discordMembers, format: 'compact', live: L, ic: 'si-discord', key: 'st-discord' }),
+      kpi({ label: t('Gefahrene km'), num: g.total.km, format: 'km', note: t('gesamt'), ic: 'ph-path', key: 'st-km' }),
+      kpi({ label: t('Fahrten heute'), num: g.today.trips, note: t('heute'), ic: 'ph-train', key: 'st-trips' }),
     ].join('');
     countUp(box);
   }
@@ -492,7 +492,7 @@
     $('[data-meters]').innerHTML = D.nets.map((net) => {
       const r = net.routes.reduce((a, no) => { const x = g.week.routes[no]; if (x) { a.n += x.n; a.ok += x.ok; } return a; }, { n: 0, ok: 0 });
       const v = r.n ? (r.ok / r.n) * 100 : 0;
-      const s = !r.n ? ['none', t('Keine Fahrten'), 'fi-rs-info'] : v >= 93 ? ['ok', t('Gut'), 'fi-rs-check'] : v >= 88 ? ['warn', t('Angespannt'), 'fi-rs-triangle-warning'] : ['bad', t('Kritisch'), 'fi-rs-triangle-warning'];
+      const s = !r.n ? ['none', t('Keine Fahrten'), 'ph-info'] : v >= 93 ? ['ok', t('Gut'), 'ph-check'] : v >= 88 ? ['warn', t('Angespannt'), 'ph-warning'] : ['bad', t('Kritisch'), 'ph-warning'];
       return `<li>
         <span class="m-label">${esc(t(net.label))}</span>
         <span class="m-value"><span class="state state--${s[0]}">${icon(s[2])}${s[1]}</span>${pct(v, 1)}</span>
@@ -531,17 +531,17 @@
     const fill = (text, rank, color, team = rank) => esc(t(text))
       .replace(/\{rank\}/g, rk(rank, color))
       .replace(/\{team\}/g, rk(team, color))
-      .replace('{group}', `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Train Sim Germany Gruppe auf Roblox')}${icon('fi-rs-arrow-up-right-from-square')}</a>`);
+      .replace('{group}', `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Train Sim Germany Gruppe auf Roblox')}${icon('ph-arrow-square-out')}</a>`);
     const start = `<article class="role-card role-card--start">
       <div class="role-card__media"><img src="assets/img/group.svg" alt="${esc(t('Roblox-Spieler winken auf dem Bahnsteig vor einem Regionalzug'))}" loading="lazy"></div>
       <div class="role-card__body">
         <h3>${t('Starte jetzt bei Train Sim Germany!')}</h3>
         <div class="start-actions">
-          <a class="btn btn--primary btn--lg btn--block" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Server beitreten')}</a>
+          <a class="btn btn--primary btn--lg btn--block" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('phf-play')}${t('Server beitreten')}</a>
           <p>${t('Deine Reise beginnt auf Roblox.')}</p>
-          <a class="btn btn--outline btn--lg btn--block" href="${esc(D.links.group)}" target="_blank" rel="noopener">${icon('fi-rs-user-add')}${t('Roblox-Gruppe beitreten')}</a>
+          <a class="btn btn--outline btn--lg btn--block" href="${esc(D.links.group)}" target="_blank" rel="noopener">${icon('ph-user-plus')}${t('Roblox-Gruppe beitreten')}</a>
           <p>${t('Für Ränge und Trainings.')}</p>
-          <a class="btn btn--outline btn--lg btn--block btn--discord" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}${t('Discord-Community beitreten')}</a>
+          <a class="btn btn--outline btn--lg btn--block btn--discord" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('si-discord')}${t('Discord-Community beitreten')}</a>
           <p>${t('Chatte mit {n} anderen Spielern.', { n: `<span data-bind="discordMembers">${compact(D.stats.discordMembers)}</span>` })}</p>
         </div>
       </div>
@@ -620,7 +620,7 @@
       return `<article class="scard">
         <div class="scard__media">
           <img src="assets/img/${r.img}" alt="${esc(t('Illustration der Strecke {name}', { name: t(r.title) }))}" loading="lazy">
-          <button class="glass-btn" type="button" aria-pressed="${fav}" aria-label="${esc(t('{name} merken', { name: t(r.title) }))}" data-fav="${esc(r.title)}">${icon('fi-rs-heart', 'fav-off')}${icon('fi-ss-heart', 'fav-on')}</button>
+          <button class="glass-btn" type="button" aria-pressed="${fav}" aria-label="${esc(t('{name} merken', { name: t(r.title) }))}" data-fav="${esc(r.title)}">${icon('ph-heart', 'fav-off')}${icon('phf-heart', 'fav-on')}</button>
           <span class="line line--${r.cat}">${esc(r.line)}</span>
         </div>
         <div class="scard__body">
@@ -656,7 +656,7 @@
   const lineEnd = (L) => L.stops[L.stops.length - 1][1];
   const lineOffset = (L, dir) => (dir ? (L.offset + Math.floor(L.every / 2)) % L.every : L.offset);
   const lineBadge = (L) => `<span class="line line--${L.cat}">${esc(L.name)}</span>`;
-  const lineChip = (L) => `<span class="line line--${L.cat} line--chip">${icon('fi-rs-train-side')}${esc(L.name)}</span>`;
+  const lineChip = (L) => `<span class="line line--${L.cat} line--chip">${icon('ph-train')}${esc(L.name)}</span>`;
   // Eine Fahrt: dir 0 = Richtung wie in data.js, 1 = Gegenrichtung, start = Abfahrt am ersten Halt (Minuten)
   function tripOf(lineId, dir, start) {
     const L = D.lines[lineId];
@@ -911,9 +911,9 @@
   function doingHtml(p) {
     if (p.line || p.train) {
       const L = lineByName(p.line);
-      return `${icon('fi-rs-train-side')}<span>${p.line ? `<span class="line line--${L ? L.cat : catOfTrain(p.veh) || 're'}">${esc(p.line)}</span>` : ''}${p.train ? `<b>${esc(p.train)}</b>` : ''}${p.dest ? ` ${t('nach {to}', { to: esc(p.dest) })}` : ''}</span>`;
+      return `${icon('ph-train')}<span>${p.line ? `<span class="line line--${L ? L.cat : catOfTrain(p.veh) || 're'}">${esc(p.line)}</span>` : ''}${p.train ? `<b>${esc(p.train)}</b>` : ''}${p.dest ? ` ${t('nach {to}', { to: esc(p.dest) })}` : ''}</span>`;
     }
-    if (p.at) return `${icon('fi-rs-marker')}<span>${esc(p.at)}</span>`;
+    if (p.at) return `${icon('ph-map-pin')}<span>${esc(p.at)}</span>`;
     return '';
   }
   const lineByName = (name) => (name ? Object.values(D.lines).find((L) => L.name.replace(/\s+/g, '') === String(name).replace(/\s+/g, '')) : null);
@@ -961,11 +961,11 @@
     const full = c.max && c.players >= c.max;
     return `<article class="sv-card${c.private ? ' is-private' : ''}">
       <div class="sv-card__top">
-        <span class="sv-card__kind">${icon(c.private ? 'fi-rs-lock' : 'fi-rs-signal-alt-2')}${kind}</span>
+        <span class="sv-card__kind">${icon(c.private ? 'ph-lock' : 'ph-cell-signal-high')}${kind}</span>
         <span class="sv-card__live"><i></i>${full ? t('Voll') : t('Live')}</span>
       </div>
       <h3 class="sv-card__title">${esc(c.title)}</h3>
-      <p class="sv-card__sub">${c.sub ? `${esc(c.sub)} · ` : ''}<button class="sv-card__id" type="button" data-copy="${esc(c.id)}" title="${esc(t('Server-ID kopieren'))}">#${esc(shortId(c.id))}${icon('fi-rs-copy')}</button></p>
+      <p class="sv-card__sub">${c.sub ? `${esc(c.sub)} · ` : ''}<button class="sv-card__id" type="button" data-copy="${esc(c.id)}" title="${esc(t('Server-ID kopieren'))}">#${esc(shortId(c.id))}${icon('ph-copy')}</button></p>
       <div class="sv-card__load">
         <span class="sv-card__count"><b>${countHtml(c.players, 'fmt', `sv-${c.id}`)}</b><small>/ ${fmt(c.max)} ${t('Spieler')}</small></span>
         ${loadMeter(c.players, c.max)}
@@ -976,8 +976,8 @@
           <span class="avatars">${shown.map((p) => personPic(p, c.avatars)).join('')}${more ? `<span class="avatar avatar--more">+${more > 99 ? '99' : more}</span>` : ''}</span>
           <small>${c.players ? t('Alle ansehen') : t('Noch leer')}</small>
         </button>
-        ${c.pserver && c.pserver.mine ? `<button class="sv-card__icon" type="button" data-pserver-edit="${esc(c.pserver.id)}" aria-label="${esc(t('Bearbeiten'))}" title="${esc(t('Bearbeiten'))}">${icon('fi-rs-settings')}</button>` : ''}
-        <a class="sv-card__go" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('fi-rs-arrow-right')}</a>
+        ${c.pserver && c.pserver.mine ? `<button class="sv-card__icon" type="button" data-pserver-edit="${esc(c.pserver.id)}" aria-label="${esc(t('Bearbeiten'))}" title="${esc(t('Bearbeiten'))}">${icon('ph-gear-six')}</button>` : ''}
+        <a class="sv-card__go" href="#/server/${encodeURIComponent(c.id)}">${t('Details')}${icon('ph-arrow-right')}</a>
       </footer>
     </article>`;
   }
@@ -1016,10 +1016,10 @@
     if (!list0) { box.innerHTML = `<div class="sv-card sv-card--skeleton" aria-hidden="true"></div>`.repeat(3); return; }
     if (!all.length && !offline.length) {
       box.innerHTML = `<div class="sv-empty">
-        <span class="sv-empty__ic">${icon('fi-rs-signal-alt-2')}</span>
+        <span class="sv-empty__ic">${icon('ph-cell-signal-high')}</span>
         <h3>${t('Gerade läuft kein Server')}</h3>
         <p>${t('Sobald jemand Train Sim Germany spielt, erscheint der Server hier – mit Spielern und Rollen. Private Server erscheinen, wenn ihr Besitzer sie zeigt.')}</p>
-        <a class="site-btn site-btn--brand" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Jetzt spielen')}</a>
+        <a class="site-btn site-btn--brand" href="${esc(D.links.play)}" target="_blank" rel="noopener">${icon('phf-play')}${t('Jetzt spielen')}</a>
       </div>`;
       return;
     }
@@ -1031,7 +1031,7 @@
   function offlineCard(p) {
     return `<article class="sv-card is-private is-offline">
       <div class="sv-card__top">
-        <span class="sv-card__kind">${icon('fi-rs-lock')}${t('Privat')}</span>
+        <span class="sv-card__kind">${icon('ph-lock')}${t('Privat')}</span>
         <span class="sv-card__live is-off"><i></i>${t('Offline')}</span>
       </div>
       <h3 class="sv-card__title">${esc(p.name)}</h3>
@@ -1040,10 +1040,10 @@
         <span class="sv-card__count"><b>0</b><small>/ ${fmt(p.max || 0)} ${t('Spieler')}</small></span>
         ${loadMeter(0, p.max || 1)}
       </div>
-      <ul class="sv-card__tags">${p.join === 'app' ? `<li>${icon('fi-ss-play')}${t('Über die App')}</li>` : `<li>${icon('fi-rs-lock')}${t('Nur über Roblox')}</li>`}${p.access === 'members' ? `<li>${icon('fi-rs-users-alt')}${t('Nur Mitglieder')}</li>` : ''}</ul>
+      <ul class="sv-card__tags">${p.join === 'app' ? `<li>${icon('phf-play')}${t('Über die App')}</li>` : `<li>${icon('ph-lock')}${t('Nur über Roblox')}</li>`}${p.access === 'members' ? `<li>${icon('ph-users-three')}${t('Nur Mitglieder')}</li>` : ''}</ul>
       <footer class="sv-card__foot">
-        ${p.canJoin && p.link ? `<a class="sv-card__go sv-card__go--brand" href="${esc(p.link)}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Starten')}</a>` : '<span></span>'}
-        ${p.mine ? `<button class="sv-card__icon" type="button" data-pserver-edit="${esc(p.id)}" aria-label="${esc(t('Bearbeiten'))}" title="${esc(t('Bearbeiten'))}">${icon('fi-rs-settings')}</button>` : ''}
+        ${p.canJoin && p.link ? `<a class="sv-card__go sv-card__go--brand" href="${esc(p.link)}" target="_blank" rel="noopener">${icon('phf-play')}${t('Starten')}</a>` : '<span></span>'}
+        ${p.mine ? `<button class="sv-card__icon" type="button" data-pserver-edit="${esc(p.id)}" aria-label="${esc(t('Bearbeiten'))}" title="${esc(t('Bearbeiten'))}">${icon('ph-gear-six')}</button>` : ''}
       </footer>
     </article>`;
   }
@@ -1091,7 +1091,7 @@
       } else if (!k.teams.some((x) => x.order != null && Number(x.order) === DISPATCH_ORDER)) body += `<br>${t('Kein Team hat die Zahl 2 – die Abfertigung bleibt leer.')}`;
     }
     if (old) { cls = 'is-warn'; body += `<br>${t('Im Spiel läuft noch eine alte Version von TSGAppSync (Version {v}, aktuell {now}) – neues Skript einfügen und veröffentlichen.', { v: (k && k.script) || 1, now: g.script || 3 })}`; }
-    return `<p class="game-link game-link--teams ${cls}">${icon(cls === 'is-ok' ? 'fi-rs-users-alt' : 'fi-rs-triangle-warning')}<span>${body}</span></p>`;
+    return `<p class="game-link game-link--teams ${cls}">${icon(cls === 'is-ok' ? 'ph-users-three' : 'ph-warning')}<span>${body}</span></p>`;
   }
   function gameStatusHtml() {
     if (!isTeam('Public Relations Department')) return '';
@@ -1101,7 +1101,7 @@
     const fresh = g.lastSync && Date.now() - g.lastSync < 10 * 60000;
     const rejected = g.lastReject && (!g.lastSync || g.lastReject.at > g.lastSync);
     if (g.configured && fresh && !rejected) {
-      return `<p class="game-link is-ok">${icon('fi-ss-check-circle')}<span>${t('Verbindung zum Spiel steht · letzte Meldung {when}', { when: agoText(g.lastSync) })}</span></p>${teamsStatusHtml(g)}`;
+      return `<p class="game-link is-ok">${icon('phf-check-circle')}<span>${t('Verbindung zum Spiel steht · letzte Meldung {when}', { when: agoText(g.lastSync) })}</span></p>${teamsStatusHtml(g)}`;
     }
     const host = esc(String(API).replace(/^https?:\/\//, ''));
     const steps = `<ol class="game-link__steps">
@@ -1121,8 +1121,8 @@
         <li>${t('File → Publish to Roblox und einem echten Server beitreten. In der Ausgabe (F9) steht dann „[TSG] Mit der App verbunden“ – oder was noch fehlt.')}</li>
       </ol>
       <div class="game-link__btns">
-        <button class="btn btn--primary btn--sm" type="button" data-copy-script>${icon('fi-rs-copy')}${t('Skript kopieren')}</button>
-        <a class="btn btn--soft btn--sm" href="${SCRIPT_URL}" target="_blank" rel="noopener">${icon('fi-rs-arrow-up-right-from-square')}${t('Auf GitHub ansehen')}</a>
+        <button class="btn btn--primary btn--sm" type="button" data-copy-script>${icon('ph-copy')}${t('Skript kopieren')}</button>
+        <a class="btn btn--soft btn--sm" href="${SCRIPT_URL}" target="_blank" rel="noopener">${icon('ph-arrow-square-out')}${t('Auf GitHub ansehen')}</a>
       </div>
     </div>`;
     let title;
@@ -1145,7 +1145,7 @@
       text = t('Letzte Meldung {when}. Läuft gerade ein Server mit TSGAppSync?', { when: agoText(g.lastSync) });
       help = script;
     }
-    return `<div class="game-link"><span class="game-link__ic">${icon('fi-rs-triangle-warning')}</span><div class="game-link__body"><b>${title}</b><p>${text}</p>${help}<small>${t('Nur für das Team sichtbar.')}</small></div></div>${g.lastSync ? teamsStatusHtml(g) : ''}`;
+    return `<div class="game-link"><span class="game-link__ic">${icon('ph-warning')}</span><div class="game-link__body"><b>${title}</b><p>${text}</p>${help}<small>${t('Nur für das Team sichtbar.')}</small></div></div>${g.lastSync ? teamsStatusHtml(g) : ''}`;
   }
 
   // Alle Spieler eines Servers (Sheet)
@@ -1156,7 +1156,7 @@
     let title = '';
     if (liveMode()) {
       const d = live.detail[id];
-      if (!d) { loadLiveDetail(id); return `<div class="sheet-loading">${icon('fi-rs-spinner')}<span>${t('Wird geladen …')}</span></div>`; }
+      if (!d) { loadLiveDetail(id); return `<div class="sheet-loading">${icon('ph-spinner-gap')}<span>${t('Wird geladen …')}</span></div>`; }
       if (d.error) return `<p class="muted">${t('Dieser Server ist nicht mehr online.')}</p>`;
       people = d.server.people;
       teams = d.server.teams;
@@ -1169,13 +1169,13 @@
       title = t(s.name);
     }
     const groups = teamGroups(people, teams);
-    return `<p class="sp-head">${icon('fi-rs-users-alt')}<span><b>${esc(title)}</b> · ${t('{n} Spieler', { n: fmt(people.length) })}</span></p>
+    return `<p class="sp-head">${icon('ph-users-three')}<span><b>${esc(title)}</b> · ${t('{n} Spieler', { n: fmt(people.length) })}</span></p>
       ${groups.map((g) => `<section class="sp-group">
         <h3 class="pgroup__title"><i style="--rc:${esc(g.color)}"></i>${esc(g.name)}<small>${g.sub ? `${esc(g.sub)} · ` : ''}${g.list.length}</small></h3>
         ${g.list.length ? '' : `<p class="team-empty">${t('Noch niemand in diesem Team')}</p>`}
         <ul class="sp-list">${g.list.map((p) => `<li>${p.id ? `<button class="sp-row" type="button" data-player="${esc(p.id)}">` : '<div class="sp-row">'}
           ${personPic(p, avatars)}<span class="sp-row__main"><b>${personName(p)}</b><span class="sp-row__doing">${doingHtml(p)}</span></span>
-          ${p.id ? icon('fi-rs-angle-small-right', 'sp-row__chev') : ''}${p.id ? '</button>' : '</div>'}</li>`).join('')}</ul>
+          ${p.id ? icon('ph-caret-right', 'sp-row__chev') : ''}${p.id ? '</button>' : '</div>'}</li>`).join('')}</ul>
       </section>`).join('')}`;
   }
 
@@ -1197,12 +1197,12 @@
     const id = state.serverId;
     const head = $('[data-sd-head]');
     const body = $('[data-sd-body]');
-    const back = `<a class="back-link" href="#/server">${icon('fi-rs-arrow-left')}${t('Alle Server')}</a>`;
+    const back = `<a class="back-link" href="#/server">${icon('ph-arrow-left')}${t('Alle Server')}</a>`;
     const d = live.detail[id];
     if (!d) {
       loadLiveDetail(id);
       head.innerHTML = `${back}<h1 class="appbar__value">${t('Server')}</h1>`;
-      body.innerHTML = `<div class="sheet-loading">${icon('fi-rs-spinner')}<span>${t('Wird geladen …')}</span></div>`;
+      body.innerHTML = `<div class="sheet-loading">${icon('ph-spinner-gap')}<span>${t('Wird geladen …')}</span></div>`;
       return;
     }
     if (d.error) {
@@ -1220,13 +1220,13 @@
       <div class="appbar">
         <div class="appbar__title">
           <span class="appbar__label"><span class="live-dot"></span>${t('Live')}${s.version ? ` · v${esc(s.version)}` : ''} · ${s.private ? t('Privat') : t('Öffentlich')}</span>
-          <h1 class="appbar__value">${esc(title)}<button class="sd-copy" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('fi-rs-copy')}</button></h1>
+          <h1 class="appbar__value">${esc(title)}<button class="sd-copy" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('ph-copy')}</button></h1>
         </div>
         <div class="appbar__actions">${full ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
-          : joinHref ? `<a class="btn btn--primary btn--sm" href="${esc(joinHref)}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Beitreten')}</a>`
-            : `<span class="ps-note">${icon('fi-rs-lock')}${t('Beitreten nur über Roblox')}</span>`}</div>
+          : joinHref ? `<a class="btn btn--primary btn--sm" href="${esc(joinHref)}" target="_blank" rel="noopener">${icon('phf-play')}${t('Beitreten')}</a>`
+            : `<span class="ps-note">${icon('ph-lock')}${t('Beitreten nur über Roblox')}</span>`}</div>
       </div>
-      ${p && p.ownerName ? `<p class="sd-net">${icon('fi-rs-user')}${t('Privater Server von {name}', { name: esc(p.ownerName) })}</p>` : ''}`;
+      ${p && p.ownerName ? `<p class="sd-net">${icon('ph-user')}${t('Privater Server von {name}', { name: esc(p.ownerName) })}</p>` : ''}`;
     const stats = `<div class="stat-row stat-row--4">
       <div class="stat"><span>${t('Spieler')}</span><b>${s.players}/${s.max}</b></div>
       <div class="stat"><span>${t('Züge unterwegs')}</span><b>${s.trainList.length}</b></div>
@@ -1234,7 +1234,7 @@
       <div class="stat"><span>${t('Version')}</span><b>${s.version ? `v${esc(s.version)}` : '–'}</b></div>
     </div>`;
     const row = (x) => `<li><button class="sp-row" type="button" data-player="${esc(x.id)}">
-      ${personPic(x, avatars)}<span class="sp-row__main"><b>${personName(x)}</b><span class="sp-row__doing">${doingHtml(x)}</span></span>${icon('fi-rs-angle-small-right', 'sp-row__chev')}</button></li>`;
+      ${personPic(x, avatars)}<span class="sp-row__main"><b>${personName(x)}</b><span class="sp-row__doing">${doingHtml(x)}</span></span>${icon('ph-caret-right', 'sp-row__chev')}</button></li>`;
     const secHead = (ic, label, n, color = '') => `<h2 class="sd-sec__title">${color ? `<i class="sd-sec__dot" style="--rc:${esc(color)}"></i>` : icon(ic)}<span>${label}</span>${n ? `<small>${n}</small>` : ''}</h2>`;
     // 1. Abfertigung: Bahnhöfe, an denen gerade jemand aus dem Team mit der Zahl 2 abfertigt (ohne Teams: Bahnsteigpersonal)
     const dt = dispatchTeam(s.teams);
@@ -1244,10 +1244,10 @@
     const nextAt = (name) => s.trainList.filter((tr) => name && tr.next === name);
     const lineTag = (tr) => (tr.line ? `<span class="line line--${(lineByName(tr.line) || {}).cat || catOfTrain(tr.veh) || 're'}">${esc(tr.line)}</span>` : '');
     const dispatch = `<section class="sd-sec">
-      ${secHead('fi-rs-flag', dt ? t('Abfertigung · {team}', { team: esc(dt.name) }) : t('Abfertigung'), stations.size ? t('{n} Bahnhöfe', { n: stations.size }) : '', dt ? teamColor(dt) : '')}
+      ${secHead('ph-flag', dt ? t('Abfertigung · {team}', { team: esc(dt.name) }) : t('Abfertigung'), stations.size ? t('{n} Bahnhöfe', { n: stations.size }) : '', dt ? teamColor(dt) : '')}
       ${stations.size ? `<div class="disp-grid" data-reveal>${[...stations].map(([name, list]) => `<article class="disp" style="--rc:${esc(dt ? teamColor(dt) : roleRank('Platform Staff').color)}">
-          <header class="disp__head"><span class="disp__ic">${icon('fi-rs-marker')}</span><div><h3>${name ? esc(name) : t('Bahnhof nicht gemeldet')}</h3><small>${list.length === 1 ? t('1 Person fertigt ab') : t('{n} Personen fertigen ab', { n: list.length })}</small></div></header>
-          ${nextAt(name).length ? `<p class="disp__next">${icon('fi-rs-train-side')}<span>${nextAt(name).map((tr) => `${lineTag(tr)} ${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || '')}`).join(' · ')}</span></p>` : ''}
+          <header class="disp__head"><span class="disp__ic">${icon('ph-map-pin')}</span><div><h3>${name ? esc(name) : t('Bahnhof nicht gemeldet')}</h3><small>${list.length === 1 ? t('1 Person fertigt ab') : t('{n} Personen fertigen ab', { n: list.length })}</small></div></header>
+          ${nextAt(name).length ? `<p class="disp__next">${icon('ph-train')}<span>${nextAt(name).map((tr) => `${lineTag(tr)} ${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || '')}`).join(' · ')}</span></p>` : ''}
           <ul class="sp-list">${list.map(row).join('')}</ul>
         </article>`).join('')}</div>`
         : `<p class="team-empty">${dt || !s.teams ? t('Gerade fertigt niemand ab.') : t('Kein Team hat die Zahl 2 – im Spiel am Team für die Abfertigung als zweites Attribut 2 eintragen.')}</p>`}
@@ -1255,14 +1255,14 @@
     // 2. Züge
     const byId = new Map(s.people.map((x) => [x.id, x]));
     const teamOf = (x) => (s.teams || []).find((tm) => sameTeam(tm.name, x.team));
-    const trains = `<section class="sd-sec">${secHead('fi-rs-train-side', t('Züge'), s.trainList.length ? fmt(s.trainList.length) : '')}
+    const trains = `<section class="sd-sec">${secHead('ph-train', t('Züge'), s.trainList.length ? fmt(s.trainList.length) : '')}
       ${s.trainList.length ? `<div class="train-grid" data-reveal>${s.trainList.map((tr) => {
         const L = lineByName(tr.line);
         const cat = L ? L.cat : catOfTrain(tr.veh) || 're';
         return `<article class="ltrain">
-          <div class="ltrain__head">${tr.line ? `<span class="line line--${cat}">${esc(tr.line)}</span>` : `<span class="line line--${cat}">${icon('fi-rs-train-side')}</span>`}
+          <div class="ltrain__head">${tr.line ? `<span class="line line--${cat}">${esc(tr.line)}</span>` : `<span class="line line--${cat}">${icon('ph-train')}</span>`}
             <div class="ltrain__title"><h3>${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : esc(tr.train || t('Zug'))}</h3><small>${[tr.train, trainName(tr.veh)].filter(Boolean).map(esc).join(' · ')}</small></div></div>
-          ${tr.next ? `<p class="train__now">${icon('fi-rs-marker')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
+          ${tr.next ? `<p class="train__now">${icon('ph-map-pin')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
           ${liveStopsHtml(tr)}
           <div class="ltrain__crew">${tr.crew.map((c) => { const x = byId.get(c.id) || c; const tm = teamOf(x); return `<button class="crew crew--btn" type="button" data-player="${esc(c.id)}">${personPic(x, avatars)}<span class="crew__text"><small${tm ? ` style="color:${esc(teamColor(tm))}"` : ''}>${esc(tm ? tm.name : t(roleRank(c.role).label))}</small><b>${esc(x.dn || x.name || t('Spieler'))}</b></span></button>`; }).join('')}</div>
         </article>`;
@@ -1270,7 +1270,7 @@
     </section>`;
     // 3. Alle Teams aus dem Teams-Service, auch leere; wer neu dazukommt, steht unter den Spielern, die schon im Team sind
     const groups = teamGroups(s.people, s.teams);
-    const teams = `<section class="sd-sec">${secHead('fi-rs-users-alt', s.teams ? t('Teams') : t('Spieler'), t('{n} Spieler', { n: fmt(s.people.length) }))}
+    const teams = `<section class="sd-sec">${secHead('ph-users-three', s.teams ? t('Teams') : t('Spieler'), t('{n} Spieler', { n: fmt(s.people.length) }))}
       ${groups.length ? `<div data-reveal>${groups.map((g) => `<section class="pgroup${g.list.length ? '' : ' is-empty'}">
           <h3 class="pgroup__title"><i style="--rc:${esc(g.color)}"></i>${esc(g.name)}<small>${g.sub ? `${esc(g.sub)} · ` : ''}${g.list.length}</small></h3>
           ${g.list.length ? `<ul class="sp-list sp-list--card">${g.list.map(row).join('')}</ul>` : `<p class="team-empty">${t('Noch niemand in diesem Team')}</p>`}
@@ -1288,7 +1288,7 @@
   const stationBtn = (name) => `<button class="link-btn" type="button" data-station="${esc(name)}">${esc(name)}</button>`;
   const crewHtml = (p, role) => {
     const r = roleRank(p ? p.role : role);
-    return `<span class="crew">${p ? avatar(p.name) : `<span class="crew__ai">${icon('fi-rs-gamepad')}</span>`}
+    return `<span class="crew">${p ? avatar(p.name) : `<span class="crew__ai">${icon('ph-game-controller')}</span>`}
       <span class="crew__text"><small>${esc(t(r.label))}</small><b>${p ? esc(p.name) : t('KI')}</b></span></span>`;
   };
   function trainWhere(m, tr) {
@@ -1321,7 +1321,7 @@
         <div class="train__title"><h3>${t('nach {to}', { to: esc(tr.to) })}</h3><small>${esc(tr.no)} · ${esc(tr.line.train)}</small></div>
         ${delayHtml(tr.delay)}
       </div>
-      <p class="train__now">${icon(st.phase === 'run' ? 'fi-rs-train-side' : 'fi-rs-marker')}<span>${esc(trainWhere(m, tr))}</span></p>
+      <p class="train__now">${icon(st.phase === 'run' ? 'ph-train' : 'ph-map-pin')}<span>${esc(trainWhere(m, tr))}</span></p>
       <div class="train__track" aria-hidden="true"><span style="width:${pctDone}%"></span><i style="left:${pctDone}%"></i></div>
       <ol class="stoplist" aria-label="${esc(t('Fahrtverlauf'))}">${tr.stops.map((stop, i) => `<li class="stoplist__row is-${stopPhase(tr, i)}">
           <i aria-hidden="true"></i><span class="stoplist__name">${esc(stop.name)}</span>
@@ -1330,20 +1330,20 @@
       <div class="train__crew">
         ${crewHtml(tr.crew.Driver, 'Qualified Driver')}
         ${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
-        ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rs-users-alt')}${riders(tr.riders.length)}</span>` : ''}
+        ${tr.riders.length ? `<span class="crew crew--riders">${icon('ph-users-three')}${riders(tr.riders.length)}</span>` : ''}
       </div>
-      <button class="sd-btn" type="button" data-trip="${esc(tr.id)}">${icon('fi-rs-route')}<span>${t('Details')}<small>${t('Fahrtverlauf')}</small></span>${icon('fi-rs-arrow-small-right', 'sd-btn__arrow')}</button>
+      <button class="sd-btn" type="button" data-trip="${esc(tr.id)}">${icon('ph-path')}<span>${t('Details')}<small>${t('Fahrtverlauf')}</small></span>${icon('ph-arrow-right', 'sd-btn__arrow')}</button>
     </article>`;
   }
   function playerWhere(p) {
-    if (p.role === 'Supervisor') return p.station ? `${icon('fi-rs-signal-alt-2')}<span>${t('Aufsicht im Betrieb')}</span>` : `${icon('fi-rs-calendar')}<span>${t('Leitet das Training')}</span>`;
+    if (p.role === 'Supervisor') return p.station ? `${icon('ph-cell-signal-high')}<span>${t('Aufsicht im Betrieb')}</span>` : `${icon('ph-calendar-blank')}<span>${t('Leitet das Training')}</span>`;
     if (p.train) {
-      return `${icon('fi-rs-train-side')}<button class="link-btn" type="button" data-trip="${esc(p.train.id)}">${lineBadge(p.train.line)}<span>${t('nach {to}', { to: esc(p.train.to) })}</span></button>`;
+      return `${icon('ph-train')}<button class="link-btn" type="button" data-trip="${esc(p.train.id)}">${lineBadge(p.train.line)}<span>${t('nach {to}', { to: esc(p.train.to) })}</span></button>`;
     }
     if (!p.station) return '';
-    if (p.role === 'Platform Staff') return `${icon('fi-rs-marker')}<span>${stationBtn(p.station.name)} · ${tracksText(p)}</span>`;
-    if (p.role === 'Signaller') return `${icon('fi-rs-traffic-light')}<span>${t('Stellwerk')} ${stationBtn(p.station.name)}</span>`;
-    return `${icon('fi-rs-clock-three')}<span>${t('Wartet in')} ${stationBtn(p.station.name)}</span>`;
+    if (p.role === 'Platform Staff') return `${icon('ph-map-pin')}<span>${stationBtn(p.station.name)} · ${tracksText(p)}</span>`;
+    if (p.role === 'Signaller') return `${icon('ph-traffic-signal')}<span>${t('Stellwerk')} ${stationBtn(p.station.name)}</span>`;
+    return `${icon('ph-clock')}<span>${t('Wartet in')} ${stationBtn(p.station.name)}</span>`;
   }
   function playerRow(p) {
     const r = roleRank(p.role);
@@ -1358,15 +1358,15 @@
     const next = deps[0];
     return `<button class="station" type="button" data-station="${esc(st.name)}">
       <span class="station__head">
-        <span class="station__ic">${icon('fi-rs-train-station')}</span>
+        <span class="station__ic">${icon('ph-signpost')}</span>
         <span class="station__name"><b>${esc(st.name)}</b><small>${t('{n} Gleise', { n: st.platforms })}${st.box ? ` · ${t('Stellwerk')}` : ''}</small></span>
-        ${icon('fi-rs-angle-small-right', 'station__chev')}
+        ${icon('ph-caret-right', 'station__chev')}
       </span>
       <span class="station__lines">${st.lines.map((id) => lineBadge(D.lines[id])).join('')}</span>
-      <span class="station__staff">${icon('fi-rs-whistle')}${st.staff.length
+      <span class="station__staff">${icon('ph-megaphone-simple')}${st.staff.length
         ? `<span><b>Platform Staff:</b> ${st.staff.map((p) => esc(p.name)).join(', ')}</span>`
         : `<span class="muted">${t('Kein Platform Staff')}</span>`}</span>
-      ${next ? `<span class="station__next">${icon('fi-rs-clock-three')}<span>${t('Nächster Zug')}: <b>${hhmm(next.time + next.tr.delay)}</b> ${esc(next.tr.line.name)} ${next.last ? t('aus {from}', { from: esc(next.tr.from) }) : t('nach {to}', { to: esc(next.tr.to) })}</span></span>` : ''}
+      ${next ? `<span class="station__next">${icon('ph-clock')}<span>${t('Nächster Zug')}: <b>${hhmm(next.time + next.tr.delay)}</b> ${esc(next.tr.line.name)} ${next.last ? t('aus {from}', { from: esc(next.tr.from) }) : t('nach {to}', { to: esc(next.tr.to) })}</span></span>` : ''}
     </button>`;
   }
   // Kommende Züge an einem Bahnhof: Abfahrten, am Endbahnhof Ankünfte
@@ -1403,7 +1403,7 @@
     const s = serverById(state.serverId);
     const head = $('[data-sd-head]');
     const body = $('[data-sd-body]');
-    const back = `<a class="back-link" href="#/server">${icon('fi-rs-arrow-left')}${t('Alle Server')}</a>`;
+    const back = `<a class="back-link" href="#/server">${icon('ph-arrow-left')}${t('Alle Server')}</a>`;
     if (!s) {
       head.innerHTML = `${back}<h1 class="appbar__value">${t('Server nicht gefunden')}</h1>`;
       body.innerHTML = `<p class="empty">${t('Diesen Server gibt es nicht mehr. Vielleicht wurde er gerade geschlossen.')}</p>`;
@@ -1418,17 +1418,17 @@
       <div class="appbar">
         <div class="appbar__title">
           <span class="appbar__label"><span class="live-dot"></span>${t('Live')} · ${esc(s.region)} · v${esc(s.version)} · ${typeName}</span>
-          <h1 class="appbar__value">${esc(t(s.name))}<button class="sd-copy" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('fi-rs-copy')}</button></h1>
+          <h1 class="appbar__value">${esc(t(s.name))}<button class="sd-copy" type="button" data-copy="${esc(s.id)}" aria-label="${esc(t('Server-ID kopieren'))}" title="${esc(t('Server-ID kopieren'))}">${icon('ph-copy')}</button></h1>
         </div>
         <div class="appbar__actions">${full
           ? `<button class="btn btn--soft btn--sm" type="button" disabled>${t('Voll')}</button>`
-          : `<a class="btn btn--primary btn--sm" href="${esc(joinUrl(s))}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Beitreten')}</a>`}</div>
+          : `<a class="btn btn--primary btn--sm" href="${esc(joinUrl(s))}" target="_blank" rel="noopener">${icon('phf-play')}${t('Beitreten')}</a>`}</div>
       </div>
-      <p class="sd-net">${icon('fi-rs-route')}${esc(t(s.network))}</p>
+      <p class="sd-net">${icon('ph-path')}${esc(t(s.network))}</p>
       <div class="head-tabs head-tabs--fill" role="tablist" aria-label="${esc(t('Ansicht'))}">
-        ${tabBtn('trains', 'fi-rs-train-side', t('Züge'), m.trains.length)}
-        ${tabBtn('players', 'fi-rs-users-alt', t('Spieler'), m.players.length)}
-        ${tabBtn('stations', 'fi-rs-train-station', t('Stationen'), m.stations.length)}
+        ${tabBtn('trains', 'ph-train', t('Züge'), m.trains.length)}
+        ${tabBtn('players', 'ph-users-three', t('Spieler'), m.players.length)}
+        ${tabBtn('stations', 'ph-signpost', t('Stationen'), m.stations.length)}
       </div>`;
 
     const stats = `<div class="stat-row stat-row--4">
@@ -1517,7 +1517,7 @@
           <span class="tv-user__text"><h3>${esc(driver.name)}</h3><span class="tv-badge" style="--rc:${dr.color}">${esc(t(dr.label))}</span></span>
         </header>`
       : `<header class="tv-user">
-          <span class="avatar-ring tv-user__ring" style="--rc:var(--line-2)"><span class="tv-user__ai">${icon('fi-rs-robot')}</span></span>
+          <span class="avatar-ring tv-user__ring" style="--rc:var(--line-2)"><span class="tv-user__ai">${icon('ph-robot')}</span></span>
           <span class="tv-user__text"><h3>${live ? t('KI') : t('Noch offen')}</h3><span class="tv-badge tv-badge--muted">${esc(live ? t(rankOf('Qualified Driver').label) : st.phase === 'done' ? t('Diese Fahrt ist beendet.') : t('Die Besatzung steht kurz vor der Abfahrt fest.'))}</span></span>
         </header>`;
 
@@ -1530,12 +1530,12 @@
           <div class="tv-unit__id"><span class="tv-label">ID</span><code>${veh.id}</code></div>
         </div>
         <div class="tv-unit__facts">
-          <span>${icon('fi-rs-bolt', 'tv-ic tv-ic--power')}<b>${powerText(tr, veh)}</b></span>
-          <span>${icon('fi-rs-dashboard', 'tv-ic tv-ic--speed')}<b>${t('{n} km/h', { n: speedOf(tr, veh) })}</b></span>
+          <span>${icon('ph-lightning', 'tv-ic tv-ic--power')}<b>${powerText(tr, veh)}</b></span>
+          <span>${icon('ph-gauge', 'tv-ic tv-ic--speed')}<b>${t('{n} km/h', { n: speedOf(tr, veh) })}</b></span>
         </div>
-        <p class="tv-unit__status">${icon(st.phase === 'run' ? 'fi-rs-train-side' : 'fi-rs-marker')}<span>${esc(status)}</span>${delayHtml(tr.delay)}</p>
+        <p class="tv-unit__status">${icon(st.phase === 'run' ? 'ph-train' : 'ph-map-pin')}<span>${esc(status)}</span>${delayHtml(tr.delay)}</p>
         ${tr.crew.Conductor || tr.riders.length ? `<div class="train__crew">${tr.crew.Conductor ? crewHtml(tr.crew.Conductor, 'Conductor') : ''}
-          ${tr.riders.length ? `<span class="crew crew--riders">${icon('fi-rs-users-alt')}${riders(tr.riders.length)}</span>` : ''}</div>` : ''}
+          ${tr.riders.length ? `<span class="crew crew--riders">${icon('ph-users-three')}${riders(tr.riders.length)}</span>` : ''}</div>` : ''}
       </section>`;
 
     // Reiseplan wie im DB Navigator: Start und Ziel mit Gleis-Schild, dazwischen die Zwischenhalte (ein- und ausblendbar).
@@ -1544,7 +1544,7 @@
     const open = state.tripMid || mids < 1;
     const progress = st.phase === 'done' ? 1 : st.phase === 'wait' ? 0 : Math.max(0, Math.min(1, st.progress));
     const fillOf = (i) => (st.phase === 'done' || i < st.i ? 1 : i === st.i && st.phase === 'run' ? st.seg : 0);
-    const marker = (fill, top) => (fill > 0 && fill < 1 ? `<span class="tl__train" style="top:calc(${top}px + ${(fill * 100).toFixed(1)}%)">${icon('fi-rs-train-side')}</span>` : '');
+    const marker = (fill, top) => (fill > 0 && fill < 1 ? `<span class="tl__train" style="top:calc(${top}px + ${(fill * 100).toFixed(1)}%)">${icon('ph-train')}</span>` : '');
     const row = (i, kind) => {
       const stop = tr.stops[i];
       const station = m.stationMap.get(stop.name);
@@ -1553,7 +1553,7 @@
       const time = kind === 'end' ? stop.arr : stop.dep;
       const fill = kind === 'end' ? 0 : kind === 'start' ? +(progress > 0) : fillOf(i);
       const people = station ? [...station.signallers.map((p) => [p, 'Signaller']), ...station.staff.map((p) => [p, 'Platform Staff'])] : [];
-      const dot = kind === 'end' ? icon(st.phase === 'done' ? 'fi-ss-marker' : 'fi-rs-marker', 'tl__pin') : `<i class="tl__dot${kind === 'start' ? ' tl__dot--start' : ''}"></i>`;
+      const dot = kind === 'end' ? icon(st.phase === 'done' ? 'phf-map-pin' : 'ph-map-pin', 'tl__pin') : `<i class="tl__dot${kind === 'start' ? ' tl__dot--start' : ''}"></i>`;
       return `<li class="tl__row tl__row--${kind} is-${ph}">
         <span class="tl__time"><b>${hhmm(time)}</b><small class="${tr.delay ? 'is-late' : 'is-ok'}">${hhmm(time + tr.delay)}</small></span>
         <span class="tl__rail" style="--fill:${fill.toFixed(3)}">${dot}${kind === 'mid' ? marker(fill, 12) : ''}</span>
@@ -1571,7 +1571,7 @@
         <span class="tl__rail" style="--fill:${legFill.toFixed(3)}">${marker(legFill, 0)}</span>
         <span class="tl__body">
           <span class="tl-leg">${lineChip(tr.line)}<b>${t('nach {to}', { to: esc(tr.to) })}</b></span>
-          ${mids ? `<button class="tl-toggle" type="button" data-trip-mid aria-expanded="${open}">${open ? t('Zwischenhalte ausblenden') : mids === 1 ? t('1 Zwischenhalt anzeigen') : t('{n} Zwischenhalte anzeigen', { n: mids })}${icon('fi-rs-angle-small-down')}</button>` : ''}
+          ${mids ? `<button class="tl-toggle" type="button" data-trip-mid aria-expanded="${open}">${open ? t('Zwischenhalte ausblenden') : mids === 1 ? t('1 Zwischenhalt anzeigen') : t('{n} Zwischenhalte anzeigen', { n: mids })}${icon('ph-caret-down')}</button>` : ''}
         </span>
       </li>`;
     const dur = Math.max(0, Math.round(tr.stops[lastI].arr - tr.stops[0].dep));
@@ -1623,7 +1623,7 @@
           <span class="sb-row__time"><b>${hhmm(d.time)}</b><b class="${tr.delay ? 'is-late' : 'is-ok'}">${hhmm(d.time + tr.delay)}</b></span>
           <span class="sb-row__main">
             <span class="sb-row__line">${lineChip(tr.line)}<b>${esc(d.last ? t('Von {from}', { from: tr.from }) : t('Nach {to}', { to: tr.to }))}</b></span>
-            ${d.gleis.changed && !d.gone ? `<small class="sb-row__warn">${icon('fi-rs-info')}${t('Gleiswechsel, statt Gl. {p}', { p: d.gleis.plan })}</small>` : ''}
+            ${d.gleis.changed && !d.gone ? `<small class="sb-row__warn">${icon('ph-info')}${t('Gleiswechsel, statt Gl. {p}', { p: d.gleis.plan })}</small>` : ''}
             <small class="sb-row__note">${note}</small>
           </span>
           ${glHtml(d.gleis, false)}
@@ -1631,20 +1631,20 @@
     };
     return `<div class="sb">
       <header class="sb-head">
-        <span class="sb-head__ic">${icon('fi-rs-train-station')}</span>
+        <span class="sb-head__ic">${icon('ph-signpost')}</span>
         <span class="sb-head__text"><h3>${esc(st.name)}</h3><small>${t('{n} Gleise', { n: st.platforms })}${st.box ? ` · ${t('Stellwerk')}` : ''} · ${t('Stand {time}', { time: hhmm(Math.floor(m.now)) })}</small></span>
       </header>
       <div class="sb-crew">
-        ${crew('fi-rs-whistle', 'Platform Staff', st.staff, tracksText, t('Gerade niemand – die Abfertigung übernimmt die KI.'))}
-        ${st.box ? crew('fi-rs-traffic-light', t('Stellwerk'), st.signallers, () => '', t('Nicht besetzt – die KI stellt die Fahrstraßen.')) : ''}
+        ${crew('ph-megaphone-simple', 'Platform Staff', st.staff, tracksText, t('Gerade niemand – die Abfertigung übernimmt die KI.'))}
+        ${st.box ? crew('ph-traffic-signal', t('Stellwerk'), st.signallers, () => '', t('Nicht besetzt – die KI stellt die Fahrstraßen.')) : ''}
       </div>
       ${groups.length > 1 ? `<div class="sb-tabs" role="tablist" aria-label="${esc(t('Zuggattung'))}">
         <button type="button" role="tab" aria-selected="${b.cat === 'all'}" data-board-cat="all">${t('Alle')}</button>
         ${groups.map((g) => `<button type="button" role="tab" aria-selected="${b.cat === g.id}" data-board-cat="${g.id}">${esc(t(g.label))}</button>`).join('')}
       </div>` : ''}
-      ${b.back < 120 ? `<button class="sb-more" type="button" data-board-earlier>${icon('fi-rs-angle-small-down', 'is-up')}${t('Früher')}</button>` : ''}
+      ${b.back < 120 ? `<button class="sb-more" type="button" data-board-earlier>${icon('ph-caret-down', 'is-up')}${t('Früher')}</button>` : ''}
       ${shown.length ? `<ol class="sb-list">${shown.map(row).join('')}</ol>` : `<p class="sb-empty">${t('In den nächsten 90 Minuten fährt hier kein Zug.')}</p>`}
-      ${b.more < 48 && list.length > shown.length ? `<button class="sb-more" type="button" data-board-later>${icon('fi-rs-angle-small-down')}${t('Später')}</button>` : ''}
+      ${b.more < 48 && list.length > shown.length ? `<button class="sb-more" type="button" data-board-later>${icon('ph-caret-down')}${t('Später')}</button>` : ''}
     </div>`;
   }
 
@@ -1733,7 +1733,7 @@
         <div class="promo-card__body">
           <${heading}>${t('Du bildest jetzt selbst aus')}</${heading}>
           <p>${t('Als {rank} kannst du Trainings für eine Rolle anbieten – die Spieler werden auf Wunsch rechtzeitig benachrichtigt.', { rank: esc(state.rank) })}</p>
-          <button class="btn btn--primary promo-card__btn" type="button" data-open="training-new">${icon('fi-rs-plus')}${t('Training anbieten')}</button>
+          <button class="btn btn--primary promo-card__btn" type="button" data-open="training-new">${icon('ph-plus')}${t('Training anbieten')}</button>
         </div>
       </article>`;
     }
@@ -1743,7 +1743,7 @@
         <div class="promo-card__body">
           <${heading}>${t('Alle Ausbildungen geschafft')}</${heading}>
           <p>${t('Du hast den höchsten Rang erreicht. Als Supervisor kannst du jetzt selbst Trainings leiten.')}</p>
-          <a class="btn btn--primary promo-card__btn" href="#/karriere/supervisor">${icon('fi-rs-briefcase')}${t('Als Supervisor bewerben')}</a>
+          <a class="btn btn--primary promo-card__btn" href="#/karriere/supervisor">${icon('ph-briefcase')}${t('Als Supervisor bewerben')}</a>
         </div>
       </article>`;
     }
@@ -1777,7 +1777,7 @@
 
   const bellBtn = (tn, cls) => {
     const on = isReminded(tn);
-    return `<button class="${cls}" type="button" data-remind="${tn.id}" aria-pressed="${on}" aria-label="${esc(on ? t('Benachrichtigung aus') : t('Benachrichtigen, wenn der Server öffnet'))}">${icon(on ? 'fi-ss-bell-ring' : 'fi-rs-bell')}</button>`;
+    return `<button class="${cls}" type="button" data-remind="${tn.id}" aria-pressed="${on}" aria-label="${esc(on ? t('Benachrichtigung aus') : t('Benachrichtigen, wenn der Server öffnet'))}">${icon(on ? 'phf-bell-ringing' : 'ph-bell')}</button>`;
   };
   // Leitung des Trainings: Profilbild und daneben der Name
   const hostHtml = (tn, cls = '') => `<span class="host ${cls}">${tn.hostAvatar
@@ -1796,7 +1796,7 @@
         </span>
         <span class="tg-card__side">
           ${serverPill(tn)}
-          <span class="tg-card__slots pill-state pill-state--${st.cls}">${icon(st.cls === 'lock' ? 'fi-rs-lock' : 'fi-ss-user')}${st.cls === 'lock' ? st.text : tn.remote ? t('max. {n}', { n: tn.slots }) : `${tn.taken}/${tn.slots}`}</span>
+          <span class="tg-card__slots pill-state pill-state--${st.cls}">${icon(st.cls === 'lock' ? 'ph-lock' : 'phf-user')}${st.cls === 'lock' ? st.text : tn.remote ? t('max. {n}', { n: tn.slots }) : `${tn.taken}/${tn.slots}`}</span>
         </span>
       </button>
       ${bellBtn(tn, 'tg-card__bell')}
@@ -1842,8 +1842,8 @@
     $('[data-day-trainings]').innerHTML = ofDay.length
       ? ofDay.map(tcard).join('')
       : types && !types.length
-        ? `<div class="tg-empty">${icon('fi-rs-check-circle')}<span>${t('Für deinen Rang gibt es keine weiteren Trainings.')}</span></div>`
-        : `<div class="tg-empty">${icon('fi-rs-calendar')}<span>${t('An diesem Tag ist kein Training geplant.')}${nextDay ? ` ${t('Nächstes:')} <button class="more-link" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
+        ? `<div class="tg-empty">${icon('ph-check-circle')}<span>${t('Für deinen Rang gibt es keine weiteren Trainings.')}</span></div>`
+        : `<div class="tg-empty">${icon('ph-calendar-blank')}<span>${t('An diesem Tag ist kein Training geplant.')}${nextDay ? ` ${t('Nächstes:')} <button class="more-link" type="button" data-day="${nextDay.day}">${dayName(nextDay.day)}</button>` : ''}</span></div>`;
 
     // Alle kommenden Trainings als Tafel
     const shown = state.showAll ? list : list.slice(0, 6);
@@ -1853,7 +1853,7 @@
         <span class="tg-board__date${tn.day === now.day ? ' is-today' : ''}"><small>${wdShort(tn.day)}</small><b>${dateOf(tn.day).getUTCDate()}</b></span>
         <span class="tg-board__time">${tn.time}</span>
         <span class="tg-board__main"><b>${esc(t(tn.title))}</b><small><i></i>${esc(tn.type)} · ${esc(tn.hostName || tn.host)}</small></span>
-        <span class="tg-board__end">${isReminded(tn) ? `<span class="tlist__bell" title="${esc(t('Benachrichtigung an'))}">${icon('fi-ss-bell-ring')}</span>` : ''}<span class="pill-state pill-state--${st.cls}">${st.text}</span>${icon('fi-rs-angle-small-right')}</span>
+        <span class="tg-board__end">${isReminded(tn) ? `<span class="tlist__bell" title="${esc(t('Benachrichtigung an'))}">${icon('phf-bell-ringing')}</span>` : ''}<span class="pill-state pill-state--${st.cls}">${st.text}</span>${icon('ph-caret-right')}</span>
       </button></li>`;
     }).join('') : `<li class="tg-empty">${types && !types.length ? t('Für deinen Rang gibt es keine weiteren Trainings.') : t('Gerade sind keine Trainings geplant.')}</li>`;
     const toggle = $('[data-all-toggle]');
@@ -1884,7 +1884,7 @@
   const newsDate = (n) => dtf({ day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(n.date.length > 10 ? n.date : `${n.date}T00:00:00Z`));
   function newsCard(n) {
     return `<button class="ncard" type="button" data-news-open="${esc(n.id)}">
-      <div class="ncard__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="ncard__play" aria-label="${esc(t('Mit Video'))}">${icon('fi-ss-play')}</span>` : ''}</div>
+      <div class="ncard__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="ncard__play" aria-label="${esc(t('Mit Video'))}">${icon('phf-play')}</span>` : ''}</div>
       <div class="ncard__body">
         <h3>${esc(t(n.title))}</h3>
         <div class="ncard__foot">${catTag(n)}<span>${newsDate(n)}</span></div>
@@ -1923,8 +1923,8 @@
   function jobStatus(job) {
     const s = jobState(job);
     if (s && s.limit && (s.received || 0) >= s.limit) return `<span class="pill pill--bad">${t('Voll')}</span>`;
-    if (jobOpen(job)) return `<span class="pill pill--ok">${icon('fi-rs-check')}${s && s.to ? t('Offen bis {date}', { date: fmtWhen(s.to) }) : t('Offen')}</span>`;
-    if (s && s.from && Date.now() < s.from && s.open !== false) return `<span class="pill pill--warn">${icon('fi-rs-clock-three')}${t('Öffnet am {date}', { date: fmtWhen(s.from) })}</span>`;
+    if (jobOpen(job)) return `<span class="pill pill--ok">${icon('ph-check')}${s && s.to ? t('Offen bis {date}', { date: fmtWhen(s.to) }) : t('Offen')}</span>`;
+    if (s && s.from && Date.now() < s.from && s.open !== false) return `<span class="pill pill--warn">${icon('ph-clock')}${t('Öffnet am {date}', { date: fmtWhen(s.from) })}</span>`;
     return `<span class="pill pill--bad">${t('Geschlossen')}</span>`;
   }
   // Wer angefangen hat, als die Stelle offen war, darf noch absenden (12 Stunden lang)
@@ -1940,14 +1940,14 @@
   // Auf der Seite einer Stelle: kurze Verwaltung mit „Bearbeiten“
   function jobAdmin(job) {
     if (mayPR() && !canBackend()) {
-      return `<section class="cbox admin-strip"><span class="admin-strip__ic">${icon('fi-rs-settings')}</span><div><b>${t('Verwaltung')}</b><small>${t('Geht, sobald der App-Server verbunden ist.')}</small></div>
+      return `<section class="cbox admin-strip"><span class="admin-strip__ic">${icon('ph-gear-six')}</span><div><b>${t('Verwaltung')}</b><small>${t('Geht, sobald der App-Server verbunden ist.')}</small></div>
         <button class="btn btn--soft btn--sm" type="button" data-open="backend-setup">${t('Einrichten')}</button></section>`;
     }
     if (!canPR()) return '';
     const st = jobStats(job);
-    return `<section class="cbox admin-strip"><span class="admin-strip__ic">${icon('fi-rs-settings')}</span>
+    return `<section class="cbox admin-strip"><span class="admin-strip__ic">${icon('ph-gear-six')}</span>
       <div><b>${t('Verwaltung')}</b><small>${esc(jobLine(job))} · ${t('{n} Bewerbungen', { n: st.total })}</small></div>
-      <button class="btn btn--primary btn--sm" type="button" data-job-edit="${esc(job.id)}">${icon('fi-rs-pencil')}${t('Bearbeiten')}</button></section>`;
+      <button class="btn btn--primary btn--sm" type="button" data-job-edit="${esc(job.id)}">${icon('ph-pencil-simple')}${t('Bearbeiten')}</button></section>`;
   }
   // ---------- Stellen verwalten (ab Public Relations Department) ----------
   // Je Stelle: offen/geschlossen, Zeitraum (mit Vorlagen), Höchstzahl an Bewerbungen, „Dringend gesucht“,
@@ -1989,23 +1989,23 @@
     const stat = (n, label, cls = '') => `<div class="jm-stat ${cls}"><b>${n}</b><span>${label}</span></div>`;
     return `<article class="jm-card${jobOpen(job) ? ' is-open' : ''}">
       <header class="jm-card__head">
-        <div class="jm-card__title"><h3>${esc(t(job.title))}</h3><span>${icon('fi-rs-users-alt')}${t('Team {name}', { name: t(job.team) })}</span></div>
+        <div class="jm-card__title"><h3>${esc(t(job.title))}</h3><span>${icon('ph-users-three')}${t('Team {name}', { name: t(job.team) })}</span></div>
         <label class="switch" title="${esc(t('Bewerbungen offen'))}"><input type="checkbox" role="switch" data-job-toggle="${esc(job.id)}"${isOpen ? ' checked' : ''} aria-label="${esc(t('Bewerbungen offen'))}"><span class="toggle__ui" aria-hidden="true"></span></label>
       </header>
       <p class="jm-card__line">${jobStatus(job)}<span>${esc(jobLineShort(job))}</span></p>
-      ${s.urgent || s.note ? `<div class="jm-card__tags">${s.urgent ? `<span class="pill pill--bad">${icon('fi-rs-bolt')}${t('Dringend gesucht')}</span>` : ''}${s.note ? `<span class="pill pill--info">${icon('fi-rs-info')}${t('Hinweis aktiv')}</span>` : ''}</div>` : ''}
+      ${s.urgent || s.note ? `<div class="jm-card__tags">${s.urgent ? `<span class="pill pill--bad">${icon('ph-lightning')}${t('Dringend gesucht')}</span>` : ''}${s.note ? `<span class="pill pill--info">${icon('ph-info')}${t('Hinweis aktiv')}</span>` : ''}</div>` : ''}
       <div class="jm-stats">${stat(st.total, t('gesamt'))}${stat(st.fresh, t('neu'), st.fresh ? 'is-new' : '')}${stat(st.passed, t('bestanden'), 'is-ok')}${stat(st.avg === null ? '–' : `${st.avg} %`, t('Ø Ergebnis'))}</div>
       ${s.limit ? `<div class="jm-limit"><div class="jm-limit__row"><span>${t('Plätze')}</span><b>${t('{a} von {b}', { a: s.received || 0, b: s.limit })}</b></div><i><span style="width:${Math.min(100, ((s.received || 0) / s.limit) * 100)}%"></span></i></div>` : ''}
       <div class="jm-card__actions">
-        <button class="btn btn--primary btn--sm" type="button" data-job-edit="${esc(job.id)}">${icon('fi-rs-pencil')}${t('Bearbeiten')}</button>
-        <button class="btn btn--soft btn--sm" type="button" data-job-apps="${esc(job.id)}">${icon('fi-rs-document')}${t('Bewerbungen')}${st.fresh ? `<span class="count-badge">${st.fresh}</span>` : ''}</button>
-        <a class="btn btn--soft btn--sm" href="#/karriere/${esc(job.id)}">${icon('fi-rs-eye')}${t('Ansehen')}</a>
+        <button class="btn btn--primary btn--sm" type="button" data-job-edit="${esc(job.id)}">${icon('ph-pencil-simple')}${t('Bearbeiten')}</button>
+        <button class="btn btn--soft btn--sm" type="button" data-job-apps="${esc(job.id)}">${icon('ph-file-text')}${t('Bewerbungen')}${st.fresh ? `<span class="count-badge">${st.fresh}</span>` : ''}</button>
+        <a class="btn btn--soft btn--sm" href="#/karriere/${esc(job.id)}">${icon('ph-eye')}${t('Ansehen')}</a>
       </div>
       ${s.updatedBy ? `<p class="jm-card__by">${t('Zuletzt geändert von {name} · {date}', { name: esc(s.updatedBy), date: fmtWhen(s.updated) })}</p>` : ''}
     </article>`;
   }
   function careerManage() {
-    const back = `<a class="back-link" href="#/karriere">${icon('fi-rs-arrow-left')}${t('Karriere')}</a>`;
+    const back = `<a class="back-link" href="#/karriere">${icon('ph-arrow-left')}${t('Karriere')}</a>`;
     if (!canPR()) return `${back}<div class="cbox">${mayPR() ? backendSetupHtml() : `<p class="lead">${t('Stellen verwalten kann das Public Relations Department und höher.')}</p>`}</div>`;
     const open = D.jobs.filter((x) => jobOpen(x)).length;
     const fresh = review.list ? review.list.filter((a) => a.status === 'new').length : 0;
@@ -2050,7 +2050,7 @@
         <input type="checkbox" role="switch" name="urgent"${s.urgent ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
       <div class="f"><label class="f__label" for="je-note">${t('Hinweis für Bewerber (optional)')}</label>
         <textarea id="je-note" name="note" maxlength="200" rows="2" placeholder="${esc(t('z. B. Wir suchen vor allem Builder für die Strecke nach Warschau.'))}">${esc(s.note || '')}</textarea></div>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-check')}${t('Speichern')}</button>
       ${(s.log || []).length ? `<div class="job-edit__log"><h4>${t('Verlauf')}</h4><ul>${s.log.map((l) => `<li><b>${esc(l.text)}</b><small>${esc(l.by)} · ${fmtWhen(l.at)}</small></li>`).join('')}</ul></div>` : ''}
     </form>`;
   }
@@ -2134,11 +2134,11 @@
 
   function jobFacts(job) {
     const n = applyQuestions(job).length;
-    return `<ul class="cr-facts">
-        <li>${icon('fi-rs-time-fast')}<span><b>${t('ca. 5 Minuten')}</b><small>${t('Dauer')}</small></span></li>
-        <li>${icon('fi-rs-edit')}<span><b>${t('{n} Fragen', { n })}</b><small>${t('kurz und offen')}</small></span></li>
-        <li>${icon('fi-rs-comment')}<span><b>${t('7 Tage')}</b><small>${t('bis zur Antwort')}</small></span></li>
-      </ul>`;
+    return `<dl class="cr-facts">
+        <div><dt>${t('Dauer')}</dt><dd>${t('ca. 5 Minuten')}</dd></div>
+        <div><dt>${t('Fragen')}</dt><dd>${n}</dd></div>
+        <div><dt>${t('Antwort')}</dt><dd>${t('innerhalb von 7 Tagen')}</dd></div>
+      </dl>`;
   }
   function crStatus(job) {
     const s = jobState(job);
@@ -2147,17 +2147,14 @@
     if (s && s.from && Date.now() < s.from && s.open !== false) return `<span class="cr-status cr-status--soon"><i></i>${t('Öffnet am {date}', { date: fmtWhen(s.from) })}</span>`;
     return `<span class="cr-status"><i></i>${t('Geschlossen')}</span>`;
   }
-  function jobRow(job, i) {
+  function jobRow(job) {
     const s = jobState(job) || {};
     const open = jobOpen(job);
     const applied = state.applications[job.id];
     return `<a class="cr-row${open ? '' : ' is-closed'}" href="#/karriere/${job.id}">
-        <span class="cr-row__no">${String(i + 1).padStart(2, '0')}</span>
-        <span class="cr-row__main"><b>${esc(t(job.title))}</b><small>${esc(t(job.text))}</small>
-          ${s.urgent && open ? `<em class="cr-tag cr-tag--hot">${icon('fi-rs-bolt')}${t('Dringend gesucht')}</em>` : ''}${applied ? `<em class="cr-tag">${icon('fi-rs-check')}${t('Beworben')}</em>` : ''}</span>
-        <span class="cr-row__team">${esc(t(job.team))}</span>
-        <span class="cr-row__status">${crStatus(job)}</span>
-        <span class="cr-row__go" aria-hidden="true">${icon('fi-rs-arrow-right')}</span>
+        <span class="cr-row__main"><b>${esc(t(job.title))}</b><small>${esc(t(job.text))}</small></span>
+        <span class="cr-row__meta">${crStatus(job)}${s.urgent && open ? `<em class="cr-flag cr-flag--hot">${t('Dringend gesucht')}</em>` : ''}${applied ? `<em class="cr-flag">${t('Beworben')}</em>` : ''}</span>
+        ${icon('ph-caret-right', 'cr-row__go')}
       </a>`;
   }
   // Ab Public Relations Department: Zugang zu Prüfen und Verwalten
@@ -2166,34 +2163,46 @@
     const open = D.jobs.filter((x) => jobOpen(x)).length;
     const fresh = review.list ? review.list.filter((a) => a.status === 'new').length : 0;
     return `<div class="cr-staff-links">
-        <a class="cr-staff-link" href="#/karriere/pruefen">${icon('fi-rs-document')}<span><b>${t('Bewerbungen prüfen')}</b><small>${fresh ? t('{n} neu', { n: fresh }) : t('Alles geprüft')}</small></span>${fresh ? `<em class="count-badge">${fresh}</em>` : icon('fi-rs-arrow-right')}</a>
-        <a class="cr-staff-link" href="#/karriere/verwalten">${icon('fi-rs-settings')}<span><b>${t('Stellen verwalten')}</b><small>${t('{a} von {b} offen', { a: open, b: D.jobs.length })}</small></span>${icon('fi-rs-arrow-right')}</a>
+        <span class="cr-staff-links__label">${t('Für das Team')}</span>
+        <a class="cr-staff-link" href="#/karriere/pruefen">${t('Bewerbungen prüfen')}<small>${fresh ? t('{n} neu', { n: fresh }) : t('Alles geprüft')}</small></a>
+        <a class="cr-staff-link" href="#/karriere/verwalten">${t('Stellen verwalten')}<small>${t('{a} von {b} offen', { a: open, b: D.jobs.length })}</small></a>
       </div>`;
   }
   function careerList() {
     const open = D.jobs.filter((x) => jobOpen(x)).length;
-    const jobs = D.jobs.slice().sort((a, b) => (jobOpen(b) - jobOpen(a)) || (!!(jobState(b) || {}).urgent - !!(jobState(a) || {}).urgent));
-    const steps = [
-      ['fi-rs-search', 'Stelle wählen', 'Lies dir Aufgaben und Anforderungen in Ruhe durch.'],
-      ['fi-rs-edit', 'Kurz bewerben', 'Drei Schritte, sechs Fragen – in rund fünf Minuten erledigt.'],
-      ['fi-rs-comment', 'Antwort erhalten', 'Das Team meldet sich im Chat, per E-Mail und auf Discord.'],
-    ];
-    return `<header class="site-head lines-bg cr-hero">
-        <div class="site-wrap">
-          <p class="cr-eyebrow">${t('Karriere')}</p>
-          <h1 class="mega mega--stack">${t('Steig ein.')}<br><span>${t('Wir fahren los.')}</span></h1>
-          <p class="site-head__lead">${t('Train Sim Germany wird von einem Team aus der Community gebaut und betrieben. Such dir eine Stelle aus – die Bewerbung dauert nur ein paar Minuten.')}</p>
-          <div class="cr-hero__count"><b>${open}</b><span>${open === 1 ? t('offene Stelle') : t('offene Stellen')}</span></div>
+    const sortJobs = (list) => list.slice().sort((a, b) => (jobOpen(b) - jobOpen(a)) || (!!(jobState(b) || {}).urgent - !!(jobState(a) || {}).urgent));
+    const teams = [...new Set(D.jobs.map((j) => j.team))];
+    const groups = teams.map((team) => {
+      const jobs = sortJobs(D.jobs.filter((j) => j.team === team));
+      const n = jobs.filter((j) => jobOpen(j)).length;
+      return `<section class="cr-team">
+          <h2 class="cr-team__name">${esc(t(team))}<small>${n ? (n === 1 ? t('1 Stelle offen') : t('{n} Stellen offen', { n })) : t('gerade nichts offen')}</small></h2>
+          <div class="cr-team__jobs">${jobs.map(jobRow).join('')}</div>
+        </section>`;
+    }).join('');
+    return `<header class="site-head cr-hero">
+        <div class="site-wrap cr-hero__grid">
+          <div>
+            <p class="cr-eyebrow">${t('Karriere')}</p>
+            <h1 class="cr-hero__title">${t('Mach mit bei Train Sim Germany.')}</h1>
+          </div>
+          <div class="cr-hero__side">
+            <p>${t('Train Sim Germany wird von einem Team aus der Community gebaut und betrieben. Such dir eine Stelle aus – die Bewerbung dauert nur ein paar Minuten.')}</p>
+            <p class="cr-hero__open">${open === 1 ? t('Gerade ist 1 Stelle offen.') : t('Gerade sind {n} Stellen offen.', { n: open })}</p>
+          </div>
         </div>
       </header>
       <div class="site-wrap cr-body">
         ${careerStaff()}
-        <div class="cr-board">
-          <div class="cr-board__head" aria-hidden="true"><span>${t('Nr.')}</span><span>${t('Stelle')}</span><span>${t('Team')}</span><span>${t('Status')}</span><span></span></div>
-          ${jobs.map(jobRow).join('')}
-        </div>
-        <h2 class="site-h2">${t('So läuft es ab')}</h2>
-        <ol class="cr-how">${steps.map(([ic, title, text], i) => `<li><span class="cr-how__no">${i + 1}</span>${icon(ic)}<b>${t(title)}</b><p>${t(text)}</p></li>`).join('')}</ol>
+        ${groups}
+        <section class="cr-team cr-team--how">
+          <h2 class="cr-team__name">${t('So läuft es ab')}</h2>
+          <div class="cr-how">
+            <p>${t('Du suchst dir eine Stelle aus und liest Aufgaben und Anforderungen in Ruhe durch.')}</p>
+            <p>${t('Die Bewerbung hat drei Teile: ein paar Angaben zu dir, sechs kurze Fragen und ein letzter Blick, bevor du sie abschickst.')}</p>
+            <p>${t('Das Team liest jede Bewerbung und meldet sich innerhalb von 7 Tagen – im Chat, per E-Mail und auf Discord.')}</p>
+          </div>
+        </section>
       </div>`;
   }
   function careerDetail(job) {
@@ -2201,40 +2210,39 @@
     const st = jobState(job);
     let action;
     if (app) {
-      action = `<div class="cr-note cr-note--ok">${icon('fi-rs-check')}<span>${t('Du hast dich am {date} beworben.', { date: fmtDate(app.at) })}</span></div>
-        <a class="site-btn site-btn--brand site-btn--block" href="#/karriere/${job.id}/bewerbung">${t('Deine Bewerbung ansehen')}${icon('fi-rs-arrow-right')}</a>`;
+      action = `<div class="cr-note cr-note--ok">${icon('ph-check')}<span>${t('Du hast dich am {date} beworben.', { date: fmtDate(app.at) })}</span></div>
+        <a class="site-btn site-btn--brand site-btn--block" href="#/karriere/${job.id}/bewerbung">${t('Deine Bewerbung ansehen')}${icon('ph-arrow-right')}</a>`;
     } else if (!jobOpen(job)) {
       const soon = st && st.from && Date.now() < st.from && st.open !== false;
-      action = `<div class="cr-note cr-note--bad">${icon('fi-rs-info')}<span>${jobFull(st) ? t('Alle Plätze sind vergeben – es sind genug Bewerbungen eingegangen.') : soon ? t('Bewerbungen sind ab {date} möglich.', { date: fmtWhen(st.from) }) : t('Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.')}</span></div>
-        <a class="site-btn site-btn--ghost site-btn--block" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('fi-brands-discord')}${t('Zum Discord')}</a>`;
+      action = `<div class="cr-note cr-note--bad">${icon('ph-info')}<span>${jobFull(st) ? t('Alle Plätze sind vergeben – es sind genug Bewerbungen eingegangen.') : soon ? t('Bewerbungen sind ab {date} möglich.', { date: fmtWhen(st.from) }) : t('Diese Stelle ist gerade geschlossen. Schau bald wieder vorbei oder frag auf unserem Discord nach.')}</span></div>
+        <a class="site-btn site-btn--ghost site-btn--block" href="${esc(D.links.discord)}" target="_blank" rel="noopener">${icon('si-discord')}${t('Zum Discord')}</a>`;
     } else {
-      action = `<a class="site-btn site-btn--brand site-btn--block site-btn--split" href="#/karriere/${job.id}/bewerben">${t('Jetzt bewerben')}${icon('fi-rs-arrow-right')}</a>
+      action = `<a class="site-btn site-btn--brand site-btn--block site-btn--split" href="#/karriere/${job.id}/bewerben">${t('Jetzt bewerben')}${icon('ph-arrow-right')}</a>
         ${st && st.to ? `<p class="cr-side__small">${t('Bewerbungen sind bis {date} möglich ({left}).', { date: fmtWhen(st.to), left: untilText(st.to) })}</p>` : ''}
         ${st && st.limit ? `<p class="cr-side__small">${t('Noch {n} Plätze frei.', { n: Math.max(0, st.limit - (st.received || 0)) })}</p>` : ''}`;
     }
-    if (st && st.note) action = `<div class="cr-note">${icon('fi-rs-info')}<span><b>${t('Hinweis vom Team')}:</b> ${esc(st.note)}</span></div>${action}`;
-    const list = (items, numbered) => `<${numbered ? 'ol' : 'ul'} class="cr-list${numbered ? ' cr-list--num' : ''}">${items.map((x) => `<li>${numbered ? '' : icon('fi-rs-check')}<span>${esc(t(x))}</span></li>`).join('')}</${numbered ? 'ol' : 'ul'}>`;
+    if (st && st.note) action = `<div class="cr-note">${icon('ph-info')}<span><b>${t('Hinweis vom Team')}:</b> ${esc(st.note)}</span></div>${action}`;
+    const list = (items) => `<ul class="cr-list">${items.map((x) => `<li>${esc(t(x))}</li>`).join('')}</ul>`;
     const areas = job.areas
-      ? `<section class="cr-sec"><h2>${t('Bereiche')}</h2><div class="cr-areas">${job.areas.map((a) => `<span style="--rc:${rankOf(a).color}"><i></i>${esc(a)}</span>`).join('')}</div></section>`
+      ? `<section class="cr-sec"><h2>${t('Bereiche')}</h2><ul class="cr-areas">${job.areas.map((a) => `<li style="--rc:${rankOf(a).color}"><i></i>${esc(a)}</li>`).join('')}</ul></section>`
       : '';
-    return `<header class="site-head lines-bg cr-jobhead">
+    return `<header class="site-head cr-jobhead">
         <div class="site-wrap">
-          <a class="back-pill" href="#/karriere">${icon('fi-rs-arrow-left')}${t('Alle Stellen')}</a>
-          <div class="cr-jobhead__meta">${crStatus(job)}<span>${icon('fi-rs-users-alt')}${t('Team {name}', { name: esc(t(job.team)) })}</span>
-            ${st && st.urgent && jobOpen(job) ? `<em class="cr-tag cr-tag--hot">${icon('fi-rs-bolt')}${t('Dringend gesucht')}</em>` : ''}</div>
-          <h1 class="mega">${esc(t(job.title))}</h1>
+          <nav class="cr-crumbs" aria-label="${esc(t('Brotkrumen'))}"><a href="#/karriere">${t('Karriere')}</a><span aria-hidden="true">/</span><span>${esc(t(job.team))}</span></nav>
+          <h1 class="cr-jobhead__title">${esc(t(job.title))}</h1>
           <p class="site-head__lead">${esc(t(job.text))}</p>
+          <div class="cr-jobhead__meta">${crStatus(job)}${st && st.urgent && jobOpen(job) ? `<em class="cr-flag cr-flag--hot">${t('Dringend gesucht')}</em>` : ''}<span>${t('Team {name}', { name: esc(t(job.team)) })}</span></div>
         </div>
       </header>
       <div class="site-wrap cr-job">
         <div class="cr-job__main">
-          <section class="cr-sec"><h2>${t('Deine Aufgaben')}</h2>${list(job.tasks, true)}</section>
+          <section class="cr-sec"><h2>${t('Deine Aufgaben')}</h2>${list(job.tasks)}</section>
           <section class="cr-sec"><h2>${t('Das bringst du mit')}</h2>${list(job.needs)}</section>
           ${areas}
         </div>
         <aside class="cr-job__side">
           <div class="cr-side">
-            <h2>${t('Bewerbung')}</h2>
+            <h2>${t('Interesse?')}</h2>
             ${jobFacts(job)}
             <div class="cr-side__action">${action}</div>
           </div>
@@ -2258,8 +2266,8 @@
         ? t('Du kannst dich für jeden Bereich bis zu deinem Rang bewerben (gerade: <b>{rank}</b>).', { rank: esc(rank) })
         : t('Für den Supervisor brauchst du mindestens den Rang Qualified Driver.')}</span>`;
   }
-  function questionHtml(q, n) {
-    const head = `<span class="cr-q__no">${String(n).padStart(2, '0')}</span><span class="cr-q__text">${esc(q.q)}${q.optional ? `<small>${t('freiwillig')}</small>` : ''}</span>`;
+  function questionHtml(q, n, total) {
+    const head = `<span class="cr-q__no">${t('Frage {n} von {total}', { n, total })}${q.optional ? ` · ${t('freiwillig')}` : ''}</span><span class="cr-q__text">${esc(q.q)}</span>`;
     const name = `q:${q.key}`;
     const id = `cr-${q.key}`;
     if (q.type === 'long') {
@@ -2276,66 +2284,71 @@
           <div class="cr-pick cr-pick--days">${[0, 1, 2, 3, 4, 5, 6].map((d) => `<label class="cr-opt"><input type="checkbox" name="${esc(name)}" value="${d}"><span>${esc(dayShort(d))}</span></label>`).join('')}</div></fieldset>`;
     }
     return `<div class="cr-q f" ${dataField(name)} data-q="link"><label class="cr-q__head" for="${id}">${head}</label>
-        <div class="write">${icon('fi-rs-link-alt')}<input id="${id}" name="${esc(name)}" type="url" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://…"></div>
+        <div class="write">${icon('ph-link')}<input id="${id}" name="${esc(name)}" type="url" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://…"></div>
         <span class="f__hint">${t('Zum Beispiel ein Video, ein Spiel, Screenshots oder dein Portfolio.')}</span></div>`;
   }
   function careerApply(job) {
     const rankOpts = RANKS.map((r) => `<option value="${esc(r.name)}"${r.name === state.rank ? ' selected' : ''}>${esc(r.name)} · ${esc(t(r.label))}</option>`).join('');
     const qs = applyQuestions(job);
     const field = (name, label, input) => `<div class="cr-field f" ${dataField(name)}><label class="f__label" for="ap-${name}">${label}</label>${input}</div>`;
-    return `<div class="site-wrap site-wrap--narrow cr-apply">
-        <a class="back-pill" href="#/karriere/${job.id}">${icon('fi-rs-arrow-left')}${esc(t(job.title))}</a>
-        <h1 class="cr-apply__title">${t('Bewerbung als <span>{job}</span>', { job: esc(t(job.title)) })}</h1>
-        <ol class="cr-steps" data-steps>${APPLY_STEPS.map((s, i) => `<li${i === 0 ? ' class="is-active" aria-current="step"' : ''}><span class="cr-steps__no">${i + 1}</span><span class="cr-steps__label">${t(s.title)}</span></li>`).join('')}</ol>
+    return `<div class="site-wrap cr-apply" data-apply-top>
+        <aside class="cr-apply__side">
+          <nav class="cr-crumbs" aria-label="${esc(t('Brotkrumen'))}"><a href="#/karriere">${t('Karriere')}</a><span aria-hidden="true">/</span><a href="#/karriere/${job.id}">${esc(t(job.title))}</a></nav>
+          <h1 class="cr-apply__title">${t('Bewerbung')}<small>${esc(t(job.title))}</small></h1>
+          <ol class="cr-steps" data-steps>${APPLY_STEPS.map((s, i) => `<li${i === 0 ? ' class="is-active" aria-current="step"' : ''}><span class="cr-steps__no">${t('Teil {n}', { n: i + 1 })}</span><b>${t(s.title)}</b><small>${t(s.text)}</small></li>`).join('')}</ol>
+        </aside>
         <form class="cr-form" data-apply="${job.id}" data-step="1" novalidate>
           <section class="cr-step" data-step-box="1">
-            <header class="cr-step__head"><h2>${t(APPLY_STEPS[0].title)}</h2><p>${t(APPLY_STEPS[0].text)}</p></header>
+            <h2 class="cr-step__title">${t(APPLY_STEPS[0].title)}</h2>
             <div class="cr-grid">
               ${field('roblox', t('Roblox-Benutzername'), `<input id="ap-roblox" name="roblox" autocomplete="username" value="${esc(state.profile ? state.profile.username : D.me.username)}" placeholder="${esc(t('Dein Roblox-Benutzername'))}"${state.profile && state.profile.oauth ? ' readonly' : ''}>`)}
               ${field('discord', t('Discord-Benutzername'), `<input id="ap-discord" name="discord" autocomplete="off" placeholder="${esc(t('z. B. lokfuehrer_max'))}">`)}
               ${field('email', t('E-Mail-Adresse'), `<input id="ap-email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="${esc(t('name@beispiel.de'))}">`)}
-              ${field('rank', t('Dein aktueller Rang'), `<div class="select"><select id="ap-rank" name="rank">${rankOpts}</select>${icon('fi-rs-angle-small-down')}</div>`)}
+              ${field('rank', t('Dein aktueller Rang'), `<div class="select"><select id="ap-rank" name="rank">${rankOpts}</select>${icon('ph-caret-down')}</div>`)}
             </div>
             <fieldset class="cr-q f" ${dataField('since')} data-q="single"><legend class="f__label">${t('Du spielst seit')}</legend>
-              <div class="cr-pick">${SINCE.map((x) => `<label class="cr-opt"><input type="radio" name="since" value="${esc(x)}"><span>${esc(t(x))}</span></label>`).join('')}</div></fieldset>
+              <div class="cr-pick cr-pick--seg">${SINCE.map((x) => `<label class="cr-opt"><input type="radio" name="since" value="${esc(x)}"><span>${esc(t(x))}</span></label>`).join('')}</div></fieldset>
           </section>
           <section class="cr-step" data-step-box="2" hidden>
-            <header class="cr-step__head"><h2>${t(APPLY_STEPS[1].title)}</h2><p>${t(APPLY_STEPS[1].text)}</p></header>
-            ${job.areas ? `<fieldset class="cr-q f" ${dataField('area')}><legend class="cr-q__head"><span class="cr-q__no">${icon('fi-rs-marker')}</span><span class="cr-q__text">${t('In welchem Bereich möchtest du Trainings leiten?')}</span></legend><div data-areas>${areasHtml(job, state.rank, null)}</div></fieldset>` : ''}
-            ${qs.map((q, i) => questionHtml(q, i + 1)).join('')}
+            <h2 class="cr-step__title">${t(APPLY_STEPS[1].title)}</h2>
+            <p class="cr-step__text">${t('Ehrlich und in eigenen Worten – es gibt keine falschen Antworten.')}</p>
+            ${job.areas ? `<fieldset class="cr-q f" ${dataField('area')}><legend class="cr-q__head"><span class="cr-q__no">${t('Bereich')}</span><span class="cr-q__text">${t('In welchem Bereich möchtest du Trainings leiten?')}</span></legend><div data-areas>${areasHtml(job, state.rank, null)}</div></fieldset>` : ''}
+            ${qs.map((q, i) => questionHtml(q, i + 1, qs.length)).join('')}
           </section>
           <section class="cr-step" data-step-box="3" hidden>
-            <header class="cr-step__head"><h2>${t(APPLY_STEPS[2].title)}</h2><p>${t(APPLY_STEPS[2].text)}</p></header>
+            <h2 class="cr-step__title">${t(APPLY_STEPS[2].title)}</h2>
+            <p class="cr-step__text">${t(APPLY_STEPS[2].text)}</p>
             <div class="cr-review" data-apply-review></div>
             <div class="f" ${dataField('confirm')}><label class="confirm"><input type="checkbox" name="confirm"><span>${t('Ich habe alle Angaben ehrlich gemacht und kenne die Regeln von Train Sim Germany.')}</span></label></div>
             <p class="cr-side__small">${apiReady() && loginReady() ? t('Die Bewerbung geht mit deinem Roblox-Konto direkt an das Team.') : t('Demo: Die Bewerbung wird noch nicht verschickt, sondern nur auf diesem Gerät gespeichert.')}</p>
           </section>
           <div class="cr-form__nav">
-            <button class="site-btn site-btn--ghost" type="button" data-step-prev hidden>${icon('fi-rs-arrow-left')}${t('Zurück')}</button>
-            <button class="site-btn site-btn--brand" type="button" data-step-next>${t('Weiter')}${icon('fi-rs-arrow-right')}</button>
-            <button class="site-btn site-btn--brand" type="submit" hidden>${t('Bewerbung senden')}${icon('fi-rs-paper-plane')}</button>
+            <button class="cr-back" type="button" data-step-prev hidden>${icon('ph-arrow-left')}${t('Zurück')}</button>
+            <button class="site-btn cr-next" type="button" data-step-next>${t('Weiter')}${icon('ph-arrow-right')}</button>
+            <button class="site-btn site-btn--brand" type="submit" hidden>${t('Bewerbung senden')}${icon('ph-paper-plane-tilt')}</button>
           </div>
         </form>
       </div>`;
   }
   function careerDone(job, app) {
-    const chatLink = app.chatId ? `<a class="cr-note__link" href="#/chat/${esc(app.chatId)}">${t('Zur Nachricht im Chat')} ${icon('fi-rs-arrow-small-right')}</a>` : '';
+    const chatLink = app.chatId ? `<a class="cr-note__link" href="#/chat/${esc(app.chatId)}">${t('Zur Nachricht im Chat')} ${icon('ph-arrow-right')}</a>` : '';
     const stage = app.status === 'passed' || app.status === 'failed' ? 2 : 1;
-    const result = app.status === 'passed' ? `<div class="cr-note cr-note--ok">${icon('fi-rs-trophy')}<span><b>${t('Bestanden – herzlichen Glückwunsch!')}</b>${chatLink}</span></div>`
-      : app.status === 'failed' ? `<div class="cr-note cr-note--bad">${icon('fi-rs-info')}<span><b>${t('Diesmal leider nicht bestanden. Du kannst dich später noch einmal bewerben.')}</b>${chatLink}</span></div>` : '';
+    const result = app.status === 'passed' ? `<div class="cr-note cr-note--ok">${icon('ph-trophy')}<span><b>${t('Bestanden – herzlichen Glückwunsch!')}</b>${chatLink}</span></div>`
+      : app.status === 'failed' ? `<div class="cr-note cr-note--bad">${icon('ph-info')}<span><b>${t('Diesmal leider nicht bestanden. Du kannst dich später noch einmal bewerben.')}</b>${chatLink}</span></div>` : '';
     const track = [t('Gesendet'), t('Wird geprüft'), t('Ergebnis')];
     const rows = [[t('Stelle'), t(job.title)], ...(app.area ? [[t('Bereich'), app.area]] : []), [t('Rang'), app.rank], ['Discord', app.discord],
       ...(app.email ? [[t('E-Mail'), app.email]] : []), [t('Gesendet'), fmtDate(app.at)]];
     return `<div class="site-wrap site-wrap--narrow cr-done">
-        <span class="cr-done__ic">${icon('fi-rs-check')}</span>
-        <h1 class="cr-apply__title">${t('Bewerbung <span>gesendet</span>')}</h1>
-        <p class="site-head__lead">${t('Danke, {name}! Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen.', { name: esc(app.roblox) })}</p>
-        <ol class="cr-track">${track.map((x, i) => `<li class="${i < stage ? 'is-done' : i === stage ? 'is-now' : ''}"><i></i><span>${x}</span></li>`).join('')}</ol>
+        <nav class="cr-crumbs" aria-label="${esc(t('Brotkrumen'))}"><a href="#/karriere">${t('Karriere')}</a><span aria-hidden="true">/</span><a href="#/karriere/${job.id}">${esc(t(job.title))}</a></nav>
+        <p class="cr-done__sent">${icon('ph-check-circle')}${t('Bewerbung gesendet')}</p>
+        <h1 class="cr-done__title">${t('Danke, {name}.', { name: esc(app.roblox) })}</h1>
+        <p class="site-head__lead">${t('Wir schauen uns deine Bewerbung an und melden uns innerhalb von 7 Tagen.')}</p>
+        <ol class="cr-track" aria-label="${esc(t('Stand'))}">${track.map((x, i) => `<li class="${i < stage ? 'is-done' : i === stage ? 'is-now' : ''}"${i === stage ? ' aria-current="step"' : ''}><span>${x}</span></li>`).join('')}</ol>
         ${result}
-        ${app.mailed && app.email ? `<p class="cr-side__small">${icon('fi-rs-envelope')} ${t('Eine Kopie mit allen Angaben ging an {email}.', { email: `<b>${esc(app.email)}</b>` })}</p>` : ''}
+        ${app.mailed && app.email ? `<p class="cr-side__small">${icon('ph-envelope-simple')} ${t('Eine Kopie mit allen Angaben ging an {email}.', { email: `<b>${esc(app.email)}</b>` })}</p>` : ''}
         <dl class="cr-dl">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
         <div class="cr-done__actions">
-          <a class="site-btn site-btn--ghost" href="#/karriere/${job.id}">${icon('fi-rs-arrow-left')}${t('Zurück zur Stelle')}</a>
+          <a class="site-btn site-btn--ghost" href="#/karriere/${job.id}">${icon('ph-arrow-left')}${t('Zurück zur Stelle')}</a>
           ${app.sent ? '' : `<button class="site-btn site-btn--ghost" type="button" data-apply-reset="${job.id}">${t('Bewerbung zurückziehen')}</button>`}
         </div>
         ${app.sent ? `<p class="cr-side__small">${t('Die Bewerbung ist beim Team angekommen. Zurückziehen kannst du sie über Discord.')}</p>` : ''}
@@ -2351,10 +2364,10 @@
       return;
     }
     if (state.jobId === 'pruefen') {
-      el.innerHTML = staffWrap(mayPR() && !canBackend() ? `<a class="back-link" href="#/karriere">${icon('fi-rs-arrow-left')}${t('Karriere')}</a><div class="cbox">${backendSetupHtml()}</div>`
+      el.innerHTML = staffWrap(mayPR() && !canBackend() ? `<a class="back-link" href="#/karriere">${icon('ph-arrow-left')}${t('Karriere')}</a><div class="cbox">${backendSetupHtml()}</div>`
         : canPR() ? (state.reviewId ? reviewDetail() : reviewList())
         : `<div class="cbox"><p class="lead">${t('Bewerbungen prüfen kann das Public Relations Department und höher, wenn es mit Roblox angemeldet ist.')}</p>
-          <a class="btn-line btn-line--outline" href="#/karriere">${icon('fi-rs-arrow-left')}${t('Zurück zu den Jobs')}</a></div>`);
+          <a class="btn-line btn-line--outline" href="#/karriere">${icon('ph-arrow-left')}${t('Zurück zu den Jobs')}</a></div>`);
       ensureReviewData();
       return;
     }
@@ -2404,7 +2417,7 @@
   }
   function showFieldError(field, msg, id) {
     field.classList.add('has-error');
-    field.insertAdjacentHTML('beforeend', `<span class="f__error" id="${id}">${icon('fi-rs-info')}${esc(msg)}</span>`);
+    field.insertAdjacentHTML('beforeend', `<span class="f__error" id="${id}">${icon('ph-info')}${esc(msg)}</span>`);
     const input = $('input, select, textarea', field);
     input.setAttribute('aria-invalid', 'true');
     input.setAttribute('aria-describedby', id);
@@ -2458,10 +2471,10 @@
       const rows = [[t('Roblox'), d.get('roblox')], ['Discord', d.get('discord')], [t('E-Mail'), d.get('email')], [t('Rang'), d.get('rank')], [t('Du spielst seit'), t(d.get('since') || '')],
         ...(d.get('area') ? [[t('Bereich'), d.get('area')]] : [])];
       $('[data-apply-review]', form).innerHTML = `<dl class="cr-dl">${rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v || '–')}</dd></div>`).join('')}</dl>
-        <ol class="cr-answers">${readAnswers(form, job).map((x, i) => `<li><span class="cr-q__no">${String(i + 1).padStart(2, '0')}</span><div><b>${esc(x.q)}</b><p>${esc(x.a || '–')}</p></div></li>`).join('')}</ol>
-        <button class="btn-text" type="button" data-step-to="2">${icon('fi-rs-pencil')}${t('Antworten bearbeiten')}</button>`;
+        <ol class="cr-answers">${readAnswers(form, job).map((x) => `<li><b>${esc(x.q)}</b><p>${esc(x.a || '–')}</p></li>`).join('')}</ol>
+        <button class="cr-back" type="button" data-step-to="2">${icon('ph-pencil-simple')}${t('Antworten bearbeiten')}</button>`;
     }
-    const top = $('[data-steps]');
+    const top = $('[data-apply-top]');
     if (top) window.scrollTo({ top: Math.max(0, top.getBoundingClientRect().top + window.scrollY - (navRoot ? navRoot.getBoundingClientRect().bottom : 0) - 24), behavior: reducedMotion() ? 'auto' : 'smooth' });
   }
   async function submitApplication(form) {
@@ -2560,14 +2573,14 @@
     return {
       week, groups, routes, trips: s.trips,
       tiles: [
-        { ic: 'fi-rs-train-side', label: t('Kilometer'), value: countHtml(s.km, 'km', 'my-km') },
-        { ic: 'fi-rs-route', label: t('Fahrten'), value: countHtml(s.trips, 'fmt', 'my-trips') },
-        { ic: 'fi-rs-clock-three', label: t('Pünktlichkeit'), value: countHtml(s.trips ? (s.punctual / s.trips) * 100 : 0, 'pct', 'my-punct') },
-        { ic: 'fi-rs-time-fast', label: t('Spielzeit'), value: t('{n} Std.', { n: nf1.format(Math.round(s.minutes / 6) / 10) }) },
-        { ic: 'fi-rs-calendar', label: t('Trainings'), value: t('{n} bestanden', { n: fmt(trainingsPassed()) }) },
-        { ic: 'fi-rs-user-add', label: t('Dabei seit'), value: s.first ? dtf({ month: 'short', year: 'numeric' }).format(new Date(s.first)) : '–' },
-        { ic: 'fi-rs-gamepad', label: t('Zuletzt gespielt'), value: s.last ? agoText(s.last) : '–' },
-        { ic: 'fi-rs-heart', label: t('Lieblingsstrecke'), value: fav ? `${routeNo(fav)}${esc(t(fav.title))}` : '–', wide: true },
+        { ic: 'ph-train', label: t('Kilometer'), value: countHtml(s.km, 'km', 'my-km') },
+        { ic: 'ph-path', label: t('Fahrten'), value: countHtml(s.trips, 'fmt', 'my-trips') },
+        { ic: 'ph-clock', label: t('Pünktlichkeit'), value: countHtml(s.trips ? (s.punctual / s.trips) * 100 : 0, 'pct', 'my-punct') },
+        { ic: 'ph-timer', label: t('Spielzeit'), value: t('{n} Std.', { n: nf1.format(Math.round(s.minutes / 6) / 10) }) },
+        { ic: 'ph-calendar-blank', label: t('Trainings'), value: t('{n} bestanden', { n: fmt(trainingsPassed()) }) },
+        { ic: 'ph-user-plus', label: t('Dabei seit'), value: s.first ? dtf({ month: 'short', year: 'numeric' }).format(new Date(s.first)) : '–' },
+        { ic: 'ph-game-controller', label: t('Zuletzt gespielt'), value: s.last ? agoText(s.last) : '–' },
+        { ic: 'ph-heart', label: t('Lieblingsstrecke'), value: fav ? `${routeNo(fav)}${esc(t(fav.title))}` : '–', wide: true },
       ],
     };
   }
@@ -2630,7 +2643,7 @@
   const langName = (code) => { try { return new Intl.DisplayNames([locale], { type: 'language' }).of(code); } catch (e) { return ''; } };
   // Sprache als Dropdown: Knopf mit Flagge, darunter die Liste (Pfeiltasten, Esc, Klick daneben schließt)
   const langFlag = (code) => (code === 'auto'
-    ? `<span class="flag flag--auto">${icon('fi-rs-smartphone')}</span>`
+    ? `<span class="flag flag--auto">${icon('ph-device-mobile')}</span>`
     : `<img class="flag" src="assets/img/flags/${langOf(code).flag}.svg" alt="" width="32" height="24">`);
   function renderLangPicker() {
     const box = $('[data-lang-picker]');
@@ -2640,11 +2653,11 @@
     const sub = (code) => (code === 'auto' ? t('Wie dein Gerät – gerade: {name}', { name: langOf(deviceLang()).name }) : code === lang ? '' : langName(code));
     const text = (code) => `<span class="dropdown__text"><b>${esc(name(code))}</b>${sub(code) ? `<small>${esc(sub(code))}</small>` : ''}</span>`;
     box.innerHTML = `<button class="dropdown__btn" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="lang-list" aria-label="${esc(t('Sprache'))}: ${esc(name(setting))}" data-lang-toggle>
-        ${langFlag(setting)}${text(setting)}${icon('fi-rs-angle-small-down', 'dropdown__chev')}
+        ${langFlag(setting)}${text(setting)}${icon('ph-caret-down', 'dropdown__chev')}
       </button>
       <div class="dropdown__list" id="lang-list" role="listbox" aria-label="${esc(t('Sprache'))}" hidden>
         ${['auto', ...LANGS.map((l) => l.code)].map((code) => `<button type="button" role="option" tabindex="-1" aria-selected="${setting === code}" data-lang-set="${code}">
-          ${langFlag(code)}${text(code)}${setting === code ? icon('fi-rs-check', 'dropdown__check') : ''}</button>`).join('')}
+          ${langFlag(code)}${text(code)}${setting === code ? icon('ph-check', 'dropdown__check') : ''}</button>`).join('')}
       </div>`;
   }
   function langMenu(open, { focus = true } = {}) {
@@ -2674,7 +2687,7 @@
     if (!box) return;
     const pv = privacy();
     const row = (key, title, text, on, off, note) => `<label class="toggle${off ? ' is-disabled' : ''}">
-        <span class="toggle__text"><b>${title}</b><small>${text}</small>${note ? `<small class="toggle__note">${icon('fi-rs-info')}${note}</small>` : ''}</span>
+        <span class="toggle__text"><b>${title}</b><small>${text}</small>${note ? `<small class="toggle__note">${icon('ph-info')}${note}</small>` : ''}</span>
         <input type="checkbox" role="switch" data-privacy-set="${key}"${on ? ' checked' : ''}${off ? ' disabled' : ''}>
         <span class="toggle__ui" aria-hidden="true"></span>
       </label>`;
@@ -2703,7 +2716,7 @@
     else toast(on ? t('Deine Statistik ist jetzt öffentlich') : t('Deine Statistik sieht jetzt nur du'));
   }
   // Hinweis im Profil- und Statistik-Dialog
-  const visibilityNote = (on, onText, offText) => `<p class="vis-note">${icon(on ? 'fi-rs-eye' : 'fi-rs-lock')}<span>${on ? onText : offText}</span><a href="#/einstellungen">${t('Ändern')}</a></p>`;
+  const visibilityNote = (on, onText, offText) => `<p class="vis-note">${icon(on ? 'ph-eye' : 'ph-lock')}<span>${on ? onText : offText}</span><a href="#/einstellungen">${t('Ändern')}</a></p>`;
   function renderSettings() {
     // Eine Seite: Themes (Hell, Dunkel, Automatisch) und Präferenzen (was öffentlich ist)
     renderPrivacy();
@@ -2720,7 +2733,7 @@
   function avatarInner(p) {
     if (p && p.avatar) return `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">`;
     if (p) return `<b>${esc(initials(p.username))}</b>`;
-    return icon('fi-ss-user');
+    return icon('phf-user');
   }
   const ringHTML = (p, rank, cls) => `<span class="avatar-ring ${cls}" style="--rc:${rank.color}"><span class="avatar-img">${avatarInner(p)}</span></span>`;
   const rankPill = (rank, extra = '') => `<span class="rank-pill" style="--rc:${rank.color}">[${esc(rank.prefix)}]${extra}</span>`;
@@ -2998,16 +3011,16 @@
     const r = rankOf(state.rank);
     const reLogin = apiReady() && !sessionToken();
     return `<div class="setup">
-      <span class="setup__ic">${icon('fi-rs-database')}</span>
+      <span class="setup__ic">${icon('ph-hard-drives')}</span>
       <h3>${reLogin ? t('Bitte neu anmelden') : t('Der App-Server fehlt noch')}</h3>
       <p>${reLogin ? t('Deine Anmeldung beim Server ist abgelaufen. Melde dich einmal neu mit Roblox an, dann kannst du wieder Trainings und Neuigkeiten erstellen.')
         : t('Als {rank} darfst du das. Damit Trainings, Neuigkeiten, Bewerbungen und der Chat bei allen ankommen, braucht die App ihren Server (Backend). Er ist noch nicht verbunden.', { rank: `<b>[${esc(r.prefix)}] ${esc(r.name)}</b>` })}</p>
-      ${reLogin ? `<button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('fi-rs-sign-in-alt')}${t('Mit Roblox anmelden')}</button>` : `<ol class="setup__steps">
+      ${reLogin ? `<button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('ph-sign-in')}${t('Mit Roblox anmelden')}</button>` : `<ol class="setup__steps">
         <li>${t('Bei Cloudflare ein kostenloses Konto anlegen und einen API-Token erstellen.')}</li>
         <li>${t('Auf GitHub unter Settings → Secrets die Werte CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID eintragen.')}</li>
         <li>${t('Unter Actions „Backend veröffentlichen“ starten – die Adresse wird automatisch eingetragen.')}</li>
       </ol>
-      <a class="btn btn--primary btn--lg btn--block" href="${BACKEND_GUIDE}" target="_blank" rel="noopener">${icon('fi-rs-arrow-up-right-from-square')}${t('Anleitung öffnen')}</a>`}
+      <a class="btn btn--primary btn--lg btn--block" href="${BACKEND_GUIDE}" target="_blank" rel="noopener">${icon('ph-arrow-square-out')}${t('Anleitung öffnen')}</a>`}
     </div>`;
   }
 
@@ -3055,13 +3068,13 @@
         <div class="f"><label class="f__label" for="tn-time">${t('Uhrzeit (deutsche Zeit)')}</label><input id="tn-time" name="time" type="time" value="18:00"></div>
       </div>
       <div class="cform__row">
-        <div class="f"><label class="f__label" for="tn-dur">${t('Dauer')}</label><div class="select"><select id="tn-dur" name="dur">${[30, 45, 60, 90, 120].map((m) => `<option value="${m}"${m === 60 ? ' selected' : ''}>${t('{m} Min.', { m })}</option>`).join('')}</select>${icon('fi-rs-angle-small-down')}</div></div>
+        <div class="f"><label class="f__label" for="tn-dur">${t('Dauer')}</label><div class="select"><select id="tn-dur" name="dur">${[30, 45, 60, 90, 120].map((m) => `<option value="${m}"${m === 60 ? ' selected' : ''}>${t('{m} Min.', { m })}</option>`).join('')}</select>${icon('ph-caret-down')}</div></div>
         <div class="f"><label class="f__label" for="tn-slots">${t('Plätze')}</label><input id="tn-slots" name="slots" type="number" inputmode="numeric" min="1" max="50" value="12"></div>
       </div>
-      <div class="f"><label class="f__label" for="tn-server">${t('Server')}</label><div class="select"><select id="tn-server" name="server">${D.servers.map((x) => `<option${x.type === 'training' ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>${icon('fi-rs-angle-small-down')}</div></div>
+      <div class="f"><label class="f__label" for="tn-server">${t('Server')}</label><div class="select"><select id="tn-server" name="server">${D.servers.map((x) => `<option${x.type === 'training' ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>${icon('ph-caret-down')}</div></div>
       <div class="f"><label class="f__label" for="tn-helpers">${t('Supervisors (optional)')}</label><input id="tn-helpers" name="helpers" maxlength="140" autocomplete="off" spellcheck="false" placeholder="${esc(t('Roblox-Namen, mit Komma getrennt'))}"></div>
       <div class="f"><label class="f__label" for="tn-text">${t('Beschreibung (optional)')}</label><textarea id="tn-text" name="text" maxlength="500" rows="3" placeholder="${esc(t('Was lernen die Teilnehmer?'))}"></textarea></div>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-plus')}${t('Training anbieten')}</button>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-plus')}${t('Training anbieten')}</button>
       <p class="sheet-note">${t('Löschen kannst du nur deine eigenen Trainings.')}</p>
     </form>`;
   }
@@ -3097,16 +3110,16 @@
 
   // ---------- Neuigkeiten erstellen (ab Public Relations Department) ----------
   const NEWS_BUTTONS = {
-    discord: { name: 'Discord', icon: 'fi-brands-discord', label: 'Auf Discord diskutieren', url: () => D.links.discord },
-    youtube: { name: 'YouTube', icon: 'fi-brands-youtube', label: 'Auf YouTube ansehen', url: () => '' },
-    roblox: { name: 'Roblox', icon: 'fi-ss-play', label: 'Jetzt spielen', url: () => D.links.play },
-    link: { name: 'Weiterleitung (Link)', icon: 'fi-rs-arrow-up-right-from-square', label: 'Mehr erfahren', url: () => '' },
+    discord: { name: 'Discord', icon: 'si-discord', label: 'Auf Discord diskutieren', url: () => D.links.discord },
+    youtube: { name: 'YouTube', icon: 'si-youtube', label: 'Auf YouTube ansehen', url: () => '' },
+    roblox: { name: 'Roblox', icon: 'phf-play', label: 'Jetzt spielen', url: () => D.links.play },
+    link: { name: 'Weiterleitung (Link)', icon: 'ph-arrow-square-out', label: 'Mehr erfahren', url: () => '' },
   };
   const newsBtnRow = (b = null) => `<div class="nbtn-row" data-nbtn>
-      <div class="select"><select name="btype" aria-label="${esc(t('Art des Buttons'))}">${Object.entries(NEWS_BUTTONS).map(([k, x]) => `<option value="${k}"${b && b.type === k ? ' selected' : ''}>${esc(t(x.name))}</option>`).join('')}</select>${icon('fi-rs-angle-small-down')}</div>
+      <div class="select"><select name="btype" aria-label="${esc(t('Art des Buttons'))}">${Object.entries(NEWS_BUTTONS).map(([k, x]) => `<option value="${k}"${b && b.type === k ? ' selected' : ''}>${esc(t(x.name))}</option>`).join('')}</select>${icon('ph-caret-down')}</div>
       <input name="blabel" maxlength="40" placeholder="${esc(t('Text, z. B. {label}', { label: t(NEWS_BUTTONS.discord.label) }))}" value="${esc(b ? b.label : t(NEWS_BUTTONS.discord.label))}">
       <input name="burl" type="url" inputmode="url" placeholder="https://…" value="${esc(b ? b.url : D.links.discord)}">
-      <button class="round-btn" type="button" data-nbtn-del aria-label="${esc(t('Button entfernen'))}">${icon('fi-rs-cross-small')}</button>
+      <button class="round-btn" type="button" data-nbtn-del aria-label="${esc(t('Button entfernen'))}">${icon('ph-x')}</button>
     </div>`;
   // n = vorhandene Neuigkeit zum Bearbeiten (sonst neu)
   function newsForm(n = null) {
@@ -3123,11 +3136,11 @@
       <div class="f"><label class="f__label" for="nw-tag">${t('Tag')}</label><input id="nw-tag" name="tag" maxlength="30" value="${esc(n ? n.tag || '' : '')}" placeholder="${esc(t('z. B. Update 2.6'))}"></div>
       <fieldset class="f"><legend class="f__label">${t('Foto oder Video? (Pflicht)')}</legend>
         <div class="seg seg--big">
-          <label><input type="radio" name="media" value="image"${kind === 'image' ? ' checked' : ''}><span>${icon('fi-rs-picture')}${t('Foto')}</span></label>
-          <label><input type="radio" name="media" value="video"${kind === 'video' ? ' checked' : ''}><span>${icon('fi-ss-play')}${t('Video')}</span></label>
+          <label><input type="radio" name="media" value="image"${kind === 'image' ? ' checked' : ''}><span>${icon('ph-image')}${t('Foto')}</span></label>
+          <label><input type="radio" name="media" value="video"${kind === 'video' ? ' checked' : ''}><span>${icon('phf-play')}${t('Video')}</span></label>
         </div>
         <div class="media-in" data-media-in="image"${kind === 'image' ? '' : ' hidden'}>
-          <label class="upload"><input type="file" name="file" accept="image/*"><span data-upload-label>${icon('fi-rs-picture')}${kind === 'image' ? t('Anderes Foto auswählen') : t('Foto auswählen')}</span></label>
+          <label class="upload"><input type="file" name="file" accept="image/*"><span data-upload-label>${icon('ph-image')}${kind === 'image' ? t('Anderes Foto auswählen') : t('Foto auswählen')}</span></label>
           <img class="upload__preview" data-upload-preview alt=""${kind === 'image' && m.url ? ` src="${esc(m.url)}"` : ' hidden'}>
           <input name="imageUrl" type="url" inputmode="url" value="${esc(kind === 'image' ? m.url || '' : '')}" placeholder="${esc(t('oder Link zu einem Bild (https://…)'))}">
         </div>
@@ -3137,9 +3150,9 @@
       </fieldset>
       <fieldset class="f"><legend class="f__label">${t('Buttons (höchstens 2)')}</legend>
         <div class="nbtns" data-nbtns>${n ? (n.buttons || []).map((b) => newsBtnRow(b)).join('') : ''}</div>
-        <button class="btn-text" type="button" data-nbtn-add${n && (n.buttons || []).length >= 2 ? ' hidden' : ''}>${icon('fi-rs-plus')}${t('Button hinzufügen')}</button>
+        <button class="btn-text" type="button" data-nbtn-add${n && (n.buttons || []).length >= 2 ? ' hidden' : ''}>${icon('ph-plus')}${t('Button hinzufügen')}</button>
       </fieldset>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(n ? 'fi-rs-check' : 'fi-rs-paper-plane')}${n ? t('Änderungen speichern') : t('Veröffentlichen')}</button>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(n ? 'ph-check' : 'ph-paper-plane-tilt')}${n ? t('Änderungen speichern') : t('Veröffentlichen')}</button>
       <p class="sheet-note">${n ? t('Datum und Autor bleiben gleich, die Neuigkeit wird als „bearbeitet“ markiert.') : t('Bearbeiten und löschen kannst du nur deine eigenen Neuigkeiten.')}</p>
     </form>`;
   }
@@ -3195,7 +3208,7 @@
       await loadContent();
     } catch (e) {
       btn.disabled = false;
-      btn.innerHTML = old ? `${icon('fi-rs-check')}${t('Änderungen speichern')}` : `${icon('fi-rs-paper-plane')}${t('Veröffentlichen')}`;
+      btn.innerHTML = old ? `${icon('ph-check')}${t('Änderungen speichern')}` : `${icon('ph-paper-plane-tilt')}${t('Veröffentlichen')}`;
       toast(e.msg || (e.message === 'video_url' ? t('Das ist kein YouTube- oder Video-Link.') : errorText(e)));
     }
   }
@@ -3253,13 +3266,13 @@
     }
     if (state.page === 'karriere' && !state.jobApply) renderCareer();
   }
-  const statusPill = (a) => (a.status === 'passed' ? `<span class="pill pill--ok">${icon('fi-rs-check')}${t('Bestanden')}</span>`
+  const statusPill = (a) => (a.status === 'passed' ? `<span class="pill pill--ok">${icon('ph-check')}${t('Bestanden')}</span>`
     : a.status === 'failed' ? `<span class="pill pill--bad">${t('Nicht bestanden')}</span>` : `<span class="pill pill--warn">${t('Neu')}</span>`);
   const scorePct = (a) => (a.total ? Math.round((a.score / a.total) * 100) : null);
   const jobTitleOf = (a) => { const j = D.jobs.find((x) => x.id === a.job); return t(j ? j.title : a.jobTitle || a.job); };
   const personImg = (a, cls = '') => (a.avatar ? `<span class="avatar ${cls}"><img src="${esc(a.avatar)}" alt="" referrerpolicy="no-referrer"></span>` : avatar(a.username, cls));
   function reviewList() {
-    const back = `<a class="back-link" href="#/karriere">${icon('fi-rs-arrow-left')}${t('Karriere')}</a>`;
+    const back = `<a class="back-link" href="#/karriere">${icon('ph-arrow-left')}${t('Karriere')}</a>`;
     if (!review.list) return `${back}<div class="cbox"><p class="lead">${t('Bewerbungen werden geladen …')}</p></div>`;
     const all = review.list;
     const count = (st) => all.filter((a) => a.status === st).length;
@@ -3277,13 +3290,13 @@
       <div class="rv-list">${shown.length ? shown.map((a) => `<a class="rv-row" href="#/karriere/pruefen/${esc(a.id)}">
           ${personImg(a)}
           <span class="rv-row__main"><b>${esc(a.displayName || a.username)}</b><small>@${esc(a.username)} · ${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''} · ${fmtDate(a.at)}</small></span>
-          <span class="rv-row__side">${scorePct(a) !== null ? `<b class="rv-score">${scorePct(a)} %</b>` : ''}${statusPill(a)}${a.sentAt ? `<small>${icon('fi-brands-discord')}${t('gesendet')}</small>` : ''}</span>
+          <span class="rv-row__side">${scorePct(a) !== null ? `<b class="rv-score">${scorePct(a)} %</b>` : ''}${statusPill(a)}${a.sentAt ? `<small>${icon('si-discord')}${t('gesendet')}</small>` : ''}</span>
         </a>`).join('') : `<p class="empty">${t('Keine Bewerbungen in dieser Ansicht.')}</p>`}</div>
       <section class="cbox rv-send">
-        <h3>${icon('fi-brands-discord')}${t('Bestandene an Discord senden')}</h3>
+        <h3>${icon('si-discord')}${t('Bestandene an Discord senden')}</h3>
         ${ready.length ? `<p>${t('Diese Spieler haben bestanden und wurden noch nicht verkündet. Entferne den Haken bei allen, die du (noch) nicht senden willst.')}</p>
           <ul class="rv-pick">${ready.map((a) => `<li><label><input type="checkbox" name="announce" value="${esc(a.id)}" checked>${personImg(a, 'avatar--sm')}<span><b>${esc(a.displayName || a.username)}</b><small>${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''}</small></span></label></li>`).join('')}</ul>
-          <button class="btn-line" type="button" data-announce>${icon('fi-rs-paper-plane')}${t('Ausgewählte an Discord senden')}</button>`
+          <button class="btn-line" type="button" data-announce>${icon('ph-paper-plane-tilt')}${t('Ausgewählte an Discord senden')}</button>`
           : `<p class="muted">${t('Gerade gibt es keine bestandenen Bewerbungen, die noch nicht gesendet wurden.')}</p>`}
       </section>`;
   }
@@ -3297,7 +3310,7 @@
       <text x="40" y="45" text-anchor="middle" font-size="17" font-weight="800" fill="currentColor">${pctv}%</text></svg>`;
   }
   function reviewDetail() {
-    const back = `<a class="back-link" href="#/karriere/pruefen">${icon('fi-rs-arrow-left')}${t('Alle Bewerbungen')}</a>`;
+    const back = `<a class="back-link" href="#/karriere/pruefen">${icon('ph-arrow-left')}${t('Alle Bewerbungen')}</a>`;
     const a = review.apps[state.reviewId];
     if (!a) return `${back}<div class="cbox"><p class="lead">${t('Bewerbung wird geladen …')}</p></div>`;
     if (a.error) return `${back}<div class="cbox"><p class="lead">${t('Diese Bewerbung gibt es nicht (mehr).')}</p></div>`;
@@ -3309,45 +3322,45 @@
     const shown = answers.map((x, i) => [x, i]).filter(([x]) => review.answers === 'all' || (review.answers === 'bad' ? x.ok === false : review.answers === 'ok' ? x.ok === true : x.ok == null));
     const fact = (ic, k, v) => `<div class="rv-fact"><span class="rv-fact__ic">${icon(ic)}</span><span><small>${k}</small><b>${v}</b></span></div>`;
     const chip = (val, label) => `<button class="chip${review.answers === val ? ' is-active' : ''}" type="button" data-rv-answers="${val}">${label}</button>`;
-    const sent = a.notifiedStatus ? `<p class="rv-sent">${icon('fi-rs-paper-plane')}<span>${t('Ergebnis gesendet: {status}', { status: a.notifiedStatus === 'passed' ? '✅ PASSED' : '❌ FAILED' })}${a.reviewedBy ? ` · ${t('von {name}', { name: esc(a.reviewedBy) })}` : ''}</span>${a.chatId ? `<a href="#/chat/${esc(a.chatId)}">${t('Zum Chat')}</a>` : ''}</p>` : '';
+    const sent = a.notifiedStatus ? `<p class="rv-sent">${icon('ph-paper-plane-tilt')}<span>${t('Ergebnis gesendet: {status}', { status: a.notifiedStatus === 'passed' ? '✅ PASSED' : '❌ FAILED' })}${a.reviewedBy ? ` · ${t('von {name}', { name: esc(a.reviewedBy) })}` : ''}</span>${a.chatId ? `<a href="#/chat/${esc(a.chatId)}">${t('Zum Chat')}</a>` : ''}</p>` : '';
     return `${back}
       <article class="rv-detail">
         <section class="cbox rv-hero">
           <div class="rv-hero__top">${personImg(a, 'avatar--lg')}
             <div class="rv-hero__who"><h2>${esc(a.displayName || a.username)}</h2><p>@${esc(a.username)}</p></div>
             ${statusPill(a)}</div>
-          <div class="rv-hero__job">${icon('fi-rs-briefcase')}<span>${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''}</span><small>${fmtDate(a.at)}</small></div>
+          <div class="rv-hero__job">${icon('ph-briefcase')}<span>${esc(jobTitleOf(a))}${a.area ? ` – ${esc(a.area)}` : ''}</span><small>${fmtDate(a.at)}</small></div>
           ${pctv !== null ? `<div class="rv-score-box">${scoreRing(pctv)}<div><b>${t('{a} von {b} richtig', { a: a.score, b: a.total })}</b>
             <span class="rv-legend"><span><i class="is-ok"></i>${nOk} ${t('richtig')}</span><span><i class="is-bad"></i>${nBad} ${t('falsch')}</span><span><i></i>${nOpen} ${t('offen')}</span></span></div></div>` : ''}
           <div class="rv-hero__actions">
-            <a class="btn btn--soft btn--sm" href="#/chat/an/${esc(a.sub)}">${icon('fi-rs-comments')}${t('Nachricht')}</a>
-            <a class="btn btn--soft btn--sm" href="https://www.roblox.com/users/${encodeURIComponent(a.sub)}/profile" target="_blank" rel="noopener">${icon('fi-rs-arrow-up-right-from-square')}${t('Roblox-Profil')}</a>
+            <a class="btn btn--soft btn--sm" href="#/chat/an/${esc(a.sub)}">${icon('ph-chats-circle')}${t('Nachricht')}</a>
+            <a class="btn btn--soft btn--sm" href="https://www.roblox.com/users/${encodeURIComponent(a.sub)}/profile" target="_blank" rel="noopener">${icon('ph-arrow-square-out')}${t('Roblox-Profil')}</a>
           </div>
         </section>
         <section class="cbox rv-facts">
-          ${fact('fi-brands-discord', 'Discord', esc(a.discord || '–'))}
-          ${fact('fi-rs-envelope', t('E-Mail'), esc(a.email || '–'))}
-          ${fact('fi-rs-clock-three', t('Spielt seit'), esc(t(a.since || '–')))}
-          ${fact('fi-rs-badge-check', t('Rang (angegeben)'), esc(a.rank || '–'))}
-          ${fact('fi-rs-users-alt', t('Rolle in der Gruppe'), esc(a.groupRole ? a.groupRole.name : t('nicht in der Gruppe')))}
-          ${fact('fi-rs-calendar', t('Freie Tage'), esc((a.days || []).join(', ') || '–'))}
-          ${a.activity ? `<div class="rv-fact rv-fact--wide"><span class="rv-fact__ic">${icon('fi-rs-chart-line-up')}</span><span><small>${t('Aktivität')}</small><b>${a.activity} / 10</b><i class="rv-bar"><span style="width:${a.activity * 10}%"></span></i></span></div>` : ''}
+          ${fact('si-discord', 'Discord', esc(a.discord || '–'))}
+          ${fact('ph-envelope-simple', t('E-Mail'), esc(a.email || '–'))}
+          ${fact('ph-clock', t('Spielt seit'), esc(t(a.since || '–')))}
+          ${fact('ph-seal-check', t('Rang (angegeben)'), esc(a.rank || '–'))}
+          ${fact('ph-users-three', t('Rolle in der Gruppe'), esc(a.groupRole ? a.groupRole.name : t('nicht in der Gruppe')))}
+          ${fact('ph-calendar-blank', t('Freie Tage'), esc((a.days || []).join(', ') || '–'))}
+          ${a.activity ? `<div class="rv-fact rv-fact--wide"><span class="rv-fact__ic">${icon('ph-chart-line-up')}</span><span><small>${t('Aktivität')}</small><b>${a.activity} / 10</b><i class="rv-bar"><span style="width:${a.activity * 10}%"></span></i></span></div>` : ''}
         </section>
         ${a.experience ? `<section class="cbox"><h3 class="rv-sub">${t('Erfahrung')}</h3><p class="rv-text">${esc(a.experience)}</p></section>` : ''}
         <section class="cbox">
           <h3 class="rv-sub">${t('Fragen und Antworten')}<span>${answers.length}</span></h3>
           <div class="chips">${chip('all', `${t('Alle')} · ${answers.length}`)}${nBad ? chip('bad', `${t('Falsch')} · ${nBad}`) : ''}${chip('ok', `${t('Richtig')} · ${nOk}`)}${nOpen ? chip('open', `${t('Offen')} · ${nOpen}`) : ''}</div>
           <ol class="rv-answers">${shown.map(([x, i]) => `<li class="${x.ok === true ? 'is-ok' : x.ok === false ? 'is-bad' : ''}">
-            <span class="rv-mark" aria-label="${x.ok === true ? esc(t('richtig')) : x.ok === false ? esc(t('falsch')) : esc(t('nicht bewertet'))}">${x.ok === true ? icon('fi-rs-check') : x.ok === false ? icon('fi-rs-cross-small') : '–'}</span>
+            <span class="rv-mark" aria-label="${x.ok === true ? esc(t('richtig')) : x.ok === false ? esc(t('falsch')) : esc(t('nicht bewertet'))}">${x.ok === true ? icon('ph-check') : x.ok === false ? icon('ph-x') : '–'}</span>
             <div><small>${t('Frage {n}', { n: i + 1 })}</small><b>${esc(x.q)}</b><p>${esc(x.a || '–')}</p></div></li>`).join('') || `<li class="rv-empty">${t('Keine Fragen in dieser Ansicht.')}</li>`}</ol>
         </section>
         ${sent}
         <div class="rv-actions">
           <p>${t('Ergebnis an {name} senden', { name: `<b>${esc(a.username)}</b>` })}</p>
-          <button class="btn btn--ok btn--lg" type="button" data-review="passed" aria-pressed="${a.status === 'passed'}">${icon('fi-rs-check')}${t('Bestanden')}</button>
-          <button class="btn btn--danger btn--lg" type="button" data-review="failed" aria-pressed="${a.status === 'failed'}">${icon('fi-rs-cross-small')}${t('Nicht bestanden')}</button>
+          <button class="btn btn--ok btn--lg" type="button" data-review="passed" aria-pressed="${a.status === 'passed'}">${icon('ph-check')}${t('Bestanden')}</button>
+          <button class="btn btn--danger btn--lg" type="button" data-review="failed" aria-pressed="${a.status === 'failed'}">${icon('ph-x')}${t('Nicht bestanden')}</button>
         </div>
-        ${a.sentAt ? `<p class="f__note">${icon('fi-brands-discord')}${t('Am {date} an Discord gesendet.', { date: fmtDate(a.sentAt) })}</p>` : ''}
+        ${a.sentAt ? `<p class="f__note">${icon('si-discord')}${t('Am {date} an Discord gesendet.', { date: fmtDate(a.sentAt) })}</p>` : ''}
       </article>`;
   }
   async function setReview(status) {
@@ -3416,12 +3429,16 @@
     { id: 'ping', usage: '/Ping', desc: 'Ist der Bot da?' },
   ];
   // Knöpfe unter Antworten des TSG-Bots: nur Links in die App, zu Roblox und zu Discord, nur diese Icons
-  const BOT_ICONS = ['fi-rs-users-alt', 'fi-ss-play', 'fi-rs-user', 'fi-rs-paper-plane', 'fi-rs-signal-alt-2', 'fi-rs-calendar', 'fi-rs-newspaper',
-    'fi-rs-chart-line-up', 'fi-rs-user-add', 'fi-brands-discord'];
+  const BOT_ICONS = ['ph-users-three', 'phf-play', 'ph-user', 'ph-paper-plane-tilt', 'ph-cell-signal-high', 'ph-calendar-blank', 'ph-newspaper',
+    'ph-chart-line-up', 'ph-user-plus', 'si-discord'];
+  // Ältere Bot-Nachrichten speichern noch die Namen der früheren Symbole
+  const BOT_ICONS_OLD = { 'fi-rs-users-alt': 'ph-users-three', 'fi-ss-play': 'phf-play', 'fi-rs-user': 'ph-user', 'fi-rs-paper-plane': 'ph-paper-plane-tilt',
+    'fi-rs-signal-alt-2': 'ph-cell-signal-high', 'fi-rs-calendar': 'ph-calendar-blank', 'fi-rs-newspaper': 'ph-newspaper', 'fi-rs-chart-line-up': 'ph-chart-line-up',
+    'fi-rs-user-add': 'ph-user-plus', 'fi-brands-discord': 'si-discord' };
   const safeBotUrl = (u) => /^#\/[\w/-]*$/.test(u) || /^https:\/\/(www\.)?(roblox\.com|discord\.gg)\//.test(u);
   const botButtons = (m) => (m.buttons || []).filter((b) => b && safeBotUrl(String(b.url))).map((b) => {
     const ext = !b.url.startsWith('#');
-    return `<a class="bot-btn${b.primary ? ' is-primary' : ''}" href="${esc(b.url)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${BOT_ICONS.includes(b.icon) ? icon(b.icon) : ''}<span>${esc(b.label)}</span>${ext ? icon('fi-rs-arrow-up-right-from-square', 'bot-btn__ext') : ''}</a>`;
+    return `<a class="bot-btn${b.primary ? ' is-primary' : ''}" href="${esc(b.url)}"${ext ? ' target="_blank" rel="noopener"' : ''}>${BOT_ICONS.includes(BOT_ICONS_OLD[b.icon] || b.icon) ? icon(BOT_ICONS_OLD[b.icon] || b.icon) : ''}<span>${esc(b.label)}</span>${ext ? icon('ph-arrow-square-out', 'bot-btn__ext') : ''}</a>`;
   }).join('');
   const GROUP_DEFAULTS = { visibility: 'private', invite: 'admins', write: 'all', media: true, slow: 0, cmd: 'all', cmds: CHAT_COMMANDS.map((c) => c.id), photo: 'admins' };
   const GROUP_COLORS = ['#EC0016', '#1455C0', '#408335', '#B35900', '#7A4BD1', '#0F8C8C', '#C2185B', '#3C414B'];
@@ -3505,7 +3522,7 @@
     if (c.kind === 'group') return groupBadge(c, cls);
     const other = chatOther(c);
     if (other) return personImg(other, cls);
-    return `<span class="chat-row__ic ${cls}">${icon(c.kind === 'ticket' ? areaOf(c.area).icon : 'fi-rs-comments')}</span>`;
+    return `<span class="chat-row__ic ${cls}">${icon(c.kind === 'ticket' ? areaOf(c.area).icon : 'ph-chats-circle')}</span>`;
   }
   const memberCount = (c) => c.count || (c.members || []).length;
   function chatStatus(c) {
@@ -3513,9 +3530,9 @@
     if (c.kind === 'group') {
       const pub = (c.visibility || (c.settings && c.settings.visibility)) === 'public';
       const nServers = Array.isArray(c.servers) ? c.servers.length : c.servers || 0;
-      return `<span class="pill${pub ? ' pill--ok' : ''}">${icon(pub ? 'fi-rs-globe' : 'fi-rs-lock')}${pub ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: memberCount(c) })}</span>${c.category === 'server' ? `<span class="pill pill--info">${icon('fi-rs-signal-alt-2')}${nServers === 1 ? t('1 Server') : t('{n} Server', { n: nServers })}</span>` : ''}`;
+      return `<span class="pill${pub ? ' pill--ok' : ''}">${icon(pub ? 'ph-globe' : 'ph-lock')}${pub ? t('Öffentlich') : t('Privat')} · ${t('{n} Mitglieder', { n: memberCount(c) })}</span>${c.category === 'server' ? `<span class="pill pill--info">${icon('ph-cell-signal-high')}${nServers === 1 ? t('1 Server') : t('{n} Server', { n: nServers })}</span>` : ''}`;
     }
-    if (c.kind === 'direct') return `<span class="pill pill--info">${icon('fi-rs-lock')}${t('Privat')}</span>`;
+    if (c.kind === 'direct') return `<span class="pill pill--info">${icon('ph-lock')}${t('Privat')}</span>`;
     if (c.status === 'open') return `<span class="pill pill--warn">${t('Wartet auf Annahme')}</span>`;
     return `<span class="pill pill--ok">${t('Angenommen von {name}', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</span>`;
   }
@@ -3616,25 +3633,25 @@
     const unread = l ? l.chats.filter(isUnread).length : 0;
     return `<div class="appbar">
         <div class="appbar__title"><span class="appbar__label">${t('Spieler, Gruppen und Team')}</span><h1 class="appbar__value">${t('Chat')}</h1></div>
-        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('fi-rs-plus')}${t('Neu')}</a></div>
+        <div class="appbar__actions"><a class="btn btn--primary btn--sm" href="#/chat/neu">${icon('ph-plus')}${t('Neu')}</a></div>
       </div>
       <div class="head-tabs head-tabs--chat" role="tablist" aria-label="${esc(t('Chat'))}">
-        ${tab('mine', '#/chat', 'fi-rs-comments', t('Gespräche'), unread)}
-        ${(l && l.areas.length) || mayTrain() ? tab('queue', '#/chat/anfragen', 'fi-rs-envelope-open', t('Anfragen'), open) : ''}
-        ${tab('public', '#/chat/gruppen', 'fi-rs-globe', t('Gruppen'))}
-        ${tab('team', '#/chat/team', 'fi-rs-users-alt', t('Team'))}
-        ${isModHere() ? tab('mod', '#/chat/moderation', 'fi-rs-shield-check', t('Moderation'), l && l.reported) : ''}
-        ${isReviewer() ? tab('discord', '#/chat/discord', 'fi-brands-discord', 'Discord', dreq.list ? dreq.list.filter((x) => x.status === 'pending').length : 0) : ''}
+        ${tab('mine', '#/chat', 'ph-chats-circle', t('Gespräche'), unread)}
+        ${(l && l.areas.length) || mayTrain() ? tab('queue', '#/chat/anfragen', 'ph-envelope-open', t('Anfragen'), open) : ''}
+        ${tab('public', '#/chat/gruppen', 'ph-globe', t('Gruppen'))}
+        ${tab('team', '#/chat/team', 'ph-users-three', t('Team'))}
+        ${isModHere() ? tab('mod', '#/chat/moderation', 'ph-shield-check', t('Moderation'), l && l.reported) : ''}
+        ${isReviewer() ? tab('discord', '#/chat/discord', 'si-discord', 'Discord', dreq.list ? dreq.list.filter((x) => x.status === 'pending').length : 0) : ''}
       </div>`;
   }
   function chatGate() {
     if (!apiReady()) {
       return mayTrain() ? `<div class="cbox">${backendSetupHtml()}</div>`
-        : `<div class="chat-empty">${icon('fi-rs-comments')}<h2>${t('Der Chat startet bald')}</h2><p>${t('Sobald der App-Server läuft, kannst du hier mit anderen Spielern und dem Team schreiben. Wer im Team ist, siehst du schon unter „Team“.')}</p>
-          <a class="btn btn--soft" href="#/chat/team">${icon('fi-rs-users-alt')}${t('Team ansehen')}</a></div>`;
+        : `<div class="chat-empty">${icon('ph-chats-circle')}<h2>${t('Der Chat startet bald')}</h2><p>${t('Sobald der App-Server läuft, kannst du hier mit anderen Spielern und dem Team schreiben. Wer im Team ist, siehst du schon unter „Team“.')}</p>
+          <a class="btn btn--soft" href="#/chat/team">${icon('ph-users-three')}${t('Team ansehen')}</a></div>`;
     }
     if (!sessionToken()) {
-      return `<div class="chat-empty">${icon('fi-rs-sign-in-alt')}<h2>${t('Mit Roblox anmelden')}</h2><p>${t('Damit alle wissen, wer schreibt, meldest du dich einmal mit Roblox an.')}</p>
+      return `<div class="chat-empty">${icon('ph-sign-in')}<h2>${t('Mit Roblox anmelden')}</h2><p>${t('Damit alle wissen, wer schreibt, meldest du dich einmal mit Roblox an.')}</p>
         <button class="btn btn--primary" type="button" data-open="profile">${t('Anmelden')}</button></div>`;
     }
     return '';
@@ -3655,16 +3672,16 @@
           <span class="chat-row__top"><b>${queue ? esc(nameOfP(c.from)) : esc(chatTitle(c))}</b><small>${chatAgo(c.updated)}</small></span>
           <span class="chat-row__sub">${sub}</span>
           ${preview ? `<span class="chat-row__text">${preview}</span>` : ''}
-          <span class="chat-row__status">${chatStatus(c)}${c.reported ? `<span class="pill pill--bad">${icon('fi-rs-flag')}${t('Gemeldet')}</span>` : ''}${c.ref ? `<span class="pill pill--bad">${icon('fi-rs-flag')}${t('Meldung')}</span>` : ''}</span>
+          <span class="chat-row__status">${chatStatus(c)}${c.reported ? `<span class="pill pill--bad">${icon('ph-flag')}${t('Gemeldet')}</span>` : ''}${c.ref ? `<span class="pill pill--bad">${icon('ph-flag')}${t('Meldung')}</span>` : ''}</span>
         </span>
       </a>
-      ${chat.edit && !queue && !mod ? `<button class="chat-row__del" type="button" data-chat-hide="${esc(c.id)}" aria-label="${esc(t('Für mich löschen'))}">${icon('fi-rs-trash')}</button>` : ''}
+      ${chat.edit && !queue && !mod ? `<button class="chat-row__del" type="button" data-chat-hide="${esc(c.id)}" aria-label="${esc(t('Für mich löschen'))}">${icon('ph-trash')}</button>` : ''}
     </div>`;
   }
   const newButtons = () => `<div class="chat-empty__btns">
-      <a class="btn btn--primary" href="#/chat/neu/spieler">${icon('fi-rs-user-add')}${t('Spieler anschreiben')}</a>
-      <a class="btn btn--soft" href="#/chat/neu/gruppe">${icon('fi-rs-users-alt')}${t('Gruppe erstellen')}</a>
-      <a class="btn btn--soft" href="#/chat/neu/anfrage">${icon('fi-rs-comments-question')}${t('Anfrage ans Team')}</a></div>`;
+      <a class="btn btn--primary" href="#/chat/neu/spieler">${icon('ph-user-plus')}${t('Spieler anschreiben')}</a>
+      <a class="btn btn--soft" href="#/chat/neu/gruppe">${icon('ph-users-three')}${t('Gruppe erstellen')}</a>
+      <a class="btn btn--soft" href="#/chat/neu/anfrage">${icon('ph-chat-centered-dots')}${t('Anfrage ans Team')}</a></div>`;
   function chatMine() {
     const gate = chatGate();
     if (gate) return gate;
@@ -3675,17 +3692,17 @@
     const normal = all.filter((c) => c.category !== 'server');
     const cat = chat.cat === 'server' ? 'server' : 'chats';
     const tab = (id, ic, label, list) => `<button type="button" role="tab" aria-selected="${cat === id}" data-chat-cat="${id}">${icon(ic)}<span>${label}</span><i>${list.length}</i>${list.some(isUnread) ? '<b class="cat-tabs__dot"></b>' : ''}</button>`;
-    const tabs = `<div class="cat-tabs" role="tablist" aria-label="${esc(t('Art der Gespräche'))}">${tab('chats', 'fi-rs-comments', t('Chats'), normal)}${tab('server', 'fi-rs-apps', t('Server'), servers)}</div>`;
+    const tabs = `<div class="cat-tabs" role="tablist" aria-label="${esc(t('Art der Gespräche'))}">${tab('chats', 'ph-chats-circle', t('Chats'), normal)}${tab('server', 'ph-squares-four', t('Server'), servers)}</div>`;
     const list = cat === 'server' ? servers : normal;
     if (!list.length) {
       return cat === 'server'
-        ? `${tabs}<div class="chat-empty">${icon('fi-rs-apps')}<h2>${t('Noch keine Server')}</h2><p>${t('Ein Server ist eine Community wie bei Discord: Kanäle, Kategorien, Rollen und Bots – auf Wunsch mit deinen privaten Servern im Spiel verbunden.')}</p>
-          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu/server">${icon('fi-rs-plus')}${t('Server erstellen')}</a></div></div>`
-        : `${tabs}<div class="chat-empty">${icon('fi-rs-comments')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
+        ? `${tabs}<div class="chat-empty">${icon('ph-squares-four')}<h2>${t('Noch keine Server')}</h2><p>${t('Ein Server ist eine Community wie bei Discord: Kanäle, Kategorien, Rollen und Bots – auf Wunsch mit deinen privaten Servern im Spiel verbunden.')}</p>
+          <div class="chat-empty__btns"><a class="btn btn--primary" href="#/chat/neu/server">${icon('ph-plus')}${t('Server erstellen')}</a></div></div>`
+        : `${tabs}<div class="chat-empty">${icon('ph-chats-circle')}<h2>${t('Noch keine Gespräche')}</h2><p>${t('Schreib einem Spieler, gründe eine Gruppe oder stell dem Team eine Frage.')}</p>${newButtons()}</div>`;
     }
     return `${tabs}<div class="chat-tools"><span>${list.length === 1 ? t('1 Gespräch') : t('{n} Gespräche', { n: list.length })}</span>
-        <button class="link-btn" type="button" data-chat-edit>${chat.edit ? t('Fertig') : `${icon('fi-rs-trash')}${t('Löschen')}`}</button></div>
-      ${chat.edit ? `<p class="chat-hint">${icon('fi-rs-info')}<span>${t('Gelöschte Gespräche verschwinden nur bei dir. Schreibt jemand Neues, sind sie wieder da.')}</span></p>` : ''}
+        <button class="link-btn" type="button" data-chat-edit>${chat.edit ? t('Fertig') : `${icon('ph-trash')}${t('Löschen')}`}</button></div>
+      ${chat.edit ? `<p class="chat-hint">${icon('ph-info')}<span>${t('Gelöschte Gespräche verschwinden nur bei dir. Schreibt jemand Neues, sind sie wieder da.')}</span></p>` : ''}
       <div class="chat-list">${list.map((c) => chatRow(c)).join('')}</div>`;
   }
   function chatQueue() {
@@ -3698,18 +3715,18 @@
     const open = q.filter((x) => x.status === 'open').sort((a, b) => a.created - b.created);
     const taken = q.filter((x) => x.status === 'claimed').sort((a, b) => b.updated - a.updated);
     const areas = chat.list.areas.map((id) => esc(t(areaOf(id).label))).join(', ');
-    return `<p class="chat-hint">${icon('fi-rs-info')}<span>${t('Du siehst Anfragen aus: {areas}', { areas })}</span></p>
+    return `<p class="chat-hint">${icon('ph-info')}<span>${t('Du siehst Anfragen aus: {areas}', { areas })}</span></p>
       <h2 class="chat-sec">${t('Wartet auf Annahme')}<span>${open.length}</span></h2>
       ${open.length ? `<div class="chat-list">${open.map((c) => chatRow(c, { queue: true })).join('')}</div>` : `<p class="empty">${t('Alles erledigt – keine offenen Anfragen.')}</p>`}
       ${taken.length ? `<h2 class="chat-sec">${t('Angenommen')}<span>${taken.length}</span></h2><div class="chat-list">${taken.map((c) => chatRow(c, { queue: true })).join('')}</div>` : ''}`;
   }
-  const searchField = (attr, value, placeholder) => `<label class="field chat-search">${icon('fi-rs-search')}<span class="field__input"><span class="sr-only">${esc(placeholder)}</span><input type="search" ${attr} value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off"></span></label>`;
+  const searchField = (attr, value, placeholder) => `<label class="field chat-search">${icon('ph-magnifying-glass')}<span class="field__input"><span class="sr-only">${esc(placeholder)}</span><input type="search" ${attr} value="${esc(value)}" placeholder="${esc(placeholder)}" autocomplete="off"></span></label>`;
   function chatPublic() {
     const gate = chatGate();
     if (gate) return gate;
     loadPublic();
     return `${searchField('data-chat-pubsearch', chat.pubQuery, t('Öffentliche Gruppen suchen …'))}
-      <a class="chat-alt" href="#/chat/neu/gruppe">${icon('fi-rs-plus')}<span>${t('Eigene Gruppe erstellen')}<small>${t('Privat oder öffentlich – mit eigenen Regeln und Befehlen')}</small></span>${icon('fi-rs-angle-small-right')}</a>
+      <a class="chat-alt" href="#/chat/neu/gruppe">${icon('ph-plus')}<span>${t('Eigene Gruppe erstellen')}<small>${t('Privat oder öffentlich – mit eigenen Regeln und Befehlen')}</small></span>${icon('ph-caret-right')}</a>
       <div data-chat-pub>${chatPublicList()}</div>`;
   }
   function chatPublicList() {
@@ -3727,7 +3744,7 @@
     if (gate) return gate;
     loadMod();
     const kinds = [['', t('Alle')], ['direct', t('Privat-Chats')], ['group', t('Gruppen')], ['ticket', t('Anfragen')]];
-    return `<p class="chat-hint chat-hint--mod">${icon('fi-rs-shield-check')}<span>${t('Zur Sicherheit kannst du jedes Gespräch unsichtbar beobachten oder sichtbar beitreten – außer bei Leuten mit höherem Rang. Jeder Blick wird vermerkt.')}</span></p>
+    return `<p class="chat-hint chat-hint--mod">${icon('ph-shield-check')}<span>${t('Zur Sicherheit kannst du jedes Gespräch unsichtbar beobachten oder sichtbar beitreten – außer bei Leuten mit höherem Rang. Jeder Blick wird vermerkt.')}</span></p>
       ${searchField('data-chat-modsearch', chat.modQuery, t('Name, Gruppe oder Spieler …'))}
       <div class="chips chips--block" role="group" aria-label="${esc(t('Art'))}">${kinds.map(([id, label]) => `<button class="chip${chat.modKind === id ? ' is-active' : ''}" type="button" data-mod-kind="${id}">${label}</button>`).join('')}</div>
       <div data-chat-modlist>${chatModList()}</div>`;
@@ -3739,7 +3756,7 @@
   }
   function chatTeam() {
     if (!chat.staff) { loadStaff(); return `<p class="empty">${t('Team wird geladen …')}</p>`; }
-    return `<a class="chat-alt" href="#/chat/neu/spieler">${icon('fi-rs-user-add')}<span>${t('Jemand anderem schreiben?')}<small>${t('Jeden Roblox-Spieler per Name finden')}</small></span>${icon('fi-rs-angle-small-right')}</a>
+    return `<a class="chat-alt" href="#/chat/neu/spieler">${icon('ph-user-plus')}<span>${t('Jemand anderem schreiben?')}<small>${t('Jeden Roblox-Spieler per Name finden')}</small></span>${icon('ph-caret-right')}</a>
       ${searchField('data-chat-search', chat.query, t('Name oder Rang suchen …'))}
       <div data-chat-team>${chatTeamList()}</div>`;
   }
@@ -3754,23 +3771,23 @@
             ${personImg(p)}
             <span class="team-row__main"><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small></span>
             ${rankPill(rankOf(p.rank))}
-            <a class="btn btn--soft btn--sm" href="#/chat/an/${esc(p.userId)}" aria-label="${esc(t('{name} schreiben', { name: p.displayName }))}">${icon('fi-rs-paper-plane')}<span>${t('Schreiben')}</span></a>
+            <a class="btn btn--soft btn--sm" href="#/chat/an/${esc(p.userId)}" aria-label="${esc(t('{name} schreiben', { name: p.displayName }))}">${icon('ph-paper-plane-tilt')}<span>${t('Schreiben')}</span></a>
           </li>`).join('')}</ul>
         </section>`).join('') : `<p class="empty">${q ? t('Niemanden gefunden.') : t('Gerade ist niemand im Team eingetragen.')}</p>`;
   }
 
   // ---------- Neu: Spieler, Gruppe, Anfrage ----------
-  const backTo = (href, label) => `<a class="back-link" href="${href}">${icon('fi-rs-arrow-left')}${label}</a>`;
+  const backTo = (href, label) => `<a class="back-link" href="${href}">${icon('ph-arrow-left')}${label}</a>`;
   function chatNewChoice() {
     const gate = chatGate();
-    const card = (href, ic, title, text) => `<a class="new-card" href="${href}"><span class="new-card__ic">${icon(ic)}</span><span class="new-card__text"><b>${title}</b><small>${text}</small></span>${icon('fi-rs-angle-small-right', 'new-card__chev')}</a>`;
+    const card = (href, ic, title, text) => `<a class="new-card" href="${href}"><span class="new-card__ic">${icon(ic)}</span><span class="new-card__text"><b>${title}</b><small>${text}</small></span>${icon('ph-caret-right', 'new-card__chev')}</a>`;
     return `${backTo('#/chat', t('Chat'))}
       ${gate || `<div class="new-grid">
-        ${card('#/chat/neu/spieler', 'fi-rs-user-add', t('Spieler anschreiben'), t('Privat mit einer Person schreiben – jeden Roblox-Spieler per Name'))}
-        ${card('#/chat/neu/gruppe', 'fi-rs-users-alt', t('Gruppe erstellen'), t('Mehrere Leute, privat oder öffentlich, mit eigenen Regeln und Befehlen'))}
-        ${card('#/chat/neu/server', 'fi-rs-signal-alt-2', t('Server erstellen'), t('Mit Kanälen wie #allgemein – auf Wunsch mit deinen privaten Servern im Spiel verbunden'))}
-        ${card('#/chat/neu/anfrage', 'fi-rs-comments-question', t('Anfrage ans Team'), t('Frage, Fehler oder Meldung – das zuständige Team antwortet'))}
-        ${card('#/chat/neu/beitreten', 'fi-rs-link-alt', t('Einem Server beitreten'), t('Mit einem Einladungslink oder Code'))}
+        ${card('#/chat/neu/spieler', 'ph-user-plus', t('Spieler anschreiben'), t('Privat mit einer Person schreiben – jeden Roblox-Spieler per Name'))}
+        ${card('#/chat/neu/gruppe', 'ph-users-three', t('Gruppe erstellen'), t('Mehrere Leute, privat oder öffentlich, mit eigenen Regeln und Befehlen'))}
+        ${card('#/chat/neu/server', 'ph-cell-signal-high', t('Server erstellen'), t('Mit Kanälen wie #allgemein – auf Wunsch mit deinen privaten Servern im Spiel verbunden'))}
+        ${card('#/chat/neu/anfrage', 'ph-chat-centered-dots', t('Anfrage ans Team'), t('Frage, Fehler oder Meldung – das zuständige Team antwortet'))}
+        ${card('#/chat/neu/beitreten', 'ph-link', t('Einem Server beitreten'), t('Mit einem Einladungslink oder Code'))}
       </div>`}`;
   }
   function chatNewDm() {
@@ -3778,14 +3795,14 @@
     const f = chat.found;
     return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="find-player" data-find-player>
-        <label class="f__label" for="fp-name">${icon('fi-rs-search')}${t('Wem möchtest du schreiben?')}</label>
+        <label class="f__label" for="fp-name">${icon('ph-magnifying-glass')}${t('Wem möchtest du schreiben?')}</label>
         <div class="find-player__row"><input id="fp-name" name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name, z. B. Lokfuehrer_Max'))}">
         <button class="btn btn--primary" type="submit">${t('Suchen')}</button></div>
         <small>${t('Du kannst jedem Roblox-Spieler schreiben. Eine Benachrichtigung bekommt, wer die App nutzt.')}</small>
       </form>
       ${f ? `<div class="dm-card">${personImg(f, 'avatar--lg')}<span><b>${esc(f.displayName)}</b><small>@${esc(f.username)}</small></span>
-        <a class="btn btn--primary btn--sm" href="#/chat/an/${esc(f.userId)}">${icon('fi-rs-paper-plane')}${t('Schreiben')}</a></div>` : ''}
-      <a class="chat-alt" href="#/chat/team">${icon('fi-rs-users-alt')}<span>${t('Jemandem aus dem Team schreiben?')}<small>${t('Alle ab Supervisor mit Suche')}</small></span>${icon('fi-rs-angle-small-right')}</a>`}`;
+        <a class="btn btn--primary btn--sm" href="#/chat/an/${esc(f.userId)}">${icon('ph-paper-plane-tilt')}${t('Schreiben')}</a></div>` : ''}
+      <a class="chat-alt" href="#/chat/team">${icon('ph-users-three')}<span>${t('Jemandem aus dem Team schreiben?')}<small>${t('Alle ab Supervisor mit Suche')}</small></span>${icon('ph-caret-right')}</a>`}`;
   }
   function chatNewTicket() {
     const gate = chatGate();
@@ -3800,7 +3817,7 @@
           <div class="ch-area-grid">${CHAT.areas.map((a) => `<label class="ch-area"><input type="radio" name="area" value="${a.id}"><span class="ch-area__ic">${icon(a.icon)}</span><span class="ch-area__text"><b>${esc(t(a.label))}</b><small>${esc(t(a.desc))}</small></span></label>`).join('')}</div>
         </fieldset>
         <div class="f"><label class="f__label" for="ch-text">${t('Deine Nachricht')}</label><textarea id="ch-text" name="text" rows="5" maxlength="2000" placeholder="${esc(t('Beschreib kurz, worum es geht …'))}"></textarea></div>
-        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-paper-plane')}${t('Anfrage senden')}</button>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-paper-plane-tilt')}${t('Anfrage senden')}</button>
         <p class="f__note">${t('Alle aus dem Team dieses Bereichs sehen deine Anfrage. Wer sie annimmt, antwortet dir hier – du siehst, wer es ist.')}</p>
       </form>`}`;
   }
@@ -3829,10 +3846,10 @@
     };
   }
   const visPick = (value) => `<div class="vis-grid">
-      <label class="vis"><input type="radio" name="visibility" value="private"${value !== 'public' ? ' checked' : ''}><span>${icon('fi-rs-lock')}<b>${t('Privat')}</b><small>${t('Nur wer eingeladen wird')}</small></span></label>
-      <label class="vis"><input type="radio" name="visibility" value="public"${value === 'public' ? ' checked' : ''}><span>${icon('fi-rs-globe')}<b>${t('Öffentlich')}</b><small>${t('Jeder kann sie finden und beitreten')}</small></span></label>
+      <label class="vis"><input type="radio" name="visibility" value="private"${value !== 'public' ? ' checked' : ''}><span>${icon('ph-lock')}<b>${t('Privat')}</b><small>${t('Nur wer eingeladen wird')}</small></span></label>
+      <label class="vis"><input type="radio" name="visibility" value="public"${value === 'public' ? ' checked' : ''}><span>${icon('ph-globe')}<b>${t('Öffentlich')}</b><small>${t('Jeder kann sie finden und beitreten')}</small></span></label>
     </div>`;
-  const memberChips = () => chat.members.map((p) => `<span class="mchip">${personImg(p, 'avatar--xs')}<b>${esc(p.displayName)}</b><button type="button" data-member-del="${esc(p.userId)}" aria-label="${esc(t('Entfernen'))}">${icon('fi-rs-cross-small')}</button></span>`).join('');
+  const memberChips = () => chat.members.map((p) => `<span class="mchip">${personImg(p, 'avatar--xs')}<b>${esc(p.displayName)}</b><button type="button" data-member-del="${esc(p.userId)}" aria-label="${esc(t('Entfernen'))}">${icon('ph-x')}</button></span>`).join('');
   function chatNewGroup() {
     const gate = chatGate();
     // Aus einem Privat-Chat: #/chat/neu/gruppe?mit=<id> – die Person ist schon dabei
@@ -3847,20 +3864,20 @@
         <div class="f"><label class="f__label" for="gr-desc">${t('Beschreibung')}</label><textarea id="gr-desc" name="desc" rows="2" maxlength="300" placeholder="${esc(t('Worum geht es in der Gruppe? (optional)'))}"></textarea></div>
         <fieldset class="f"><legend class="f__label">${t('Wer kann die Gruppe sehen?')}</legend>${visPick('private')}</fieldset>
         <div class="f"><span class="f__label">${t('Leute hinzufügen')}</span>
-          <div class="find-player__row"><input data-member-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--soft" type="button" data-member-add>${icon('fi-rs-plus')}${t('Dazu')}</button></div>
+          <div class="find-player__row"><input data-member-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--soft" type="button" data-member-add>${icon('ph-plus')}${t('Dazu')}</button></div>
           <div class="mchips" data-member-chips>${memberChips()}</div>
         </div>
         <div class="f"><label class="f__label" for="gr-rules">${t('Regeln')}</label><textarea id="gr-rules" name="rules" rows="3" maxlength="1500" placeholder="${esc(t('z. B. Freundlich bleiben, kein Spam, keine Werbung (optional)'))}"></textarea></div>
-        <details class="gset"><summary>${icon('fi-rs-settings-sliders')}${t('Rechte, Medien und Befehle')}</summary>${groupSettingsFields(GROUP_DEFAULTS)}</details>
+        <details class="gset"><summary>${icon('ph-sliders-horizontal')}${t('Rechte, Medien und Befehle')}</summary>${groupSettingsFields(GROUP_DEFAULTS)}</details>
         <div class="f"><label class="f__label" for="gr-text">${t('Erste Nachricht')}</label><textarea id="gr-text" name="text" rows="2" maxlength="2000" placeholder="${esc(t('Hallo zusammen! (optional)'))}"></textarea></div>
-        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-users-alt')}${t('Gruppe erstellen')}</button>
-        <p class="f__note">${icon('fi-rs-shield-check')} ${t('Zur Sicherheit kann die Moderation (ab Supervisor) jede Gruppe einsehen.')}</p>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-users-three')}${t('Gruppe erstellen')}</button>
+        <p class="f__note">${icon('ph-shield-check')} ${t('Zur Sicherheit kann die Moderation (ab Supervisor) jede Gruppe einsehen.')}</p>
       </form>`}`;
   }
   // Beitreten: über die App (Knopf mit dem Link zum privaten Server) oder nur über Roblox
   const joinPick = (value) => `<div class="vis-grid">
-      <label class="vis"><input type="radio" name="join" value="app"${value === 'app' ? ' checked' : ''}><span>${icon('fi-ss-play')}<b>${t('Über die App')}</b><small>${t('„Beitreten“ in der App mit deinem Link zum privaten Server')}</small></span></label>
-      <label class="vis"><input type="radio" name="join" value="roblox"${value !== 'app' ? ' checked' : ''}><span>${icon('fi-rs-lock')}<b>${t('Nur über Roblox')}</b><small>${t('Freunde und Einladungen direkt in Roblox')}</small></span></label>
+      <label class="vis"><input type="radio" name="join" value="app"${value === 'app' ? ' checked' : ''}><span>${icon('phf-play')}<b>${t('Über die App')}</b><small>${t('„Beitreten“ in der App mit deinem Link zum privaten Server')}</small></span></label>
+      <label class="vis"><input type="radio" name="join" value="roblox"${value !== 'app' ? ' checked' : ''}><span>${icon('ph-lock')}<b>${t('Nur über Roblox')}</b><small>${t('Freunde und Einladungen direkt in Roblox')}</small></span></label>
     </div>`;
   const linkField = (value = '') => `<div class="f"><label class="f__label" for="ps-link">${t('Link zum privaten Server')}</label>
       <input id="ps-link" name="link" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(value)}" placeholder="https://www.roblox.com/share?code=…&type=Server">
@@ -3872,8 +3889,8 @@
     const mine = ps.list ? ps.list.mine : null;
     const pick = !mine ? loadingHtml() : mine.length
       ? `<div class="ps-pick">${mine.map((p) => `<label class="ps-pick__row"><input type="checkbox" name="servers" value="${esc(p.id)}"${mine.length === 1 ? ' checked' : ''}>
-          <span class="ps-pick__ic">${icon('fi-rs-signal-alt-2')}</span><span class="ps-pick__text"><b>${esc(p.name)}</b><small>${psState(p)}${p.chat ? ` · ${t('jetzt mit „{name}“ verbunden', { name: esc(p.chat.name) })}` : ''}</small></span></label>`).join('')}</div>`
-      : `<p class="ps-empty">${icon('fi-rs-info')}<span>${t('Noch kein privater Server von dir bekannt. Starte deinen privaten Server einmal in Roblox – dann erscheint er hier (das Spiel meldet ihn automatisch). Den Chat kannst du schon jetzt erstellen und den Server später unter „Info“ verbinden.')}</span></p>`;
+          <span class="ps-pick__ic">${icon('ph-cell-signal-high')}</span><span class="ps-pick__text"><b>${esc(p.name)}</b><small>${psState(p)}${p.chat ? ` · ${t('jetzt mit „{name}“ verbunden', { name: esc(p.chat.name) })}` : ''}</small></span></label>`).join('')}</div>`
+      : `<p class="ps-empty">${icon('ph-info')}<span>${t('Noch kein privater Server von dir bekannt. Starte deinen privaten Server einmal in Roblox – dann erscheint er hier (das Spiel meldet ihn automatisch). Den Chat kannst du schon jetzt erstellen und den Server später unter „Info“ verbinden.')}</span></p>`;
     return `${backTo('#/chat/neu', t('Neu'))}
       ${gate || `<form class="cform group-form" data-server-new novalidate>
         <div class="f"><label class="f__label" for="gr-name">${t('Name des Servers')}</label><input id="gr-name" name="name" maxlength="60" placeholder="${esc(defaultName('Server'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(defaultName('Server')) })}</small></div>
@@ -3889,14 +3906,14 @@
         <div class="f"><label class="f__label" for="sv-welcome">${t('Begrüßung im Spiel')}</label><textarea id="sv-welcome" name="welcome" rows="2" maxlength="300" placeholder="${esc(t('Willkommen auf unserem Server! (optional)'))}"></textarea></div>
         <fieldset class="f"><legend class="f__label">${t('Wer kann den Chat sehen?')}</legend>${visPick('private')}</fieldset>
         <div class="f"><span class="f__label">${t('Leute hinzufügen')}</span>
-          <div class="find-player__row"><input data-member-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--soft" type="button" data-member-add>${icon('fi-rs-plus')}${t('Dazu')}</button></div>
+          <div class="find-player__row"><input data-member-input autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--soft" type="button" data-member-add>${icon('ph-plus')}${t('Dazu')}</button></div>
           <div class="mchips" data-member-chips>${memberChips()}</div>
         </div>
         <div class="f"><label class="f__label" for="gr-rules">${t('Regeln')}</label><textarea id="gr-rules" name="rules" rows="3" maxlength="1500" placeholder="${esc(t('Gelten im Chat und werden im Spiel beim Betreten gezeigt (optional)'))}"></textarea></div>
-        <details class="gset"><summary>${icon('fi-rs-settings-sliders')}${t('Rechte, Medien und Befehle')}</summary>${groupSettingsFields(GROUP_DEFAULTS)}</details>
+        <details class="gset"><summary>${icon('ph-sliders-horizontal')}${t('Rechte, Medien und Befehle')}</summary>${groupSettingsFields(GROUP_DEFAULTS)}</details>
         <div class="f"><label class="f__label" for="gr-text">${t('Erste Nachricht')}</label><textarea id="gr-text" name="text" rows="2" maxlength="2000" placeholder="${esc(t('Hallo zusammen! (optional)'))}"></textarea></div>
-        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-signal-alt-2')}${t('Server-Chat erstellen')}</button>
-        <p class="f__note">${icon('fi-rs-info')} ${t('Die Einstellungen holt sich dein Server beim nächsten Abgleich mit der App (spätestens nach 30 Sekunden).')}</p>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-cell-signal-high')}${t('Server-Chat erstellen')}</button>
+        <p class="f__note">${icon('ph-info')} ${t('Die Einstellungen holt sich dein Server beim nächsten Abgleich mit der App (spätestens nach 30 Sekunden).')}</p>
       </form>`}`;
   }
 
@@ -3913,16 +3930,16 @@
   function pserverCard(p, { inChat = null } = {}) {
     const status = p.online ? `<span class="status status--ok">${t('Online')} · ${p.players}/${p.max}</span>` : `<span class="status">${t('Offline')}</span>`;
     const why = p.join === 'roblox' ? t('Beitreten nur über Roblox') : p.access === 'members' && !p.member && !p.mine ? t('Nur für Mitglieder des Server-Chats') : t('Noch kein Link hinterlegt');
-    const join = p.canJoin && p.link ? `<a class="btn btn--primary btn--sm" href="${esc(p.link)}" target="_blank" rel="noopener">${icon('fi-ss-play')}${t('Beitreten')}</a>`
-      : `<span class="ps-note">${icon(p.join === 'roblox' ? 'fi-rs-lock' : 'fi-rs-info')}${why}</span>`;
+    const join = p.canJoin && p.link ? `<a class="btn btn--primary btn--sm" href="${esc(p.link)}" target="_blank" rel="noopener">${icon('phf-play')}${t('Beitreten')}</a>`
+      : `<span class="ps-note">${icon(p.join === 'roblox' ? 'ph-lock' : 'ph-info')}${why}</span>`;
     const unlink = inChat && (p.mine || (inChat.me && inChat.me.role === 'owner'));
     return `<article class="ps-card">
-      <div class="ps-card__head"><span class="ps-card__ic">${icon('fi-rs-signal-alt-2')}</span>
+      <div class="ps-card__head"><span class="ps-card__ic">${icon('ph-cell-signal-high')}</span>
         <span class="ps-card__name"><b>${esc(p.name)}</b><small>${t('Privater Server')}${p.ownerName ? ` · ${t('von {name}', { name: esc(p.ownerName) })}` : ''}${!p.online && p.lastSeen ? ` · ${t('zuletzt {when}', { when: fmtWhen(p.lastSeen) })}` : ''}</small></span>${status}</div>
-      ${p.chat && !inChat ? `<a class="ps-card__chat" href="#/chat/${esc(p.chat.id)}">${icon('fi-rs-comments')}<span>${t('Server-Chat „{name}“', { name: esc(p.chat.name) })}</span>${icon('fi-rs-angle-small-right')}</a>` : ''}
-      <div class="ps-card__tags">${p.join === 'app' ? `<span class="pill pill--info">${icon('fi-ss-play')}${t('Beitritt über die App')}</span>` : `<span class="pill">${icon('fi-rs-lock')}${t('Beitritt über Roblox')}</span>`}${p.access === 'members' ? `<span class="pill">${icon('fi-rs-users-alt')}${t('Nur Mitglieder')}</span>` : ''}${p.relay ? `<span class="pill">${icon('fi-rs-comments')}${t('Chat im Spiel')}</span>` : ''}</div>
+      ${p.chat && !inChat ? `<a class="ps-card__chat" href="#/chat/${esc(p.chat.id)}">${icon('ph-chats-circle')}<span>${t('Server-Chat „{name}“', { name: esc(p.chat.name) })}</span>${icon('ph-caret-right')}</a>` : ''}
+      <div class="ps-card__tags">${p.join === 'app' ? `<span class="pill pill--info">${icon('phf-play')}${t('Beitritt über die App')}</span>` : `<span class="pill">${icon('ph-lock')}${t('Beitritt über Roblox')}</span>`}${p.access === 'members' ? `<span class="pill">${icon('ph-users-three')}${t('Nur Mitglieder')}</span>` : ''}${p.relay ? `<span class="pill">${icon('ph-chats-circle')}${t('Chat im Spiel')}</span>` : ''}</div>
       <div class="ps-card__foot">${join}
-        ${p.mine ? `<button class="btn btn--soft btn--sm" type="button" data-pserver-edit="${esc(p.id)}">${icon('fi-rs-settings')}${t('Einstellungen')}</button>` : ''}
+        ${p.mine ? `<button class="btn btn--soft btn--sm" type="button" data-pserver-edit="${esc(p.id)}">${icon('ph-gear-six')}${t('Einstellungen')}</button>` : ''}
         ${unlink ? `<button class="btn btn--soft btn--sm" type="button" data-ps-unlink="${esc(p.id)}">${t('Trennen')}</button>` : ''}</div>
     </article>`;
   }
@@ -3933,7 +3950,7 @@
     if (!apiReady()) { box.innerHTML = ''; return; }
     if (!ps.list) { loadPservers(); box.innerHTML = ''; return; }
     const any = ps.list.mine.length || ps.list.visible.length;
-    box.innerHTML = !any && sessionToken() ? `<section class="ps-sec"><p class="ps-empty">${icon('fi-rs-info')}<span>${t('Hast du einen privaten Server? Starte ihn einmal in Roblox – dann erscheint er hier und bleibt dauerhaft stehen. Du kannst ihn benennen, mit einem Server-Chat verbinden und festlegen, ob man über die App oder nur über Roblox beitritt.')}</span></p></section>` : '';
+    box.innerHTML = !any && sessionToken() ? `<section class="ps-sec"><p class="ps-empty">${icon('ph-info')}<span>${t('Hast du einen privaten Server? Starte ihn einmal in Roblox – dann erscheint er hier und bleibt dauerhaft stehen. Du kannst ihn benennen, mit einem Server-Chat verbinden und festlegen, ob man über die App oder nur über Roblox beitritt.')}</span></p></section>` : '';
   }
   // Bearbeiten in Abschnitten: Vorschau oben, darunter Name, Beitritt, Zutritt, Sichtbarkeit, Chat und Spiel
   function pserverForm(id) {
@@ -3946,27 +3963,27 @@
     const sec = (no, title, text, inner) => `<section class="pe-sec"><header class="pe-sec__head"><span class="pe-sec__no">${no}</span><div><h3>${title}</h3>${text ? `<p>${text}</p>` : ''}</div></header>${inner}</section>`;
     return `<form class="pe-form" data-pserver-form="${esc(p.id)}" novalidate>
       <div class="pe-preview">
-        <span class="pe-preview__ic">${icon('fi-rs-lock')}</span>
+        <span class="pe-preview__ic">${icon('ph-lock')}</span>
         <div class="pe-preview__text"><b data-pe-name>${esc(p.name)}</b><small><span class="sv-card__live${p.online ? '' : ' is-off'}"><i></i>${psState(p)}</span></small></div>
-        <button class="sv-card__id" type="button" data-copy="${esc(p.id)}" title="${esc(t('Server-ID kopieren'))}">#${esc(shortId(p.id))}${icon('fi-rs-copy')}</button>
+        <button class="sv-card__id" type="button" data-copy="${esc(p.id)}" title="${esc(t('Server-ID kopieren'))}">#${esc(shortId(p.id))}${icon('ph-copy')}</button>
       </div>
       ${sec('01', t('Name'), t('So heißt der Server in der App und auf der Server-Seite.'), `<div class="f"><label class="sr-only" for="ps-name">${t('Name in der App')}</label><input id="ps-name" name="name" maxlength="50" value="${esc(p.name)}" data-pe-input></div>`)}
       ${sec('02', t('Beitritt'), t('Wie kommen Spieler auf deinen Server?'), `<div class="pe-opts">
-          ${card('join', 'app', p.join === 'app' ? 'app' : 'roblox', 'fi-ss-play', t('Über die App'), t('„Beitreten“ in der App mit deinem Link zum privaten Server'))}
-          ${card('join', 'roblox', p.join === 'app' ? 'app' : 'roblox', 'fi-rs-lock', t('Nur über Roblox'), t('Freunde und Einladungen direkt in Roblox'))}
+          ${card('join', 'app', p.join === 'app' ? 'app' : 'roblox', 'phf-play', t('Über die App'), t('„Beitreten“ in der App mit deinem Link zum privaten Server'))}
+          ${card('join', 'roblox', p.join === 'app' ? 'app' : 'roblox', 'ph-lock', t('Nur über Roblox'), t('Freunde und Einladungen direkt in Roblox'))}
         </div>
         <div class="pe-link" data-pe-link${p.join === 'app' ? '' : ' hidden'}>${linkField(p.link || '')}</div>`)}
       ${sec('03', t('Zutritt'), t('Wer darf auf den Server?'), `<div class="pe-opts">
-          ${card('access', 'all', p.access === 'members' ? 'members' : 'all', 'fi-rs-globe', t('Jeder mit Link'), t('Wie bei Roblox üblich'))}
-          ${card('access', 'members', p.access === 'members' ? 'members' : 'all', 'fi-rs-users-alt', t('Nur Chat-Mitglieder'), t('Das Spiel weist andere ab'))}
+          ${card('access', 'all', p.access === 'members' ? 'members' : 'all', 'ph-globe', t('Jeder mit Link'), t('Wie bei Roblox üblich'))}
+          ${card('access', 'members', p.access === 'members' ? 'members' : 'all', 'ph-users-three', t('Nur Chat-Mitglieder'), t('Das Spiel weist andere ab'))}
         </div>`)}
       ${sec('04', t('Sichtbarkeit'), t('Wer sieht den Server in der App?'), `<div class="pe-seg" role="radiogroup" aria-label="${esc(t('Wer sieht den Server in der App?'))}">${seg('public', t('Alle'))}${seg('members', t('Mitglieder'))}${seg('owner', t('Nur ich'))}</div>`)}
-      ${sec('05', t('Server-Chat'), t('Gruppen, in denen du Inhaber oder Admin bist. Sie werden damit zum Server-Chat.'), `<div class="f"><div class="select"><select name="chat" aria-label="${esc(t('Server-Chat'))}">${opt('', p.chat ? p.chat.id : '', t('Keiner'))}${chats.map((c) => opt(c.id, p.chat ? p.chat.id : '', esc(c.name))).join('')}</select>${icon('fi-rs-angle-small-down')}</div></div>`)}
+      ${sec('05', t('Server-Chat'), t('Gruppen, in denen du Inhaber oder Admin bist. Sie werden damit zum Server-Chat.'), `<div class="f"><div class="select"><select name="chat" aria-label="${esc(t('Server-Chat'))}">${opt('', p.chat ? p.chat.id : '', t('Keiner'))}${chats.map((c) => opt(c.id, p.chat ? p.chat.id : '', esc(c.name))).join('')}</select>${icon('ph-caret-down')}</div></div>`)}
       ${sec('06', t('Im Spiel'), '', `<div class="f"><label class="f__label" for="ps-welcome">${t('Begrüßung im Spiel')}</label><textarea id="ps-welcome" name="welcome" rows="2" maxlength="300" placeholder="${esc(t('z. B. Willkommen auf unserem Server!'))}">${esc(p.welcome || '')}</textarea></div>
         <label class="toggle pe-toggle"><span class="toggle__text"><b>${t('Nachrichten aus dem Server-Chat im Spiel anzeigen')}</b><small>${t('Vorher von Roblox gefiltert.')}</small></span>
           <input type="checkbox" role="switch" name="relay"${p.relay ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>`)}
       <p class="pe-note">${t('Der Server übernimmt die Einstellungen beim nächsten Abgleich (spätestens nach 30 Sekunden). Für Zutritt, Begrüßung und Chat im Spiel braucht das Spiel die Skripte TSGAppSync und TSGAppChat.')}</p>
-      <div class="pe-save"><button class="site-btn site-btn--brand site-btn--block" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button></div>
+      <div class="pe-save"><button class="site-btn site-btn--brand site-btn--block" type="submit">${icon('ph-check')}${t('Speichern')}</button></div>
     </form>`;
   }
 
@@ -3993,8 +4010,8 @@
       <div class="dm-card">${personImg(p, 'avatar--lg')}<span><b>${esc(p.displayName)}</b><small>@${esc(p.username)}</small>${p.rank ? rankPill(rankOf(p.rank)) : `<span class="pill pill--info">${t('Spieler')}</span>`}</span></div>
       ${gate || `<form class="cform" data-chat-direct="${esc(p.userId)}" novalidate>
         <div class="f"><label class="f__label" for="dm-text">${t('Nachricht an {name}', { name: esc(p.displayName) })}</label><textarea id="dm-text" name="text" rows="5" maxlength="2000"></textarea></div>
-        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-paper-plane')}${t('Senden')}</button>
-        <p class="f__note">${icon('fi-rs-lock')} ${t('Nur ihr beide seht die Nachrichten – zur Sicherheit kann die Moderation (ab Supervisor) mitlesen.')}</p>
+        <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-paper-plane-tilt')}${t('Senden')}</button>
+        <p class="f__note">${icon('ph-lock')} ${t('Nur ihr beide seht die Nachrichten – zur Sicherheit kann die Moderation (ab Supervisor) mitlesen.')}</p>
       </form>`}`}`;
   }
 
@@ -4036,7 +4053,7 @@
     return `${imgs.length ? `<div class="msg-media msg-media--${Math.min(imgs.length, 3)}">${imgs.map((f) => `<button class="msg-photo" type="button" data-photo="${url(f)}" aria-label="${esc(t('Foto öffnen'))}">
         <img src="${url(f)}" alt="${esc(f.name)}" loading="lazy"${f.w && f.h && imgs.length === 1 ? ` style="aspect-ratio:${f.w}/${f.h}"` : ''}></button>`).join('')}</div>` : ''}
       ${vids.map((f) => videoPlayer(`${API + f.url}#t=0.1`, { cls: 'vp--chat' })).join('')}
-      ${docs.map((f) => `<a class="msg-file" href="${url(f)}" target="_blank" rel="noopener">${icon('fi-rs-file')}<span><b>${esc(f.name)}</b><small>${sizeText(f.size)}</small></span>${icon('fi-rs-download')}</a>`).join('')}`;
+      ${docs.map((f) => `<a class="msg-file" href="${url(f)}" target="_blank" rel="noopener">${icon('ph-file')}<span><b>${esc(f.name)}</b><small>${sizeText(f.size)}</small></span>${icon('ph-download-simple')}</a>`).join('')}`;
   }
   // @Name hervorheben (eigener Name und @alle in Rot)
   function mentionHtml(text) {
@@ -4079,8 +4096,8 @@
         lastBy = key;
         const lines = [m.text || '', ...(m.rows || []).map(([k, v]) => `${k}: ${v}`)].filter(Boolean).join('\n');
         return `${sep}<li class="msg msg--bot msg--tsg${firstB ? ' is-first' : ''}${m.only ? ' is-local' : ''}">
-          ${firstB ? `<span class="bot-ava bot-ava--sm bot-ava--tsg">${icon('fi-rs-terminal')}</span>` : '<span class="msg__gap"></span>'}
-          <div class="msg__col"><div class="msg__bubble">${firstB ? `<b class="msg__name">TSG-Bot <span class="bot-tag">BOT</span>${m.only ? `<small class="bot-only">${icon('fi-rs-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}
+          ${firstB ? `<span class="bot-ava bot-ava--sm bot-ava--tsg">${icon('ph-terminal-window')}</span>` : '<span class="msg__gap"></span>'}
+          <div class="msg__col"><div class="msg__bubble">${firstB ? `<b class="msg__name">TSG-Bot <span class="bot-tag">BOT</span>${m.only ? `<small class="bot-only">${icon('ph-eye')}${t('Nur für dich')}</small>` : ''}</b>` : ''}
             ${m.title ? `<p><b>${esc(m.title)}</b></p>` : ''}${lines ? `<p>${esc(lines)}</p>` : ''}
             ${(m.buttons || []).length ? `<span class="msg__links">${botButtons(m)}</span>` : ''}<time>${time}</time></div></div>
         </li>`;
@@ -4091,13 +4108,13 @@
       lastBy = m.by;
       const canDel = !m.deleted && (mine || c.canModerate);
       const body = m.deleted
-        ? `<p class="msg__deleted">${icon('fi-rs-ban')}${m.deletedBy ? t('Von der Moderation gelöscht') : t('Nachricht gelöscht')}</p>`
+        ? `<p class="msg__deleted">${icon('ph-prohibit')}${m.deletedBy ? t('Von der Moderation gelöscht') : t('Nachricht gelöscht')}</p>`
         : `${m.files ? filesHtml(m) : ''}${m.text ? `<p>${mentionHtml(m.text)}</p>` : ''}`;
       const tr = c.kind === 'group' ? topRole(c, p) : null;
       return `${sep}<li class="msg${mine ? ' msg--mine' : ''}${first ? ' is-first' : ''}${m.files && !m.text ? ' msg--media' : ''}">
         ${!mine ? (first ? personImg(p, 'avatar--sm') : '<span class="msg__gap"></span>') : ''}
         <div class="msg__col"><div class="msg__bubble"${canDel ? ` data-msg="${esc(m.id)}"` : ''}>${!mine && first && (many || p.rank) ? `<b class="msg__name"${tr ? ` style="--rc:${esc(tr.color)}"` : ''}>${esc(nameOfP(p))}${p.rank ? ` ${rankPill(rankOf(p.rank))}` : ''}${ROLE_TAG[p.role] ? `<span class="role-tag role-tag--${p.role}">${t(ROLE_TAG[p.role])}</span>` : ''}</b>` : ''}${body}<time>${time}</time></div>
-        ${canDel ? `<div class="msg__acts"><button type="button" data-msg-del="${esc(m.id)}">${icon('fi-rs-trash')}${mine ? t('Löschen') : t('Löschen (Moderation)')}</button></div>` : ''}</div>
+        ${canDel ? `<div class="msg__acts"><button type="button" data-msg-del="${esc(m.id)}">${icon('ph-trash')}${mine ? t('Löschen') : t('Löschen (Moderation)')}</button></div>` : ''}</div>
       </li>`;
     }).join('');
   }
@@ -4119,46 +4136,46 @@
     const sub = [
       other && other.rank && c.kind !== 'group' ? rankPill(rankOf(other.rank)) : '',
       area ? `<span>${esc(t(area.label))}</span>` : '',
-      `<span class="conv-state conv-state--${tone}">${tone === 'lock' ? icon('fi-rs-lock') : '<i></i>'}${stateText}</span>`,
+      `<span class="conv-state conv-state--${tone}">${tone === 'lock' ? icon('ph-lock') : '<i></i>'}${stateText}</span>`,
     ].filter(Boolean).join('');
     return `<div class="conv-bar">
-        <a class="conv-bar__back" href="${chatBackHref(c)}" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-rs-arrow-left')}</a>
+        <a class="conv-bar__back" href="${chatBackHref(c)}" aria-label="${esc(t('Alle Gespräche'))}">${icon('ph-arrow-left')}</a>
         <a class="conv-bar__who" href="#/chat/${esc(c.id)}/info">
-          ${c.kind === 'group' ? groupBadge(c, 'conv-bar__avatar') : other ? personImg(other, 'conv-bar__avatar') : `<span class="conv-bar__ic">${icon(area ? area.icon : 'fi-rs-comments')}</span>`}
+          ${c.kind === 'group' ? groupBadge(c, 'conv-bar__avatar') : other ? personImg(other, 'conv-bar__avatar') : `<span class="conv-bar__ic">${icon(area ? area.icon : 'ph-chats-circle')}</span>`}
           <span class="conv-bar__text"><h1>${esc(chatTitle(c))}</h1><p>${sub}</p></span>
         </a>
-        ${c.canClose && c.kind === 'ticket' ? `<button class="conv-bar__close" type="button" data-chat-close="${esc(c.id)}">${icon('fi-rs-check')}<span>${t('Beenden')}</span></button>` : ''}
-        <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('fi-rs-info')}</a>
+        ${c.canClose && c.kind === 'ticket' ? `<button class="conv-bar__close" type="button" data-chat-close="${esc(c.id)}">${icon('ph-check')}<span>${t('Beenden')}</span></button>` : ''}
+        <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('ph-info')}</a>
       </div>`;
   }
   // Hinweis am Anfang: wer sieht das Gespräch, Regeln der Gruppe
   function chatIntro(c) {
     const me = meSub();
-    const safety = `<small class="msg-intro__safe">${icon('fi-rs-shield-check')}${t('Zur Sicherheit kann die Moderation (ab Supervisor) Gespräche einsehen.')}</small>`;
+    const safety = `<small class="msg-intro__safe">${icon('ph-shield-check')}${t('Zur Sicherheit kann die Moderation (ab Supervisor) Gespräche einsehen.')}</small>`;
     if (c.kind === 'group') {
       return `<li class="msg-intro msg-intro--group">${groupBadge(c, 'group-badge--lg')}
         <b class="msg-intro__name">${esc(c.name)}</b>
         ${c.desc ? `<span class="msg-intro__desc">${esc(c.desc)}</span>` : ''}
-        ${c.rules ? `<span class="msg-rules"><b>${icon('fi-rs-rules')}${t('Regeln')}</b><span>${esc(c.rules)}</span></span>` : ''}
-        ${c.commands && c.commands.length ? `<small class="msg-intro__cmd">${icon('fi-rs-terminal')}${t('Tipp: Schreib / für Befehle, z. B. /GetGroupData')}</small>` : ''}
+        ${c.rules ? `<span class="msg-rules"><b>${icon('ph-scroll')}${t('Regeln')}</b><span>${esc(c.rules)}</span></span>` : ''}
+        ${c.commands && c.commands.length ? `<small class="msg-intro__cmd">${icon('ph-terminal-window')}${t('Tipp: Schreib / für Befehle, z. B. /GetGroupData')}</small>` : ''}
         ${safety}</li>`;
     }
     if (c.kind === 'direct') {
       const other = chatOther(c);
-      return `<li class="msg-intro">${icon('fi-rs-lock')}<span>${t('Privates Gespräch mit {name}. Nur ihr beide seht diese Nachrichten.', { name: `<b>${esc(nameOfP(other))}</b>` })}${safety}</span></li>`;
+      return `<li class="msg-intro">${icon('ph-lock')}<span>${t('Privates Gespräch mit {name}. Nur ihr beide seht diese Nachrichten.', { name: `<b>${esc(nameOfP(other))}</b>` })}${safety}</span></li>`;
     }
     const area = areaOf(c.area);
-    return `<li class="msg-intro">${icon(area ? area.icon : 'fi-rs-comments')}<span><b>${esc(t(reasonOf(c.reason).label))}</b>${area ? ` · ${esc(t(area.label))}` : ''}<br>${c.from.sub === me
+    return `<li class="msg-intro">${icon(area ? area.icon : 'ph-chats-circle')}<span><b>${esc(t(reasonOf(c.reason).label))}</b>${area ? ` · ${esc(t(area.label))}` : ''}<br>${c.from.sub === me
       ? t('Alle aus dem Team dieses Bereichs sehen deine Anfrage. Wer sie annimmt, antwortet dir hier – du siehst, wer es ist.')
       : t('Anfrage von {name}', { name: `<b>${esc(nameOfP(c.from))}</b>` })}
-      ${c.ref && c.from.sub !== me ? `<a class="btn btn--soft btn--sm msg-intro__ref" href="#/chat/${esc(c.ref)}">${icon('fi-rs-eye')}${t('Gemeldetes Gespräch ansehen')}</a>` : ''}</span></li>`;
+      ${c.ref && c.from.sub !== me ? `<a class="btn btn--soft btn--sm msg-intro__ref" href="#/chat/${esc(c.ref)}">${icon('ph-eye')}${t('Gemeldetes Gespräch ansehen')}</a>` : ''}</span></li>`;
   }
   function trayHtml(id) {
     return (chat.pending[id] || []).map((p) => `<div class="tray-item" data-tray="${p.key}">
-        ${p.kind === 'image' ? `<img src="${p.preview}" alt="">` : `<span class="tray-item__ic">${icon(p.kind === 'video' ? 'fi-rs-video-camera' : 'fi-rs-file')}</span>`}
+        ${p.kind === 'image' ? `<img src="${p.preview}" alt="">` : `<span class="tray-item__ic">${icon(p.kind === 'video' ? 'ph-video-camera' : 'ph-file')}</span>`}
         <span class="tray-item__name">${esc(p.name)}<small>${sizeText(p.size)}</small></span>
         <i class="tray-item__bar"><span style="width:${Math.round(p.progress * 100)}%"></span></i>
-        ${chat.sending ? '' : `<button type="button" class="tray-item__x" data-tray-del="${p.key}" aria-label="${esc(t('Entfernen'))}">${icon('fi-rs-cross-small')}</button>`}
+        ${chat.sending ? '' : `<button type="button" class="tray-item__x" data-tray-del="${p.key}" aria-label="${esc(t('Entfernen'))}">${icon('ph-x')}</button>`}
       </div>`).join('');
   }
   function renderTray(id) {
@@ -4169,34 +4186,34 @@
   }
   function chatComposer(c) {
     if (c.me && c.me.observe) {
-      return `<div class="compose compose--note compose--mod">${icon('fi-rs-crossed-eye')}<span>${t('Du beobachtest dieses Gespräch unsichtbar (Moderation).')}</span>
+      return `<div class="compose compose--note compose--mod">${icon('ph-eye-slash')}<span>${t('Du beobachtest dieses Gespräch unsichtbar (Moderation).')}</span>
         ${c.canJoinMod ? `<button class="btn btn--soft btn--sm" type="button" data-chat-joinmod="${esc(c.id)}">${t('Sichtbar beitreten')}</button>` : ''}</div>`;
     }
     if (c.canJoin) {
       return `<div class="compose compose--claim"><p>${t('Öffentliche Gruppe – du liest gerade mit.')}</p>
-        <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-join="${esc(c.id)}">${icon('fi-rs-user-add')}${t('Gruppe beitreten')}</button></div>`;
+        <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-join="${esc(c.id)}">${icon('ph-user-plus')}${t('Gruppe beitreten')}</button></div>`;
     }
     if (c.canClaim) {
       return `<div class="compose compose--claim"><p>${t('Diese Anfrage wartet auf jemanden aus deinem Bereich.')}</p>
-        <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-claim="${esc(c.id)}">${icon('fi-rs-hand-wave')}${t('Anfrage annehmen')}</button></div>`;
+        <button class="btn btn--primary btn--lg btn--block" type="button" data-chat-claim="${esc(c.id)}">${icon('ph-hand-waving')}${t('Anfrage annehmen')}</button></div>`;
     }
-    if (c.status === 'closed') return `<p class="compose compose--note">${icon('fi-rs-check-circle')}${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
+    if (c.status === 'closed') return `<p class="compose compose--note">${icon('ph-check-circle')}${t('Dieses Gespräch ist beendet. Für etwas Neues starte eine neue Anfrage.')}</p>`;
     if (!c.canWrite) {
       const ch = c.community ? (c.channels || []).find((x) => x.id === c.channel) : null;
-      if (ch && ch.locked && c.me && c.me.role) return `<p class="compose compose--note">${icon('fi-rs-megaphone')}${t('In #{name} schreiben nur Inhaber, Admins und Rollen mit dem Recht „Schreiben“.', { name: esc(ch.name) })}</p>`;
-      if (c.kind === 'group' && c.me && c.me.role) return `<p class="compose compose--note">${icon('fi-rs-megaphone')}${t('In dieser Gruppe schreiben nur Inhaber und Admins.')}</p>`;
-      return `<p class="compose compose--note">${icon('fi-rs-lock')}${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
+      if (ch && ch.locked && c.me && c.me.role) return `<p class="compose compose--note">${icon('ph-megaphone')}${t('In #{name} schreiben nur Inhaber, Admins und Rollen mit dem Recht „Schreiben“.', { name: esc(ch.name) })}</p>`;
+      if (c.kind === 'group' && c.me && c.me.role) return `<p class="compose compose--note">${icon('ph-megaphone')}${t('In dieser Gruppe schreiben nur Inhaber und Admins.')}</p>`;
+      return `<p class="compose compose--note">${icon('ph-lock')}${t('Angenommen von {name}. Schreiben können nur die beiden.', { name: esc(c.claimedBy ? c.claimedBy.username : '') })}</p>`;
     }
     const files = (chat.pending[c.id] || []).length;
     return `<form class="compose${files ? ' has-files' : ''}" data-chat-send="${esc(c.id)}">
       <div class="compose__tray" data-chat-tray>${trayHtml(c.id)}</div>
       <div class="compose__cmds" data-chat-cmds hidden></div>
       <div class="compose__row">
-        ${c.canMedia ? `<label class="compose__attach" title="${esc(t('Foto, Video oder Datei anhängen'))}"><span class="sr-only">${t('Foto, Video oder Datei anhängen')}</span>${icon('fi-rs-clip')}
+        ${c.canMedia ? `<label class="compose__attach" title="${esc(t('Foto, Video oder Datei anhängen'))}"><span class="sr-only">${t('Foto, Video oder Datei anhängen')}</span>${icon('ph-paperclip')}
           <input type="file" data-chat-file multiple accept="image/*,video/*,application/pdf"></label>` : ''}
         <label class="sr-only" for="msg-text">${t('Nachricht')}</label>
         <textarea id="msg-text" name="text" rows="1" maxlength="2000" placeholder="${esc(c.community ? t('Nachricht an #{name}', { name: chLabel(((c.channels || []).find((x) => x.id === c.channel) || {}).name || '') }) : c.commands && c.commands.length ? t('Nachricht oder / für Befehle …') : t('Nachricht schreiben …'))}"></textarea>
-        <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('fi-rs-paper-plane')}</button>
+        <button class="compose__send" type="submit" aria-label="${esc(t('Senden'))}">${icon('ph-paper-plane-tilt')}</button>
       </div>
     </form>`;
   }
@@ -4294,7 +4311,7 @@
   // „📄-·-hub“ → „📄 · hub“
   const chLabel = (name) => String(name || '').replace(/-·-/g, ' · ');
   const chFind = (c, id = c.channel) => (c.channels || []).find((x) => x.id === id) || null;
-  const chIcon = (x, cls = 'cm-ch__ic') => icon(x && x.kind === 'news' ? 'fi-rs-megaphone' : 'fi-rs-hastag', cls);
+  const chIcon = (x, cls = 'cm-ch__ic') => icon(x && x.kind === 'news' ? 'ph-megaphone' : 'ph-hash', cls);
   function chSeenOf(c) {
     const all = store.get('tsg-ch-seen', {}) || {};
     // Erster Besuch: alles bisher Geschriebene gilt als gelesen
@@ -4325,7 +4342,7 @@
     const row = (x) => (match(x) ? `<div class="cm-ch-row">
         <button type="button" class="cm-ch${x.id === c.channel ? ' is-active' : ''}${chUnread(c, x, seenMap) ? ' is-unread' : ''}" data-cm-ch="${esc(x.id)}"${x.id === c.channel ? ' aria-current="true"' : ''}>
           ${chIcon(x)}<span class="cm-ch__name">${esc(chLabel(x.name))}</span></button>
-        ${c.canManage ? `<button type="button" class="cm-ch__edit" data-cm-edit="${esc(x.id)}" aria-label="${esc(t('Kanal bearbeiten'))}">${icon('fi-rs-settings')}</button>` : ''}
+        ${c.canManage ? `<button type="button" class="cm-ch__edit" data-cm-edit="${esc(x.id)}" aria-label="${esc(t('Kanal bearbeiten'))}">${icon('ph-gear-six')}</button>` : ''}
       </div>` : '');
     const loose = (c.channels || []).filter((x) => !x.cat || !cats.some((k) => k.id === x.cat));
     const groups = cats.map((k) => {
@@ -4335,8 +4352,8 @@
       const unread = shut && list.some((x) => chUnread(c, x, seenMap));
       return `<div class="cm-cat${shut ? ' is-shut' : ''}">
         <div class="cm-cat__head">
-          <button type="button" class="cm-cat__toggle" data-cm-cat="${esc(k.id)}" aria-expanded="${!shut}"><span>${esc(k.name)}</span>${icon('fi-rs-angle-small-down', 'cm-cat__chev')}${unread ? '<i class="cm-dot" aria-hidden="true"></i>' : ''}</button>
-          ${c.canManage ? `<button type="button" class="cm-cat__add" data-cm-new="${esc(k.id)}" aria-label="${esc(t('Kanal in {name} erstellen', { name: k.name }))}">${icon('fi-rs-plus-small')}</button>` : ''}
+          <button type="button" class="cm-cat__toggle" data-cm-cat="${esc(k.id)}" aria-expanded="${!shut}"><span>${esc(k.name)}</span>${icon('ph-caret-down', 'cm-cat__chev')}${unread ? '<i class="cm-dot" aria-hidden="true"></i>' : ''}</button>
+          ${c.canManage ? `<button type="button" class="cm-cat__add" data-cm-new="${esc(k.id)}" aria-label="${esc(t('Kanal in {name} erstellen', { name: k.name }))}">${icon('ph-plus')}</button>` : ''}
         </div>
         ${(shut ? list.filter((x) => x.id === c.channel) : list).map(row).join('')}
       </div>`;
@@ -4347,29 +4364,29 @@
     const unreadAll = chat.list ? chat.list.chats.filter(isUnread).length : 0;
     return `<aside class="cm-side" data-cm-side aria-label="${esc(t('Kanäle'))}">
       <nav class="cm-rail" aria-label="${esc(t('Server'))}">
-        <a class="cm-rail__dm" href="#/chat" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-ss-comments')}</a><i class="cm-rail__sep"></i>
+        <a class="cm-rail__dm" href="#/chat" aria-label="${esc(t('Alle Gespräche'))}">${icon('phf-chats-circle')}</a><i class="cm-rail__sep"></i>
         ${rail.map((x) => `<a class="cm-rail__srv${x.id === c.id ? ' is-active' : ''}" href="#/chat/${esc(x.id)}" title="${esc(x.name)}">${groupBadge(x, 'cm-rail__img')}${isUnread(x) && x.id !== c.id ? '<i class="cm-rail__dot"></i>' : ''}</a>`).join('')}
-        <a class="cm-rail__add" href="#/chat/neu/server" aria-label="${esc(t('Server erstellen'))}">${icon('fi-rs-plus')}</a>
+        <a class="cm-rail__add" href="#/chat/neu/server" aria-label="${esc(t('Server erstellen'))}">${icon('ph-plus')}</a>
       </nav>
       <div class="cm-panel">
         <div class="cm-panel__head">
-          <a class="cm-panel__name" href="#/chat/${esc(c.id)}/info"><b>${esc(c.name)}</b>${c.canManage ? icon('fi-ss-settings', 'cm-panel__gear') : ''}${icon('fi-rs-angle-small-right', 'cm-panel__chev')}</a>
+          <a class="cm-panel__name" href="#/chat/${esc(c.id)}/info"><b>${esc(c.name)}</b>${c.canManage ? icon('phf-gear-six', 'cm-panel__gear') : ''}${icon('ph-caret-right', 'cm-panel__chev')}</a>
           <small>${membersText((c.members || []).length)} • ${t('Community')}</small>
         </div>
         <div class="cm-tools">
-          <label class="cm-search">${icon('fi-rs-search')}<input type="search" data-cm-q value="${esc(chat.cmq || '')}" placeholder="${esc(t('Suche'))}" autocomplete="off"></label>
-          ${c.me && c.me.role ? `<button class="cm-tool" type="button" data-cm-invite-id="${esc(c.id)}" aria-label="${esc(t('Leute einladen'))}">${icon('fi-rs-user-add')}</button>` : ''}
-          <a class="cm-tool" href="#/trainings" aria-label="${esc(t('Events'))}">${icon('fi-ss-calendar')}</a>
+          <label class="cm-search">${icon('ph-magnifying-glass')}<input type="search" data-cm-q value="${esc(chat.cmq || '')}" placeholder="${esc(t('Suche'))}" autocomplete="off"></label>
+          ${c.me && c.me.role ? `<button class="cm-tool" type="button" data-cm-invite-id="${esc(c.id)}" aria-label="${esc(t('Leute einladen'))}">${icon('ph-user-plus')}</button>` : ''}
+          <a class="cm-tool" href="#/trainings" aria-label="${esc(t('Events'))}">${icon('phf-calendar-blank')}</a>
         </div>
         <div class="cm-links">
-          <button type="button" data-cm-browse>${icon('fi-rs-list-check')}<span>${t('Kanäle durchstöbern')}</span></button>
-          <a href="#/chat/${esc(c.id)}/info">${icon('fi-rs-settings-sliders')}<span>${c.canManage ? t('Server-Einstellungen') : t('Server-Info')}</span></a>
+          <button type="button" data-cm-browse>${icon('ph-list-checks')}<span>${t('Kanäle durchstöbern')}</span></button>
+          <a href="#/chat/${esc(c.id)}/info">${icon('ph-sliders-horizontal')}<span>${c.canManage ? t('Server-Einstellungen') : t('Server-Info')}</span></a>
         </div>
-        <nav class="cm-side__list">${loose.map(row).join('')}${groups}${c.canManage ? `<div class="cm-side__foot"><button type="button" class="cm-side__btn" data-cm-new="">${icon('fi-rs-plus')}${t('Kanal')}</button><button type="button" class="cm-side__btn" data-cm-cat-new>${icon('fi-rs-folder')}${t('Kategorie')}</button></div>` : ''}</nav>
+        <nav class="cm-side__list">${loose.map(row).join('')}${groups}${c.canManage ? `<div class="cm-side__foot"><button type="button" class="cm-side__btn" data-cm-new="">${icon('ph-plus')}${t('Kanal')}</button><button type="button" class="cm-side__btn" data-cm-cat-new>${icon('ph-folder')}${t('Kategorie')}</button></div>` : ''}</nav>
         <div class="cm-user">
           <button class="cm-user__me" type="button" data-open="profile" aria-label="${esc(t('Profil'))}">${p && p.avatar ? `<img src="${esc(p.avatar)}" alt="" referrerpolicy="no-referrer">` : `<b>${esc(initials(p ? p.username : 'G'))}</b>`}<i class="cm-user__dot"></i></button>
-          <button class="cm-user__text" type="button" data-open="profile"><span><b>${esc(p ? p.displayName || p.username : t('Gast'))}</b><span class="cm-user__tag">${icon('fi-ss-heart')}${esc(rankOf(state.rank).prefix)}</span></span><small>@${esc(p ? p.username : '')}</small></button>
-          <a class="cm-user__bell" href="#/chat" aria-label="${esc(t('Benachrichtigungen'))}">${icon('fi-ss-bell')}${unreadAll ? `<i>${unreadAll > 9 ? '9+' : unreadAll}</i>` : ''}</a>
+          <button class="cm-user__text" type="button" data-open="profile"><span><b>${esc(p ? p.displayName || p.username : t('Gast'))}</b><span class="cm-user__tag">${icon('phf-heart')}${esc(rankOf(state.rank).prefix)}</span></span><small>@${esc(p ? p.username : '')}</small></button>
+          <a class="cm-user__bell" href="#/chat" aria-label="${esc(t('Benachrichtigungen'))}">${icon('phf-bell')}${unreadAll ? `<i>${unreadAll > 9 ? '9+' : unreadAll}</i>` : ''}</a>
         </div>
       </div>
     </aside>`;
@@ -4379,13 +4396,13 @@
     const seenMap = chSeenOf(c);
     const unread = (c.channels || []).some((x) => chUnread(c, x, seenMap));
     return `<div class="conv-bar conv-bar--cm">
-        <a class="conv-bar__back" href="${chatBackHref(c)}" aria-label="${esc(t('Alle Gespräche'))}">${icon('fi-rs-arrow-left')}</a>
-        <button class="cm-toggle${unread ? ' has-unread' : ''}" type="button" data-cm-side-open aria-label="${esc(t('Kanäle'))}">${icon('fi-rs-burger-menu')}</button>
+        <a class="conv-bar__back" href="${chatBackHref(c)}" aria-label="${esc(t('Alle Gespräche'))}">${icon('ph-arrow-left')}</a>
+        <button class="cm-toggle${unread ? ' has-unread' : ''}" type="button" data-cm-side-open aria-label="${esc(t('Kanäle'))}">${icon('ph-list')}</button>
         <a class="conv-bar__who" href="#/chat/${esc(c.id)}/info">
           ${groupBadge(c, 'conv-bar__avatar cm-head__badge')}
           <span class="conv-bar__text"><h1 class="cm-head__ch">${chIcon(ch, 'cm-head__ic')}<span>${esc(chLabel(ch.name))}</span></h1><p><span>${esc(c.name)}</span>${ch.topic ? `<span class="cm-head__topic">${esc(ch.topic)}</span>` : ''}</p></span>
         </a>
-        <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('fi-rs-info')}</a>
+        <a class="conv-bar__info" href="#/chat/${esc(c.id)}/info" aria-label="${esc(t('Info und Einstellungen'))}">${icon('ph-info')}</a>
       </div>`;
   }
   // Anfang eines Kanals (wie bei Discord); im Standardkanal dazu Beschreibung und Regeln des Servers
@@ -4394,7 +4411,7 @@
     return `<li class="cm-intro"><span class="cm-intro__ic">${chIcon(ch, '')}</span>
         <b>${t('Willkommen in #{name}!', { name: esc(chLabel(ch.name)) })}</b>
         <span>${ch.topic ? esc(ch.topic) : ch.id === c.home ? t('Das ist der Anfang von {name}. Hier landen auch Begrüßungen und Hinweise.', { name: `<b>${esc(c.name)}</b>` }) : t('Das ist der Anfang des Kanals #{name}.', { name: esc(chLabel(ch.name)) })}</span>
-        ${ch.kind === 'news' ? `<small>${icon('fi-rs-megaphone')}${t('Ankündigungen: schreiben dürfen Inhaber, Admins und Rollen mit dem Recht „Schreiben“.')}</small>` : ''}
+        ${ch.kind === 'news' ? `<small>${icon('ph-megaphone')}${t('Ankündigungen: schreiben dürfen Inhaber, Admins und Rollen mit dem Recht „Schreiben“.')}</small>` : ''}
       </li>${ch.id === c.home ? chatIntro(c) : ''}`;
   }
   function switchChannel(id, ch) {
@@ -4449,19 +4466,19 @@
     const kind = ch ? ch.kind : 'text';
     return `<form class="cform ch-form" data-ch-form="${esc(cid)}:${esc(ch ? ch.id : 'neu')}" novalidate>
       <div class="f"><label class="f__label" for="ch-name">${t('Name des Kanals')}</label>
-        <div class="ch-name">${icon(kind === 'news' ? 'fi-rs-megaphone' : 'fi-rs-hastag')}<input id="ch-name" name="name" maxlength="30" value="${esc(ch ? ch.name : '')}" placeholder="${esc(t('neuer-kanal'))}" autocomplete="off" autocapitalize="off" spellcheck="false" data-ch-name></div>
+        <div class="ch-name">${icon(kind === 'news' ? 'ph-megaphone' : 'ph-hash')}<input id="ch-name" name="name" maxlength="30" value="${esc(ch ? ch.name : '')}" placeholder="${esc(t('neuer-kanal'))}" autocomplete="off" autocapitalize="off" spellcheck="false" data-ch-name></div>
         <small class="f__hint">${t('Kleinbuchstaben, Zahlen und Bindestriche – Leerzeichen werden zu „-“.')}</small></div>
       <fieldset class="f"><legend class="f__label">${t('Art')}</legend><div class="vis-grid">
-        <label class="vis"><input type="radio" name="kind" value="text"${kind !== 'news' ? ' checked' : ''}><span>${icon('fi-rs-hastag')}<b>${t('Text')}</b><small>${t('Alle Mitglieder schreiben')}</small></span></label>
-        <label class="vis"><input type="radio" name="kind" value="news"${kind === 'news' ? ' checked' : ''}><span>${icon('fi-rs-megaphone')}<b>${t('Ankündigungen')}</b><small>${t('Nur Inhaber, Admins und Rollen mit „Schreiben“')}</small></span></label>
+        <label class="vis"><input type="radio" name="kind" value="text"${kind !== 'news' ? ' checked' : ''}><span>${icon('ph-hash')}<b>${t('Text')}</b><small>${t('Alle Mitglieder schreiben')}</small></span></label>
+        <label class="vis"><input type="radio" name="kind" value="news"${kind === 'news' ? ' checked' : ''}><span>${icon('ph-megaphone')}<b>${t('Ankündigungen')}</b><small>${t('Nur Inhaber, Admins und Rollen mit „Schreiben“')}</small></span></label>
       </div></fieldset>
       <label class="f"><span class="f__label">${t('Kategorie')}</span><select name="cat"><option value="">${t('Ohne Kategorie')}</option>${(c.categories || []).map((k) => `<option value="${esc(k.id)}"${k.id === cat ? ' selected' : ''}>${esc(k.name)}</option>`).join('')}</select></label>
       <div class="f"><label class="f__label" for="ch-topic">${t('Thema')}</label><input id="ch-topic" name="topic" maxlength="200" value="${esc(ch ? ch.topic || '' : '')}" placeholder="${esc(t('Worum geht es hier? (optional)'))}"></div>
       ${ch ? `<label class="toggle"><span class="toggle__text"><b>${t('Standardkanal')}</b><small>${t('Begrüßungen, Hinweise und Weitergabe ins Spiel und nach Discord')}</small></span>
         <input type="checkbox" role="switch" name="home"${c.home === ch.id ? ' checked disabled' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
-      <div class="ch-move"><button class="btn btn--soft btn--sm" type="button" data-ch-move="-1">${icon('fi-rs-arrow-small-up')}${t('Nach oben')}</button><button class="btn btn--soft btn--sm" type="button" data-ch-move="1">${icon('fi-rs-arrow-small-down')}${t('Nach unten')}</button></div>` : ''}
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(ch ? 'fi-rs-check' : 'fi-rs-plus')}${ch ? t('Speichern') : t('Kanal erstellen')}</button>
-      ${ch && (c.channels || []).length > 1 ? `<button class="btn btn--danger btn--block" type="button" data-ch-del>${icon('fi-rs-trash')}${t('Kanal löschen')}</button>
+      <div class="ch-move"><button class="btn btn--soft btn--sm" type="button" data-ch-move="-1">${icon('ph-arrow-up')}${t('Nach oben')}</button><button class="btn btn--soft btn--sm" type="button" data-ch-move="1">${icon('ph-arrow-down')}${t('Nach unten')}</button></div>` : ''}
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(ch ? 'ph-check' : 'ph-plus')}${ch ? t('Speichern') : t('Kanal erstellen')}</button>
+      ${ch && (c.channels || []).length > 1 ? `<button class="btn btn--danger btn--block" type="button" data-ch-del>${icon('ph-trash')}${t('Kanal löschen')}</button>
         <p class="f__note">${t('Beim Löschen verschwinden auch alle Nachrichten in diesem Kanal.')}</p>` : ''}
     </form>`;
   }
@@ -4472,28 +4489,28 @@
     const k = catId && catId !== 'neu' ? (c.categories || []).find((x) => x.id === catId) : null;
     return `<form class="cform" data-cat-form="${esc(cid)}:${esc(k ? k.id : 'neu')}" novalidate>
       <div class="f"><label class="f__label" for="cat-name">${t('Name der Kategorie')}</label><input id="cat-name" name="name" maxlength="30" value="${esc(k ? k.name : '')}" placeholder="${esc(t('z. B. Spiel'))}"></div>
-      ${k ? `<div class="ch-move"><button class="btn btn--soft btn--sm" type="button" data-cat-move="-1">${icon('fi-rs-arrow-small-up')}${t('Nach oben')}</button><button class="btn btn--soft btn--sm" type="button" data-cat-move="1">${icon('fi-rs-arrow-small-down')}${t('Nach unten')}</button></div>` : ''}
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(k ? 'fi-rs-check' : 'fi-rs-plus')}${k ? t('Speichern') : t('Kategorie erstellen')}</button>
-      ${k ? `<button class="btn btn--danger btn--block" type="button" data-cat-del>${icon('fi-rs-trash')}${t('Kategorie löschen')}</button><p class="f__note">${t('Die Kanäle darin bleiben erhalten (ohne Kategorie).')}</p>` : ''}
+      ${k ? `<div class="ch-move"><button class="btn btn--soft btn--sm" type="button" data-cat-move="-1">${icon('ph-arrow-up')}${t('Nach oben')}</button><button class="btn btn--soft btn--sm" type="button" data-cat-move="1">${icon('ph-arrow-down')}${t('Nach unten')}</button></div>` : ''}
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon(k ? 'ph-check' : 'ph-plus')}${k ? t('Speichern') : t('Kategorie erstellen')}</button>
+      ${k ? `<button class="btn btn--danger btn--block" type="button" data-cat-del>${icon('ph-trash')}${t('Kategorie löschen')}</button><p class="f__note">${t('Die Kanäle darin bleiben erhalten (ohne Kategorie).')}</p>` : ''}
     </form>`;
   }
   // Übersicht in „Info“: alle Kanäle nach Kategorie, zum Bearbeiten antippen
   function channelsSection(c) {
     if (c.kind !== 'group') return '';
     if (!c.community) {
-      return c.canManage ? `<section class="info-sec"><h3>${icon('fi-rs-hastag')}${t('Kanäle wie bei Discord')}</h3>
+      return c.canManage ? `<section class="info-sec"><h3>${icon('ph-hash')}${t('Kanäle wie bei Discord')}</h3>
         <p class="muted">${t('Mach diese Gruppe zu einem Server mit Kanälen und Kategorien – die bisherigen Nachrichten landen in #allgemein.')}</p>
-        <button class="btn btn--soft btn--block" type="button" data-cm-convert="${esc(c.id)}">${icon('fi-rs-apps-add')}${t('In einen Server umwandeln')}</button></section>` : '';
+        <button class="btn btn--soft btn--block" type="button" data-cm-convert="${esc(c.id)}">${icon('ph-plus-square')}${t('In einen Server umwandeln')}</button></section>` : '';
     }
     const cats = c.categories || [];
     const line = (x) => `<li><button type="button" class="ch-line" ${c.canManage ? `data-cm-edit="${esc(x.id)}"` : `data-cm-go="${esc(x.id)}"`}>${chIcon(x, 'ch-line__ic')}<span><b>${esc(x.name)}</b>${x.topic ? `<small>${esc(x.topic)}</small>` : ''}</span>
-      ${x.id === c.home ? `<span class="pill">${t('Standard')}</span>` : ''}${x.kind === 'news' ? `<span class="pill pill--info">${t('Ankündigungen')}</span>` : ''}${c.canManage ? icon('fi-rs-angle-small-right', 'ch-line__chev') : ''}</button></li>`;
+      ${x.id === c.home ? `<span class="pill">${t('Standard')}</span>` : ''}${x.kind === 'news' ? `<span class="pill pill--info">${t('Ankündigungen')}</span>` : ''}${c.canManage ? icon('ph-caret-right', 'ch-line__chev') : ''}</button></li>`;
     const loose = (c.channels || []).filter((x) => !x.cat || !cats.some((k) => k.id === x.cat));
-    return `<section class="info-sec"><h3>${icon('fi-rs-hastag')}${t('Kanäle')}</h3>
+    return `<section class="info-sec"><h3>${icon('ph-hash')}${t('Kanäle')}</h3>
       ${loose.length ? `<ul class="ch-lines">${loose.map(line).join('')}</ul>` : ''}
-      ${cats.map((k) => `<div class="ch-group"><div class="ch-group__head"><b>${esc(k.name)}</b>${c.canManage ? `<button type="button" class="link-btn" data-cm-cat-edit="${esc(k.id)}">${icon('fi-rs-pencil')}${t('Bearbeiten')}</button>` : ''}</div>
+      ${cats.map((k) => `<div class="ch-group"><div class="ch-group__head"><b>${esc(k.name)}</b>${c.canManage ? `<button type="button" class="link-btn" data-cm-cat-edit="${esc(k.id)}">${icon('ph-pencil-simple')}${t('Bearbeiten')}</button>` : ''}</div>
         <ul class="ch-lines">${(c.channels || []).filter((x) => x.cat === k.id).map(line).join('') || `<li class="muted ch-lines__empty">${t('Noch keine Kanäle')}</li>`}</ul></div>`).join('')}
-      ${c.canManage ? `<div class="ch-actions"><button class="btn btn--primary btn--sm" type="button" data-cm-new="">${icon('fi-rs-plus')}${t('Kanal erstellen')}</button><button class="btn btn--soft btn--sm" type="button" data-cm-cat-new>${icon('fi-rs-folder')}${t('Kategorie erstellen')}</button></div>` : ''}
+      ${c.canManage ? `<div class="ch-actions"><button class="btn btn--primary btn--sm" type="button" data-cm-new="">${icon('ph-plus')}${t('Kanal erstellen')}</button><button class="btn btn--soft btn--sm" type="button" data-cm-cat-new>${icon('ph-folder')}${t('Kategorie erstellen')}</button></div>` : ''}
     </section>`;
   }
 
@@ -4503,12 +4520,12 @@
     const myRole = c.me && c.me.role;
     const boss = myRole === 'owner' || myRole === 'mod' || (c.me && c.me.observe && c.canModerate);
     const acts = [];
-    if (c.kind === 'group' && c.canManage && (c.roles || []).length) acts.push(`<button type="button" data-mem-roles="${esc(p.sub)}">${icon('fi-rs-id-badge')}${t('Rollen')}</button>`);
+    if (c.kind === 'group' && c.canManage && (c.roles || []).length) acts.push(`<button type="button" data-mem-roles="${esc(p.sub)}">${icon('ph-identification-badge')}${t('Rollen')}</button>`);
     if (c.kind === 'group' && p.sub !== me) {
-      if (boss && p.role === 'member') acts.push(`<button type="button" data-mem-role="admin" data-mem="${esc(p.sub)}">${icon('fi-rs-crown')}${t('Admin machen')}</button>`);
+      if (boss && p.role === 'member') acts.push(`<button type="button" data-mem-role="admin" data-mem="${esc(p.sub)}">${icon('ph-crown')}${t('Admin machen')}</button>`);
       if (boss && p.role === 'admin') acts.push(`<button type="button" data-mem-role="member" data-mem="${esc(p.sub)}">${t('Kein Admin mehr')}</button>`);
       if (myRole === 'owner' && p.role !== 'mod') acts.push(`<button type="button" data-mem-role="owner" data-mem="${esc(p.sub)}">${t('Zum Inhaber machen')}</button>`);
-      if ((boss && p.role !== 'owner') || c.canModerate && !myRole || (myRole === 'admin' && p.role === 'member')) acts.push(`<button class="is-danger" type="button" data-mem-del="${esc(p.sub)}">${icon('fi-rs-user-slash')}${t('Entfernen')}</button>`);
+      if ((boss && p.role !== 'owner') || c.canModerate && !myRole || (myRole === 'admin' && p.role === 'member')) acts.push(`<button class="is-danger" type="button" data-mem-del="${esc(p.sub)}">${icon('ph-user-minus')}${t('Entfernen')}</button>`);
     }
     return `<li class="mem-row">
       ${personImg(p)}
@@ -4531,19 +4548,19 @@
         <h2>${esc(chatTitle(c))}</h2>
         ${c.kind === 'group' && c.desc ? `<p>${esc(c.desc)}</p>` : other ? `<p>@${esc(other.username)}</p>` : ''}
         <div class="info-head__tags">${chatStatus(c)}${other && other.rank && c.kind !== 'group' ? rankPill(rankOf(other.rank)) : ''}</div>
-        ${c.canPhoto ? `<div class="photo-ctl"><label class="btn btn--soft btn--sm photo-ctl__pick">${icon('fi-rs-picture')}${c.photo ? t('Bild ändern') : t('Gruppenbild hochladen')}<input type="file" accept="image/*" data-group-photo="${esc(c.id)}"></label>
-          ${c.photo ? `<button class="btn btn--soft btn--sm" type="button" data-group-photo-del="${esc(c.id)}">${icon('fi-rs-trash')}${t('Entfernen')}</button>` : ''}</div>` : ''}
+        ${c.canPhoto ? `<div class="photo-ctl"><label class="btn btn--soft btn--sm photo-ctl__pick">${icon('ph-image')}${c.photo ? t('Bild ändern') : t('Gruppenbild hochladen')}<input type="file" accept="image/*" data-group-photo="${esc(c.id)}"></label>
+          ${c.photo ? `<button class="btn btn--soft btn--sm" type="button" data-group-photo-del="${esc(c.id)}">${icon('ph-trash')}${t('Entfernen')}</button>` : ''}</div>` : ''}
       </div>`;
     // Server-Chat: verbundene private Server
     if (c.kind === 'group' && (c.category === 'server' || (c.servers || []).length) && !ps.list) loadPservers();
     const free = ps.list ? ps.list.mine.filter((p) => !(c.servers || []).some((x) => x.id === p.id)) : [];
-    const servers = c.kind === 'group' && (c.category === 'server' || (c.servers || []).length) ? `<section class="info-sec"><h3>${icon('fi-rs-signal-alt-2')}${t('Private Server')}</h3>
+    const servers = c.kind === 'group' && (c.category === 'server' || (c.servers || []).length) ? `<section class="info-sec"><h3>${icon('ph-cell-signal-high')}${t('Private Server')}</h3>
         ${(c.servers || []).length ? `<div class="ps-list">${c.servers.map((p) => pserverCard(p, { inChat: c })).join('')}</div>` : `<p class="muted">${t('Noch kein Server verbunden.')}</p>`}
-        ${c.canAdmin && free.length ? `<form class="find-player find-player--inline" data-ps-link="${esc(c.id)}"><div class="find-player__row"><select name="server">${free.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button class="btn btn--primary" type="submit">${icon('fi-rs-plus')}${t('Verbinden')}</button></div></form>` : ''}
-        ${c.canAdmin && ps.list && !ps.list.mine.length ? `<p class="ps-empty">${icon('fi-rs-info')}<span>${t('Verbinden kann nur der Besitzer eines privaten Servers. Starte deinen privaten Server einmal in Roblox, dann erscheint er hier.')}</span></p>` : ''}
+        ${c.canAdmin && free.length ? `<form class="find-player find-player--inline" data-ps-link="${esc(c.id)}"><div class="find-player__row"><select name="server">${free.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select><button class="btn btn--primary" type="submit">${icon('ph-plus')}${t('Verbinden')}</button></div></form>` : ''}
+        ${c.canAdmin && ps.list && !ps.list.mine.length ? `<p class="ps-empty">${icon('ph-info')}<span>${t('Verbinden kann nur der Besitzer eines privaten Servers. Starte deinen privaten Server einmal in Roblox, dann erscheint er hier.')}</span></p>` : ''}
       </section>` : '';
     // Bearbeiten (Inhaber, Admins, Moderation)
-    const edit = c.canAdmin ? `<section class="info-sec"><h3>${icon('fi-rs-settings-sliders')}${t('Gruppe bearbeiten')}</h3>
+    const edit = c.canAdmin ? `<section class="info-sec"><h3>${icon('ph-sliders-horizontal')}${t('Gruppe bearbeiten')}</h3>
         <form class="cform group-form" data-group-edit="${esc(c.id)}" novalidate>
           <div class="f"><label class="f__label" for="ge-name">${t('Name')}</label><input id="ge-name" name="name" maxlength="60" value="${esc(c.name)}"></div>
           <div class="f"><label class="f__label" for="ge-desc">${t('Beschreibung')}</label><textarea id="ge-desc" name="desc" rows="2" maxlength="300">${esc(c.desc)}</textarea></div>
@@ -4551,9 +4568,9 @@
           <fieldset class="f"><legend class="f__label">${t('Wer kann die Gruppe sehen?')}</legend>${visPick(st.visibility)}</fieldset>
           <div class="f"><label class="f__label" for="ge-rules">${t('Regeln')}</label><textarea id="ge-rules" name="rules" rows="4" maxlength="1500">${esc(c.rules)}</textarea></div>
           ${groupSettingsFields(st)}
-          <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button>
+          <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-check')}${t('Speichern')}</button>
         </form></section>`
-      : c.kind === 'group' ? `<section class="info-sec"><h3>${icon('fi-rs-rules')}${t('Regeln und Einstellungen')}</h3>
+      : c.kind === 'group' ? `<section class="info-sec"><h3>${icon('ph-scroll')}${t('Regeln und Einstellungen')}</h3>
         ${c.rules ? `<p class="info-rules">${esc(c.rules)}</p>` : `<p class="muted">${t('Diese Gruppe hat keine eigenen Regeln.')}</p>`}
         <dl class="info-dl">
           <div><dt>${t('Leute hinzufügen')}</dt><dd>${label.invite[st.invite]}</dd></div>
@@ -4563,28 +4580,28 @@
           <div><dt>${t('Befehle')}</dt><dd>${label.cmd[st.cmd]}</dd></div>
         </dl></section>` : '';
     const members = c.members || [];
-    const people = `<section class="info-sec"><h3>${icon('fi-rs-users-alt')}${c.kind === 'group' ? t('{n} Mitglieder', { n: members.length }) : t('Im Gespräch')}</h3>
-        ${c.canInvite ? `<form class="find-player find-player--inline" data-member-invite="${esc(c.id)}"><div class="find-player__row"><input name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--primary" type="submit">${icon('fi-rs-user-add')}${t('Hinzufügen')}</button></div></form>` : ''}
+    const people = `<section class="info-sec"><h3>${icon('ph-users-three')}${c.kind === 'group' ? t('{n} Mitglieder', { n: members.length }) : t('Im Gespräch')}</h3>
+        ${c.canInvite ? `<form class="find-player find-player--inline" data-member-invite="${esc(c.id)}"><div class="find-player__row"><input name="name" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name'))}"><button class="btn btn--primary" type="submit">${icon('ph-user-plus')}${t('Hinzufügen')}</button></div></form>` : ''}
         <ul class="mem-list">${members.map((p) => memberRow(c, p)).join('')}</ul></section>`;
-    const cmds = c.commands && c.commands.length ? `<section class="info-sec"><h3>${icon('fi-rs-terminal')}${t('Befehle')}</h3>
+    const cmds = c.commands && c.commands.length ? `<section class="info-sec"><h3>${icon('ph-terminal-window')}${t('Befehle')}</h3>
         <ul class="cmd-list">${c.commands.map((x) => `<li><code>${esc(x.usage)}</code><span>${esc(t(x.desc))}</span></li>`).join('')}</ul></section>` : '';
-    const mine = role ? `<section class="info-sec"><h3>${icon('fi-rs-bell')}${t('Für dich')}</h3>
+    const mine = role ? `<section class="info-sec"><h3>${icon('ph-bell')}${t('Für dich')}</h3>
         <label class="toggle"><span class="toggle__text"><b>${t('Stummschalten')}</b><small>${t('Keine Benachrichtigungen aus diesem Gespräch.')}</small></span>
           <input type="checkbox" role="switch" data-chat-mute="${esc(c.id)}"${c.me.muted ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label></section>` : '';
     const btn = (attr, ic, text, cls = 'btn--soft') => `<button class="btn ${cls} btn--block" type="button" ${attr}>${icon(ic)}${text}</button>`;
     const actions = [
-      c.kind === 'direct' && role && other ? `<button class="btn btn--soft btn--block" type="button" data-invite-player="${esc(other.sub)}" data-invite-name="${esc(nameOfP(other))}">${icon('fi-ss-play')}${t('{name} ins Spiel einladen', { name: esc(nameOfP(other)) })}</button>` : '',
-      c.kind === 'direct' && role && other ? `<a class="btn btn--soft btn--block" href="#/chat/neu/gruppe?mit=${esc(other.sub)}">${icon('fi-rs-user-add')}${t('Gruppe mit {name} und weiteren Leuten', { name: esc(nameOfP(other)) })}</a>` : '',
-      c.canJoinMod ? btn(`data-chat-joinmod="${esc(c.id)}"`, 'fi-rs-shield-check', t('Sichtbar als Moderation beitreten')) : '',
-      c.canJoin ? btn(`data-chat-join="${esc(c.id)}"`, 'fi-rs-user-add', t('Gruppe beitreten'), 'btn--primary') : '',
-      c.canReport ? btn(`data-chat-report="${esc(c.id)}"`, 'fi-rs-flag', t('Gespräch melden')) : '',
-      c.canLeave ? btn(`data-chat-leave="${esc(c.id)}"`, 'fi-rs-sign-out-alt', c.kind === 'group' ? t('Gruppe verlassen') : t('Gespräch verlassen')) : '',
-      role ? btn(`data-chat-hide="${esc(c.id)}"`, 'fi-rs-trash', t('Für mich löschen')) : '',
-      c.canDeleteAll ? btn(`data-chat-delete="${esc(c.id)}"`, 'fi-rs-trash-xmark', t('Für alle löschen'), 'btn--danger') : '',
+      c.kind === 'direct' && role && other ? `<button class="btn btn--soft btn--block" type="button" data-invite-player="${esc(other.sub)}" data-invite-name="${esc(nameOfP(other))}">${icon('phf-play')}${t('{name} ins Spiel einladen', { name: esc(nameOfP(other)) })}</button>` : '',
+      c.kind === 'direct' && role && other ? `<a class="btn btn--soft btn--block" href="#/chat/neu/gruppe?mit=${esc(other.sub)}">${icon('ph-user-plus')}${t('Gruppe mit {name} und weiteren Leuten', { name: esc(nameOfP(other)) })}</a>` : '',
+      c.canJoinMod ? btn(`data-chat-joinmod="${esc(c.id)}"`, 'ph-shield-check', t('Sichtbar als Moderation beitreten')) : '',
+      c.canJoin ? btn(`data-chat-join="${esc(c.id)}"`, 'ph-user-plus', t('Gruppe beitreten'), 'btn--primary') : '',
+      c.canReport ? btn(`data-chat-report="${esc(c.id)}"`, 'ph-flag', t('Gespräch melden')) : '',
+      c.canLeave ? btn(`data-chat-leave="${esc(c.id)}"`, 'ph-sign-out', c.kind === 'group' ? t('Gruppe verlassen') : t('Gespräch verlassen')) : '',
+      role ? btn(`data-chat-hide="${esc(c.id)}"`, 'ph-trash', t('Für mich löschen')) : '',
+      c.canDeleteAll ? btn(`data-chat-delete="${esc(c.id)}"`, 'ph-trash-simple', t('Für alle löschen'), 'btn--danger') : '',
     ].filter(Boolean);
-    const mod = c.canModerate && (c.reports || c.modlog) ? `<section class="info-sec info-sec--mod"><h3>${icon('fi-rs-shield-check')}${t('Moderation')}</h3>
-        ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('fi-rs-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
-        ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'fi-rs-user-add' : 'fi-rs-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
+    const mod = c.canModerate && (c.reports || c.modlog) ? `<section class="info-sec info-sec--mod"><h3>${icon('ph-shield-check')}${t('Moderation')}</h3>
+        ${(c.reports || []).length ? `<ul class="mod-log">${c.reports.map((r) => `<li>${icon('ph-flag')}<span><b>${esc(r.name)}</b> ${t('hat gemeldet')} · ${fmtWhen(r.at)}${r.text ? `<small>${esc(r.text)}</small>` : ''}</span>${r.ticket ? `<a href="#/chat/${esc(r.ticket)}">${t('Meldung')}</a>` : ''}</li>`).join('')}</ul>` : `<p class="muted">${t('Keine Meldungen.')}</p>`}
+        ${(c.modlog || []).length ? `<ul class="mod-log mod-log--quiet">${c.modlog.slice().reverse().map((x) => `<li>${icon(x.action === 'join' ? 'ph-user-plus' : 'ph-eye')}<span>${esc(x.name)} ${x.action === 'join' ? t('ist beigetreten') : t('hat mitgelesen')} · ${fmtWhen(x.at)}</span></li>`).join('')}</ul>` : ''}
       </section>` : '';
     return `${backTo(`#/chat/${esc(c.id)}`, t('Zurück zum Gespräch'))}${head}${channelsSection(c)}${servers}${discordSection(c)}${edit}${rolesSection(c)}${botsSection(c)}${people}${cmds}${mine}
       ${actions.length ? `<section class="info-sec"><div class="btn-stack">${actions.join('')}</div></section>` : ''}${mod}`;
@@ -4605,12 +4622,12 @@
     if (!roles.length && !c.canManage) return '';
     const count = (r) => (c.members || []).filter((m) => (m.roles || []).includes(r.id)).length;
     const perms = (r) => (r.perms.length ? r.perms.map((x) => t((PERM_LABELS.find(([k]) => k === x) || [x, x])[1])).join(' · ') : t('Keine Extra-Rechte'));
-    return `<section class="info-sec"><h3>${icon('fi-rs-id-badge')}${t('Rollen')}</h3>
+    return `<section class="info-sec"><h3>${icon('ph-identification-badge')}${t('Rollen')}</h3>
       ${roles.length ? `<ul class="crole-list">${roles.map((r) => `<li>
         <span class="crole-list__main">${roleChip(r)}<small>${t('{n} Mitglieder', { n: count(r) })} · ${perms(r)}</small></span>
-        ${c.canManage ? `<button class="btn btn--soft btn--sm" type="button" data-role-edit="${esc(r.id)}">${icon('fi-rs-edit')}${t('Bearbeiten')}</button>` : ''}
+        ${c.canManage ? `<button class="btn btn--soft btn--sm" type="button" data-role-edit="${esc(r.id)}">${icon('ph-note-pencil')}${t('Bearbeiten')}</button>` : ''}
       </li>`).join('')}</ul>` : `<p class="muted">${t('Noch keine eigenen Rollen. Rollen geben Mitgliedern einen Namen, eine Farbe und Rechte – wie bei Discord.')}</p>`}
-      ${c.canManage ? `<button class="btn btn--outline btn--block" type="button" data-role-edit="new">${icon('fi-rs-plus')}${t('Rolle hinzufügen')}</button>` : ''}
+      ${c.canManage ? `<button class="btn btn--outline btn--block" type="button" data-role-edit="new">${icon('ph-plus')}${t('Rolle hinzufügen')}</button>` : ''}
     </section>`;
   }
   function roleView(arg) {
@@ -4622,8 +4639,8 @@
       <div class="f"><label class="f__label" for="role-name">${t('Name der Rolle')}</label><input id="role-name" name="name" maxlength="30" value="${esc(r.name)}" placeholder="${esc(t('z. B. Fahrdienst'))}"></div>
       <fieldset class="f"><legend class="f__label">${t('Farbe')}</legend><div class="swatches">${ROLE_COLORS.map((col) => `<label class="swatch" style="--gc:${col}"><input type="radio" name="color" value="${col}"${r.color === col ? ' checked' : ''}><span></span></label>`).join('')}</div></fieldset>
       <fieldset class="f"><legend class="f__label">${t('Rechte')}</legend><div class="toggles">${PERM_LABELS.map(([k, label]) => `<label class="toggle"><span class="toggle__text"><b>${t(label)}</b></span><input type="checkbox" role="switch" name="perm" value="${k}"${r.perms.includes(k) ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>`).join('')}</div></fieldset>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button>
-      ${r.id !== 'new' ? `<button class="btn btn--danger btn--block" type="button" data-role-del="${esc(r.id)}" data-role-chat="${esc(cid)}">${icon('fi-rs-trash')}${t('Rolle löschen')}</button>` : ''}
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-check')}${t('Speichern')}</button>
+      ${r.id !== 'new' ? `<button class="btn btn--danger btn--block" type="button" data-role-del="${esc(r.id)}" data-role-chat="${esc(cid)}">${icon('ph-trash')}${t('Rolle löschen')}</button>` : ''}
     </form>`;
   }
   function memberRolesView(arg) {
@@ -4635,7 +4652,7 @@
     return `<form class="cform" data-mem-roles-form="${esc(cid)}" data-mem="${esc(sub)}" novalidate>
       <p class="sp-head">${personImg(p)}<span><b>${esc(nameOfP(p))}</b> · @${esc(p.username)}</span></p>
       <div class="toggles">${c.roles.map((r) => `<label class="toggle"><span class="toggle__text">${roleChip(r)}</span><input type="checkbox" role="switch" name="role" value="${esc(r.id)}"${(p.roles || []).includes(r.id) ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>`).join('')}</div>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-check')}${t('Speichern')}</button>
     </form>`;
   }
   async function saveRoles(cid, roles, msg) {
@@ -4649,7 +4666,7 @@
     const d = c.discord;
     if (c.kind !== 'group' || !d) return '';
     if (!c.canManage) {
-      return d.status === 'active' ? `<section class="info-sec"><h3>${icon('fi-brands-discord')}Discord</h3><p class="muted">${t('Dieser Server-Chat ist mit Discord verbunden. Nachrichten erscheinen auch dort.')}</p></section>` : '';
+      return d.status === 'active' ? `<section class="info-sec"><h3>${icon('si-discord')}Discord</h3><p class="muted">${t('Dieser Server-Chat ist mit Discord verbunden. Nachrichten erscheinen auch dort.')}</p></section>` : '';
     }
     if (c.category !== 'server') return '';
     const st = DISCORD_STATUS[d.status] || DISCORD_STATUS.none;
@@ -4657,17 +4674,17 @@
     const ready = req.every((r) => r.ok);
     const mode = d.mode || 'webhook';
     return `<section class="info-sec info-sec--discord">
-      <h3>${icon('fi-brands-discord')}${t('Discord verbinden')}<span class="pill ${st[0]}">${t(st[1])}</span></h3>
+      <h3>${icon('si-discord')}${t('Discord verbinden')}<span class="pill ${st[0]}">${t(st[1])}</span></h3>
       <p class="muted">${t('Zeigt die Nachrichten dieses Server-Chats auch auf deinem Discord-Server – per Webhook oder mit deinem eigenen Bot. Das Team prüft jede Verbindung, bevor sie startet.')}</p>
-      ${d.status === 'denied' ? `<p class="note note--bad">${icon('fi-rs-info')}<span>${d.reason ? t('Abgelehnt: {reason}', { reason: esc(d.reason) }) : t('Abgelehnt. Du kannst die Verbindung anpassen und erneut einreichen.')}</span></p>` : ''}
-      ${d.status === 'pending' ? `<p class="note">${icon('fi-rs-time-fast')}<span>${t('Eingereicht – das Team prüft die Verbindung. Du bekommst eine Benachrichtigung.')}</span></p>` : ''}
-      ${d.lastError && d.status === 'active' ? `<p class="note note--bad">${icon('fi-rs-triangle-warning')}<span>${t('Discord hat zuletzt eine Nachricht abgelehnt ({when}). Webhook bzw. Bot prüfen.', { when: fmtWhen(d.lastError.at) })}</span></p>` : ''}
+      ${d.status === 'denied' ? `<p class="note note--bad">${icon('ph-info')}<span>${d.reason ? t('Abgelehnt: {reason}', { reason: esc(d.reason) }) : t('Abgelehnt. Du kannst die Verbindung anpassen und erneut einreichen.')}</span></p>` : ''}
+      ${d.status === 'pending' ? `<p class="note">${icon('ph-timer')}<span>${t('Eingereicht – das Team prüft die Verbindung. Du bekommst eine Benachrichtigung.')}</span></p>` : ''}
+      ${d.lastError && d.status === 'active' ? `<p class="note note--bad">${icon('ph-warning')}<span>${t('Discord hat zuletzt eine Nachricht abgelehnt ({when}). Webhook bzw. Bot prüfen.', { when: fmtWhen(d.lastError.at) })}</span></p>` : ''}
       <h4 class="info-sub">${t('Voraussetzungen')}</h4>
-      <ul class="req-list">${req.map((r) => `<li class="${r.ok ? 'is-ok' : ''}">${icon(r.ok ? 'fi-ss-check-circle' : 'fi-rs-circle')}<span>${t(r.text)}</span></li>`).join('')}</ul>
+      <ul class="req-list">${req.map((r) => `<li class="${r.ok ? 'is-ok' : ''}">${icon(r.ok ? 'phf-check-circle' : 'ph-circle')}<span>${t(r.text)}</span></li>`).join('')}</ul>
       <form class="cform dc-form" data-discord-form="${esc(c.id)}" novalidate>
         <fieldset class="f"><legend class="f__label">${t('Verbindung')}</legend><div class="vis-grid">
-          <label class="vis"><input type="radio" name="mode" value="webhook"${mode === 'webhook' ? ' checked' : ''}><span>${icon('fi-rs-link-alt')}<b>Webhook</b><small>${t('Einfach: Link aus Discord')}</small></span></label>
-          <label class="vis"><input type="radio" name="mode" value="bot"${mode === 'bot' ? ' checked' : ''}><span>${icon('fi-rs-robot')}<b>${t('Eigener Bot')}</b><small>${t('Bot-Token und Kanal')}</small></span></label>
+          <label class="vis"><input type="radio" name="mode" value="webhook"${mode === 'webhook' ? ' checked' : ''}><span>${icon('ph-link')}<b>Webhook</b><small>${t('Einfach: Link aus Discord')}</small></span></label>
+          <label class="vis"><input type="radio" name="mode" value="bot"${mode === 'bot' ? ' checked' : ''}><span>${icon('ph-robot')}<b>${t('Eigener Bot')}</b><small>${t('Bot-Token und Kanal')}</small></span></label>
         </div></fieldset>
         <div class="f dc-webhook"><label class="f__label" for="dc-hook">Webhook</label><input id="dc-hook" name="webhook" type="password" autocomplete="off" spellcheck="false" placeholder="${esc(mode === 'webhook' && d.hint ? d.hint : 'https://discord.com/api/webhooks/…')}">
           <small class="f__hint">${t('In Discord: Kanal bearbeiten → Integrationen → Webhooks → „Webhook-URL kopieren“.')}${mode === 'webhook' && d.info ? ` ${t('Verbunden mit „{name}“.', { name: esc(d.info.name) })}` : ''}</small></div>
@@ -4679,12 +4696,12 @@
           <label class="toggle"><span class="toggle__text"><b>${t('Nachrichten aus dem Server-Chat')}</b><small>${t('Mit Name und Profilbild, ohne Erwähnungen.')}</small></span><input type="checkbox" role="switch" name="messages"${!d.events || d.events.messages ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
           <label class="toggle"><span class="toggle__text"><b>${t('Wer beitritt und geht')}</b></span><input type="checkbox" role="switch" name="joins"${!d.events || d.events.joins ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span></label>
         </div></fieldset>
-        <p class="f__hint">${icon('fi-rs-robot')} ${t('Was dein Bot schreibt (z. B. eine Begrüßung), stellst du unter „Bots“ ein – dort kann jede Regel auch nach Discord gehen.')}</p>
+        <p class="f__hint">${icon('ph-robot')} ${t('Was dein Bot schreibt (z. B. eine Begrüßung), stellst du unter „Bots“ ein – dort kann jede Regel auch nach Discord gehen.')}</p>
         <div class="btn-row dc-actions">
-          <button class="btn btn--primary" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button>
-          ${d.verified ? `<button class="btn btn--soft" type="button" data-discord-test="${esc(c.id)}">${icon('fi-rs-paper-plane')}${t('Testnachricht')}</button>` : ''}
-          ${['draft', 'denied', 'none'].includes(d.status) ? `<button class="btn btn--soft" type="button" data-discord-submit="${esc(c.id)}"${ready ? '' : ' disabled'}>${icon('fi-rs-paper-plane-top')}${t('Zur Prüfung einreichen')}</button>` : ''}
-          ${d.status !== 'none' ? `<button class="btn btn--ghost" type="button" data-discord-remove="${esc(c.id)}">${icon('fi-rs-trash')}${t('Entfernen')}</button>` : ''}
+          <button class="btn btn--primary" type="submit">${icon('ph-check')}${t('Speichern')}</button>
+          ${d.verified ? `<button class="btn btn--soft" type="button" data-discord-test="${esc(c.id)}">${icon('ph-paper-plane-tilt')}${t('Testnachricht')}</button>` : ''}
+          ${['draft', 'denied', 'none'].includes(d.status) ? `<button class="btn btn--soft" type="button" data-discord-submit="${esc(c.id)}"${ready ? '' : ' disabled'}>${icon('ph-paper-plane-right')}${t('Zur Prüfung einreichen')}</button>` : ''}
+          ${d.status !== 'none' ? `<button class="btn btn--ghost" type="button" data-discord-remove="${esc(c.id)}">${icon('ph-trash')}${t('Entfernen')}</button>` : ''}
         </div>
       </form>
     </section>`;
@@ -4740,21 +4757,21 @@
     if (c.kind !== 'group') return '';
     const bots = c.bots || [];
     if (!bots.length && !c.canBots) return '';
-    return `<section class="info-sec info-sec--bots"><h3>${icon('fi-rs-robot')}${t('Bots')}</h3>
+    return `<section class="info-sec info-sec--bots"><h3>${icon('ph-robot')}${t('Bots')}</h3>
       ${bots.length ? `<ul class="bot-list">${bots.map((b) => `<li class="bot-row${b.on ? '' : ' is-off'}">
         ${botAvatar(c.id, b)}
         <span class="bot-row__main"><b>${esc(b.name)} <span class="bot-tag">BOT</span></b><small>${b.desc ? esc(b.desc) : t('Vorlagen mit Platzhaltern')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>
         ${c.canBots ? `<span class="bot-row__acts">
-          <button class="btn btn--soft btn--sm" type="button" data-bot-edit="${esc(c.id)}:${esc(b.id)}">${icon('fi-rs-settings')}${t('Einstellungen')}</button></span>` : ''}
+          <button class="btn btn--soft btn--sm" type="button" data-bot-edit="${esc(c.id)}:${esc(b.id)}">${icon('ph-gear-six')}${t('Einstellungen')}</button></span>` : ''}
       </li>`).join('')}</ul>` : `<p class="muted">${t('Eigene Bots begrüßen neue Mitglieder, antworten auf Befehle wie !regeln und melden, wer im Spiel ist – einfach mit Vorlagen.')}</p>`}
-      ${c.canBots && bots.length < 5 ? `<button class="btn btn--outline btn--block" type="button" data-bot-new="${esc(c.id)}">${icon('fi-rs-plus')}${t('Bot erstellen')}</button>` : ''}
+      ${c.canBots && bots.length < 5 ? `<button class="btn btn--outline btn--block" type="button" data-bot-new="${esc(c.id)}">${icon('ph-plus')}${t('Bot erstellen')}</button>` : ''}
     </section>`;
   }
   function botNewView(cid) {
     return `<form class="cform" data-bot-create="${esc(cid)}" novalidate>
       <div class="f"><label class="f__label" for="bot-name">${t('Name des Bots')}</label><input id="bot-name" name="name" maxlength="32" placeholder="${esc(defaultName('Bot'))}"><small class="f__hint">${t('Leer lassen für „{name}“', { name: esc(defaultName('Bot')) })}</small></div>
       <p class="f__hint">${t('Bild, Beschreibung und Regeln wie „Willkommen {username}!“ stellst du danach ein. Bots brauchen kein Discord – sie laufen direkt in diesem Chat.')}</p>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-plus')}${t('Bot erstellen')}</button>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-plus')}${t('Bot erstellen')}</button>
     </form>`;
   }
   function ruleRow(a = {}, discordOn = true) {
@@ -4767,7 +4784,7 @@
       <textarea class="code-field" name="template" rows="2" maxlength="500" spellcheck="false" autocapitalize="off" placeholder="Willkommen {username} auf {server}!">${esc(a.template || '')}</textarea>
       <div class="auto-row__foot">
         <label class="mini-toggle"><input type="checkbox" name="on"${a.on === false ? '' : ' checked'}><span>${t('Aktiv')}</span></label>
-        <button class="btn btn--ghost btn--sm" type="button" data-auto-del>${icon('fi-rs-trash')}${t('Entfernen')}</button>
+        <button class="btn btn--ghost btn--sm" type="button" data-auto-del>${icon('ph-trash')}${t('Entfernen')}</button>
       </div>
     </li>`;
   }
@@ -4782,8 +4799,8 @@
     return `<form class="cform bot-form" data-bot-form="${esc(cid)}" data-bot-id="${esc(bid)}" novalidate>
       <div class="bot-head">
         ${botAvatar(cid, b, 'bot-ava--xl')}
-        <div class="photo-ctl"><label class="btn btn--soft btn--sm photo-ctl__pick">${icon('fi-rs-picture')}${b.avatar ? t('Bild ändern') : t('Bild hochladen')}<input type="file" accept="image/*" data-bot-photo="${esc(cid)}:${esc(bid)}"></label>
-          ${b.avatar ? `<button class="btn btn--soft btn--sm" type="button" data-bot-photo-del="${esc(cid)}:${esc(bid)}">${icon('fi-rs-trash')}${t('Entfernen')}</button>` : ''}</div>
+        <div class="photo-ctl"><label class="btn btn--soft btn--sm photo-ctl__pick">${icon('ph-image')}${b.avatar ? t('Bild ändern') : t('Bild hochladen')}<input type="file" accept="image/*" data-bot-photo="${esc(cid)}:${esc(bid)}"></label>
+          ${b.avatar ? `<button class="btn btn--soft btn--sm" type="button" data-bot-photo-del="${esc(cid)}:${esc(bid)}">${icon('ph-trash')}${t('Entfernen')}</button>` : ''}</div>
       </div>
       <div class="f"><label class="f__label" for="bf-name">${t('Name')}</label><input id="bf-name" name="name" maxlength="32" value="${esc(b.name)}"></div>
       <div class="f"><label class="f__label" for="bf-desc">${t('Beschreibung')}</label><input id="bf-desc" name="desc" maxlength="140" value="${esc(b.desc || '')}" placeholder="${esc(t('Was macht dein Bot?'))}"></div>
@@ -4793,12 +4810,12 @@
       <div class="bot-rules">
         <h4 class="info-sub">${t('Regeln')}</h4>
         <ul class="auto-list" data-auto-list>${(b.rules || []).map((r) => ruleRow(r, discordOn)).join('')}</ul>
-        <button class="btn btn--outline btn--sm" type="button" data-auto-add data-discord-on="${discordOn ? 1 : 0}">${icon('fi-rs-plus')}${t('Regel hinzufügen')}</button>
+        <button class="btn btn--outline btn--sm" type="button" data-auto-add data-discord-on="${discordOn ? 1 : 0}">${icon('ph-plus')}${t('Regel hinzufügen')}</button>
         <p class="f__hint code-help">${t('Platzhalter:')} ${BOT_PH.map((x) => `<code>{${x}}</code>`).join(' ')}</p>
         ${discordOn ? '' : `<p class="f__hint">${t('Nach Discord geht es erst, wenn dieser Server-Chat mit Discord verbunden und angenommen ist.')}</p>`}
       </div>
-      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button>
-      <button class="btn btn--danger btn--block" type="button" data-bot-del="${esc(cid)}:${esc(bid)}">${icon('fi-rs-trash')}${t('Bot löschen')}</button>
+      <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-check')}${t('Speichern')}</button>
+      <button class="btn btn--danger btn--block" type="button" data-bot-del="${esc(cid)}:${esc(bid)}">${icon('ph-trash')}${t('Bot löschen')}</button>
     </form>`;
   }
   // Quadratisches JPEG (256 × 256) für Gruppen- und Bot-Bilder
@@ -4853,16 +4870,16 @@
       </dl>
       ${r.rules ? `<p class="info-rules">${esc(r.rules)}</p>` : ''}
       ${(r.roles || []).length ? `<div class="dreq__roles">${r.roles.map((x) => `${roleChip(x)}<small>${x.count}</small>`).join('')}</div>` : ''}
-      ${(r.bots || []).length ? `<p class="dreq__bots">${icon('fi-rs-robot')}${r.bots.map((b) => `<span>${esc(b.name)} <small>${b.mode === 'advanced' ? 'Luna' : t('Basis')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>`).join('')}</p>` : ''}
-      ${r.status === 'pending' ? `<div class="btn-row"><button class="btn btn--primary" type="button" data-dreq-accept="${esc(r.id)}">${icon('fi-rs-check')}${t('Annehmen')}</button>
-        <button class="btn btn--soft" type="button" data-dreq-deny="${esc(r.id)}">${icon('fi-rs-cross-small')}${t('Ablehnen')}</button></div>`
+      ${(r.bots || []).length ? `<p class="dreq__bots">${icon('ph-robot')}${r.bots.map((b) => `<span>${esc(b.name)} <small>${b.mode === 'advanced' ? 'Luna' : t('Basis')}${b.on ? '' : ` · ${t('Aus')}`}</small></span>`).join('')}</p>` : ''}
+      ${r.status === 'pending' ? `<div class="btn-row"><button class="btn btn--primary" type="button" data-dreq-accept="${esc(r.id)}">${icon('ph-check')}${t('Annehmen')}</button>
+        <button class="btn btn--soft" type="button" data-dreq-deny="${esc(r.id)}">${icon('ph-x')}${t('Ablehnen')}</button></div>`
         : r.reviewedBy ? `<p class="muted">${r.status === 'active' ? t('Angenommen von {name}', { name: esc(r.reviewedBy.name) }) : t('Abgelehnt von {name}', { name: esc(r.reviewedBy.name) })} · ${fmtWhen(r.reviewedAt)}${r.reason ? ` – ${esc(r.reason)}` : ''}</p>` : ''}
     </article>`;
   }
   function chatDiscordReview() {
     if (!isReviewer()) return `<p class="empty">${t('Discord-Verbindungen prüfen die Ränge über Public Relations Department.')}</p>`;
     if (!dreq.list) { loadDiscordRequests(); return loadingHtml(); }
-    if (!dreq.list.length) return `<div class="chat-empty">${icon('fi-brands-discord')}<h2>${t('Keine Anfragen')}</h2><p>${t('Eingereichte Discord-Verbindungen von Server-Chats erscheinen hier.')}</p></div>`;
+    if (!dreq.list.length) return `<div class="chat-empty">${icon('si-discord')}<h2>${t('Keine Anfragen')}</h2><p>${t('Eingereichte Discord-Verbindungen von Server-Chats erscheinen hier.')}</p></div>`;
     return `<div class="dreq-list">${dreq.list.map(dreqCard).join('')}</div>`;
   }
   async function reviewDiscord(id, decision) {
@@ -5191,11 +5208,11 @@
         ${tr ? `<span class="tr-card__trip">
             <span class="tr-card__line"><span class="line line--${tripCat(tr)}">${esc(tr.line || tr.train || '')}</span>${tr.train && tr.line ? `<small>${esc(tr.train)}</small>` : ''}</span>
             <b class="tr-card__dest">${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : t('unterwegs')}</b>
-            ${tr.next ? `<span class="tr-card__next">${icon('fi-rs-marker')}${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span>` : ''}
-            ${tr.veh ? `<small class="tr-card__veh">${icon('fi-rs-train-side')}${esc(trainName(tr.veh))}</small>` : ''}
-          </span>` : `<span class="tr-card__idle">${icon('fi-rs-train-side')}${t('Gerade keine Zugfahrt')}</span>`}
+            ${tr.next ? `<span class="tr-card__next">${icon('ph-map-pin')}${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span>` : ''}
+            ${tr.veh ? `<small class="tr-card__veh">${icon('ph-train')}${esc(trainName(tr.veh))}</small>` : ''}
+          </span>` : `<span class="tr-card__idle">${icon('ph-train')}${t('Gerade keine Zugfahrt')}</span>`}
       </button>
-      ${p && p.me ? '' : `<button class="pl-card__unfollow" type="button" data-track="${esc(id)}" aria-pressed="true" aria-label="${esc(t('Nicht mehr verfolgen'))}" title="${esc(t('Nicht mehr verfolgen'))}">${icon('fi-rs-cross-small')}</button>`}
+      ${p && p.me ? '' : `<button class="pl-card__unfollow" type="button" data-track="${esc(id)}" aria-pressed="true" aria-label="${esc(t('Nicht mehr verfolgen'))}" title="${esc(t('Nicht mehr verfolgen'))}">${icon('ph-x')}</button>`}
     </article>`;
   }
   const playersSorted = (ids) => [...ids].sort((a, b) => (!!(pl.data[b] || {}).trip - !!(pl.data[a] || {}).trip));
@@ -5211,17 +5228,17 @@
         <h1 class="mega mega--stack">${t('Spieler.')}<br><span>${t('Wer fährt gerade?')}</span></h1>
         <p class="site-head__lead">${t('Such nach einem Roblox-Namen und verfolge ihn. Dann siehst du hier seine Zugfahrt: Linie, Zug, Ziel und den nächsten Halt.')}</p>
         <form class="sv-hero__bar pl-search" data-player-search novalidate>
-          <label class="sv-search">${icon('fi-rs-search')}<span class="sr-only">${t('Roblox-Name oder ID')}</span><input name="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name oder ID'))}"></label>
+          <label class="sv-search">${icon('ph-magnifying-glass')}<span class="sr-only">${t('Roblox-Name oder ID')}</span><input name="q" type="search" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(t('Roblox-Name oder ID'))}"></label>
           <button class="site-btn site-btn--brand" type="submit">${t('Suchen')}</button>
         </form>`;
     }
     if (!apiReady()) {
-      body.innerHTML = `<div class="sv-empty"><span class="sv-empty__ic">${icon('fi-rs-database')}</span><h3>${t('Der App-Server fehlt noch')}</h3><p>${t('Zugfahrten verfolgen geht nur mit dem Server der App.')}</p></div>`;
+      body.innerHTML = `<div class="sv-empty"><span class="sv-empty__ic">${icon('ph-hard-drives')}</span><h3>${t('Der App-Server fehlt noch')}</h3><p>${t('Zugfahrten verfolgen geht nur mit dem Server der App.')}</p></div>`;
       return;
     }
     let found = '';
-    if (pl.finding) found = `<div class="pl-found"><div class="sheet-loading">${icon('fi-rs-spinner')}<span>${t('Suche auf Roblox …')}</span></div></div>`;
-    else if (pl.found && pl.found.missing) found = `<div class="pl-found"><p class="cr-note cr-note--bad">${icon('fi-rs-info')}<span>${t('Auf Roblox gibt es niemanden mit „{name}“.', { name: esc(pl.found.q) })}</span></p></div>`;
+    if (pl.finding) found = `<div class="pl-found"><div class="sheet-loading">${icon('ph-spinner-gap')}<span>${t('Suche auf Roblox …')}</span></div></div>`;
+    else if (pl.found && pl.found.missing) found = `<div class="pl-found"><p class="cr-note cr-note--bad">${icon('ph-info')}<span>${t('Auf Roblox gibt es niemanden mit „{name}“.', { name: esc(pl.found.q) })}</span></p></div>`;
     else if (pl.found) {
       const id = pl.found.userId;
       const p = pl.data[id] || pl.found;
@@ -5230,13 +5247,13 @@
           <span class="pl-found__pic">${playerPic(p, 'avatar--lg')}</span>
           <span class="pl-found__main"><small>${t('Gefunden')}</small><b>${esc(p.displayName || p.username || id)}</b>${p.username ? `<span>@${esc(p.username)}</span>` : ''}${pl.data[id] ? tripLine(pl.data[id]) : ''}</span>
           <span class="pl-found__btns">
-            ${p.me ? '' : `<button class="site-btn ${on ? 'site-btn--ghost' : 'site-btn--brand'} site-btn--sm" type="button" data-track="${esc(id)}" aria-pressed="${on}">${icon(on ? 'fi-rs-check' : 'fi-rs-eye')}${on ? t('Wird verfolgt') : t('Verfolgen')}</button>`}
+            ${p.me ? '' : `<button class="site-btn ${on ? 'site-btn--ghost' : 'site-btn--brand'} site-btn--sm" type="button" data-track="${esc(id)}" aria-pressed="${on}">${icon(on ? 'ph-check' : 'ph-eye')}${on ? t('Wird verfolgt') : t('Verfolgen')}</button>`}
           </span>
         </div>`;
     }
     let list;
     if (!pl.track.length) {
-      list = `<div class="sv-empty"><span class="sv-empty__ic">${icon('fi-rs-train-side')}</span><h3>${t('Noch niemand verfolgt')}</h3><p>${t('Suche oben nach einem Roblox-Namen und tippe auf „Verfolgen“. Sobald er einen Zug fährt, siehst du hier Linie, Ziel und den nächsten Halt.')}</p></div>`;
+      list = `<div class="sv-empty"><span class="sv-empty__ic">${icon('ph-train')}</span><h3>${t('Noch niemand verfolgt')}</h3><p>${t('Suche oben nach einem Roblox-Namen und tippe auf „Verfolgen“. Sobald er einen Zug fährt, siehst du hier Linie, Ziel und den nächsten Halt.')}</p></div>`;
     } else {
       if (!pl.at) loadTracked();
       const sorted = playersSorted(pl.track);
@@ -5261,23 +5278,23 @@
   function playerView(id) {
     const p = pl.data[id];
     if (!p || Date.now() - (p.at || 0) > 30000) loadStatus([id], () => { if (modalView && modalView.name === 'player' && modalView.arg === id) refreshModal(); if (state.page === 'spieler') renderPlayers(); });
-    if (!p) return `<div class="sheet-loading">${icon('fi-rs-spinner')}<span>${t('Wird geladen …')}</span></div>`;
+    if (!p) return `<div class="sheet-loading">${icon('ph-spinner-gap')}<span>${t('Wird geladen …')}</span></div>`;
     const tr = p.trip;
     const tracked = isTracked(id);
     const trip = tr ? `<section class="trip-box">
         <div class="trip-box__head"><span class="line line--${tripCat(tr)}">${esc(tr.line || tr.train || '')}</span>
           <span><b>${tr.dest ? t('nach {to}', { to: esc(tr.dest) }) : t('unterwegs')}</b><small>${[tr.train, trainName(tr.veh)].filter(Boolean).map(esc).join(' · ')}</small></span></div>
-        ${tr.next ? `<p class="train__now">${icon('fi-rs-marker')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
+        ${tr.next ? `<p class="train__now">${icon('ph-map-pin')}<span>${t('Nächster Halt')}: <b>${esc(tr.next)}</b></span></p>` : ''}
         ${liveStopsHtml(tr)}
       </section>`
-      : `<section class="trip-box is-idle">${icon('fi-rs-train-side')}<p>${t('Gerade keine Zugfahrt. Sobald {name} einen Zug fährt, steht die Fahrt hier.', { name: esc(p.displayName || p.username || '') })}</p></section>`;
+      : `<section class="trip-box is-idle">${icon('ph-train')}<p>${t('Gerade keine Zugfahrt. Sobald {name} einen Zug fährt, steht die Fahrt hier.', { name: esc(p.displayName || p.username || '') })}</p></section>`;
     return `<div class="profile-box profile-box--player">
         <span class="pbig${tr ? ' is-ingame' : ''}">${playerPic(p, 'avatar--xl')}</span>
         <h3>${esc(p.displayName || p.username || id)}</h3>
         ${p.username ? `<p>@${esc(p.username)}</p>` : ''}
       </div>
       ${trip}
-      ${p.me ? '' : `<div class="sheet-actions"><button class="btn ${tracked ? 'btn--soft' : 'btn--primary'} btn--lg btn--block" type="button" data-track="${esc(id)}" aria-pressed="${tracked}">${icon(tracked ? 'fi-rs-check' : 'fi-rs-eye')}${tracked ? t('Wird verfolgt – beenden') : t('Verfolgen')}</button></div>`}
+      ${p.me ? '' : `<div class="sheet-actions"><button class="btn ${tracked ? 'btn--soft' : 'btn--primary'} btn--lg btn--block" type="button" data-track="${esc(id)}" aria-pressed="${tracked}">${icon(tracked ? 'ph-check' : 'ph-eye')}${tracked ? t('Wird verfolgt – beenden') : t('Verfolgen')}</button></div>`}
       <p class="sheet-note">${t('Angezeigt wird nur die Zugfahrt in Train Sim Germany – nichts anderes.')}</p>`;
   }
 
@@ -5314,7 +5331,7 @@
       api(`/api/invites/${encodeURIComponent(id)}`).then((r) => { invites[id] = r; }).catch(() => { invites[id] = { error: true }; })
         .finally(() => { if (modalView && modalView.name === 'invite') refreshModal(); });
     }
-    if (!inv || inv === 'loading') return `<div class="sheet-loading">${icon('fi-rs-spinner')}<span>${t('Wird geladen …')}</span></div>`;
+    if (!inv || inv === 'loading') return `<div class="sheet-loading">${icon('ph-spinner-gap')}<span>${t('Wird geladen …')}</span></div>`;
     if (inv.error) return `<p class="muted">${t('Diese Einladung gibt es nicht mehr.')}</p>`;
     const from = inv.from || {};
     const open = inv.status === 'open' && inv.to === meSub();
@@ -5324,7 +5341,7 @@
         <p>${inv.where ? t('Lädt dich zu Train Sim Germany ein – {where}', { where: esc(inv.where) }) : t('Lädt dich zu Train Sim Germany ein')}</p>
       </div>
       ${open ? `<div class="sheet-actions">
-        <a class="btn btn--primary btn--lg btn--block" href="${esc(inv.join)}" target="_blank" rel="noopener" data-invite-answer="join" data-invite-id="${esc(inv.id)}">${icon('fi-ss-play')}${t('Beitreten')}</a>
+        <a class="btn btn--primary btn--lg btn--block" href="${esc(inv.join)}" target="_blank" rel="noopener" data-invite-answer="join" data-invite-id="${esc(inv.id)}">${icon('phf-play')}${t('Beitreten')}</a>
         <button class="btn btn--soft btn--lg btn--block" type="button" data-invite-answer="decline" data-invite-id="${esc(inv.id)}">${t('Ablehnen')}</button>
       </div>` : `<p class="sheet-note">${inv.status === 'joined' ? t('Angenommen.') : inv.status === 'declined' ? t('Abgelehnt.') : t('Offen.')}</p>`}`;
   }
@@ -5420,7 +5437,7 @@
     const range = (s) => `${dtf({ day: 'numeric', month: 'short' }).format(dateOf(s.from))} – ${dtf({ day: 'numeric', month: 'short' }).format(dateOf(s.to))}`;
     box.innerHTML = `<label class="toggle">
         <span class="toggle__text"><b>${t('Saison-Design')}</b><small>${now ? t('Gerade: {name} ({range})', { name: now.name, range: range(now) }) : next ? t('Gerade keine Saison. Als Nächstes: {name} ab {date}', { name: next.name, date: dtf({ day: 'numeric', month: 'long' }).format(dateOf(next.from)) }) : ''}</small>
-          <small class="toggle__note">${icon('fi-rs-info')}${t('Halloween, Weihnachten, Neujahr und Ostern – automatisch zur passenden Zeit.')}</small></span>
+          <small class="toggle__note">${icon('ph-info')}${t('Halloween, Weihnachten, Neujahr und Ostern – automatisch zur passenden Zeit.')}</small></span>
         <input type="checkbox" role="switch" data-season-toggle${fx.season ? ' checked' : ''}><span class="toggle__ui" aria-hidden="true"></span>
       </label>`;
   }
@@ -5429,20 +5446,20 @@
   // Jede Zeile öffnet eine eigene Seite mit allem, was zu ihr gehört – z. B. „Privatsphäre“ → alle Schalter dazu.
   const SET_PAGES = [
     { group: 'Konto', items: [
-      { id: 'konto', ic: 'fi-rs-link-alt', label: 'Roblox-Konto' },
-      { id: 'privacy', ic: 'fi-rs-shield-check', label: 'Privatsphäre' },
-      { id: 'benachrichtigungen', ic: 'fi-rs-bell', label: 'Benachrichtigungen' },
+      { id: 'konto', ic: 'ph-link', label: 'Roblox-Konto' },
+      { id: 'privacy', ic: 'ph-shield-check', label: 'Privatsphäre' },
+      { id: 'benachrichtigungen', ic: 'ph-bell', label: 'Benachrichtigungen' },
     ] },
     { group: 'App', items: [
-      { id: 'darstellung', ic: 'fi-rs-palette', label: 'Darstellung' },
-      { id: 'themes', ic: 'fi-rs-sparkles', label: 'Themes' },
-      { id: 'app-symbol', ic: 'fi-rs-apps', label: 'App-Symbol' },
-      { id: 'bewegung', ic: 'fi-rs-play', label: 'Bewegung & Haptik' },
-      { id: 'sprache', ic: 'fi-rs-globe', label: 'Sprache' },
-      { id: 'app', ic: 'fi-rs-download', label: 'App installieren' },
+      { id: 'darstellung', ic: 'ph-palette', label: 'Darstellung' },
+      { id: 'themes', ic: 'ph-sparkle', label: 'Themes' },
+      { id: 'app-symbol', ic: 'ph-squares-four', label: 'App-Symbol' },
+      { id: 'bewegung', ic: 'ph-play', label: 'Bewegung & Haptik' },
+      { id: 'sprache', ic: 'ph-globe', label: 'Sprache' },
+      { id: 'app', ic: 'ph-download-simple', label: 'App installieren' },
     ] },
     { group: 'Info', items: [
-      { id: 'rechtliches', ic: 'fi-rs-document', label: 'Rechtliches' },
+      { id: 'rechtliches', ic: 'ph-file-text', label: 'Rechtliches' },
     ] },
   ];
   const setPage = (id) => SET_PAGES.flatMap((g) => g.items).find((x) => x.id === id) || null;
@@ -5464,7 +5481,7 @@
     const head = $('[data-settings-head]');
     if (head) {
       head.innerHTML = page
-        ? `<a class="set-back" href="#/einstellungen" aria-label="${esc(t('Zurück zu den Einstellungen'))}">${icon('fi-rs-arrow-left')}</a><div class="appbar__title"><span class="appbar__label">${t('Einstellungen')}</span><h1 class="appbar__value">${esc(t(page.label))}</h1></div>`
+        ? `<a class="set-back" href="#/einstellungen" aria-label="${esc(t('Zurück zu den Einstellungen'))}">${icon('ph-arrow-left')}</a><div class="appbar__title"><span class="appbar__label">${t('Einstellungen')}</span><h1 class="appbar__value">${esc(t(page.label))}</h1></div>`
         : `<div class="appbar__title"><span class="appbar__label">App</span><h1 class="appbar__value">${t('Einstellungen')}</h1></div>`;
     }
     const menu = $('[data-settings-menu]');
@@ -5472,9 +5489,9 @@
     if (page) return;
     const p = state.profile;
     const r = rankOf(state.rank);
-    menu.innerHTML = `<button class="set-me" type="button" data-open="profile">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${p ? esc(p.displayName || p.username) : t('Gast')}</b><small>${p ? `@${esc(p.username)}` : t('Mit Roblox anmelden')}</small></span>${rankPill(r)}${icon('fi-rs-angle-small-right', 'set-row__chev')}</button>
+    menu.innerHTML = `<button class="set-me" type="button" data-open="profile">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${p ? esc(p.displayName || p.username) : t('Gast')}</b><small>${p ? `@${esc(p.username)}` : t('Mit Roblox anmelden')}</small></span>${rankPill(r)}${icon('ph-caret-right', 'set-row__chev')}</button>
       ${SET_PAGES.map((g) => `<div class="set-group"><h2>${esc(t(g.group))}</h2><div class="set-list">${g.items.map((x) => `<a class="set-row" href="${x.href || `#/einstellungen/${x.id}`}">
-        <span class="set-row__ic">${icon(x.ic)}</span><span class="set-row__label">${esc(t(x.label))}</span><span class="set-row__val">${esc(setValue(x.id) || '')}</span>${icon('fi-rs-angle-small-right', 'set-row__chev')}</a>`).join('')}</div></div>`).join('')}`;
+        <span class="set-row__ic">${icon(x.ic)}</span><span class="set-row__label">${esc(t(x.label))}</span><span class="set-row__val">${esc(setValue(x.id) || '')}</span>${icon('ph-caret-right', 'set-row__chev')}</a>`).join('')}</div></div>`).join('')}`;
   }
 
   // ---------- Themes: ganzes Design statt nur Hell/Dunkel ----------
@@ -5591,7 +5608,7 @@
     if (!box) return;
     box.innerHTML = `<div class="icon-grid">${APP_ICONS.map((v) => `<button type="button" class="icon-opt" data-icon-set="${v.id}" aria-pressed="${fx.icon === v.id}">
         <span class="icon-opt__img">${appIconSvg(v, 112)}</span><span>${esc(t(v.name))}</span></button>`).join('')}</div>
-      <p class="set-note">${icon('fi-rs-info')}<span>${t('Das Symbol gilt sofort im Browser-Tab. Auf dem Home-Bildschirm übernimmt das Gerät es, wenn du die App neu hinzufügst (iPhone/iPad: Teilen → „Zum Home-Bildschirm“). Installierte Android-Apps behalten ihr Symbol, bis sie neu installiert werden.')}</span></p>`;
+      <p class="set-note">${icon('ph-info')}<span>${t('Das Symbol gilt sofort im Browser-Tab. Auf dem Home-Bildschirm übernimmt das Gerät es, wenn du die App neu hinzufügst (iPhone/iPad: Teilen → „Zum Home-Bildschirm“). Installierte Android-Apps behalten ihr Symbol, bis sie neu installiert werden.')}</span></p>`;
   }
 
   // ---------- Echte Zahlen: Gruppe, Spiel, Discord ----------
@@ -5706,7 +5723,7 @@
               <p>${t('Du wirst zu Roblox weitergeleitet und bestätigst dort die Anmeldung. Wir erhalten nur deinen Namen, Anzeigenamen und dein Profilbild – nie dein Passwort.')}</p>
             </div>
             <div class="sheet-actions">
-              <button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('fi-rs-sign-in-alt')}${t('Mit Roblox anmelden')}</button>
+              <button class="btn btn--primary btn--lg btn--block" type="button" data-roblox-login>${icon('ph-sign-in')}${t('Mit Roblox anmelden')}</button>
             </div>
             <p class="sheet-note">${t('Mit der Anmeldung akzeptierst du die {terms} und die {privacy}.', {
               terms: `<a href="terms.html">${t('Nutzungsbedingungen')}</a>`, privacy: `<a href="privacy.html">${t('Datenschutzerklärung')}</a>`,
@@ -5720,7 +5737,7 @@
             </div>
             <form class="connect" data-connect novalidate>
               <div class="f"><label class="f__label" for="rbx-name">${t('Roblox-Benutzername')}</label><input id="rbx-name" name="username" autocomplete="username" placeholder="${esc(t('z. B. {name}', { name: D.me.username }))}"></div>
-              <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('fi-rs-link-alt')}${t('Verbinden')}</button>
+              <button class="btn btn--primary btn--lg btn--block" type="submit">${icon('ph-link')}${t('Verbinden')}</button>
               <p class="sheet-note">${t('Es wird nur dein öffentliches Roblox-Profil geladen – kein Passwort, kein Login.')}</p>
             </form>`;
         }
@@ -5728,15 +5745,15 @@
             ${ringHTML(p, r, 'avatar-ring--xl')}
             <h3>${esc(p.displayName || p.username)}</h3>
             <p>@${esc(p.username)}</p>
-            <button class="rank-pill rank-pill--btn" type="button" data-open="rank" style="--rc:${r.color}">[${esc(r.prefix)}] ${esc(r.name)}${icon('fi-rs-angle-small-down')}</button>
+            <button class="rank-pill rank-pill--btn" type="button" data-open="rank" style="--rc:${r.color}">[${esc(r.prefix)}] ${esc(r.name)}${icon('ph-caret-down')}</button>
           </div>
-          ${p.oauth && RBX.groupId ? `<p class="group-note">${icon('fi-rs-users-alt')}<span>${state.groupRole
+          ${p.oauth && RBX.groupId ? `<p class="group-note">${icon('ph-users-three')}<span>${state.groupRole
             ? t('Rolle in der Roblox-Gruppe: {role}', { role: `<b>${esc(state.groupRole.name)}</b>` })
             : state.rankFromGroup ? t('Du bist noch nicht in der Roblox-Gruppe und bist deshalb Gast.') : t('Deine Rolle in der Roblox-Gruppe wird geladen …')}</span>${!state.groupRole && state.rankFromGroup ? `<a href="${esc(D.links.group)}" target="_blank" rel="noopener">${t('Beitreten')}</a>` : ''}</p>` : ''}
           ${visibilityNote(privacy().profile, t('Dein Profil ist öffentlich.'), t('Dein Profil ist privat.'))}
           <div class="sheet-actions">
-            <button class="btn btn--primary btn--lg btn--block" type="button" data-open="stats">${icon('fi-rs-chart-line-up')}${t('Meine Statistik')}</button>
-            ${p.userId ? `<a class="btn btn--outline btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(p.userId)}/profile" target="_blank" rel="noopener">${icon('fi-rs-arrow-up-right-from-square')}${t('Roblox-Profil ansehen')}</a>` : ''}
+            <button class="btn btn--primary btn--lg btn--block" type="button" data-open="stats">${icon('ph-chart-line-up')}${t('Meine Statistik')}</button>
+            ${p.userId ? `<a class="btn btn--outline btn--lg btn--block" href="https://www.roblox.com/users/${encodeURIComponent(p.userId)}/profile" target="_blank" rel="noopener">${icon('ph-arrow-square-out')}${t('Roblox-Profil ansehen')}</a>` : ''}
             <button class="btn btn--soft btn--lg btn--block" type="button" data-disconnect>${p.oauth ? t('Abmelden') : t('Verbindung trennen')}</button>
           </div>`;
       },
@@ -5767,7 +5784,7 @@
           <h4 class="mystats__title">${t('Diese Woche gespielt')}</h4>
           <div class="week-bars">${st.week.map((d) => `<div class="week-bars__col${d.today ? ' is-today' : ''}"><span class="week-bars__val">${nf1.format(Math.round(d.min / 6) / 10)} h</span><span class="week-bars__bar"><i style="height:${Math.max(4, (d.min / max) * 100)}%"></i></span><span class="week-bars__day">${d.label}</span></div>`).join('')}</div>
           <p class="sheet-note">${t('Alle Werte kommen direkt aus dem Spiel. Was noch nicht passiert ist, steht auf 0.')}</p>
-          <div class="sheet-actions"><button class="btn btn--soft btn--lg btn--block" type="button" data-open="profile">${icon('fi-rs-arrow-left')}${t('Zurück zum Profil')}</button></div>
+          <div class="sheet-actions"><button class="btn btn--soft btn--lg btn--block" type="button" data-open="profile">${icon('ph-arrow-left')}${t('Zurück zum Profil')}</button></div>
         </div>`;
       },
     },
@@ -5776,7 +5793,7 @@
       render: () => `<div class="opt-list" role="radiogroup" aria-label="${esc(t('Rang wählen'))}">${RANKS.map((r) => `
         <button class="opt" type="button" role="radio" aria-checked="${r.name === state.rank}" data-rank="${r.name}"${state.rankFromGroup ? ' disabled' : ''}>
           ${rankPill(r)}<span><b>${esc(r.name)}</b><small>${esc(t(r.label))} · ${esc(t(r.desc))}</small></span>
-          ${r.name === state.rank ? icon('fi-rs-check') : ''}
+          ${r.name === state.rank ? icon('ph-check') : ''}
         </button>`).join('')}</div>
         <p class="sheet-note">${state.rankFromGroup ? t('Dein Rang kommt automatisch aus der Roblox-Gruppe.') : t('Demo: Später wird dein Rang automatisch aus der Roblox-Gruppe übernommen.')}</p>`,
     },
@@ -5845,7 +5862,7 @@
     // Foto aus dem Chat in groß
     photo: {
       title: () => t('Foto'),
-      render: (src) => `<div class="photo-view"><img src="${esc(src)}" alt=""><a class="btn btn--soft btn--block" href="${esc(src)}" target="_blank" rel="noopener">${icon('fi-rs-download')}${t('Original öffnen')}</a></div>`,
+      render: (src) => `<div class="photo-view"><img src="${esc(src)}" alt=""><a class="btn btn--soft btn--block" href="${esc(src)}" target="_blank" rel="noopener">${icon('ph-download-simple')}${t('Original öffnen')}</a></div>`,
     },
     news: {
       title: () => t('Neuigkeit'),
@@ -5855,12 +5872,12 @@
         if (!n) return `<p class="muted">${t('Diese Neuigkeit gibt es nicht mehr.')}</p>`;
         return `<div class="detail">
           ${mediaHtml(n)}
-          <div class="detail__top">${catTag(n)}<span class="tag">${newsDate(n)}</span>${n.author ? `<span class="tag">${icon('fi-rs-pencil')}${esc(n.author)}</span>` : ''}${n.edited ? `<span class="tag">${t('bearbeitet')}</span>` : ''}</div>
+          <div class="detail__top">${catTag(n)}<span class="tag">${newsDate(n)}</span>${n.author ? `<span class="tag">${icon('ph-pencil-simple')}${esc(n.author)}</span>` : ''}${n.edited ? `<span class="tag">${t('bearbeitet')}</span>` : ''}</div>
           <h3>${esc(t(n.title))}</h3>
           <p class="detail__text">${esc(t(n.text))}</p>
           <div class="btn-stack">${newsButtons(n)}
-            ${n.remote && isMine(n.authorId) ? `<button class="btn btn--soft btn--block btn--lg" type="button" data-news-edit="${esc(n.id)}">${icon('fi-rs-pencil')}${t('Bearbeiten')}</button>
-            <button class="btn btn--danger btn--block btn--lg" type="button" data-news-del="${esc(n.id)}">${icon('fi-rs-trash')}${t('Neuigkeit löschen')}</button>` : ''}</div>
+            ${n.remote && isMine(n.authorId) ? `<button class="btn btn--soft btn--block btn--lg" type="button" data-news-edit="${esc(n.id)}">${icon('ph-pencil-simple')}${t('Bearbeiten')}</button>
+            <button class="btn btn--danger btn--block btn--lg" type="button" data-news-del="${esc(n.id)}">${icon('ph-trash')}${t('Neuigkeit löschen')}</button>` : ''}</div>
         </div>`;
       },
     },
@@ -5876,8 +5893,8 @@
         const locked = isLocked(tn);
         // „Join Now“ ist nur aktiv (hellblau), solange der Trainingsserver offen ist
         const action = ss.open && !locked
-          ? `<a class="btn btn--join btn--lg btn--block" href="${esc(joinUrl(trainingServer(tn)))}" target="_blank" rel="noopener">${icon('fi-ss-play')}Join Now</a>`
-          : `<button class="btn btn--join btn--lg btn--block" type="button" disabled>${icon(locked ? 'fi-rs-lock' : 'fi-ss-play')}Join Now</button>`;
+          ? `<a class="btn btn--join btn--lg btn--block" href="${esc(joinUrl(trainingServer(tn)))}" target="_blank" rel="noopener">${icon('phf-play')}Join Now</a>`
+          : `<button class="btn btn--join btn--lg btn--block" type="button" disabled>${icon(locked ? 'ph-lock' : 'phf-play')}Join Now</button>`;
         const hint = locked ? '' : ss.open ? t('Der Trainingsserver ist offen – du kannst jetzt beitreten.') : t('Der Trainingsserver öffnet {n} Minuten vor Beginn.', { n: SERVER_OPENS });
         return `<div class="detail">
           <div class="detail__media"><img src="assets/img/${tn.img}" alt=""></div>
@@ -5885,22 +5902,22 @@
           <h3>${esc(t(tn.title))}</h3>
           <p>${esc(tn.text || (type ? t(type.text) : ''))}</p>
           <dl>
-            <div><dt>${icon('fi-rs-calendar')}${t('Datum')}</dt><dd>${dayName(tn.day, { long: true })}</dd></div>
-            <div><dt>${icon('fi-rs-clock-three')}${t('Uhrzeit')}</dt><dd>${t('{time} Uhr', { time: `${tn.time} – ${hhmm(tn.end)}` })}</dd></div>
-            <div><dt>${icon('fi-rs-database')}${t('Server')}</dt><dd>${esc(t(tn.server || '–'))}</dd></div>
-            <div><dt>${icon('fi-rs-users-alt')}${t('Leitung')}</dt><dd>${hostHtml(tn, 'host--sm')}</dd></div>
-            ${tn.helpers && tn.helpers.length ? `<div><dt>${icon('fi-rs-users')}${t('Supervisors')}</dt><dd>${tn.helpers.map(esc).join(', ')}</dd></div>` : ''}
-            ${tn.remote ? `<div><dt>${icon('fi-ss-user')}${t('Plätze')}</dt><dd>${t('max. {n}', { n: tn.slots })}</dd></div>` : ''}
+            <div><dt>${icon('ph-calendar-blank')}${t('Datum')}</dt><dd>${dayName(tn.day, { long: true })}</dd></div>
+            <div><dt>${icon('ph-clock')}${t('Uhrzeit')}</dt><dd>${t('{time} Uhr', { time: `${tn.time} – ${hhmm(tn.end)}` })}</dd></div>
+            <div><dt>${icon('ph-hard-drives')}${t('Server')}</dt><dd>${esc(t(tn.server || '–'))}</dd></div>
+            <div><dt>${icon('ph-users-three')}${t('Leitung')}</dt><dd>${hostHtml(tn, 'host--sm')}</dd></div>
+            ${tn.helpers && tn.helpers.length ? `<div><dt>${icon('ph-users')}${t('Supervisors')}</dt><dd>${tn.helpers.map(esc).join(', ')}</dd></div>` : ''}
+            ${tn.remote ? `<div><dt>${icon('phf-user')}${t('Plätze')}</dt><dd>${t('max. {n}', { n: tn.slots })}</dd></div>` : ''}
           </dl>
           ${tn.remote ? '' : `<div class="occ">
             <div class="occ__row"><span class="status status--${st.level}">${st.text}</span><b>${t('{a}/{b} Plätze', { a: tn.taken, b: tn.slots })}</b></div>
             <div class="bar bar--${st.level}"><span style="width:${(tn.taken / tn.slots) * 100}%"></span></div>
           </div>`}
-          ${locked ? `<div class="lock">${icon('fi-rs-lock')}<span>${t('Für dieses Training brauchst du mindestens den Rang {rank}. Dein Rang: {mine}.', { rank: esc(tn.req), mine: esc(state.rank) })}</span></div>` : ''}
+          ${locked ? `<div class="lock">${icon('ph-lock')}<span>${t('Für dieses Training brauchst du mindestens den Rang {rank}. Dein Rang: {mine}.', { rank: esc(tn.req), mine: esc(state.rank) })}</span></div>` : ''}
           ${action}
-          <button class="btn btn--remind btn--lg btn--block" type="button" data-remind="${tn.id}" aria-pressed="${isReminded(tn)}">${icon(isReminded(tn) ? 'fi-ss-bell-ring' : 'fi-rs-bell')}${isReminded(tn) ? t('Benachrichtigung an') : t('Benachrichtigen, wenn der Server öffnet')}</button>
+          <button class="btn btn--remind btn--lg btn--block" type="button" data-remind="${tn.id}" aria-pressed="${isReminded(tn)}">${icon(isReminded(tn) ? 'phf-bell-ringing' : 'ph-bell')}${isReminded(tn) ? t('Benachrichtigung an') : t('Benachrichtigen, wenn der Server öffnet')}</button>
           ${hint ? `<p class="sheet-note join-hint">${hint}</p>` : ''}
-          ${tn.remote && isMine(tn.hostId) ? `<button class="btn btn--danger btn--lg btn--block" type="button" data-training-del="${esc(tn.id)}">${icon('fi-rs-trash')}${t('Training löschen')}</button>` : ''}
+          ${tn.remote && isMine(tn.hostId) ? `<button class="btn btn--danger btn--lg btn--block" type="button" data-training-del="${esc(tn.id)}">${icon('ph-trash')}${t('Training löschen')}</button>` : ''}
         </div>`;
       },
     },
@@ -5940,22 +5957,22 @@
     const pip = typeof document !== 'undefined' && document.pictureInPictureEnabled;
     return `<div class="vp ${cls}" data-vp tabindex="0" aria-label="${esc(t('Videoplayer'))}">
       <video class="vp__video" src="${esc(src)}"${poster ? ` poster="${esc(poster)}"` : ''} playsinline preload="metadata"></video>
-      <button class="vp__big" type="button" data-vp-play aria-label="${esc(t('Abspielen'))}"><span>${icon('fi-ss-play')}</span></button>
+      <button class="vp__big" type="button" data-vp-play aria-label="${esc(t('Abspielen'))}"><span>${icon('phf-play')}</span></button>
       <span class="vp__spin" aria-hidden="true"></span>
       <div class="vp__bar">
         <div class="vp__track" data-vp-seek role="slider" tabindex="0" aria-label="${esc(t('Position im Video'))}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <i class="vp__buf"></i><i class="vp__fill"></i><i class="vp__knob"></i><span class="vp__tip" data-vp-tip>0:00</span>
         </div>
         <div class="vp__row">
-          <button class="vp__btn vp__btn--play" type="button" data-vp-play aria-label="${esc(t('Abspielen'))}">${icon('fi-ss-play')}</button>
-          <button class="vp__btn" type="button" data-vp-skip="-10" aria-label="${esc(t('10 Sekunden zurück'))}">${icon('fi-rs-rewind')}</button>
-          <button class="vp__btn" type="button" data-vp-skip="10" aria-label="${esc(t('10 Sekunden vor'))}">${icon('fi-rs-forward')}</button>
+          <button class="vp__btn vp__btn--play" type="button" data-vp-play aria-label="${esc(t('Abspielen'))}">${icon('phf-play')}</button>
+          <button class="vp__btn" type="button" data-vp-skip="-10" aria-label="${esc(t('10 Sekunden zurück'))}">${icon('ph-rewind')}</button>
+          <button class="vp__btn" type="button" data-vp-skip="10" aria-label="${esc(t('10 Sekunden vor'))}">${icon('ph-fast-forward')}</button>
           <span class="vp__time"><b data-vp-cur>0:00</b><span>/</span><span data-vp-dur>0:00</span></span>
           <span class="vp__gap"></span>
-          <button class="vp__btn" type="button" data-vp-mute aria-label="${esc(t('Ton aus'))}">${icon('fi-rs-volume')}</button>
+          <button class="vp__btn" type="button" data-vp-mute aria-label="${esc(t('Ton aus'))}">${icon('ph-speaker-high')}</button>
           <button class="vp__btn vp__btn--text" type="button" data-vp-speed aria-label="${esc(t('Tempo'))}">1×</button>
-          ${pip ? `<button class="vp__btn vp__btn--pip" type="button" data-vp-pip aria-label="${esc(t('Bild im Bild'))}">${icon('fi-rs-picture')}</button>` : ''}
-          <button class="vp__btn" type="button" data-vp-full aria-label="${esc(t('Vollbild'))}">${icon('fi-rs-expand')}</button>
+          ${pip ? `<button class="vp__btn vp__btn--pip" type="button" data-vp-pip aria-label="${esc(t('Bild im Bild'))}">${icon('ph-image')}</button>` : ''}
+          <button class="vp__btn" type="button" data-vp-full aria-label="${esc(t('Vollbild'))}">${icon('ph-corners-out')}</button>
         </div>
       </div>
     </div>`;
@@ -5988,10 +6005,10 @@
     box.classList.toggle('is-playing', playing);
     box.classList.toggle('is-started', playing || v.currentTime > 0);
     $$('[data-vp-play]', box).forEach((b) => { b.setAttribute('aria-label', playing ? t('Pause') : t('Abspielen')); });
-    $('.vp__btn--play', box).innerHTML = icon(playing ? 'fi-ss-pause' : 'fi-ss-play');
-    $('.vp__big span', box).innerHTML = icon(v.ended ? 'fi-rs-rotate-right' : 'fi-ss-play');
+    $('.vp__btn--play', box).innerHTML = icon(playing ? 'phf-pause' : 'phf-play');
+    $('.vp__big span', box).innerHTML = icon(v.ended ? 'ph-arrow-clockwise' : 'phf-play');
     const mute = $('[data-vp-mute]', box);
-    mute.innerHTML = icon(v.muted || !v.volume ? 'fi-rs-volume-mute' : 'fi-rs-volume');
+    mute.innerHTML = icon(v.muted || !v.volume ? 'ph-speaker-slash' : 'ph-speaker-high');
     mute.setAttribute('aria-label', v.muted ? t('Ton an') : t('Ton aus'));
     vpWake(box);
   }
@@ -6097,7 +6114,7 @@
         const on = document.fullscreenElement === box;
         box.classList.toggle('is-full', on);
         const b = $('[data-vp-full]', box);
-        if (b) { b.innerHTML = icon(on ? 'fi-rs-compress' : 'fi-rs-expand'); b.setAttribute('aria-label', on ? t('Vollbild beenden') : t('Vollbild')); }
+        if (b) { b.innerHTML = icon(on ? 'ph-corners-in' : 'ph-corners-out'); b.setAttribute('aria-label', on ? t('Vollbild beenden') : t('Vollbild')); }
       });
     });
   }
@@ -6108,14 +6125,14 @@
     if (yt) {
       // Erst nach dem Antippen laden (Datenschutz): Vorschaubild mit Play-Knopf
       return `<div class="detail__media detail__media--video"><button class="video-start" type="button" data-youtube="${yt}" aria-label="${esc(t('Video abspielen'))}">
-          <img src="https://i.ytimg.com/vi/${yt}/hqdefault.jpg" alt="" referrerpolicy="no-referrer"><span class="video-start__btn">${icon('fi-ss-play')}</span></button></div>`;
+          <img src="https://i.ytimg.com/vi/${yt}/hqdefault.jpg" alt="" referrerpolicy="no-referrer"><span class="video-start__btn">${icon('phf-play')}</span></button></div>`;
     }
     return `<div class="detail__media detail__media--video detail__media--vp">${videoPlayer(n.video, { poster: n.poster || (n.img ? `assets/img/${n.img}` : '') })}</div>`;
   }
   // Wechsel zwischen Zug und Bahnhof im offenen Dialog: vorige Ansicht merken (Zurück-Knopf)
   let modalStack = [];
   const modalBody = (name, arg) => (modalStack.length
-    ? `<button class="modal-back" type="button" data-modal-back>${icon('fi-rs-arrow-left')}${esc(t('Zurück zu {name}', { name: modalTitle(modalStack[modalStack.length - 1]) }))}</button>` : '') + VIEWS[name].render(arg);
+    ? `<button class="modal-back" type="button" data-modal-back>${icon('ph-arrow-left')}${esc(t('Zurück zu {name}', { name: modalTitle(modalStack[modalStack.length - 1]) }))}</button>` : '') + VIEWS[name].render(arg);
   const modalTitle = (v) => { const title = VIEWS[v.name].title; return typeof title === 'function' ? title(v.arg) : title; };
   let modalCloseTimer = null;
   function openModal(name, arg, { stack = false } = {}) {
@@ -6404,12 +6421,12 @@
     else if (denied) note = t('Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Einstellungen deines Geräts bzw. Browsers.');
     else if (on && !sessionToken()) note = t('Für Chat und Bewerbungen melde dich mit Roblox an – Trainings-Erinnerungen gehen auch so.');
     box.innerHTML = `${row('data-notify-set="on"', t('Benachrichtigungen erlauben'), t('Echte Benachrichtigungen auf diesem Gerät – auch wenn die App geschlossen ist.'), on, !pushSupported() || denied)}
-      ${note ? `<p class="toggle__note notify-note">${icon('fi-rs-info')}<span>${note}</span></p>` : ''}
+      ${note ? `<p class="toggle__note notify-note">${icon('ph-info')}<span>${note}</span></p>` : ''}
       <div class="notify-kinds${on ? '' : ' is-off'}">
         ${NOTIFY_KINDS.filter(([k]) => k !== 'team' || mayTrain()).map(([k, title, text]) => row(`data-notify-kind="${k}"`, t(title), t(text), on && ns.prefs[k] !== false, !on)).join('')}
         ${row('data-bell', t('Trainings'), t('Wenn der Server eines Trainings für deinen nächsten Rang öffnet. Einzelne Trainings stellst du über die Glocke ein.'), on && state.bell, !on)}
       </div>
-      ${on ? `<button class="btn btn--soft btn--block" type="button" data-notify-test>${icon('fi-rs-bell')}${t('Probe-Benachrichtigung senden')}</button>` : ''}`;
+      ${on ? `<button class="btn btn--soft btn--block" type="button" data-notify-test>${icon('ph-bell')}${t('Probe-Benachrichtigung senden')}</button>` : ''}`;
   }
 
   // ---------- Tooltip & Toast ----------
@@ -6439,7 +6456,7 @@
   let toastOutTimer;
   function toast(msg) {
     const el = $('[data-toast]');
-    el.innerHTML = `${icon('fi-rs-check')}<span>${esc(msg)}</span>`;
+    el.innerHTML = `${icon('ph-check')}<span>${esc(msg)}</span>`;
     el.hidden = false;
     el.classList.remove('is-out');
     el.style.animation = 'none';
@@ -6476,7 +6493,7 @@
           <input id="inv-code" name="code" value="${esc(invite.code || '')}" placeholder="${esc(`${location.origin}${location.pathname}#/einladung/aB3dE5fG`)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
         ${pv ? `<div class="inv-preview">${groupBadge(pv, 'inv-preview__img')}<span><b>${esc(pv.name)}</b><small>${membersText(pv.members)}${pv.desc ? ` · ${esc(pv.desc)}` : ''}</small></span></div>` : ''}
         <button class="btn btn--primary btn--lg btn--block" type="submit"${invite.busy ? ' disabled' : ''}>${pv ? (pv.joined ? t('Öffnen') : t('Beitreten')) : t('Weiter')}</button>
-        <a class="back-link" href="#/chat/gruppen">${icon('fi-rs-globe')}${t('Oder öffentliche Server und Gruppen entdecken')}</a>
+        <a class="back-link" href="#/chat/gruppen">${icon('ph-globe')}${t('Oder öffentliche Server und Gruppen entdecken')}</a>
       </form>`}`;
   }
   async function joinSubmit(form) {
@@ -6552,10 +6569,10 @@
   }
   const navClose = () => navOpen(null);
   // Seiten im Menü: Gäste sehen die Webseite, angemeldet kommen Trainings und Spieler dazu
-  const NAV_GUEST = [['', 'Startseite', 'fi-rs-home'], ['netz', 'Netz', 'fi-rs-map'], ['server', 'Server', 'fi-rs-database'], ['news', 'Neuigkeiten', 'fi-rs-newspaper'],
-    ['karriere', 'Karriere', 'fi-rs-rocket-lunch'], ['entwickler', 'Team', 'fi-rs-users-alt'], ['faq', 'FAQ', 'fi-rs-interrogation']];
-  const NAV_AUTH = [['', 'Startseite', 'fi-rs-home'], ['netz', 'Netz', 'fi-rs-map'], ['server', 'Server', 'fi-rs-database'], ['trainings', 'Trainings', 'fi-rs-calendar'],
-    ['spieler', 'Spieler', 'fi-rs-train-side'], ['news', 'Neuigkeiten', 'fi-rs-newspaper'], ['karriere', 'Karriere', 'fi-rs-rocket-lunch'], ['entwickler', 'Team', 'fi-rs-users-alt'], ['faq', 'FAQ', 'fi-rs-interrogation']];
+  const NAV_GUEST = [['', 'Startseite', 'ph-house'], ['netz', 'Netz', 'ph-map-trifold'], ['server', 'Server', 'ph-hard-drives'], ['news', 'Neuigkeiten', 'ph-newspaper'],
+    ['karriere', 'Karriere', 'ph-rocket-launch'], ['entwickler', 'Team', 'ph-users-three'], ['faq', 'FAQ', 'ph-question']];
+  const NAV_AUTH = [['', 'Startseite', 'ph-house'], ['netz', 'Netz', 'ph-map-trifold'], ['server', 'Server', 'ph-hard-drives'], ['trainings', 'Trainings', 'ph-calendar-blank'],
+    ['spieler', 'Spieler', 'ph-train'], ['news', 'Neuigkeiten', 'ph-newspaper'], ['karriere', 'Karriere', 'ph-rocket-launch'], ['entwickler', 'Team', 'ph-users-three'], ['faq', 'FAQ', 'ph-question']];
   function navMenuHtml() {
     const list = state.profile ? NAV_AUTH : NAV_GUEST;
     const cur = (id) => state.page === (id || 'home');
@@ -6564,7 +6581,7 @@
         ${list.map(([id, label, ic]) => `<a class="nav__item" href="#/${id}" data-nav="${id || 'home'}"${cur(id) ? ' aria-current="page"' : ''}>${icon(ic)}<span>${esc(t(label))}</span></a>`).join('')}
       </nav>
       <hr class="nav__sep">
-      <button class="nav__item" type="button" data-lang-set="${other[0]}" lang="${other[0]}">${icon('fi-rs-globe')}<span>${other[1]}</span></button>`;
+      <button class="nav__item" type="button" data-lang-set="${other[0]}" lang="${other[0]}">${icon('ph-globe')}<span>${other[1]}</span></button>`;
   }
   function navAccountHtml() {
     const p = state.profile;
@@ -6572,12 +6589,12 @@
     const r = rankOf(state.rank);
     return `<div class="nav__acc-head">${ringHTML(p, r, 'avatar-ring--lg')}<span><b>${esc(p.displayName || p.username)}</b><small>@${esc(p.username)}</small></span>${rankPill(r)}</div>
       <nav class="nav__menu-list" aria-label="${esc(t('Konto'))}">
-        ${rankIdx(state.rank) >= rankIdx('Junior Supervisor') && meSub() ? `<a class="nav__item" href="#/entwickler/${encodeURIComponent(meSub())}">${icon('fi-rs-id-badge')}<span>${t('Mein Steckbrief')}</span></a>` : ''}
-        <a class="nav__item" href="#/einstellungen"${state.page === 'einstellungen' ? ' aria-current="page"' : ''}>${icon('fi-rs-settings')}<span>${t('Einstellungen')}</span></a>
-        <a class="nav__item" href="#/statistiken"${state.page === 'statistiken' ? ' aria-current="page"' : ''}>${icon('fi-rs-chart-line-up')}<span>${t('Statistiken')}</span></a>
+        ${rankIdx(state.rank) >= rankIdx('Junior Supervisor') && meSub() ? `<a class="nav__item" href="#/entwickler/${encodeURIComponent(meSub())}">${icon('ph-identification-badge')}<span>${t('Mein Steckbrief')}</span></a>` : ''}
+        <a class="nav__item" href="#/einstellungen"${state.page === 'einstellungen' ? ' aria-current="page"' : ''}>${icon('ph-gear-six')}<span>${t('Einstellungen')}</span></a>
+        <a class="nav__item" href="#/statistiken"${state.page === 'statistiken' ? ' aria-current="page"' : ''}>${icon('ph-chart-line-up')}<span>${t('Statistiken')}</span></a>
       </nav>
       <hr class="nav__sep">
-      <button class="nav__item nav__item--out" type="button" data-disconnect>${icon('fi-rs-sign-out-alt')}<span>${p.oauth ? t('Abmelden') : t('Trennen')}</span></button>`;
+      <button class="nav__item nav__item--out" type="button" data-disconnect>${icon('ph-sign-out')}<span>${p.oauth ? t('Abmelden') : t('Trennen')}</span></button>`;
   }
   // Menü-Inhalt neu zeichnen, wenn es offen ist (Seitenwechsel, Anmeldung, Sprache)
   function renderNavLinks() {
@@ -6628,19 +6645,41 @@
     'Echte Bahnhöfe, echte Linien, echter Fahrplan – und eine Community, die pünktlich sein will.',
     'Jeder Halt, jedes Signal und jede Ansage ist mit Liebe zum Detail gebaut. Und das Netz wächst weiter.',
   ];
-  const quote = { i: 0, timer: null, paused: false };
+  // Sätze: alle 7 Sekunden der nächste. Der Knopf in der Mitte ist ein grauer Kreis, um den sich ein roter Ring
+  // füllt – so sieht man, wie lange es noch bis zum nächsten Satz dauert. Pause hält den Ring an.
+  const QUOTE_MS = 7000;
+  const quote = { i: 0, timer: null, paused: false, left: QUOTE_MS, started: 0 };
   function showQuote(i, dir = 1) {
     const stage = $('[data-quote-stage]');
     if (!stage) return;
     quote.i = (i + QUOTES.length) % QUOTES.length;
-    stage.innerHTML = `<blockquote class="quotes__text" style="--dir:${dir}">${esc(t(QUOTES[quote.i]))}<span class="quotes__mark" aria-hidden="true">”</span></blockquote>`;
+    stage.innerHTML = `<blockquote class="quotes__text" style="--dir:${dir}"><span class="quotes__mark" aria-hidden="true">„</span>${esc(t(QUOTES[quote.i]))}</blockquote>`;
     const c = $('[data-quote-count]');
     if (c) c.innerHTML = `<b>${pad(quote.i + 1)}</b> / ${pad(QUOTES.length)}`;
   }
-  function quoteAuto() {
-    clearInterval(quote.timer);
+  function quoteRing(restart) {
+    const ring = $('[data-quote-play]');
+    if (!ring) return;
+    ring.style.setProperty('--qdur', `${QUOTE_MS}ms`);
+    if (restart) { ring.classList.remove('is-running'); void ring.offsetWidth; }
+    ring.classList.add('is-running');
+    ring.classList.toggle('is-paused', quote.paused || reducedMotion());
+  }
+  function quoteAuto(restart = true) {
+    clearTimeout(quote.timer);
+    if (restart) quote.left = QUOTE_MS;
+    quoteRing(restart);
     if (quote.paused || reducedMotion()) return;
-    quote.timer = setInterval(() => { if (state.page === 'home' && document.visibilityState === 'visible') showQuote(quote.i + 1); }, 7000);
+    quote.started = Date.now();
+    quote.timer = setTimeout(() => {
+      if (state.page === 'home' && document.visibilityState === 'visible') showQuote(quote.i + 1);
+      quoteAuto(true);
+    }, quote.left);
+  }
+  function quotePause(on) {
+    if (on && !quote.paused) quote.left = Math.max(300, quote.left - (Date.now() - quote.started));
+    quote.paused = on;
+    quoteAuto(false);
   }
 
   // Titel: Schiene mit Halten, der nächste Halt wechselt
@@ -6649,7 +6688,7 @@
   function heroLine() {
     const box = $('[data-hero-line]');
     if (!box) return;
-    box.innerHTML = `<span class="hero__rule"></span>${HERO_STOPS.map((s, i) => `<i class="hero__stop${i === hero.i ? ' is-next' : i < hero.i ? ' is-past' : ''}" style="--x:${(i / (HERO_STOPS.length - 1)) * 100}%"></i>`).join('')}`;
+    box.innerHTML = `<span class="hero__rule"></span>${HERO_STOPS.map((s, i) => `<span class="hero__stop${i === hero.i ? ' is-next' : i < hero.i ? ' is-past' : ''}" style="--x:${(i / (HERO_STOPS.length - 1)) * 100}%"><i></i><small>${esc(s)}</small></span>`).join('')}`;
     const name = $('[data-hero-stop]');
     if (name) name.textContent = HERO_STOPS[hero.i];
     clearInterval(hero.timer);
@@ -6679,17 +6718,17 @@
   function newsTile(n, kind = 'row') {
     if (kind === 'feature') {
       return `<a class="nr-feature" href="${newsHref(n)}">
-        <img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="nr-play">${icon('fi-ss-play')}</span>` : ''}
+        <img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="nr-play">${icon('phf-play')}</span>` : ''}
         <span class="nr-feature__body"><span class="nr-meta">${chipOf(n)}<span>${newsDate(n)}</span><span>${readText(n)}</span></span>
           <b class="nr-feature__title">${esc(t(n.title))}</b><span class="nr-feature__text">${esc(excerpt(t(n.text), 110))}</span></span>
       </a>`;
     }
     if (kind === 'card') {
       return `<a class="nr-card" href="${newsHref(n)}">
-        <span class="nr-card__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="nr-play">${icon('fi-ss-play')}</span>` : ''}</span>
+        <span class="nr-card__img"><img src="${esc(newsImage(n))}" alt="" loading="lazy" referrerpolicy="no-referrer">${n.video ? `<span class="nr-play">${icon('phf-play')}</span>` : ''}</span>
         <span class="nr-meta">${chipOf(n)}<span>${newsDate(n)}</span></span>
         <b class="nr-card__title">${esc(t(n.title))}</b><span class="nr-card__text">${esc(excerpt(t(n.text)))}</span>
-        <span class="nr-card__read">${icon('fi-rs-clock-three')}${readText(n)}</span>
+        <span class="nr-card__read">${icon('ph-clock')}${readText(n)}</span>
       </a>`;
     }
     return `<a class="nr-row" href="${newsHref(n)}"><span class="nr-meta">${chipOf(n)}<span>${newsDate(n)}</span><span>${readText(n)}</span></span>
@@ -6700,7 +6739,7 @@
     if (!box) return;
     const list = newsItems();
     if (!list.length) { box.innerHTML = `<p class="empty">${t('Hier gibt es noch keine Neuigkeiten.')}</p>`; return; }
-    box.innerHTML = `${newsTile(list[0], 'feature')}<div class="nr-side">${list.slice(1, 4).map((n) => newsTile(n)).join('')}</div>`;
+    box.innerHTML = `<div class="nr-side">${list.slice(1, 4).map((n) => newsTile(n)).join('')}</div>${newsTile(list[0], 'feature')}`;
   }
 
   // Zahlen wie auf einer Anzeigetafel: jede Ziffer rollt an ihren Platz
@@ -6713,11 +6752,11 @@
     const box = $('[data-home-numbers]');
     if (!box) return;
     const s = D.stats;
-    const items = [[s.groupMembers, t('Gruppenmitglieder')], [s.visits, t('Besuche')], [Math.max(state.online || 0, (live.data && live.data.online) || 0), t('Gerade im Spiel')]];
+    const items = [[s.groupMembers, t('Gruppenmitglieder'), 'ph-users-three'], [s.visits, t('Besuche'), 'ph-door-open'], [Math.max(state.online || 0, (live.data && live.data.online) || 0), t('Gerade im Spiel'), 'ph-game-controller']];
     const key = items.map((x) => Math.round(x[0] || 0)).join('|');
     if (box.dataset.key === key) return;
     box.dataset.key = key;
-    box.innerHTML = items.map(([n, label]) => `<div class="numbers__item"><b class="numbers__value" aria-label="${esc(fmt(Math.round(n || 0)))}">${rollDigits(n)}</b><span>${label}</span></div>`).join('');
+    box.innerHTML = items.map(([n, label, ic]) => `<div class="numbers__item">${icon(ic, 'numbers__ic')}<b class="numbers__value" aria-label="${esc(fmt(Math.round(n || 0)))}">${rollDigits(n)}</b><span>${label}</span></div>`).join('');
     // Erst rollen, wenn die Zahlen zu sehen sind
     const go = () => box.classList.add('is-rolled');
     box.classList.remove('is-rolled');
@@ -6748,6 +6787,11 @@
   function renderHome() {
     heroStars();
     heroLine();
+    const marks = $('[data-open-marks]');
+    if (marks && !marks.childElementCount) {
+      marks.innerHTML = ['R004', 'R001', 'R005'].map((no) => D.routes.find((r) => r.no === no)).filter(Boolean)
+        .map((r) => `<a class="open-net__mark" href="#/netz/${esc(r.no)}">${lineMark(r.cat, r.line)}<span>${esc(r.from)} – ${esc(r.to)}</span></a>`).join('');
+    }
     if (!$('[data-quote-stage] blockquote')) showQuote(quote.i);
     quoteAuto();
     renderHomeNews();
@@ -6756,30 +6800,115 @@
   }
 
   // Netz: Kennzahlen, Linien als Bänder mit allen Halten, Strecken als Karten
+  // ---------- Netz: Linien als Karten, jede Strecke mit eigener Seite (#/netz/R001) ----------
+  // Zeichen der Linie: S-Bahn mit rundem S-Logo (weißer Rand) in Grün, Regionalverkehr dunkelgrau mit Regionalzug,
+  // Fernverkehr schwarz mit Fernzug; daneben ein abgerundeter Kasten in derselben Farbe mit der Linie.
+  const lineKind = (cat) => (cat === 's' ? 's' : ['ice', 'ic', 'ec'].includes(cat) ? 'fv' : 'rv');
+  const KIND_NAME = { s: 'S-Bahn', rv: 'Regionalverkehr', fv: 'Fernverkehr' };
+  function lineMark(cat, name, cls = '') {
+    const k = lineKind(cat);
+    const logo = k === 's' ? '<b class="lmark__s">S</b>' : icon(k === 'fv' ? 'ph-train' : 'ph-train-regional');
+    return `<span class="lmark lmark--${k} ${cls}" title="${esc(t(KIND_NAME[k]))}"><span class="lmark__logo" aria-hidden="true">${logo}</span><span class="lmark__pill">${esc(String(name).replace(/\s+/g, ''))}</span></span>`;
+  }
+  const routeLine = (r) => (r.lineId && D.lines[r.lineId]) || Object.values(D.lines).find((L) => L.name === r.line) || null;
+  const sameStop = (a, b) => a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `);
+  // Verlauf einer Strecke aus dem Fahrplan der Linie: Halte von Start bis Ziel mit Minuten ab Start (auch rückwärts)
+  function routeCourse(r) {
+    const L = routeLine(r);
+    if (!L) return [];
+    const i = L.stops.findIndex(([n]) => sameStop(n, r.from));
+    const j = L.stops.findIndex(([n]) => sameStop(n, r.to));
+    if (i < 0 || j < 0) return L.stops.map(([n, m]) => ({ name: n, min: m }));
+    const seg = i <= j ? L.stops.slice(i, j + 1) : L.stops.slice(j, i + 1).reverse();
+    const m0 = seg[0][1];
+    return seg.map(([n, m]) => ({ name: n, min: Math.abs(m - m0) }));
+  }
+  const durText = (min) => (min >= 60 ? (min % 60 ? t('{h} h {m} min', { h: Math.floor(min / 60), m: min % 60 }) : t('{h} h', { h: min / 60 })) : t('{m} min', { m: min }));
+  function routeVia(course) {
+    if (course.length < 3) return '';
+    const end = course[course.length - 1].min;
+    const mid = course.slice(1, -1).reduce((best, x) => (Math.abs(x.min - end / 2) < Math.abs(best.min - end / 2) ? x : best));
+    return mid.name;
+  }
+  function routeCard(r) {
+    const course = routeCourse(r);
+    const end = course.length ? course[course.length - 1].min : 0;
+    const via = routeVia(course);
+    return `<a class="ln-card" href="#/netz/${esc(r.no)}" data-kind="${lineKind(r.cat)}">
+      <span class="ln-card__head"><b class="ln-card__no">${esc(r.no)}</b>${lineMark(r.cat, r.line)}</span>
+      <span class="ln-card__ends">
+        <span><small>${t('Von')}</small><b>${esc(r.from)}</b></span>
+        <span class="ln-card__to"><small>${t('Nach')}</small><b>${esc(r.to)}</b></span>
+      </span>
+      ${via ? `<span class="ln-card__via"><small>${t('Via')}</small><span>${esc(via)}</span></span>` : ''}
+      <span class="ln-card__foot"><span class="ln-card__dur">${icon('ph-clock')}${durText(end)}</span><span class="ln-card__km">${fmt(r.km)} km</span><span class="ln-card__go">${t('Details ansehen')}</span></span>
+    </a>`;
+  }
+  const NET_FILTERS = [['all', 'Alle'], ['s', 'S-Bahn'], ['rv', 'Regionalverkehr'], ['fv', 'Fernverkehr']];
   function renderNet() {
+    if (state.routeNo) { renderRoute(); return; }
     const lines = Object.values(D.lines);
     const stations = new Set(lines.flatMap((L) => L.stops.map(([n]) => n)));
     const km = D.routes.reduce((n, r) => n + (r.km || 0), 0);
     const stats = $('[data-net-stats]');
     if (stats) {
       stats.innerHTML = [[D.routes.length, t('Strecken')], [lines.length, t('Linien')], [stations.size, t('Bahnhöfe')], [km, t('Kilometer Strecke')]]
-        .map(([n, label]) => `<div class="net-stat"><b>${fmt(n)}</b><span>${label}</span></div>`).join('');
+        .map(([n, label]) => `<div class="sv-stat"><b>${fmt(n)}</b><span>${label}</span></div>`).join('');
     }
-    const lb = $('[data-net-lines]');
-    if (lb) {
-      lb.innerHTML = lines.map((L) => `<article class="net-line">
-          <header><span class="line line--${L.cat}">${esc(L.name)}</span><b>${esc(L.stops[0][0])} – ${esc(L.stops[L.stops.length - 1][0])}</b><small>${esc(L.train)} · ${t('alle {n} Min.', { n: L.every })}</small></header>
-          <ol class="net-line__stops" style="--n:${L.stops.length}">${L.stops.map(([n, m]) => `<li><i></i><span>${esc(n)}</span><small>${m ? `+${m}′` : t('ab')}</small></li>`).join('')}</ol>
-        </article>`).join('');
+    const f = state.netFilter || 'all';
+    const fb = $('[data-net-filter]');
+    if (fb) fb.innerHTML = NET_FILTERS.map(([id, label]) => `<button class="sv-chip${f === id ? ' is-active' : ''}" type="button" data-net-filter-set="${id}">${t(label)}</button>`).join('');
+    const box = $('[data-net-routes]');
+    if (box) {
+      const list = D.routes.filter((r) => f === 'all' || lineKind(r.cat) === f);
+      box.innerHTML = list.map(routeCard).join('') || `<p class="sv-none">${t('Keine Strecke in dieser Auswahl.')}</p>`;
     }
-    const rb = $('[data-net-routes]');
-    if (rb) {
-      rb.innerHTML = D.routes.map((r) => `<article class="net-route">
-          <span class="net-route__img"><img src="assets/img/${r.img}" alt="" loading="lazy"><span class="line line--${r.cat}">${esc(r.line)}</span></span>
-          <span class="net-route__body"><small>${esc(r.no)} · ${esc(t(r.tag || ''))}</small><b>${esc(t(r.title))}</b>
-          <span>${esc(r.from)} → ${esc(r.to)}</span><em>${fmt(r.km)} km · ${t('{d} Std.', { d: r.dur })} · ${t('{n} Halte', { n: r.stops })}</em></span>
-        </article>`).join('');
-    }
+  }
+  // Eine Strecke: Kopf mit Routennummer und Linie, Daten, dann Hin- und Rückfahrt mit allen Halten, Minuten und Spawnpunkten
+  function renderRoute() {
+    const box = $('[data-route]');
+    if (!box) return;
+    const r = D.routes.find((x) => x.no === state.routeNo);
+    const back = `<a class="back-pill" href="#/netz">${icon('ph-arrow-left')}${t('Alle Linien')}</a>`;
+    if (!r) { box.innerHTML = `<div class="site-wrap rt-wrap">${back}<h1 class="mega">${t('Strecke nicht gefunden')}</h1></div>`; return; }
+    const L = routeLine(r);
+    const course = routeCourse(r);
+    const end = course.length ? course[course.length - 1].min : 0;
+    const spawns = new Map((r.spawns || []).map(([at, name]) => [at, name]));
+    const spawnAt = (n) => [...spawns].find(([at]) => sameStop(n, at));
+    const back2 = course.slice().reverse().map((x) => ({ name: x.name, min: end - x.min }));
+    const k = lineKind(r.cat);
+    const dir = (title, list) => `<section class="rt-dir">
+        <header class="rt-dir__head"><h2>${title}</h2><p>${esc(list[0].name)} ${icon('ph-arrow-right')} ${esc(list[list.length - 1].name)}</p></header>
+        <ol class="rt-stops">${list.map((x, i) => {
+          const sp = spawnAt(x.name);
+          const first = i === 0;
+          const last = i === list.length - 1;
+          return `<li class="${first ? 'is-start' : last ? 'is-end' : ''}${sp ? ' has-spawn' : ''}">
+            <span class="rt-stops__time">${first ? t('ab') : `+${x.min}`}<small>${first ? '0 min' : 'min'}</small></span>
+            <i class="rt-stops__dot" aria-hidden="true"></i>
+            <span class="rt-stops__body"><b>${esc(x.name)}</b>${first ? `<em class="rt-tag">${t('Start')}</em>` : last ? `<em class="rt-tag rt-tag--end">${t('Ziel')}</em>` : ''}
+              ${sp ? `<span class="rt-spawn">${icon('ph-warehouse')}<span>${t('Spawnpunkt')}: <b>${esc(sp[1])}</b></span></span>` : ''}</span>
+          </li>`;
+        }).join('')}</ol>
+      </section>`;
+    const fact = (label, value) => `<div class="sv-stat"><b>${value}</b><span>${label}</span></div>`;
+    box.innerHTML = `<header class="site-head lines-bg rt-hero">
+        <div class="site-wrap">
+          ${back}
+          <div class="rt-hero__top"><span class="rt-hero__no">${esc(r.no)}</span>${lineMark(r.cat, r.line, 'lmark--lg')}</div>
+          <h1 class="mega">${esc(t(r.title))}</h1>
+          <p class="site-head__lead">${t('{kind} von {from} nach {to}.', { kind: t(KIND_NAME[k]), from: `<b>${esc(r.from)}</b>`, to: `<b>${esc(r.to)}</b>` })}${L ? ` ${t('Gefahren wird mit dem {train}, alle {n} Minuten in jede Richtung.', { train: esc(L.train), n: L.every })}` : ''}</p>
+        </div>
+      </header>
+      <div class="site-wrap rt-body">
+        <div class="sv-stats sv-stats--4 rt-facts">
+          ${fact(t('Fahrzeit'), durText(end))}${fact(t('Länge'), `${fmt(r.km)} km`)}${fact(t('Halte'), fmt(course.length))}${fact(t('Takt'), L ? t('{n} min', { n: L.every }) : '–')}
+        </div>
+        <p class="rt-meta">${L ? `${icon('ph-train')}<span>${esc(L.train)}</span>` : ''}${r.tag ? `${icon('ph-tag')}<span>${esc(t(r.tag))}</span>` : ''}${spawns.size ? `${icon('ph-warehouse')}<span>${t('{n} Spawnpunkte', { n: spawns.size })}</span>` : ''}</p>
+        <div class="rt-dirs">${course.length ? dir(t('Hinfahrt'), course) + dir(t('Rückfahrt'), back2) : `<p class="sv-none">${t('Für diese Strecke gibt es noch keinen Fahrplan.')}</p>`}</div>
+        <p class="rt-note">${icon('ph-info')}<span>${t('Spawnpunkte sind Depots und Abstellgleise, an denen Züge für diese Strecke ins Spiel kommen. Die Minuten zählen ab der Abfahrt am Start.')}</span></p>
+      </div>`;
   }
 
   // Team: alle ab Supervisor aus der Roblox-Gruppe in drei Gruppen (Leitung, Manager, Aufsicht). Jede Karte: Bild auf
@@ -6807,7 +6936,7 @@
           <span class="team-card__img">${p.avatar ? `<img src="${esc(p.avatar)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : `<b>${esc(initials(p.displayName || p.username))}</b>`}</span>
           <b class="team-card__name">${esc(p.displayName || p.username)}</b>
           <span class="team-card__role">${esc(p.rank)}</span>
-          <span class="team-card__foot"><small>@${esc(p.username)}</small><span class="team-card__go" aria-hidden="true">${icon('fi-rs-arrow-up-right')}</span></span>
+          <span class="team-card__foot"><small>@${esc(p.username)}</small><span class="team-card__go" aria-hidden="true">${icon('ph-arrow-up-right')}</span></span>
         </a>`).join('')}</div>
       </section>`).join('');
   }
@@ -6848,7 +6977,7 @@
     if (!box) return;
     const id = state.memberId;
     const r = team.members[id];
-    const back = `<a class="back-pill" href="#/entwickler">${icon('fi-rs-arrow-left')}${t('Das Team')}</a>`;
+    const back = `<a class="back-pill" href="#/entwickler">${icon('ph-arrow-left')}${t('Das Team')}</a>`;
     if (!r) { loadMember(id); box.innerHTML = `<div class="site-wrap mb-wrap">${back}${loadingHtml()}</div>`; return; }
     if (r.error) { box.innerHTML = `<div class="site-wrap mb-wrap">${back}<h1 class="mega">${t('Nicht im Team')}</h1><p class="site-head__lead">${t('Diese Person gehört nicht (mehr) zum Team.')}</p></div>`; return; }
     const m = r.member;
@@ -6858,12 +6987,12 @@
     const p = r.profile || {};
     const fact = (ic, label, value) => `<div class="mb-fact">${icon(ic)}<span><small>${label}</small><b>${value}</b></span></div>`;
     const facts = [
-      fact('fi-rs-id-badge', t('Rang'), esc(m.rank)),
-      fact('fi-rs-calendar', t('Im Rang seit'), b.rankSince ? dateLong(b.rankSince) : t('noch nicht bekannt')),
-      fact('fi-rs-user-add', t('Roblox-Konto seit'), dateLong(b.robloxJoined)),
-      fact('fi-rs-gamepad', t('Zum ersten Mal gespielt'), dateLong(b.firstPlayed)),
-      ...(b.lastPlayed ? [fact('fi-rs-time-fast', t('Zuletzt gespielt'), agoText(b.lastPlayed))] : []),
-      ...(b.appSince ? [fact('fi-rs-sign-in-alt', t('In der App seit'), dateLong(b.appSince))] : []),
+      fact('ph-identification-badge', t('Rang'), esc(m.rank)),
+      fact('ph-calendar-blank', t('Im Rang seit'), b.rankSince ? dateLong(b.rankSince) : t('noch nicht bekannt')),
+      fact('ph-user-plus', t('Roblox-Konto seit'), dateLong(b.robloxJoined)),
+      fact('ph-game-controller', t('Zum ersten Mal gespielt'), dateLong(b.firstPlayed)),
+      ...(b.lastPlayed ? [fact('ph-timer', t('Zuletzt gespielt'), agoText(b.lastPlayed))] : []),
+      ...(b.appSince ? [fact('ph-sign-in', t('In der App seit'), dateLong(b.appSince))] : []),
     ].join('');
     const details = MEMBER_FIELDS.filter(([k]) => p[k]).map(([k, label]) => `<div><dt>${t(label)}</dt><dd>${esc(p[k])}</dd></div>`).join('');
     const st = r.stats;
@@ -6878,7 +7007,7 @@
         <div class="f"><label class="f__label" for="mb-about">${t('Über mich')}</label><textarea id="mb-about" name="about" maxlength="600" rows="4" placeholder="${esc(t('Wer bist du, was machst du im Team?'))}">${esc(p.about || '')}</textarea></div>
         <div class="mb-edit__grid">${MEMBER_FIELDS.map(([k, label, ph, max]) => `<div class="f"><label class="f__label" for="mb-${k}">${t(label)}</label><input id="mb-${k}" name="${k}" maxlength="${max}" value="${esc(p[k] || '')}" placeholder="${esc(t(ph))}"></div>`).join('')}</div>
         <p class="cr-side__small">${r.public ? t('Dein Profil ist öffentlich – alle sehen deinen Steckbrief.') : t('Dein Profil ist privat – andere sehen nur Rang und Beitrittsdaten.')} <a href="#/einstellungen">${t('In den Einstellungen ändern')}</a></p>
-        <div class="mb-edit__btns"><button class="site-btn site-btn--ghost" type="button" data-member-cancel>${t('Abbrechen')}</button><button class="site-btn site-btn--brand" type="submit">${icon('fi-rs-check')}${t('Speichern')}</button></div>
+        <div class="mb-edit__btns"><button class="site-btn site-btn--ghost" type="button" data-member-cancel>${t('Abbrechen')}</button><button class="site-btn site-btn--brand" type="submit">${icon('ph-check')}${t('Speichern')}</button></div>
       </form>` : '';
     box.innerHTML = `<header class="site-head lines-bg mb-hero">
         <div class="site-wrap">
@@ -6890,9 +7019,9 @@
               <h1 class="mega">${esc(name)}</h1>
               <p class="mb-head__user">@${esc(m.username)}${p.motto && !hidden ? ` · „${esc(p.motto)}“` : ''}</p>
               <div class="mb-head__btns">
-                ${r.own ? `<button class="site-btn site-btn--brand" type="button" data-member-edit>${icon('fi-rs-pencil')}${t('Steckbrief bearbeiten')}</button>`
-                  : `<a class="site-btn site-btn--brand" href="#/chat/an/${encodeURIComponent(m.userId)}">${icon('fi-rs-paper-plane')}${t('Anschreiben')}</a>`}
-                <a class="site-btn site-btn--ghost" href="https://www.roblox.com/users/${encodeURIComponent(m.userId)}/profile" target="_blank" rel="noopener">${t('Roblox-Profil')}${icon('fi-rs-arrow-up-right')}</a>
+                ${r.own ? `<button class="site-btn site-btn--brand" type="button" data-member-edit>${icon('ph-pencil-simple')}${t('Steckbrief bearbeiten')}</button>`
+                  : `<a class="site-btn site-btn--brand" href="#/chat/an/${encodeURIComponent(m.userId)}">${icon('ph-paper-plane-tilt')}${t('Anschreiben')}</a>`}
+                <a class="site-btn site-btn--ghost" href="https://www.roblox.com/users/${encodeURIComponent(m.userId)}/profile" target="_blank" rel="noopener">${t('Roblox-Profil')}${icon('ph-arrow-up-right')}</a>
               </div>
             </div>
           </div>
@@ -6901,9 +7030,9 @@
       <div class="site-wrap mb-body">
         ${edit}
         <section class="mb-sec"><h2>${t('Das Wichtigste')}</h2><div class="mb-facts">${facts}</div></section>
-        ${hidden ? `<p class="cr-note">${icon('fi-rs-lock')}<span>${t('{name} hat das Profil nicht öffentlich gemacht. Zu sehen sind nur Rang und Beitrittsdaten.', { name: esc(name) })}</span></p>` : ''}
+        ${hidden ? `<p class="cr-note">${icon('ph-lock')}<span>${t('{name} hat das Profil nicht öffentlich gemacht. Zu sehen sind nur Rang und Beitrittsdaten.', { name: esc(name) })}</span></p>` : ''}
         ${!hidden && (p.about || details) ? `<section class="mb-sec"><h2>${t('Steckbrief')}</h2>${p.about ? `<p class="mb-about">${esc(p.about)}</p>` : ''}${details ? `<dl class="cr-dl">${details}</dl>` : ''}</section>` : ''}
-        ${!hidden && !p.about && !details && r.own && !team.editing ? `<p class="cr-note">${icon('fi-rs-info')}<span>${t('Dein Steckbrief ist noch leer. Tippe auf „Steckbrief bearbeiten“.')}</span></p>` : ''}
+        ${!hidden && !p.about && !details && r.own && !team.editing ? `<p class="cr-note">${icon('ph-info')}<span>${t('Dein Steckbrief ist noch leer. Tippe auf „Steckbrief bearbeiten“.')}</span></p>` : ''}
         ${stats}
       </div>`;
   }
@@ -6927,35 +7056,35 @@
     const box = $('[data-article]');
     const n = newsItems().find((x) => String(x.id) === String(state.newsId));
     if (!n) {
-      box.innerHTML = `<div class="site-wrap article__head"><a class="back-pill" href="#/news">${icon('fi-rs-arrow-left')}${t('Alle Neuigkeiten')}</a><h1 class="article__title">${t('Diese Neuigkeit gibt es nicht mehr.')}</h1></div>`;
+      box.innerHTML = `<div class="site-wrap article__head"><a class="back-pill" href="#/news">${icon('ph-arrow-left')}${t('Alle Neuigkeiten')}</a><h1 class="article__title">${t('Diese Neuigkeit gibt es nicht mehr.')}</h1></div>`;
       return;
     }
     const url = `${location.origin}${location.pathname}${newsHref(n)}`;
     const share = [
-      ['x', 'X', `https://x.com/intent/post?text=${encodeURIComponent(t(n.title))}&url=${encodeURIComponent(url)}`, 'fi-brands-twitter-alt'],
-      ['whatsapp', 'WhatsApp', `https://wa.me/?text=${encodeURIComponent(`${t(n.title)} ${url}`)}`, 'fi-brands-whatsapp'],
-      ['reddit', 'Reddit', `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(t(n.title))}`, 'fi-brands-reddit'],
-      ['facebook', 'Facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, 'fi-brands-facebook'],
+      ['x', 'X', `https://x.com/intent/post?text=${encodeURIComponent(t(n.title))}&url=${encodeURIComponent(url)}`, 'si-x'],
+      ['whatsapp', 'WhatsApp', `https://wa.me/?text=${encodeURIComponent(`${t(n.title)} ${url}`)}`, 'si-whatsapp'],
+      ['reddit', 'Reddit', `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(t(n.title))}`, 'si-reddit'],
+      ['facebook', 'Facebook', `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, 'si-facebook'],
     ];
     const others = newsItems().filter((x) => x.id !== n.id).slice(0, 3);
     box.innerHTML = `<div class="site-wrap article__head">
-        <a class="back-pill" href="#/news">${icon('fi-rs-arrow-left')}${t('Alle Neuigkeiten')}</a>
+        <a class="back-pill" href="#/news">${icon('ph-arrow-left')}${t('Alle Neuigkeiten')}</a>
         ${chipOf(n)}
         <h1 class="article__title">${esc(t(n.title))}</h1>
-        <p class="article__meta"><span>${newsDate(n)}</span>${n.author ? `<span>${t('Von {name}', { name: esc(n.author) })}</span>` : ''}<span>${icon('fi-rs-clock-three')}${readText(n)}</span>${n.edited ? `<span>${t('bearbeitet')}</span>` : ''}</p>
+        <p class="article__meta"><span>${newsDate(n)}</span>${n.author ? `<span>${t('Von {name}', { name: esc(n.author) })}</span>` : ''}<span>${icon('ph-clock')}${readText(n)}</span>${n.edited ? `<span>${t('bearbeitet')}</span>` : ''}</p>
       </div>
       <div class="site-wrap article__media">${mediaHtml(n)}</div>
       <div class="site-wrap site-wrap--narrow article__body">
         ${String(t(n.text)).split(/\n{2,}/).map((para) => `<p>${esc(para)}</p>`).join('')}
         <div class="article__btns">${newsButtons(n)}</div>
-        ${n.remote && isMine(n.authorId) ? `<div class="article__own"><button class="btn btn--soft" type="button" data-news-edit="${esc(n.id)}">${icon('fi-rs-pencil')}${t('Bearbeiten')}</button><button class="btn btn--danger" type="button" data-news-del="${esc(n.id)}">${icon('fi-rs-trash')}${t('Löschen')}</button></div>` : ''}
+        ${n.remote && isMine(n.authorId) ? `<div class="article__own"><button class="btn btn--soft" type="button" data-news-edit="${esc(n.id)}">${icon('ph-pencil-simple')}${t('Bearbeiten')}</button><button class="btn btn--danger" type="button" data-news-del="${esc(n.id)}">${icon('ph-trash')}${t('Löschen')}</button></div>` : ''}
         <div class="article__share"><b>${t('Beitrag teilen')}</b><span>
           ${share.map(([k, name, href, ic]) => `<a class="share-btn" href="${esc(href)}" target="_blank" rel="noopener" aria-label="${esc(t('Auf {name} teilen', { name }))}" data-share="${k}">${icon(ic)}</a>`).join('')}
-          <button class="share-btn" type="button" data-copy="${esc(url)}" aria-label="${esc(t('Link kopieren'))}">${icon('fi-rs-link-alt')}</button>
-          ${navigator.share ? `<button class="share-btn" type="button" data-share-native="${esc(url)}" data-share-title="${esc(t(n.title))}" aria-label="${esc(t('Teilen'))}">${icon('fi-rs-share')}</button>` : ''}
+          <button class="share-btn" type="button" data-copy="${esc(url)}" aria-label="${esc(t('Link kopieren'))}">${icon('ph-link')}</button>
+          ${navigator.share ? `<button class="share-btn" type="button" data-share-native="${esc(url)}" data-share-title="${esc(t(n.title))}" aria-label="${esc(t('Teilen'))}">${icon('ph-share-network')}</button>` : ''}
         </span></div>
       </div>
-      ${others.length ? `<div class="site-wrap article__more"><div class="mega-head"><h2 class="display">${t('Weitere Neuigkeiten')}</h2><a class="more-link" href="#/news">${t('Alle Beiträge')}${icon('fi-rs-arrow-small-right')}</a></div>
+      ${others.length ? `<div class="site-wrap article__more"><div class="mega-head"><h2 class="display">${t('Weitere Neuigkeiten')}</h2><a class="more-link" href="#/news">${t('Alle Beiträge')}${icon('ph-arrow-right')}</a></div>
         <div class="nr-cards">${others.map((x) => newsTile(x, 'card')).join('')}</div></div>` : ''}`;
   }
 
@@ -7099,6 +7228,7 @@
     const reviewId = jobId === 'pruefen' ? (sub2 || null) : null;
     const serverId = page === 'server' && sub ? decodeURIComponent(sub) : null;
     const memberId = page === 'entwickler' && sub ? decodeURIComponent(sub) : null;
+    const routeNo = page === 'netz' && sub ? decodeURIComponent(sub).toUpperCase() : null;
     // Neuigkeit als eigene Seite: #/news/<id>
     const newsId = page === 'news' && sub ? decodeURIComponent(sub) : null;
     const chatSub = page === 'chat' ? (sub || '') : null;
@@ -7126,7 +7256,7 @@
     }
     if (chatView !== state.chatView || chatArg !== state.chatArg) { chat.side = false; chat.cmq = ''; chat.sideAuto = chatView === 'conv' && !kParam ? chatArg : null; }
     const settingsSub = page === 'einstellungen' ? (sub || '') : '';
-    const changed = page !== state.page || newsId !== state.newsId || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId || memberId !== state.memberId
+    const changed = page !== state.page || newsId !== state.newsId || jobId !== state.jobId || jobApply !== state.jobApply || serverId !== state.serverId || memberId !== state.memberId || routeNo !== state.routeNo
       || jobView !== state.jobView || reviewId !== state.reviewId || chatView !== state.chatView || chatArg !== state.chatArg
       || settingsSub !== (state.settingsSub || '');
     if (chatView && chatView !== state.chatView && ['mine', 'queue'].includes(chatView)) chat.at = 0;
@@ -7151,6 +7281,7 @@
     if (memberId !== state.memberId) team.editing = false;
     state.serverId = serverId;
     state.memberId = memberId;
+    state.routeNo = routeNo;
     state.newsId = newsId;
     state.chatView = chatView;
     state.chatArg = chatArg;
@@ -7161,7 +7292,7 @@
     }
     document.body.dataset.page = page;
     document.body.dataset.chatView = chatView || '';
-    const view = serverId ? 'server-detail' : newsId ? 'news-article' : memberId ? 'member' : page;
+    const view = serverId ? 'server-detail' : newsId ? 'news-article' : memberId ? 'member' : routeNo ? 'net-route' : page;
 
     $$('.page').forEach((p) => { p.hidden = p.dataset.page !== view; });
     // Inhalt der neuen Seite gleitet nacheinander herein
@@ -7214,10 +7345,17 @@
     const article = nextPage === 'news' && parts[1] ? decodeURIComponent(parts[1]) : null;
     const server = nextPage === 'server' && parts[1] ? decodeURIComponent(parts[1]) : null;
     const member = nextPage === 'entwickler' && parts[1] ? decodeURIComponent(parts[1]) : null;
+    const routeTo = nextPage === 'netz' && parts[1] ? decodeURIComponent(parts[1]).toUpperCase() : null;
     if (server && server !== state.serverId) {
       navClose();
       const x = serverLoader(server);
       playLoader(x.text, route, x.opts);
+      return;
+    }
+    if (routeTo && routeTo !== state.routeNo) {
+      navClose();
+      const r = D.routes.find((x) => x.no === routeTo);
+      playLoader(r ? `${r.no} · ${r.line}` : t('Unser Netz'), route, { sub: r ? `${r.from} → ${r.to}` : '' });
       return;
     }
     if (member && member !== state.memberId) {
@@ -7292,10 +7430,10 @@
       if ('quotePrev' in ds) { showQuote(quote.i - 1, -1); quoteAuto(); }
       else if ('quoteNext' in ds) { showQuote(quote.i + 1, 1); quoteAuto(); }
       else if ('quotePlay' in ds) {
-        quote.paused = !quote.paused;
-        el.innerHTML = icon(quote.paused ? 'fi-ss-play' : 'fi-ss-pause');
+        quotePause(!quote.paused);
+        const ic = $('.ic', el);
+        if (ic) ic.className = `i ${quote.paused ? 'phf-play' : 'phf-pause'} ic`;
         el.setAttribute('aria-label', quote.paused ? t('Abspielen') : t('Pause'));
-        quoteAuto();
       } else if (ds.shareNative) navigator.share({ title: ds.shareTitle, url: ds.shareNative }).catch(() => {});
     });
 
@@ -7307,8 +7445,8 @@
       const v = $('[data-hero-video]');
       if (!v) return;
       v.dataset.userPaused = v.paused ? '' : '1';
-      if (v.paused) { v.play().catch(() => {}); b.innerHTML = icon('fi-ss-pause'); b.setAttribute('aria-label', t('Video anhalten')); }
-      else { v.pause(); b.innerHTML = icon('fi-ss-play'); b.setAttribute('aria-label', t('Video abspielen')); }
+      if (v.paused) { v.play().catch(() => {}); b.innerHTML = icon('phf-pause'); b.setAttribute('aria-label', t('Video anhalten')); }
+      else { v.pause(); b.innerHTML = icon('phf-play'); b.setAttribute('aria-label', t('Video abspielen')); }
     });
 
     const topbar = $('[data-topbar]');
@@ -7547,6 +7685,13 @@
       const box = $('[data-pe-link]', e.target.closest('form'));
       if (box) box.hidden = e.target.value !== 'app';
     });
+    // Netz: Filter nach Art der Linie
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-net-filter-set]');
+      if (!b) return;
+      state.netFilter = b.dataset.netFilterSet;
+      renderNet();
+    });
     // Steckbrief bearbeiten
     document.addEventListener('click', (e) => {
       if (e.target.closest('[data-member-edit]')) { team.editing = true; renderMember(); const f = $('[data-member-form] textarea'); if (f) f.focus(); }
@@ -7666,7 +7811,7 @@
     });
     document.addEventListener('change', (e) => {
       const f = e.target.closest('form[data-ch-form]');
-      if (f && e.target.name === 'kind') { const ic = $('.ch-name .ic', f); if (ic) ic.outerHTML = icon(e.target.value === 'news' ? 'fi-rs-megaphone' : 'fi-rs-hastag'); }
+      if (f && e.target.name === 'kind') { const ic = $('.ch-name .ic', f); if (ic) ic.outerHTML = icon(e.target.value === 'news' ? 'ph-megaphone' : 'ph-hash'); }
     });
     document.addEventListener('submit', async (e) => {
       const chf = e.target.closest('form[data-ch-form]');

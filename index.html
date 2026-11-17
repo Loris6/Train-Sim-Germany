@@ -21,8 +21,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png" data-app-favicon>
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" data-app-icon>
   <link rel="preload" href="assets/fonts/rubik-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="assets/fonts/uicons-regular-straight.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="assets/css/uicons.css">
+  <link rel="preload" href="assets/fonts/phosphor-regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/icons.css">
   <link rel="stylesheet" href="assets/css/style.css">
   <link rel="stylesheet" href="assets/css/site.css">
   <script>
@@ -55,94 +55,130 @@
 
     <!-- ===================== START ===================== -->
     <section class="page page--site" data-page="home" aria-label="Start">
-      <!-- Titel: Video im Hintergrund, die Leiste liegt darüber -->
+      <!-- Titel: Video im Hintergrund, Text links unten, rechts ein Blick ins Spiel -->
       <div class="hero" data-tone="dark">
         <video class="hero__video" data-hero-video src="assets/video/rheinstrecke.mp4" poster="assets/video/rheinstrecke.jpg" autoplay muted loop playsinline preload="metadata" aria-hidden="true"></video>
         <div class="hero__shade" aria-hidden="true"></div>
-        <h1 class="hero__title">Deutschland<br>auf Schienen</h1>
-        <button class="hero__pause" type="button" data-hero-pause aria-label="Video anhalten"><i class="fi fi-ss-pause ic" aria-hidden="true"></i></button>
+        <div class="site-wrap hero__inner">
+          <div class="hero__text">
+            <p class="hero__kicker">Bahnsimulation auf Roblox</p>
+            <h1 class="hero__title">Deutschland<br>auf Schienen.</h1>
+            <p class="hero__lead">Echte Linien, echte Bahnhöfe, echter Fahrplan – fahr ICE, Regionalzug oder S-Bahn, stell im Stellwerk die Fahrstraßen oder fertige Züge ab.</p>
+            <div class="hero__btns">
+              <a class="site-btn site-btn--brand" data-link="play" href="#" target="_blank" rel="noopener"><i class="i phf-play ic" aria-hidden="true"></i>Auf Roblox spielen</a>
+              <a class="site-btn hero__ghost" href="#/netz">Unser Netz<i class="i ph-arrow-right ic" aria-hidden="true"></i></a>
+            </div>
+          </div>
+          <div class="hero__live" aria-label="Gerade im Spiel">
+            <span class="hero__live-dot" aria-hidden="true"></span>
+            <span><b data-bind="online">0</b><small>Spieler online</small></span>
+            <span><b data-bind="servers">0</b><small>Server</small></span>
+          </div>
+        </div>
+        <button class="hero__pause" type="button" data-hero-pause aria-label="Video anhalten"><i class="i phf-pause ic" aria-hidden="true"></i></button>
       </div>
 
-      <!-- Nächster Halt: Nachthimmel, Schiene mit Halten, Stadt -->
+      <!-- Nächster Halt: links die Strecke von oben nach unten, rechts der Halt groß -->
       <section class="nexthalt" data-tone="dark" aria-label="Nächster Halt">
         <div class="nexthalt__sky" aria-hidden="true" data-stars></div>
-        <div class="nexthalt__wires" aria-hidden="true"></div>
-        <div class="nexthalt__line" aria-hidden="true" data-hero-line></div>
-        <p class="nexthalt__next">Nächster Halt: <b data-hero-stop>Berlin Hbf</b></p>
-        <svg class="nexthalt__city" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
-          <path d="M0 220V150h40v-30h26v30h22V96h34v54h18v-40h30v40h24V70h12V50h8v20h12v80h30v-36h44v36h26V120h20v-26h30v26h18v56h40V84h22V60h16v24h22v92h28v-50h38v50h34V110h26v-18h18v18h26v66h30V72h40v104h22v-46h34v46h30V100h18V80h24v20h18v76h36v-64h44v64h26V90h30v-30h12v30h18v86h34v-58h40v58h28V112h24v-24h26v24h22v64h30V70h44v106h24v-40h36v40h30V96h20v-22h22v22h18v80h40V128h30v48h20V220z" fill="currentColor"/>
-        </svg>
-        <div class="nexthalt__lights" aria-hidden="true"><i style="left:12%;top:58%"></i><i style="left:21%;top:66%"></i><i style="left:37%;top:61%"></i><i style="left:48%;top:70%"></i><i style="left:63%;top:57%"></i><i style="left:71%;top:68%"></i><i style="left:84%;top:63%"></i><i class="is-signal" style="left:62%;top:46%"></i></div>
+        <div class="site-wrap nexthalt__board">
+          <div class="nexthalt__line" aria-hidden="true" data-hero-line></div>
+          <div class="nexthalt__text">
+            <p class="nexthalt__label"><i class="i ph-train ic" aria-hidden="true"></i>Nächster Halt</p>
+            <p class="nexthalt__next"><b data-hero-stop>Berlin Hbf</b></p>
+            <p class="nexthalt__sub">Zwischen Harz und Oder ist immer ein Zug unterwegs – und meistens ist er pünktlich.</p>
+          </div>
+        </div>
         <div class="nexthalt__rail" aria-hidden="true"></div>
       </section>
 
-      <!-- Sätze zum Durchblättern -->
+      <!-- Stimmen: links wer spricht und die Steuerung, rechts der Satz -->
       <section class="quotes" data-tone="dark" aria-label="Was dich erwartet" data-quotes>
-        <div class="site-wrap">
-          <div class="quotes__stage" data-quote-stage aria-live="polite"></div>
-          <div class="quotes__foot">
+        <div class="site-wrap quotes__grid">
+          <aside class="quotes__side">
+            <p class="quotes__label">Aus dem Team</p>
             <div class="quotes__by"><span class="quotes__ava"><img src="assets/img/logo-white.svg" alt="" width="28" height="14"></span><span><b>@TrainSimGermany</b><small>Das Team</small></span></div>
             <div class="quotes__ctl">
-              <button class="ctl-btn" type="button" data-quote-prev aria-label="Vorheriger Satz"><i class="fi fi-rs-angle-small-left ic" aria-hidden="true"></i></button>
-              <button class="ctl-btn ctl-btn--main" type="button" data-quote-play aria-label="Pause"><i class="fi fi-ss-pause ic" aria-hidden="true"></i></button>
-              <button class="ctl-btn" type="button" data-quote-next aria-label="Nächster Satz"><i class="fi fi-rs-angle-small-right ic" aria-hidden="true"></i></button>
+              <button class="ctl-btn" type="button" data-quote-prev aria-label="Vorheriger Satz"><i class="i ph-caret-left ic" aria-hidden="true"></i></button>
+              <button class="qring" type="button" data-quote-play aria-label="Pause">
+                <svg class="qring__svg" viewBox="0 0 56 56" aria-hidden="true"><circle class="qring__bg" cx="28" cy="28" r="25"/><circle class="qring__fg" cx="28" cy="28" r="25" pathLength="100"/></svg>
+                <i class="i phf-pause ic" aria-hidden="true"></i>
+              </button>
+              <button class="ctl-btn" type="button" data-quote-next aria-label="Nächster Satz"><i class="i ph-caret-right ic" aria-hidden="true"></i></button>
               <span class="quotes__count" data-quote-count><b>01</b> / 04</span>
             </div>
+          </aside>
+          <div class="quotes__stage" data-quote-stage aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- Das Netz ist offen: Text links, Bild mit Linien rechts -->
+      <section class="open-net" aria-labelledby="h-open">
+        <div class="site-wrap open-net__grid">
+          <div class="open-net__text">
+            <p class="cr-eyebrow">Jetzt einsteigen</p>
+            <h2 id="h-open" class="display">Das Netz ist offen.</h2>
+            <p>Fahr, entdecke und betreibe das Netz von Train Sim Germany – jeden Tag, zusammen mit der Community.</p>
+            <div class="hero__btns">
+              <a class="site-btn site-btn--brand" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="i ph-arrow-up-right ic" aria-hidden="true"></i></a>
+              <a class="site-btn site-btn--ghost" href="#/netz">Alle Linien</a>
+            </div>
           </div>
+          <figure class="open-net__pic">
+            <img src="assets/img/route-city.svg" alt="" loading="lazy">
+            <figcaption class="open-net__marks" data-open-marks></figcaption>
+          </figure>
         </div>
       </section>
 
-      <!-- Das Netz ist offen -->
-      <section class="open-net" data-tone="dark" aria-labelledby="h-open">
-        <img class="open-net__img" src="assets/img/route-city.svg" alt="" loading="lazy">
-        <div class="site-wrap open-net__inner">
-          <h2 id="h-open" class="open-net__title">Das Netz<br>ist offen.</h2>
-          <p>Fahr, entdecke und betreibe das Netz von Train Sim Germany – jeden Tag, zusammen mit der Community.</p>
-          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox spielen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
-        </div>
-      </section>
-
-      <!-- Neuigkeiten -->
-      <section class="newsroom lines-bg" aria-labelledby="h-newsroom">
+      <!-- Neuigkeiten: Liste links, große Neuigkeit rechts -->
+      <section class="newsroom" aria-labelledby="h-newsroom">
         <div class="site-wrap">
-          <div class="mega-head">
-            <h2 id="h-newsroom" class="mega">Neuigkeiten</h2>
-            <a class="more-link" href="#/news">Alle Beiträge<i class="fi fi-rs-arrow-small-right ic" aria-hidden="true"></i></a>
+          <div class="sec-row">
+            <h2 id="h-newsroom" class="display">Neuigkeiten</h2>
+            <a class="more-link" href="#/news">Alle Beiträge<i class="i ph-arrow-right ic" aria-hidden="true"></i></a>
           </div>
-          <div class="nr-grid" data-home-news></div>
+          <div class="nr-grid nr-grid--flip" data-home-news></div>
         </div>
       </section>
 
-      <!-- Zahlen -->
-      <section class="numbers" data-tone="dark" aria-label="Train Sim Germany in Zahlen">
-        <div class="site-wrap numbers__grid" data-home-numbers></div>
+      <!-- Zahlen: rote Fläche mit Titel links und Zahlen rechts -->
+      <section class="numbers-wrap" aria-label="Train Sim Germany in Zahlen">
+        <div class="site-wrap">
+          <div class="numbers" data-tone="dark">
+            <div class="numbers__head"><p class="numbers__kicker">Live</p><h2>Train Sim Germany in Zahlen</h2></div>
+            <div class="numbers__grid" data-home-numbers></div>
+          </div>
+        </div>
       </section>
 
-      <!-- Fragen -->
-      <section class="faq lines-bg" aria-labelledby="h-faq">
-        <div class="site-wrap faq__grid">
-          <div class="faq__head">
-            <h2 id="h-faq" class="mega mega--stack">Fragen,<br><span>beantwortet.</span></h2>
-            <p>Nicht gefunden, was du suchst?</p>
-            <a class="ask-link" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Auf Discord fragen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
-          </div>
+      <!-- Fragen: Titel oben, Antworten darunter, Discord als Karte -->
+      <section class="faq" aria-labelledby="h-faq">
+        <div class="site-wrap faq__wrap">
+          <h2 id="h-faq" class="display faq__title">Häufige Fragen</h2>
           <div class="faq__list" data-faq="home"></div>
+          <a class="faq__ask" data-link="discord" href="#" target="_blank" rel="noopener">
+            <i class="i si-discord ic" aria-hidden="true"></i>
+            <span><b>Nicht gefunden, was du suchst?</b><small>Frag die Community und das Team auf Discord.</small></span>
+            <i class="i ph-arrow-up-right ic" aria-hidden="true"></i>
+          </a>
         </div>
       </section>
 
       <!-- Mitmachen -->
       <section class="join" aria-labelledby="h-join">
         <div class="site-wrap">
-          <h2 id="h-join" class="giant">Werde Teil<br>des Teams</h2>
-          <div class="join__cards">
-            <div class="join__card">
-              <span class="kicker">Mitbauen</span>
-              <p>Hilf mit, Züge, Strecken und Systeme für die nächste Generation von Train Sim Germany zu bauen.</p>
+          <div class="join__panel">
+            <div class="join__text">
+              <p class="cr-eyebrow">Karriere</p>
+              <h2 id="h-join" class="display">Werde Teil des Teams.</h2>
+              <p>Hilf mit, Züge, Strecken und Systeme für die nächste Generation von Train Sim Germany zu bauen – oder leite Trainings und kümmere dich um die Community.</p>
+              <div class="tag-row"><span>Scripting</span><span>3D &amp; Weltenbau</span><span>Trainings</span><span>Community</span></div>
             </div>
-            <div class="join__card">
-              <span class="kicker">Wo du mithelfen kannst</span>
-              <div class="tag-row"><span>Scripting</span><span>3D &amp; Weltenbau</span><span>UI &amp; UX</span></div>
-              <a class="site-btn site-btn--brand site-btn--block site-btn--split" href="#/karriere">Jetzt bewerben<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
+            <div class="join__actions">
+              <a class="join__link" href="#/karriere"><span><b>Offene Stellen</b><small>Bewerbung in drei kurzen Schritten</small></span><i class="i ph-arrow-right ic" aria-hidden="true"></i></a>
+              <a class="join__link" href="#/entwickler"><span><b>Das Team</b><small>Wer Train Sim Germany baut und betreibt</small></span><i class="i ph-arrow-right ic" aria-hidden="true"></i></a>
+              <a class="join__link" href="#/trainings"><span><b>Trainings</b><small>So kommst du zum nächsten Rang</small></span><i class="i ph-arrow-right ic" aria-hidden="true"></i></a>
             </div>
           </div>
         </div>
@@ -160,10 +196,10 @@
             <button class="tg-rank" type="button" data-open="rank">
               <span class="tg-rank__dot" data-rank-dot></span>
               <span class="tg-rank__text"><small>Dein Rang</small><b data-rank-name>Conductor</b></span>
-              <i class="fi fi-rs-angle-small-down ic" aria-hidden="true"></i>
+              <i class="i ph-caret-down ic" aria-hidden="true"></i>
             </button>
-            <button class="site-btn site-btn--ghost tg-bell" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="fi fi-ss-bell ic" aria-hidden="true"></i><span>Erinnerungen</span></button>
-            <button class="site-btn site-btn--brand" type="button" data-open="training-new" data-can-train hidden><i class="fi fi-rs-plus ic" aria-hidden="true"></i><span>Training anbieten</span></button>
+            <button class="site-btn site-btn--ghost tg-bell" type="button" data-bell aria-pressed="false" aria-label="Erinnerungen für Trainings"><i class="i phf-bell ic" aria-hidden="true"></i><span>Erinnerungen</span></button>
+            <button class="site-btn site-btn--brand" type="button" data-open="training-new" data-can-train hidden><i class="i ph-plus ic" aria-hidden="true"></i><span>Training anbieten</span></button>
           </div>
         </div>
       </header>
@@ -173,12 +209,12 @@
         <section class="tg-sec">
           <div class="tg-sec__head">
             <h2 class="site-h2">Fahrplan</h2>
-            <button class="tg-date" type="button" data-open="date"><i class="fi fi-rs-calendar ic" aria-hidden="true"></i><span data-date-field>Trainingsdatum wählen</span></button>
+            <button class="tg-date" type="button" data-open="date"><i class="i ph-calendar-blank ic" aria-hidden="true"></i><span data-date-field>Trainingsdatum wählen</span></button>
           </div>
           <div class="tg-days">
-            <button class="tg-days__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="fi fi-rs-angle-small-left ic" aria-hidden="true"></i></button>
+            <button class="tg-days__nav" type="button" data-day-prev aria-label="Frühere Tage"><i class="i ph-caret-left ic" aria-hidden="true"></i></button>
             <div class="tg-days__list" data-day-tabs role="tablist" aria-label="Tag wählen"></div>
-            <button class="tg-days__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="fi fi-rs-angle-small-right ic" aria-hidden="true"></i></button>
+            <button class="tg-days__nav" type="button" data-day-next aria-label="Spätere Tage"><i class="i ph-caret-right ic" aria-hidden="true"></i></button>
           </div>
           <div class="tg-day" data-day-trainings></div>
         </section>
@@ -199,14 +235,14 @@
         <section class="tg-sec">
           <h2 class="site-h2">So läuft ein Training ab</h2>
           <ol class="cr-how tg-how">
-            <li><span class="cr-how__no">1</span><i class="fi fi-rs-user-add ic" aria-hidden="true"></i><b>Gruppe beitreten</b><p>Ränge werden über die Roblox-Gruppe vergeben.</p></li>
-            <li><span class="cr-how__no">2</span><i class="fi fi-ss-play ic" aria-hidden="true"></i><b>Server joinen</b><p>Der Server öffnet 15 Min. vor Beginn – dann auf „Join Now“ tippen.</p></li>
-            <li><span class="cr-how__no">3</span><i class="fi fi-rs-train-side ic" aria-hidden="true"></i><b>Theorie &amp; Praxis</b><p>Signale, Fahrplan, Funk – danach eine Prüfung.</p></li>
-            <li><span class="cr-how__no">4</span><i class="fi fi-rs-id-badge ic" aria-hidden="true"></i><b>Rang erhalten</b><p>Bestanden? Dein neuer Rang kommt automatisch.</p></li>
+            <li><span class="cr-how__no">1</span><i class="i ph-user-plus ic" aria-hidden="true"></i><b>Gruppe beitreten</b><p>Ränge werden über die Roblox-Gruppe vergeben.</p></li>
+            <li><span class="cr-how__no">2</span><i class="i phf-play ic" aria-hidden="true"></i><b>Server joinen</b><p>Der Server öffnet 15 Min. vor Beginn – dann auf „Join Now“ tippen.</p></li>
+            <li><span class="cr-how__no">3</span><i class="i ph-train ic" aria-hidden="true"></i><b>Theorie &amp; Praxis</b><p>Signale, Fahrplan, Funk – danach eine Prüfung.</p></li>
+            <li><span class="cr-how__no">4</span><i class="i ph-identification-badge ic" aria-hidden="true"></i><b>Rang erhalten</b><p>Bestanden? Dein neuer Rang kommt automatisch.</p></li>
           </ol>
           <div class="tg-links">
-            <a class="site-btn site-btn--brand" data-link="group" href="#" target="_blank" rel="noopener"><i class="fi fi-rs-user-add ic" aria-hidden="true"></i>Gruppe beitreten</a>
-            <a class="site-btn site-btn--ghost" data-link="discord" href="#" target="_blank" rel="noopener"><i class="fi fi-brands-discord ic" aria-hidden="true"></i>Discord beitreten</a>
+            <a class="site-btn site-btn--brand" data-link="group" href="#" target="_blank" rel="noopener"><i class="i ph-user-plus ic" aria-hidden="true"></i>Gruppe beitreten</a>
+            <a class="site-btn site-btn--ghost" data-link="discord" href="#" target="_blank" rel="noopener"><i class="i si-discord ic" aria-hidden="true"></i>Discord beitreten</a>
           </div>
         </section>
       </div>
@@ -220,10 +256,10 @@
           <h1 class="mega mega--stack">Server.<br><span>Live aus dem Spiel.</span></h1>
           <div class="sv-hero__bar">
             <label class="sv-search">
-              <i class="fi fi-rs-search ic" aria-hidden="true"></i>
+              <i class="i ph-magnifying-glass ic" aria-hidden="true"></i>
               <span class="sr-only">Server suchen</span><input type="search" placeholder="Server, Spieler oder ID suchen" data-server-search>
             </label>
-            <a class="site-btn site-btn--brand" data-link="play" href="#" target="_blank" rel="noopener"><i class="fi fi-ss-play ic" aria-hidden="true"></i>Spielen</a>
+            <a class="site-btn site-btn--brand" data-link="play" href="#" target="_blank" rel="noopener"><i class="i phf-play ic" aria-hidden="true"></i>Spielen</a>
           </div>
         </div>
       </header>
@@ -234,12 +270,12 @@
         <div class="sv-grid" data-servers></div>
         <div data-pservers></div>
         <aside class="sv-vip">
-          <span class="sv-vip__ic"><i class="fi fi-rs-lock ic" aria-hidden="true"></i></span>
+          <span class="sv-vip__ic"><i class="i ph-lock ic" aria-hidden="true"></i></span>
           <div>
             <h2>Eigener privater Server</h2>
             <p>Fahr mit Freunden auf deinem privaten Server – mit eigenem Fahrplan und Stellwerk. Starte ihn einmal in Roblox, dann erscheint er hier und du kannst ihn bearbeiten.</p>
           </div>
-          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
+          <a class="site-btn site-btn--light" data-link="play" href="#" target="_blank" rel="noopener">Auf Roblox ansehen<i class="i ph-arrow-up-right ic" aria-hidden="true"></i></a>
         </aside>
       </div>
     </section>
@@ -340,7 +376,7 @@
               <h1 class="appbar__value">Neuigkeiten</h1>
             </div>
             <div class="appbar__actions">
-              <button class="btn btn--primary btn--sm" type="button" data-open="news-new" data-can-pr hidden><i class="fi fi-rs-plus ic" aria-hidden="true"></i>Neuigkeit</button>
+              <button class="btn btn--primary btn--sm" type="button" data-open="news-new" data-can-pr hidden><i class="i ph-plus ic" aria-hidden="true"></i>Neuigkeit</button>
             </div>
           </div>
           <div class="head-tabs" role="tablist" aria-label="Kategorie" data-news-tabs>
@@ -369,19 +405,23 @@
     <section class="page page--site" data-page="netz" aria-label="Netz" hidden>
       <div class="site-head lines-bg">
         <div class="site-wrap">
+          <p class="cr-eyebrow">Linien &amp; Strecken</p>
           <h1 class="mega">Unser Netz.</h1>
-          <p class="site-head__lead">Vom Harz bis an die Oder: Diese Strecken fährst du in Train Sim Germany – mit echten Bahnhöfen, Linien und Fahrplänen.</p>
+          <p class="site-head__lead">Vom Harz bis an die Oder: Diese Linien fährst du in Train Sim Germany. Tippe auf eine Strecke für den ganzen Verlauf mit Minuten und Spawnpunkten.</p>
         </div>
       </div>
       <div class="site-body">
         <div class="site-wrap">
-          <div class="net-stats" data-net-stats></div>
-          <h2 class="site-h2">Linien</h2>
-          <div class="net-lines" data-net-lines></div>
-          <h2 class="site-h2">Strecken</h2>
-          <div class="net-routes" data-net-routes></div>
+          <div class="sv-stats sv-stats--4" data-net-stats></div>
+          <div class="sv-filter" data-net-filter role="group" aria-label="Linien filtern"></div>
+          <div class="ln-grid" data-net-routes></div>
         </div>
       </div>
+    </section>
+
+    <!-- ===================== STRECKE (#/netz/<R-Nummer>) ===================== -->
+    <section class="page page--site" data-page="net-route" aria-label="Strecke" hidden>
+      <div data-route></div>
     </section>
 
     <!-- ===================== FAQ ===================== -->
@@ -466,39 +506,44 @@
 
   <!-- Fußzeile -->
   <footer class="foot" data-tone="dark">
+    <div class="site-wrap foot__top">
+      <a class="foot__logo" href="#/" aria-label="Train Sim Germany – Startseite">
+        <img src="assets/img/logo-white.svg" alt="" width="72" height="36">
+        <span>Train Sim Germany</span>
+      </a>
+      <div class="foot__social">
+        <a data-link="play" href="#" target="_blank" rel="noopener" aria-label="Auf Roblox spielen" title="Roblox"><i class="i si-roblox ic" aria-hidden="true"></i></a>
+        <a data-link="discord" href="#" target="_blank" rel="noopener" aria-label="Discord" title="Discord"><i class="i si-discord ic" aria-hidden="true"></i></a>
+      </div>
+    </div>
     <div class="site-wrap foot__grid">
       <div class="foot__brand">
-        <a class="foot__logo" href="#/" aria-label="Train Sim Germany – Startseite">
-          <img src="assets/img/logo-white.svg" alt="" width="72" height="36">
-          <span>Train Sim Germany</span>
-        </a>
         <p>Die Bahnsimulation für ganz Deutschland auf Roblox – gebaut von und mit der Community.</p>
-        <button class="foot__install" type="button" data-install hidden><i class="fi fi-rs-download ic" aria-hidden="true"></i>App installieren</button>
+        <button class="foot__install" type="button" data-install hidden><i class="i ph-download-simple ic" aria-hidden="true"></i>App installieren</button>
       </div>
       <div class="foot__col">
-        <h3>Nächster Halt</h3>
-        <a class="foot__big" href="#/netz">Unser Netz</a>
-        <a href="#/news">Neuigkeiten<i class="fi fi-rs-arrow-small-right ic" aria-hidden="true"></i></a>
-        <a href="#/server">Server<i class="fi fi-rs-arrow-small-right ic" aria-hidden="true"></i></a>
-      </div>
-      <div class="foot__col">
-        <h3>Entdecken</h3>
-        <a data-link="play" href="#" target="_blank" rel="noopener">Spielen<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
-        <a data-link="discord" href="#" target="_blank" rel="noopener">Discord<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
-        <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe<i class="fi fi-rs-arrow-up-right ic" aria-hidden="true"></i></a>
+        <h3>Fahren</h3>
+        <a href="#/netz">Unser Netz</a>
+        <a href="#/server">Server</a>
         <a href="#/trainings">Trainings</a>
         <a href="#/statistiken">Statistiken</a>
       </div>
       <div class="foot__col">
-        <h3>Informationen</h3>
+        <h3>Community</h3>
+        <a href="#/news">Neuigkeiten</a>
+        <a data-link="discord" href="#" target="_blank" rel="noopener">Discord<i class="i ph-arrow-up-right ic" aria-hidden="true"></i></a>
+        <a data-link="group" href="#" target="_blank" rel="noopener">Roblox-Gruppe<i class="i ph-arrow-up-right ic" aria-hidden="true"></i></a>
+        <a href="#/faq">FAQ</a>
+      </div>
+      <div class="foot__col">
+        <h3>Über uns</h3>
         <a href="#/entwickler">Das Team</a>
         <a href="#/karriere">Karriere</a>
-        <a href="#/faq">FAQ</a>
         <a href="privacy.html">Datenschutz</a>
         <a href="terms.html">Nutzungsbedingungen</a>
       </div>
     </div>
-    <p class="site-wrap foot__legal">© <span data-year>2026</span> Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation · Icons: <a href="https://www.flaticon.com/uicons" target="_blank" rel="noopener">UIcons von Flaticon</a></p>
+    <p class="site-wrap foot__legal">© <span data-year>2026</span> Train Sim Germany · Ein Fan-Projekt auf Roblox, nicht verbunden mit der Deutschen Bahn AG oder der Roblox Corporation · Icons: <a href="https://phosphoricons.com" target="_blank" rel="noopener">Phosphor Icons</a> und <a href="https://simpleicons.org" target="_blank" rel="noopener">Simple Icons</a></p>
   </footer>
 
   <!-- Seitenwechsel: Streifen wischen über den Bildschirm, dann Ladebildschirm mit Logo -->
@@ -527,7 +572,7 @@
       <div class="grip" aria-hidden="true"></div>
       <div class="sheet-modal__head">
         <h2 id="modal-title" data-modal-title></h2>
-        <button class="round-btn" type="button" data-modal-close aria-label="Schließen"><i class="fi fi-rs-cross-small ic" aria-hidden="true"></i></button>
+        <button class="round-btn" type="button" data-modal-close aria-label="Schließen"><i class="i ph-x ic" aria-hidden="true"></i></button>
       </div>
       <div class="sheet-modal__body" data-modal-body></div>
     </div>

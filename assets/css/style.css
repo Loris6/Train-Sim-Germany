@@ -4,7 +4,7 @@
    Buttons 40 px mit 8 px Ecken, Karten mit 1 px Rand und 12 px Ecken,
    Eingabefelder mit grauer Fläche, rote 4-px-Markierung für Aktives.
    Farben: DB-Rot #EC0016 und Cool-Gray-Töne. Schrift: Rubik (SIL OFL).
-   Icons: Flaticon UIcons (assets/css/uicons.css)
+   Icons: Flaticon UIcons (assets/css/icons.css)
    ========================================================= */
 
 @font-face {
@@ -259,7 +259,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; a
   cursor: pointer; transition: background-color .15s, border-color .15s, color .15s;
 }
 .btn .ic { font-size: 18px; }
-.btn .fi-ss-play { font-size: 14px; }
+.btn .phf-play { font-size: 14px; }
 .btn--primary { background: var(--red); color: #fff; }
 .btn--primary:hover { background: var(--red-600); }
 .btn--primary:active { background: var(--red-700); }
@@ -283,7 +283,7 @@ input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; a
 .join-hint { margin-top: 10px; text-align: center; }
 .btn--sm { min-height: 32px; padding: 0 12px; gap: 6px; font-size: 14px; }
 .btn--sm .ic { font-size: 16px; }
-.btn--sm .fi-ss-play { font-size: 12px; }
+.btn--sm .phf-play { font-size: 12px; }
 .btn--lg { min-height: 48px; padding: 0 20px; }
 .btn--block { width: 100%; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }

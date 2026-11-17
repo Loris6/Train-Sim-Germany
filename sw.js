@@ -1,7 +1,7 @@
 /* Train Sim Germany – Service Worker
    Die App funktioniert auch offline. Online wird immer zuerst das Netz gefragt,
    damit Änderungen an der Seite sofort ankommen. */
-const CACHE = 'tsg-v34';
+const CACHE = 'tsg-v35';
 const SHELL = [
   './',
   'index.html',
@@ -12,7 +12,7 @@ const SHELL = [
   'assets/css/site.css',
   'assets/img/lines-bg.svg',
   'assets/img/logo-white.svg',
-  'assets/css/uicons.css',
+  'assets/css/icons.css',
   'assets/js/nozoom.js',
   'assets/js/config.js',
   'assets/js/data.js',
@@ -27,9 +27,9 @@ const SHELL = [
   'assets/icons/badge-96.png',
   'assets/fonts/rubik-latin-wght-normal.woff2',
   'assets/fonts/rubik-latin-ext-wght-normal.woff2',
-  'assets/fonts/uicons-regular-straight.woff2',
-  'assets/fonts/uicons-solid-straight.woff2',
-  'assets/fonts/uicons-brands.woff2',
+  'assets/fonts/phosphor-regular.woff2',
+  'assets/fonts/phosphor-fill.woff2',
+  'assets/fonts/simple-icons.woff2',
 ];
 
 self.addEventListener('install', (e) => {

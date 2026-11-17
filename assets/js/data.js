@@ -102,22 +102,22 @@ window.TSG = {
   // Chat: Grund und Bereich einer Anfrage. Wer annehmen darf, legt backend/chat.js fest (AREAS).
   chat: {
     reasons: [
-      { id: 'training', label: 'Frage zu einem Training', icon: 'fi-rs-calendar' },
-      { id: 'rank', label: 'Rang oder Beförderung', icon: 'fi-rs-badge-check', area: 'other' },
-      { id: 'bug', label: 'Fehler im Spiel', icon: 'fi-rs-bug', area: 'tech' },
-      { id: 'report', label: 'Spieler melden', icon: 'fi-rs-flag', area: 'report' },
-      { id: 'application', label: 'Bewerbung', icon: 'fi-rs-briefcase', area: 'career' },
-      { id: 'other', label: 'Etwas anderes', icon: 'fi-rs-interrogation', area: 'other' },
+      { id: 'training', label: 'Frage zu einem Training', icon: 'ph-calendar-blank' },
+      { id: 'rank', label: 'Rang oder Beförderung', icon: 'ph-seal-check', area: 'other' },
+      { id: 'bug', label: 'Fehler im Spiel', icon: 'ph-bug', area: 'tech' },
+      { id: 'report', label: 'Spieler melden', icon: 'ph-flag', area: 'report' },
+      { id: 'application', label: 'Bewerbung', icon: 'ph-briefcase', area: 'career' },
+      { id: 'other', label: 'Etwas anderes', icon: 'ph-question', area: 'other' },
     ],
     areas: [
-      { id: 'driver', label: 'Qualified Driver', desc: 'Fahren, Signale, Fahrplan', icon: 'fi-rs-train-side', rank: 'Qualified Driver' },
-      { id: 'platform', label: 'Platform Staff', desc: 'Abfertigung am Bahnsteig', icon: 'fi-rs-whistle', rank: 'Platform Staff' },
-      { id: 'conductor', label: 'Conductor', desc: 'Türen, Fahrgäste, Tickets', icon: 'fi-rs-ticket', rank: 'Conductor' },
-      { id: 'signaller', label: 'Signaller', desc: 'Stellwerk und Fahrstraßen', icon: 'fi-rs-traffic-light', rank: 'Signaller' },
-      { id: 'career', label: 'Karriere & Bewerbungen', desc: 'Stellen und Bewerbungen', icon: 'fi-rs-briefcase' },
-      { id: 'tech', label: 'Technik & Fehler', desc: 'Bugs, App, Coins und Käufe', icon: 'fi-rs-bug' },
-      { id: 'report', label: 'Meldungen', desc: 'Regelverstöße und Spieler melden', icon: 'fi-rs-flag' },
-      { id: 'other', label: 'Allgemein', desc: 'Alles andere', icon: 'fi-rs-interrogation' },
+      { id: 'driver', label: 'Qualified Driver', desc: 'Fahren, Signale, Fahrplan', icon: 'ph-train', rank: 'Qualified Driver' },
+      { id: 'platform', label: 'Platform Staff', desc: 'Abfertigung am Bahnsteig', icon: 'ph-megaphone-simple', rank: 'Platform Staff' },
+      { id: 'conductor', label: 'Conductor', desc: 'Türen, Fahrgäste, Tickets', icon: 'ph-ticket', rank: 'Conductor' },
+      { id: 'signaller', label: 'Signaller', desc: 'Stellwerk und Fahrstraßen', icon: 'ph-traffic-signal', rank: 'Signaller' },
+      { id: 'career', label: 'Karriere & Bewerbungen', desc: 'Stellen und Bewerbungen', icon: 'ph-briefcase' },
+      { id: 'tech', label: 'Technik & Fehler', desc: 'Bugs, App, Coins und Käufe', icon: 'ph-bug' },
+      { id: 'report', label: 'Meldungen', desc: 'Regelverstöße und Spieler melden', icon: 'ph-flag' },
+      { id: 'other', label: 'Allgemein', desc: 'Alles andere', icon: 'ph-question' },
     ],
   },
 
@@ -207,17 +207,25 @@ window.TSG = {
   ],
 
   // Strecken mit Nummer (R001, R002, …) wie im Spiel
+  // Strecken mit Routennummer (R001 …): Linie (line bzw. lineId), Start und Ziel, Länge, Fahrzeit und die Spawnpunkte
+  // (Bahnhof, Name des Depots), an denen Züge für diese Strecke ins Spiel kommen. Neue Strecken mit der nächsten Nummer anhängen.
   routes: [
-    { no: 'R001', title: 'Magdeburg – Berlin', from: 'Magdeburg Hbf', to: 'Berlin Hbf', line: 'RE 1', cat: 're', km: 142, dur: '1:39', stops: 9, rating: 4.8, reviews: '2,6K', img: 'route-city.svg', tag: 'Hauptstrecke' },
-    { no: 'R002', title: 'Magdeburg – Leipzig', from: 'Magdeburg Hbf', to: 'Leipzig Hbf', line: 'RE 13', cat: 're', km: 118, dur: '1:37', stops: 9, rating: 4.7, reviews: '1,8K', img: 'route-forest.svg', tag: 'Über Dessau' },
-    { no: 'R003', title: 'Magdeburg – Halle', from: 'Magdeburg Hbf', to: 'Halle (Saale) Hbf', line: 'RE 30', cat: 're', km: 86, dur: '1:00', stops: 5, rating: 4.6, reviews: '1,2K', img: 'route-rhine.svg', tag: 'Elbe & Saale' },
-    { no: 'R004', title: 'S-Bahn Mitteldeutschland', from: 'Halle (Saale) Hbf', to: 'Leipzig Hbf', line: 'S 5', cat: 's', km: 38, dur: '0:39', stops: 9, rating: 4.7, reviews: '2,1K', img: 'route-city.svg', tag: 'City-Tunnel' },
-    { no: 'R005', title: 'Leipzig – Berlin', from: 'Leipzig Hbf', to: 'Berlin Hbf', line: 'ICE 28', cat: 'ice', km: 190, dur: '1:12', stops: 4, rating: 4.8, reviews: '2,9K', img: 'play.svg', tag: '200 km/h' },
-    { no: 'R006', title: 'Halle – Berlin', from: 'Halle (Saale) Hbf', to: 'Berlin Hbf', line: 'ICE 15', cat: 'ice', km: 166, dur: '1:10', stops: 5, rating: 4.6, reviews: '1,4K', img: 'play.svg', tag: '200 km/h' },
-    { no: 'R007', title: 'Magdeburg – Halle – Leipzig', from: 'Magdeburg Hbf', to: 'Leipzig Hbf', line: 'IC 55', cat: 'ic', km: 120, dur: '1:20', stops: 4, rating: 4.6, reviews: '1,1K', img: 'route-rhine.svg', tag: 'Intercity' },
-    { no: 'R008', title: 'Berliner Stadtbahn', from: 'Westkreuz', to: 'Ostkreuz', line: 'S 7', cat: 's', km: 12, dur: '0:24', stops: 7, rating: 4.7, reviews: '3,1K', img: 'route-city.svg', tag: 'Großstadt' },
-    { no: 'R009', title: 'Berlin – Frankfurt (Oder)', from: 'Berlin Hbf', to: 'Frankfurt (Oder)', line: 'RE 1', cat: 're', km: 82, dur: '0:59', stops: 6, rating: 4.5, reviews: '960', img: 'route-forest.svg', tag: 'Richtung Polen' },
-    { no: 'R010', title: 'Berlin – Warschau', from: 'Berlin Hbf', to: 'Warszawa Centralna', line: 'EC 95', cat: 'ec', km: 573, dur: '5:30', stops: 9, rating: 4.9, reviews: '870', img: 'route-coast.svg', tag: 'Neu in 2.5' },
+    { no: 'R001', title: 'Magdeburg – Berlin', from: 'Magdeburg Hbf', to: 'Berlin Hbf', line: 'RE 1', cat: 're', km: 142, dur: '1:39', stops: 9, rating: 4.8, reviews: '2,6K', img: 'route-city.svg', tag: 'Hauptstrecke', spawns: [['Magdeburg Hbf', 'Depot Magdeburg'], ['Brandenburg Hbf', 'Abstellgleis Brandenburg'], ['Berlin Hbf', 'Depot Berlin-Rummelsburg']] },
+    { no: 'R002', title: 'Magdeburg – Leipzig', from: 'Magdeburg Hbf', to: 'Leipzig Hbf', line: 'RE 13', cat: 're', km: 118, dur: '1:37', stops: 9, rating: 4.7, reviews: '1,8K', img: 'route-forest.svg', tag: 'Über Dessau', spawns: [['Magdeburg Hbf', 'Depot Magdeburg'], ['Dessau Hbf', 'Abstellgleis Dessau'], ['Leipzig Hbf', 'Depot Leipzig']] },
+    { no: 'R003', title: 'Magdeburg – Halle', from: 'Magdeburg Hbf', to: 'Halle (Saale) Hbf', line: 'RE 30', cat: 're', km: 86, dur: '1:00', stops: 5, rating: 4.6, reviews: '1,2K', img: 'route-rhine.svg', tag: 'Elbe & Saale', spawns: [['Magdeburg Hbf', 'Depot Magdeburg'], ['Halle (Saale) Hbf', 'Depot Halle']] },
+    { no: 'R004', title: 'S-Bahn Mitteldeutschland', from: 'Halle (Saale) Hbf', to: 'Leipzig Hbf', line: 'S 5', cat: 's', km: 38, dur: '0:39', stops: 9, rating: 4.7, reviews: '2,1K', img: 'route-city.svg', tag: 'City-Tunnel', spawns: [['Halle (Saale) Hbf', 'Depot Halle'], ['Leipzig Hbf', 'Depot Leipzig-Engelsdorf']] },
+    { no: 'R005', title: 'Leipzig – Berlin', from: 'Leipzig Hbf', to: 'Berlin Hbf', line: 'ICE 28', cat: 'ice', km: 190, dur: '1:12', stops: 4, rating: 4.8, reviews: '2,9K', img: 'play.svg', tag: '200 km/h', spawns: [['Leipzig Hbf', 'ICE-Werk Leipzig'], ['Berlin Hbf', 'ICE-Werk Berlin-Rummelsburg']] },
+    { no: 'R006', title: 'Halle – Berlin', from: 'Halle (Saale) Hbf', to: 'Berlin Hbf', line: 'ICE 15', cat: 'ice', km: 166, dur: '1:10', stops: 5, rating: 4.6, reviews: '1,4K', img: 'play.svg', tag: '200 km/h', spawns: [['Halle (Saale) Hbf', 'Depot Halle'], ['Berlin Hbf', 'ICE-Werk Berlin-Rummelsburg']] },
+    { no: 'R007', title: 'Magdeburg – Halle – Leipzig', from: 'Magdeburg Hbf', to: 'Leipzig Hbf', line: 'IC 55', cat: 'ic', km: 120, dur: '1:20', stops: 4, rating: 4.6, reviews: '1,1K', img: 'route-rhine.svg', tag: 'Intercity', spawns: [['Magdeburg Hbf', 'Depot Magdeburg'], ['Leipzig Hbf', 'Depot Leipzig']] },
+    { no: 'R008', title: 'Berliner Stadtbahn', from: 'Westkreuz', to: 'Ostkreuz', line: 'S 7', cat: 's', km: 12, dur: '0:24', stops: 7, rating: 4.7, reviews: '3,1K', img: 'route-city.svg', tag: 'Großstadt', spawns: [['Westkreuz', 'Abstellanlage Grunewald'], ['Ostkreuz', 'Betriebswerk Rummelsburg']] },
+    { no: 'R009', title: 'Berlin – Frankfurt (Oder)', from: 'Berlin Hbf', to: 'Frankfurt (Oder)', line: 'RE 1', cat: 're', km: 82, dur: '0:59', stops: 6, rating: 4.5, reviews: '960', img: 'route-forest.svg', tag: 'Richtung Polen', spawns: [['Berlin Hbf', 'Depot Berlin-Rummelsburg'], ['Frankfurt (Oder)', 'Depot Frankfurt (Oder)']] },
+    { no: 'R010', title: 'Berlin – Warschau', from: 'Berlin Hbf', to: 'Warszawa Centralna', line: 'EC 95', cat: 'ec', km: 573, dur: '5:30', stops: 9, rating: 4.9, reviews: '870', img: 'route-coast.svg', tag: 'Neu in 2.5', spawns: [['Berlin Hbf', 'Depot Berlin-Rummelsburg'], ['Frankfurt (Oder)', 'Grenzbahnhof Frankfurt (Oder)'], ['Warszawa Centralna', 'Depot Warszawa Grochów']] },
+    { no: 'R011', title: 'Magdeburg – Berlin (IC)', from: 'Magdeburg Hbf', to: 'Berlin Hbf', line: 'IC 56', lineId: 'ic-56', cat: 'ic', km: 150, dur: '1:30', stops: 4, img: 'play.svg', tag: 'Intercity', spawns: [['Magdeburg Hbf', 'Depot Magdeburg'], ['Berlin Hbf', 'Depot Berlin-Rummelsburg']] },
+    { no: 'R012', title: 'Berlin – Wittenberg', from: 'Berlin Hbf', to: 'Lutherstadt Wittenberg', line: 'RE 3', lineId: 're-3', cat: 're', km: 96, dur: '1:16', stops: 5, img: 'route-forest.svg', tag: 'Richtung Süden', spawns: [['Berlin Hbf', 'Depot Berlin-Rummelsburg'], ['Lutherstadt Wittenberg', 'Abstellgleis Wittenberg']] },
+    { no: 'R013', title: 'Leipzig – Dresden', from: 'Leipzig Hbf', to: 'Dresden Hbf', line: 'RE 50', lineId: 're-50', cat: 're', km: 119, dur: '1:27', stops: 7, img: 'route-rhine.svg', tag: 'Durch Sachsen', spawns: [['Leipzig Hbf', 'Depot Leipzig'], ['Riesa', 'Abstellgleis Riesa'], ['Dresden Hbf', 'Depot Dresden-Altstadt']] },
+    { no: 'R014', title: 'Magdeburg – Haldensleben', from: 'Magdeburg Hbf', to: 'Haldensleben', line: 'RB 32', lineId: 'rb-32', cat: 'rb', km: 28, dur: '0:33', stops: 5, img: 'route-forest.svg', tag: 'Börde', spawns: [['Magdeburg Hbf', 'Depot Magdeburg'], ['Haldensleben', 'Abstellgleis Haldensleben']] },
+    { no: 'R015', title: 'S-Bahn Magdeburg', from: 'Schönebeck-Bad Salzelmen', to: 'Zielitz', line: 'S 1', lineId: 's-1md', cat: 's', km: 46, dur: '0:40', stops: 6, img: 'route-city.svg', tag: 'Elbe', spawns: [['Schönebeck-Bad Salzelmen', 'Abstellgleis Bad Salzelmen'], ['Magdeburg Hbf', 'Depot Magdeburg'], ['Zielitz', 'Abstellgleis Zielitz']] },
+    { no: 'R016', title: 'S-Bahn Dresden', from: 'Meißen Triebischtal', to: 'Dresden Hbf', line: 'S 1', lineId: 's-1d', cat: 's', km: 27, dur: '0:43', stops: 5, img: 'route-city.svg', tag: 'Elbtal', spawns: [['Meißen Triebischtal', 'Abstellgleis Meißen'], ['Dresden Hbf', 'Depot Dresden-Altstadt']] },
   ],
 
   // Züge für „Meine Statistik“: daraus werden die meistgefahrenen Züge je Bereich angezeigt
